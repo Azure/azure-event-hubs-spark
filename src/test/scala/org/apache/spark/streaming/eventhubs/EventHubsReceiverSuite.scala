@@ -75,7 +75,7 @@ with MockitoSugar {
       .thenReturn(null)
     val receiver = new EventHubsReceiver(ehParams2, "0", StorageLevel.MEMORY_ONLY,
       offsetStoreMock, ehClientWrapperMock)
-    receiver.attachExecutor(executorMock)
+    receiver.attachSupervisor(executorMock)
 
     receiver.onStart()
     Thread sleep (100)
@@ -101,7 +101,7 @@ with MockitoSugar {
 
     val receiver = new EventHubsReceiver(ehParams, "0", StorageLevel.MEMORY_ONLY,
       offsetStoreMock, ehClientWrapperMock)
-    receiver.attachExecutor(executorMock)
+    receiver.attachSupervisor(executorMock)
 
     receiver.onStart()
     Thread sleep (100)

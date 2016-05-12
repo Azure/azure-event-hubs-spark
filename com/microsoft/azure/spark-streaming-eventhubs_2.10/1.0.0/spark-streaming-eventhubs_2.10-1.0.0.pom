@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.apache.spark</groupId>
-  <artifactId>spark-streaming-eventhubs</artifactId>
+  <groupId>com.microsoft.azure</groupId>
+  <artifactId>spark-streaming-eventhubs_2.10</artifactId>
   <name>Spark Project External EventHubs</name>
-  <version>1.6.1-1.0.0</version>
+  <version>1.0.0</version>
   <url>http://spark.apache.org/</url>
   <build>
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>

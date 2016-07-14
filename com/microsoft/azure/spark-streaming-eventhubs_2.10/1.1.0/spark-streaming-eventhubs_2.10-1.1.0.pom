@@ -4,7 +4,7 @@
   <groupId>com.microsoft.azure</groupId>
   <artifactId>spark-streaming-eventhubs_2.10</artifactId>
   <name>Spark Project External EventHubs</name>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <url>http://spark.apache.org/</url>
   <build>
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>

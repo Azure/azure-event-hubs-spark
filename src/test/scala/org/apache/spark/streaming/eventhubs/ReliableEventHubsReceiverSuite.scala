@@ -54,6 +54,7 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
     .setMaster("local[3]") // At least 2, 1 for receiver and 1 for data transform
     .setAppName("ReliableEventHubsReceiverSuite")
     .set("spark.streaming.receiver.writeAheadLog.enable", "true")
+    .set("spark.driver.allowMultipleContexts", "true")
 
   override def beforeAll() : Unit = {
 

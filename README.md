@@ -21,7 +21,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>spark-streaming-eventhubs_2.10</artifactId>
-      <version>1.0.0</version>
+      <version>1.1.0</version>
     </dependency>
     
 ### SBT
@@ -33,7 +33,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 
 #### Dependency
     libraryDependencies ++= Seq(
-        "com.microsoft.azure" %% "spark-streaming-eventhubs" % "1.0.0"
+        "com.microsoft.azure" %% "spark-streaming-eventhubs" % "1.1.0"
     )
 
 ### Build Prerequisites

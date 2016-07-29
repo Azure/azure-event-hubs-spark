@@ -28,7 +28,7 @@ object EventHubsUtils {
    * Create a unioned EventHubs stream that receives data from Microsoft Azure Eventhubs
    * The unioned stream will receive message from all partitions of the EventHubs
    *
-   * @param ssc Streaming Context object
+   * @param streamingContext Streaming Context object
    * @param eventhubsParams a Map that contains parameters for EventHubs.
    *   Required parameters are:
    *   "eventhubs.policyname": EventHubs policy name
@@ -48,21 +48,21 @@ object EventHubsUtils {
    * @return ReceiverInputStream
    */
   def createUnionStream (
-      ssc: StreamingContext,
+      streamingContext: StreamingContext,
       eventhubsParams: Map[String, String],
-      storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY
+      storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK
     ): DStream[Array[Byte]] = {
     val partitionCount = eventhubsParams("eventhubs.partition.count").toInt
-    val streams = (0 to partitionCount-1).map{
-      i => createStream(ssc,eventhubsParams, i.toString, storageLevel)}
-    ssc.union(streams)
+    val streams = (0 until partitionCount-1).map{
+      i => createStream(streamingContext, eventhubsParams, i.toString, storageLevel)}
+    streamingContext.union(streams)
   }
 
   /**
    * Create a single EventHubs stream that receives data from Microsoft Azure EventHubs
    * A single stream only receives message from one EventHubs partition
    *
-   * @param ssc Streaming Context object
+   * @param streamingContext Streaming Context object
    * @param eventhubsParams a Map that contains parameters for EventHubs. Same as above.
    * @param partitionId Partition ID
    * @param storageLevel Storage level
@@ -71,15 +71,15 @@ object EventHubsUtils {
    * @return ReceiverInputStream
    */
   def createStream (
-    ssc: StreamingContext,
+    streamingContext: StreamingContext,
     eventhubsParams: Map[String, String],
     partitionId: String,
-    storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
+    storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK,
     offsetStore: OffsetStore = null,
     receiverClient: EventHubsClientWrapper = new EventHubsClientWrapper
   ): ReceiverInputDStream[Array[Byte]] = {
-    ssc.receiverStream(getReceiver(ssc, eventhubsParams, partitionId, storageLevel, offsetStore,
-      receiverClient))
+    streamingContext.receiverStream(getReceiver(streamingContext, eventhubsParams, partitionId, storageLevel,
+      offsetStore, receiverClient))
   }
 
   /**
@@ -87,20 +87,21 @@ object EventHubsUtils {
    * Write Ahead Log is enabled or not ("spark.streaming.receiver.writeAheadLog.enable")
    */
   private def getReceiver(
-    ssc: StreamingContext,
+    streamingContext: StreamingContext,
     eventhubsParams: Map[String, String],
     partitionId: String,
     storageLevel: StorageLevel,
     offsetStore: OffsetStore,
     receiverClient: EventHubsClientWrapper): Receiver[Array[Byte]] = {
-    val walEnabled = ssc.conf.getBoolean("spark.streaming.receiver.writeAheadLog.enable", false)
+    val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", 0)
+    val walEnabled = streamingContext.conf.getBoolean("spark.streaming.receiver.writeAheadLog.enable", false)
     if (walEnabled) {
-      new ReliableEventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore,
-        receiverClient)
+
+      new ReliableEventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore, receiverClient, maximumEventRate)
     }
     else {
-      new EventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore,
-        receiverClient)
+
+      new EventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore, receiverClient, maximumEventRate)
     }
   }
 }

@@ -19,9 +19,11 @@ package org.apache.spark.streaming.eventhubs
 import org.mockito.Mockito._
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{BeforeAndAfter, FunSuite}
-import org.mockito.Matchers
-import org.mockito.ArgumentMatcher
-import com.microsoft.eventhubs.client.{EventHubEnqueueTimeFilter, IEventHubFilter, EventHubOffsetFilter}
+import org.mockito.{Matchers, Mockito}
+import com.microsoft.azure.eventhubs._
+import org.apache.spark.streaming.eventhubs.EventhubsOffsetType.EventhubsOffsetType
+
+//import com.microsoft.eventhubs.client.{EventHubEnqueueTimeFilter, IEventHubFilter, EventHubOffsetFilter}
 
 /**
  * Test suite for EventHubsClientWrapper
@@ -50,82 +52,61 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
   before(beforeFunction)
   after(afterFunction)
 
-  // Verify that the EventHubOffsetFilter matches the given offset string
-  class OffsetFilterEqual(offset: String) extends ArgumentMatcher[EventHubOffsetFilter] {
-    override def matches(obj: Object): Boolean = {
-      if(obj == null) {
-        false
-      }
-      else {
-        obj.asInstanceOf[EventHubOffsetFilter].getFilterValue().equals(offset)
-      }
-    }
-  }
-
-  // Verify that the EventHubEnqueueTimeFilter matches the given enqueuetime string
-  class EnqueueTimeFilterEqual(time: String) extends ArgumentMatcher[EventHubEnqueueTimeFilter] {
-    override def matches(obj: Object): Boolean = {
-      if(obj == null) {
-        false
-      }
-      else {
-        obj.asInstanceOf[EventHubEnqueueTimeFilter].getFilterValue().equals(time)
-      }
-    }
-  }
-
   test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {
-    when(offsetStoreMock.read()).thenReturn("123")
-    doNothing().when(ehClientWrapperMock).createReceiverProxy(
-      Matchers.anyString, Matchers.anyString, Matchers.anyString, Matchers.anyString,
-      Matchers.anyInt, Matchers.any[IEventHubFilter])
+    Mockito.when(offsetStoreMock.read()).thenReturn("2147483647")
+    Mockito.doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString, Matchers.anyString,
+      Matchers.anyString, Matchers.eq[EventhubsOffsetType](EventhubsOffsetType.PreviousCheckpoint), Matchers.anyString,
+      Matchers.anyInt)
 
-    ehClientWrapperMock.createReceiver(ehParams, "0", offsetStoreMock)
+    ehClientWrapperMock.createReceiver(ehParams, "4", offsetStoreMock, 999)
 
-    verify(ehClientWrapperMock, times(1)).createReceiverProxy(
-      Matchers.eq("amqps://policyname:policykey@namespace.servicebus.windows.net"),
-      Matchers.eq("name"),
-      Matchers.eq("0"),
-      Matchers.eq(null),
-      Matchers.eq(-1),
-      Matchers.argThat(new OffsetFilterEqual("123")))
+    verify(ehClientWrapperMock, times(1)).createReceiverInternal(
+      Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;SharedAccessKeyName=policyname;" +
+        "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
+      Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
+      Matchers.eq("4"),
+      Matchers.eq(EventhubsOffsetType.PreviousCheckpoint),
+      Matchers.eq("2147483647"),
+      Matchers.eq(1))
   }
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {
     val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
     ehParams2("eventhubs.consumergroup") = "$consumergroup"
     when(offsetStoreMock.read()).thenReturn("-1")
-    doNothing().when(ehClientWrapperMock).createReceiverProxy(
-      Matchers.anyString, Matchers.anyString, Matchers.anyString, Matchers.anyString,
-      Matchers.anyInt, Matchers.any[IEventHubFilter])
+    doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString, Matchers.anyString,
+      Matchers.anyString, Matchers.eq[EventhubsOffsetType](EventhubsOffsetType.None), Matchers.anyString,
+      Matchers.anyInt)
 
-    ehClientWrapperMock.createReceiver(ehParams2, "0", offsetStoreMock)
+    ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
 
-    verify(ehClientWrapperMock, times(1)).createReceiverProxy(
-      Matchers.eq("amqps://policyname:policykey@namespace.servicebus.windows.net"),
-      Matchers.eq("name"),
-      Matchers.eq("0"),
+    verify(ehClientWrapperMock, times(1)).createReceiverInternal(
+      Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;SharedAccessKeyName=policyname;" +
+        "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
       Matchers.eq("$consumergroup"),
-      Matchers.eq(-1),
-      Matchers.eq(null))
+      Matchers.eq("4"),
+      Matchers.eq(EventhubsOffsetType.None),
+      Matchers.eq("-1"),
+      Matchers.eq(1))
   }
 
   test("EventHubsClientWrapper converts parameters for enqueuetime filter") {
     val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
-    ehParams2("eventhubs.filter.enqueuetime") = "1433889798"
+    ehParams2("eventhubs.filter.enqueuetime") = "1433887583"
     when(offsetStoreMock.read()).thenReturn("-1")
-    doNothing().when(ehClientWrapperMock).createReceiverProxy(
-      Matchers.anyString, Matchers.anyString, Matchers.anyString, Matchers.anyString,
-      Matchers.anyInt, Matchers.any[IEventHubFilter])
+    doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString, Matchers.anyString,
+      Matchers.anyString, Matchers.eq[EventhubsOffsetType](EventhubsOffsetType.InputTimeOffset), Matchers.anyString,
+      Matchers.anyInt)
 
-    ehClientWrapperMock.createReceiver(ehParams2, "0", offsetStoreMock)
+    ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
 
-    verify(ehClientWrapperMock, times(1)).createReceiverProxy(
-      Matchers.eq("amqps://policyname:policykey@namespace.servicebus.windows.net"),
-      Matchers.eq("name"),
-      Matchers.eq("0"),
-      Matchers.eq(null),
-      Matchers.eq(-1),
-      Matchers.argThat(new EnqueueTimeFilterEqual("1433889798")))
+    verify(ehClientWrapperMock, times(1)).createReceiverInternal(
+      Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;SharedAccessKeyName=policyname;" +
+        "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
+      Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
+      Matchers.eq("4"),
+      Matchers.eq(EventhubsOffsetType.InputTimeOffset),
+      Matchers.eq("1433887583"),
+      Matchers.eq(1))
   }
 }

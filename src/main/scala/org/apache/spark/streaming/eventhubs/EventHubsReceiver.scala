@@ -20,21 +20,22 @@ import org.apache.spark.storage.StorageLevel
 import scala.collection.Map
 import org.apache.spark.Logging
 import org.apache.spark.streaming.receiver.Receiver
-import com.microsoft.eventhubs.client.EventHubMessage
+import com.microsoft.azure.eventhubs._
 import scala.util.control.ControlThrowable
 
 import org.apache.spark.util.ThreadUtils
 
-// Spark 1.6
+// Spark 1.6.x
 
 private[eventhubs]
 class EventHubsReceiver(
-    eventhubsParams: Map[String, String],
-    partitionId: String,
-    storageLevel: StorageLevel,
-    offsetStore: OffsetStore,
-    receiverClient: EventHubsClientWrapper
-    ) extends Receiver[Array[Byte]](storageLevel) with Logging {
+                         eventhubsParams: Map[String, String],
+                         partitionId: String,
+                         storageLevel: StorageLevel,
+                         offsetStore: OffsetStore,
+                         receiverClient: EventHubsClientWrapper,
+                         maximumEventRate: Int
+                       ) extends Receiver[Array[Byte]](storageLevel) with Logging {
 
   /** If offset store is empty we construct one using provided parameters */
   var myOffsetStore: OffsetStore = offsetStore
@@ -84,10 +85,11 @@ class EventHubsReceiver(
     }
   }
 
-  def processReceivedMessage(message: EventHubMessage): Unit = {
-    // Just store the message to Spark and update offsetToSave
-    store(message.getData)
-    offsetToSave = message.getOffset
+  def processReceivedMessage(eventData: EventData): Unit = {
+
+    // Just store the event data to Spark and update offsetToSave
+    store(eventData.getBody())
+    offsetToSave = eventData.getSystemProperties().getOffset()
   }
 
   // Handles EventHubs messages
@@ -107,16 +109,25 @@ class EventHubsReceiver(
       logInfo("Begin EventHubsMessageHandler for partition " + partitionId)
 
       try {
+
         myOffsetStore.open()
 
         // Create an EventHubs client receiver
-        receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore)
+
+        receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore, maximumEventRate)
 
         while (!stopMessageHandler) {
-          val message = receiverClient.receive()
-          if (message != null && message.getSequence > latestSequence) {
-            latestSequence = message.getSequence
-            processReceivedMessage(message)
+
+          val receivedEvents: Iterable[EventData] = receiverClient.receive()
+
+          if (receivedEvents != null) {
+
+            receivedEvents.foreach(x => { if (x.getSystemProperties.getSequenceNumber() > latestSequence) {
+
+              latestSequence = x.getSystemProperties.getSequenceNumber()
+
+              processReceivedMessage(x)
+            }})
           }
 
           val now = System.currentTimeMillis()
@@ -132,7 +143,7 @@ class EventHubsReceiver(
       } catch {
         case c: ControlThrowable => throw c // propagate these bad throwable
         case e: Throwable =>
-          restart("Error handling message; restarting receiver", e)
+          restart("Error handling message, restarting receiver", e)
       } finally {
         myOffsetStore.close()
         receiverClient.close()

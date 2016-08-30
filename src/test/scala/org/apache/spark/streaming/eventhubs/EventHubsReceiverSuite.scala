@@ -16,20 +16,13 @@
  */
 package org.apache.spark.streaming.eventhubs
 
-//import java.util.concurrent.CompletableFuture
-
-import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 import org.apache.spark.streaming.receiver.ReceiverSupervisor
 import org.mockito.Mockito._
 import org.scalatest.mock.MockitoSugar
 import com.microsoft.azure.eventhubs._
-import org.junit.runner.RunWith
-import org.mockito.Mockito
-import org.powermock.api.mockito.PowerMockito
-import org.powermock.core.classloader.annotations.PrepareForTest
-import org.powermock.modules.junit4.PowerMockRunner
+import org.mockito.internal.util.reflection.Whitebox
 
 import scala.collection.mutable._
 
@@ -37,17 +30,13 @@ import scala.collection.mutable._
  * Suite of EventHubs streaming receiver tests
  * This suite of tests are low level unit tests, they directly call EventHubsReceiver with mocks
  */
-@RunWith(classOf[PowerMockRunner])
-@PrepareForTest(Array(classOf[SystemProperties]))
 class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
   var eventhubsClientWrapperMock: EventHubsClientWrapper = _
   var offsetStoreMock: OffsetStore = _
   var executorMock: ReceiverSupervisor = _
-  var eventDataCollectionMock: ArrayBuffer[EventData] = _
   var eventDataMock: EventData = _
-  //var systemPropertiesMock: SystemProperties = _
 
-  val ehParams = Map[String, String] (
+  val eventhubParameters = Map[String, String] (
     "eventhubs.policyname" -> "policyname",
     "eventhubs.policykey" -> "policykey",
     "eventhubs.namespace" -> "namespace",
@@ -62,19 +51,7 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     eventhubsClientWrapperMock = mock[EventHubsClientWrapper]
     offsetStoreMock = mock[OffsetStore]
     executorMock = mock[ReceiverSupervisor]
-    //completableFutureEventDataMock = mock[CompletableFuture[java.lang.Iterable[EventData]]]
-    eventDataCollectionMock = mock[ArrayBuffer[EventData]]
     eventDataMock = mock[EventData]
-    //systemPropertiesMock = mock[SystemProperties]
-
-    /*
-    eventhubsClientWrapperMock = PowerMockito.mock[EventHubsClientWrapper](classOf[EventHubsClientWrapper])
-    offsetStoreMock = PowerMockito.mock[OffsetStore](classOf[OffsetStore])
-    executorMock = PowerMockito.mock[ReceiverSupervisor](classOf[ReceiverSupervisor])
-    eventDataCollectionMock = PowerMockito.mock[ArrayBuffer[EventData]](classOf[ArrayBuffer[EventData]])
-    eventDataMock = PowerMockito.mock[EventData](classOf[EventData])
-    systemPropertiesMock = PowerMockito.mock[SystemProperties](classOf[SystemProperties])
-    */
   }
 
   override def afterFunction(): Unit = {
@@ -86,94 +63,85 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
 
   test("EventHubsUtils API works") {
     val streamingContext = new StreamingContext(master, framework, batchDuration)
-    EventHubsUtils.createStream(streamingContext, ehParams, "0", StorageLevel.MEMORY_ONLY)
-    EventHubsUtils.createUnionStream(streamingContext, ehParams, StorageLevel.MEMORY_ONLY_2)
+    EventHubsUtils.createStream(streamingContext, eventhubParameters, "0", StorageLevel.MEMORY_ONLY)
+    EventHubsUtils.createUnionStream(streamingContext, eventhubParameters, StorageLevel.MEMORY_ONLY_2)
     streamingContext.stop()
   }
 
-  // To be revisited. Sequence Number of Event Data is part of System Properties which is final in Eventhubs Client
-  // and cannot be mocked.
+  test("EventHubsReceiver can receive message with proper checkpointing") {
 
-  ignore("EventHubsReceiver can receive message with proper checkpointing") {
-    val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
-    ehParams2("eventhubs.checkpoint.interval") = "10"
+    val eventhubPartitionId: String  = "0"
+    val eventCheckpointIntervalInSeconds: Int = 1
+    val eventOffset: String = "2147483647"
+    val maximumEventRate: Int = 999
 
-    // Mock object setup
+    val updatedEventhubsParams = collection.mutable.Map[String, String]() ++= eventhubParameters
+    updatedEventhubsParams("eventhubs.checkpoint.interval") = eventCheckpointIntervalInSeconds.toString
 
-    //val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
+    eventDataMock = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
+    Whitebox.setInternalState(eventDataMock, "isReceivedEvent", true)
+    Whitebox.setInternalState(eventDataMock, "offset", eventOffset)
 
-    eventDataMock = new EventData(Array[Byte](1,2,3,4), 2147483647, 4)
+    val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
+    eventDataCollection += eventDataMock
 
-    eventDataCollectionMock += eventDataMock
+    when(offsetStoreMock.read()).thenReturn("-1")
+    when(eventhubsClientWrapperMock.receive()).thenReturn(eventDataCollection)
 
-    Mockito.when(offsetStoreMock.read()).thenReturn("-1")
-
-    //when(systemPropertiesMock.getSequenceNumber).thenReturn(8)
-    //when(eventDataMock.getSystemProperties).thenReturn(systemPropertiesMock)
-    //when(eventDataMock.getSequenceNumber).thenReturn(8)
-
-    PowerMockito.mockStatic(classOf[SystemProperties])
-
-    //PowerMockito.when(systemPropertiesMock.getSequenceNumber).thenReturn(8)
-
-    //PowerMockito.when(classOf[EventData], eventDataMock.getSystemProperties.getSequenceNumber).thenReturn(8)
-
-    //PowerMockito.when(eventDataMock.getSystemProperties.getSequenceNumber).thenReturn(8)
-
-    Mockito.when(eventhubsClientWrapperMock.receive()).thenReturn(eventDataCollectionMock).thenReturn(null)
-
-    val receiver = new EventHubsReceiver(ehParams2, "0", StorageLevel.MEMORY_ONLY, offsetStoreMock,
-      eventhubsClientWrapperMock, 999)
+    val receiver = new EventHubsReceiver(updatedEventhubsParams, eventhubPartitionId, StorageLevel.MEMORY_ONLY,
+      offsetStoreMock, eventhubsClientWrapperMock, maximumEventRate)
 
     receiver.attachSupervisor(executorMock)
 
     receiver.onStart()
-    Thread sleep (100)
+    Thread sleep eventCheckpointIntervalInSeconds * 1000
     receiver.onStop()
 
     verify(offsetStoreMock, times(1)).open()
-    verify(offsetStoreMock, times(1)).write("2147483647")
+    verify(offsetStoreMock, times(1)).write(eventOffset)
     verify(offsetStoreMock, times(1)).close()
 
-    verify(eventhubsClientWrapperMock, times(1)).createReceiver(ehParams2, "0", offsetStoreMock, 999)
+    verify(eventhubsClientWrapperMock, times(1)).createReceiver(updatedEventhubsParams, eventhubPartitionId,
+      offsetStoreMock, maximumEventRate)
     verify(eventhubsClientWrapperMock, atLeastOnce).receive()
     verify(eventhubsClientWrapperMock, times(1)).close()
   }
 
-  // To be revisited. Sequence Number of Event Data is part of System Properties which is final in Eventhubs Client
-  // and cannot be mocked.
+  test("EventHubsReceiver can restart when exception is thrown") {
 
-  ignore("EventHubsReceiver can restart when exception is thrown") {
-    // Mock object setup
+    val eventhubPartitionId: String  = "0"
+    val eventOffset: String = "2147483647"
+    val maximumEventRate: Int = 999
 
-    val exception = new RuntimeException("error")
-
-    when(offsetStoreMock.read()).thenReturn("-1")
+    eventDataMock = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
+    Whitebox.setInternalState(eventDataMock, "isReceivedEvent", true)
+    Whitebox.setInternalState(eventDataMock, "offset", eventOffset)
 
     val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
-
-    eventDataCollection += new EventData(Array[Byte](1,2,3,4), 2147483647, 4)
-
     eventDataCollection += eventDataMock
 
-    when(eventhubsClientWrapperMock.receive()).thenReturn(eventDataCollection).thenThrow(exception)
+    val eventhubException = new RuntimeException("error")
 
-    val receiver = new EventHubsReceiver(ehParams, "0", StorageLevel.MEMORY_ONLY, offsetStoreMock,
-      eventhubsClientWrapperMock, 999)
+    when(offsetStoreMock.read()).thenReturn("-1")
+    when(eventhubsClientWrapperMock.receive()).thenReturn(eventDataCollection).thenThrow(eventhubException)
+
+    val receiver = new EventHubsReceiver(eventhubParameters, eventhubPartitionId, StorageLevel.MEMORY_ONLY,
+      offsetStoreMock, eventhubsClientWrapperMock, maximumEventRate)
 
     receiver.attachSupervisor(executorMock)
 
     receiver.onStart()
-    Thread sleep (1000)
+    Thread sleep 1000
     receiver.onStop()
 
-    // Verify that executor.restartReceiver() has been called
-    verify(executorMock, times(1)).restartReceiver("Error handling message, restarting receiver", Some(exception))
+    verify(executorMock, times(1)).restartReceiver("Error handling message, restarting receiver",
+      Some(eventhubException))
 
     verify(offsetStoreMock, times(1)).open()
     verify(offsetStoreMock, times(1)).close()
 
-    verify(eventhubsClientWrapperMock, times(1)).createReceiver(ehParams, "0", offsetStoreMock, 999)
+    verify(eventhubsClientWrapperMock, times(1)).createReceiver(eventhubParameters, "0", offsetStoreMock,
+      maximumEventRate)
     verify(eventhubsClientWrapperMock, times(2)).receive()
     verify(eventhubsClientWrapperMock, times(1)).close()
   }

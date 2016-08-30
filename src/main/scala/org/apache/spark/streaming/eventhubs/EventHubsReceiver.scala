@@ -121,17 +121,21 @@ class EventHubsReceiver(
           val receivedEvents: Iterable[EventData] = receiverClient.receive()
 
           if (receivedEvents != null) {
-
-            receivedEvents.foreach(x => { if (x.getSystemProperties.getSequenceNumber() > latestSequence) {
-
-              latestSequence = x.getSystemProperties.getSequenceNumber()
-
-              processReceivedMessage(x)
-            }})
+            receivedEvents.foreach(x => {
+              if (x.getSystemProperties.getSequenceNumber > latestSequence) {
+                latestSequence = x.getSystemProperties.getSequenceNumber
+                processReceivedMessage(x)
+              }
+            })
           }
 
           val now = System.currentTimeMillis()
-          if(now > nextTime) {
+
+          if(now >= nextTime) {
+
+            //logInfo("now: " + now + ", nextTime: " + nextTime)
+            //logInfo("offsetToSave: " + offsetToSave + ", savedOffset: " + savedOffset)
+
             if(offsetToSave != savedOffset) {
               logInfo("writing offset to store: " + offsetToSave + ", partition: " + partitionId)
               myOffsetStore.write(offsetToSave)

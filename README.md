@@ -45,6 +45,7 @@ In order to build and run the examples, you need to have:
 3. Scala 2.10
 
 ### Build Command
-    mvn clean install    
+    mvn clean
+    mvn package
 This command builds and installs EventHubsReceiver jar to local maven cache. Subsequently you can build any Spark Streaming application that references this jar.
 

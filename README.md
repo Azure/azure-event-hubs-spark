@@ -1,7 +1,7 @@
 # spark-eventhubs
 This is the source code of EventHubsReceiver for Spark Streaming. 
 
-[Here](https://github.com/hdinsight/hdinsight-spark-examples) is an example project that uses EventHubsReceiver to count messages from Azure EventHubs.
+[Here](https://github.com/hdinsight/spark-streaming-data-persistence-examples) is an example project that uses EventHubsReceiver to count and persist messages from Azure Eventhubs.
 
 ## Project References
 
@@ -21,7 +21,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>spark-streaming-eventhubs_2.10</artifactId>
-      <version>1.0.0</version>
+      <version>2.0.0</version>
     </dependency>
     
 ### SBT
@@ -33,14 +33,14 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 
 #### Dependency
     libraryDependencies ++= Seq(
-        "com.microsoft.azure" %% "spark-streaming-eventhubs" % "1.0.0"
+        "com.microsoft.azure" %% "spark-streaming-eventhubs" % "2.0.0"
     )
 
 ### Build Prerequisites
 
 In order to build and run the examples, you need to have:
 
-1. Java 1.7/1.8 SDK.
+1. Java 1.8 SDK.
 2. Maven 3.x
 3. Scala 2.10
 

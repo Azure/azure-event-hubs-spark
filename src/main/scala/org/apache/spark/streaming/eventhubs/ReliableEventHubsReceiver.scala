@@ -80,7 +80,7 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
   }
 
   override def processReceivedMessage(eventData: EventData): Unit = {
-    blockGenerator.addDataWithCallback(eventData.getBody(), eventData.getSystemProperties())
+    blockGenerator.addDataWithCallback(eventData.getBody, eventData.getSystemProperties.getOffset)
   }
 
   /**

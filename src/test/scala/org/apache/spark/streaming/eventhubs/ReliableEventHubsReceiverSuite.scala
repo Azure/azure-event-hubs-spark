@@ -19,6 +19,8 @@ package org.apache.spark.streaming.eventhubs
 import java.io.File
 
 import com.microsoft.azure.eventhubs.EventData
+import com.microsoft.azure.eventhubs.EventData.SystemProperties
+import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetType.EventhubsOffsetType
 import org.apache.spark.util.Utils
 
@@ -26,12 +28,10 @@ import scala.concurrent.duration._
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
-import org.mockito.Mockito
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 import org.scalatest.mock.MockitoSugar
 import org.mockito.internal.util.reflection.Whitebox
-import org.mockito.mock.SerializableMode
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -91,7 +91,7 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
 
   //Test ignored due to an issue with mocking library unavailable to the executors.
 
-  ignore("Reliable EventHubs input stream") {
+  test("Reliable EventHubs input stream") {
     // after 100 messages then start to receive null
     ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, -1)
 
@@ -116,7 +116,7 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
 
   //Test ignored due to an issue with mocking library unavailable to the executors.
 
-  ignore("Reliable EventHubs input stream recover from exception") {
+  test("Reliable EventHubs input stream recover from exception") {
     // After 60 messages then exception, after 100 messages then receive null
     ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, 60)
 
@@ -153,8 +153,8 @@ class MyMockedEventHubsClientWrapper(
     exceptionCount: Int) extends EventHubsClientWrapper with MockitoSugar {
   var offset = -1
   var count = 0
+  var partition = "0"
   var myExceptionCount = exceptionCount
-  var eventDataMock: EventData = Mockito.mock(classOf[EventData], Mockito.withSettings().serializable())
 
   override def createReceiverInternal(connectionString: String,
                                       consumerGroup: String,
@@ -166,6 +166,7 @@ class MyMockedEventHubsClientWrapper(
     if (offsetType != EventhubsOffsetType.None) {
 
       offset = currentOffset.toInt
+      partition = partitionId
     }
   }
 
@@ -180,13 +181,20 @@ class MyMockedEventHubsClientWrapper(
     count += 1
     // do not send more than emitCount number of messages
     if(count <= emitCount) {
-      eventDataMock = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
+      val eventData: EventData = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
 
-      Whitebox.setInternalState(eventDataMock, "offset", offset)
-      Whitebox.setInternalState(eventDataMock, "sequenceNumber", count)
+      val systemPropertiesMap: java.util.HashMap[String, AnyRef] = new java.util.HashMap[String, AnyRef]()
+
+      systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME, offset.toString)
+      systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, Long.box(count))
+      systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, partition)
+
+      val systemProperties : SystemProperties =  new SystemProperties(systemPropertiesMap)
+
+      Whitebox.setInternalState(eventData, "systemProperties", systemProperties)
 
       val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
-      eventDataCollection += eventDataMock
+      eventDataCollection += eventData
 
       eventDataCollection
     }

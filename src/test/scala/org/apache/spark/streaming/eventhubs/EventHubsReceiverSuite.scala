@@ -16,6 +16,7 @@
  */
 package org.apache.spark.streaming.eventhubs
 
+import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 import org.apache.spark.streaming.receiver.ReceiverSupervisor
@@ -23,6 +24,7 @@ import org.mockito.Mockito._
 import org.scalatest.mock.MockitoSugar
 import com.microsoft.azure.eventhubs._
 import org.mockito.internal.util.reflection.Whitebox
+import com.microsoft.azure.servicebus.amqp.AmqpConstants
 
 import scala.collection.mutable._
 
@@ -34,7 +36,6 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
   var eventhubsClientWrapperMock: EventHubsClientWrapper = _
   var offsetStoreMock: OffsetStore = _
   var executorMock: ReceiverSupervisor = _
-  var eventDataMock: EventData = _
 
   val eventhubParameters = Map[String, String] (
     "eventhubs.policyname" -> "policyname",
@@ -51,7 +52,6 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     eventhubsClientWrapperMock = mock[EventHubsClientWrapper]
     offsetStoreMock = mock[OffsetStore]
     executorMock = mock[ReceiverSupervisor]
-    eventDataMock = mock[EventData]
   }
 
   override def afterFunction(): Unit = {
@@ -73,17 +73,26 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     val eventhubPartitionId: String  = "0"
     val eventCheckpointIntervalInSeconds: Int = 1
     val eventOffset: String = "2147483647"
+    val eventSequenceNumber: Long = 1
     val maximumEventRate: Int = 999
 
     val updatedEventhubsParams = collection.mutable.Map[String, String]() ++= eventhubParameters
     updatedEventhubsParams("eventhubs.checkpoint.interval") = eventCheckpointIntervalInSeconds.toString
 
-    eventDataMock = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
-    Whitebox.setInternalState(eventDataMock, "isReceivedEvent", true)
-    Whitebox.setInternalState(eventDataMock, "offset", eventOffset)
+    var eventData: EventData = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
+
+    val systemPropertiesMap: java.util.HashMap[String, AnyRef] = new java.util.HashMap[String, AnyRef]()
+
+    systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME, eventOffset)
+    systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, Long.box(eventSequenceNumber))
+    systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, eventhubPartitionId)
+
+    val systemProperties : SystemProperties =  new SystemProperties(systemPropertiesMap)
+
+    Whitebox.setInternalState(eventData, "systemProperties", systemProperties)
 
     val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
-    eventDataCollection += eventDataMock
+    eventDataCollection += eventData
 
     when(offsetStoreMock.read()).thenReturn("-1")
     when(eventhubsClientWrapperMock.receive()).thenReturn(eventDataCollection)
@@ -111,14 +120,22 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
 
     val eventhubPartitionId: String  = "0"
     val eventOffset: String = "2147483647"
+    val eventSequenceNumber: Long = 1
     val maximumEventRate: Int = 999
 
-    eventDataMock = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
-    Whitebox.setInternalState(eventDataMock, "isReceivedEvent", true)
-    Whitebox.setInternalState(eventDataMock, "offset", eventOffset)
+    val eventData: EventData = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
 
+    val systemPropertiesMap: java.util.HashMap[String, AnyRef] = new java.util.HashMap[String, AnyRef]()
+
+    systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME, eventOffset)
+    systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, Long.box(eventSequenceNumber))
+    systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, eventhubPartitionId)
+
+    val systemProperties : SystemProperties =  new SystemProperties(systemPropertiesMap)
+
+    Whitebox.setInternalState(eventData, "systemProperties", systemProperties)
     val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
-    eventDataCollection += eventDataMock
+    eventDataCollection += eventData
 
     val eventhubException = new RuntimeException("error")
 

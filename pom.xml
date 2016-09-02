@@ -67,7 +67,7 @@
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
-      <version>0.7.1</version>
+      <version>0.8.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
@@ -179,9 +179,9 @@
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
         <configuration>
-          <args>
-            <arg>-target:jvm-1.6</arg>
-          </args>
+          <!--args>
+            <arg>-target:jvm-1.7</arg>
+          </args-->
         </configuration>
         <executions>
           <execution>
@@ -222,6 +222,24 @@
             <goals>
               <goal>shade</goal>
             </goals>
+            <configuration>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <artifactSet>
+                <includes>
+                  <include>com.microsoft.azure</include>
+                  <include>org.apache.qpid</include>
+                </includes>
+              </artifactSet>
+            </configuration>
           </execution>
         </executions>
       </plugin>

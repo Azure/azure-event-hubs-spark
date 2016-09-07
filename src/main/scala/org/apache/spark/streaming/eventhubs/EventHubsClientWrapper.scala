@@ -51,9 +51,8 @@ class EventHubsClientWrapper extends Serializable {
 
     //Set the epoch if specified
 
-    val receiverEpoch: Int = if (eventhubsParams.contains("eventhubs.epoch"))
-      eventhubsParams("eventhubs.epoch").toInt
-    else 1
+    val receiverEpoch: Long = if (eventhubsParams.contains("eventhubs.epoch")) eventhubsParams("eventhubs.epoch").toLong
+    else -1
 
     //Determine the offset to start receiving data
 
@@ -78,10 +77,14 @@ class EventHubsClientWrapper extends Serializable {
       currentOffset = eventhubsParams("eventhubs.filter.enqueuetime")
     }
 
-    createReceiverInternal(connectionString.toString(), consumerGroup, partitionId, offsetType,
-      currentOffset, receiverEpoch)
+    MAXIMUM_EVENT_RATE = maximumEventRate
 
-    MAXIMUM_EVENT_RATE = if (maximumEventRate <= 0) MAXIMUM_PREFETCH_COUNT else maximumEventRate
+    MAXIMUM_PREFETCH_COUNT = if (maximumEventRate < MINIMUM_PREFETCH_COUNT) MINIMUM_PREFETCH_COUNT
+    else if (maximumEventRate > MAXIMUM_EVENT_RATE) MAXIMUM_PREFETCH_COUNT
+    else maximumEventRate
+
+    createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
+      currentOffset, receiverEpoch)
   }
 
   private[eventhubs]
@@ -90,47 +93,46 @@ class EventHubsClientWrapper extends Serializable {
                              partitionId: String,
                              offsetType: EventhubsOffsetType,
                              currentOffset: String,
-                             receiverEpoch: Int): Unit = {
+                             receiverEpoch: Long): Unit = {
 
     //Create Eventhubs client
-    val eventhubsClient: EventHubClient = EventHubClient.createFromConnectionString(connectionString).get()
+    val eventhubsClient: EventHubClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
     //Create Eventhubs receiver  based on the offset type and specification
     offsetType match  {
 
-      case EventhubsOffsetType.None => eventhubsReceiver = eventhubsClient.createEpochReceiver(consumerGroup,
-        partitionId, currentOffset, false, receiverEpoch).get()
+      case EventhubsOffsetType.None => eventhubsReceiver = if(receiverEpoch > 0)
+        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, receiverEpoch)
+      else eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
 
-      case EventhubsOffsetType.PreviousCheckpoint => eventhubsClient.createEpochReceiver(consumerGroup,
-        partitionId, currentOffset, false, receiverEpoch).get()
+      case EventhubsOffsetType.PreviousCheckpoint => eventhubsReceiver = if(receiverEpoch > 0)
+        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, false, receiverEpoch)
+      else  eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset, false)
 
-      case EventhubsOffsetType.InputByteOffset => eventhubsClient.createEpochReceiver(consumerGroup,
-        partitionId, currentOffset, false, receiverEpoch).get()
+      case EventhubsOffsetType.InputByteOffset => eventhubsReceiver = if(receiverEpoch > 0)
+        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, false, receiverEpoch)
+      else eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset, false)
 
-      case EventhubsOffsetType.InputTimeOffset => eventhubsReceiver = eventhubsClient.createEpochReceiver(consumerGroup,
-          partitionId, Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch).get()
+      case EventhubsOffsetType.InputTimeOffset => eventhubsReceiver = if(receiverEpoch > 0)
+        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch)
+      else eventhubsClient.createReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong))
     }
 
-    eventhubsReceiver.setPrefetchCount(MAXIMUM_EVENT_RATE)
+    eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
   }
 
   def receive(): Iterable[EventData] = {
 
     val receivedEvents: Iterable[EventData] = eventhubsReceiver.receive(MAXIMUM_EVENT_RATE).get().asScala
 
-    if (receivedEvents != null) List.empty[EventData]
-    else receivedEvents
+    if (receivedEvents == null) List.empty[EventData] else receivedEvents
   }
 
-  def close(): Unit = {
+  def close(): Unit = if(eventhubsReceiver != null) eventhubsReceiver.close()
 
-    if(eventhubsReceiver != null) {
 
-      eventhubsReceiver.close()
-    }
-  }
-
-  private var eventhubsReceiver: PartitionReceiver = null
-  private val MAXIMUM_PREFETCH_COUNT: Int = 999
+  private var eventhubsReceiver: PartitionReceiver = _
+  private val MINIMUM_PREFETCH_COUNT: Int = 10
+  private var MAXIMUM_PREFETCH_COUNT: Int = 999
   private var MAXIMUM_EVENT_RATE: Int = 0
 }

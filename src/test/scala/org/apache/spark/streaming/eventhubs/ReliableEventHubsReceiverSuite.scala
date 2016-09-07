@@ -161,7 +161,7 @@ class MyMockedEventHubsClientWrapper(
                                       partitionId: String,
                                       offsetType: EventhubsOffsetType,
                                       currentOffset: String,
-                                      receiverEpoch: Int): Unit = {
+                                      receiverEpoch: Long): Unit = {
 
     if (offsetType != EventhubsOffsetType.None) {
 
@@ -181,6 +181,7 @@ class MyMockedEventHubsClientWrapper(
     count += 1
     // do not send more than emitCount number of messages
     if(count <= emitCount) {
+
       val eventData: EventData = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
 
       val systemPropertiesMap: java.util.HashMap[String, AnyRef] = new java.util.HashMap[String, AnyRef]()
@@ -199,6 +200,7 @@ class MyMockedEventHubsClientWrapper(
       eventDataCollection
     }
     else {
+
       Thread sleep 1000
       null
     }

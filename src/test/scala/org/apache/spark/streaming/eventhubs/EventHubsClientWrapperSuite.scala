@@ -56,7 +56,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
     Mockito.when(offsetStoreMock.read()).thenReturn("2147483647")
     Mockito.doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString, Matchers.anyString,
       Matchers.anyString, Matchers.eq[EventhubsOffsetType](EventhubsOffsetType.PreviousCheckpoint), Matchers.anyString,
-      Matchers.anyInt)
+      Matchers.anyLong)
 
     ehClientWrapperMock.createReceiver(ehParams, "4", offsetStoreMock, 999)
 
@@ -67,7 +67,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("4"),
       Matchers.eq(EventhubsOffsetType.PreviousCheckpoint),
       Matchers.eq("2147483647"),
-      Matchers.eq(1))
+      Matchers.eq(-1L))
   }
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {
@@ -76,7 +76,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
     when(offsetStoreMock.read()).thenReturn("-1")
     doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString, Matchers.anyString,
       Matchers.anyString, Matchers.eq[EventhubsOffsetType](EventhubsOffsetType.None), Matchers.anyString,
-      Matchers.anyInt)
+      Matchers.anyLong)
 
     ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
 
@@ -87,7 +87,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("4"),
       Matchers.eq(EventhubsOffsetType.None),
       Matchers.eq("-1"),
-      Matchers.eq(1))
+      Matchers.eq(-1L))
   }
 
   test("EventHubsClientWrapper converts parameters for enqueuetime filter") {
@@ -96,7 +96,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
     when(offsetStoreMock.read()).thenReturn("-1")
     doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString, Matchers.anyString,
       Matchers.anyString, Matchers.eq[EventhubsOffsetType](EventhubsOffsetType.InputTimeOffset), Matchers.anyString,
-      Matchers.anyInt)
+      Matchers.anyLong)
 
     ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
 
@@ -107,6 +107,6 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("4"),
       Matchers.eq(EventhubsOffsetType.InputTimeOffset),
       Matchers.eq("1433887583"),
-      Matchers.eq(1))
+      Matchers.eq(-1L))
   }
 }

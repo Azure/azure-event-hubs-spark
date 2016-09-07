@@ -67,7 +67,7 @@
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
-      <version>0.8.0</version>
+      <version>0.8.1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
@@ -179,9 +179,9 @@
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
         <configuration>
-          <!--args>
+          <args>
             <arg>-target:jvm-1.7</arg>
-          </args-->
+          </args>
         </configuration>
         <executions>
           <execution>
@@ -237,6 +237,7 @@
                 <includes>
                   <include>com.microsoft.azure</include>
                   <include>org.apache.qpid</include>
+                  <include>org.bouncycastle</include>
                 </includes>
               </artifactSet>
             </configuration>

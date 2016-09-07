@@ -53,7 +53,7 @@ object EventHubsUtils {
       storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK
     ): DStream[Array[Byte]] = {
     val partitionCount = eventhubsParams("eventhubs.partition.count").toInt
-    val streams = (0 until partitionCount-1).map{
+    val streams = (0 until partitionCount).map{
       i => createStream(streamingContext, eventhubsParams, i.toString, storageLevel)}
     streamingContext.union(streams)
   }
@@ -93,11 +93,13 @@ object EventHubsUtils {
     storageLevel: StorageLevel,
     offsetStore: OffsetStore,
     receiverClient: EventHubsClientWrapper): Receiver[Array[Byte]] = {
-    val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", 0)
+    val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", -1)
     val walEnabled = streamingContext.conf.getBoolean("spark.streaming.receiver.writeAheadLog.enable", false)
+
     if (walEnabled) {
 
-      new ReliableEventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore, receiverClient, maximumEventRate)
+      new ReliableEventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore, receiverClient,
+        maximumEventRate)
     }
     else {
 

@@ -67,7 +67,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("4"),
       Matchers.eq(EventhubsOffsetType.PreviousCheckpoint),
       Matchers.eq("2147483647"),
-      Matchers.eq(-1L))
+      Matchers.eq(0L))
   }
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {
@@ -87,7 +87,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("4"),
       Matchers.eq(EventhubsOffsetType.None),
       Matchers.eq("-1"),
-      Matchers.eq(-1L))
+      Matchers.eq(0L))
   }
 
   test("EventHubsClientWrapper converts parameters for enqueuetime filter") {
@@ -107,6 +107,6 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("4"),
       Matchers.eq(EventhubsOffsetType.InputTimeOffset),
       Matchers.eq("1433887583"),
-      Matchers.eq(-1L))
+      Matchers.eq(0L))
   }
 }

@@ -52,7 +52,7 @@ class EventHubsClientWrapper extends Serializable {
     //Set the epoch if specified
 
     val receiverEpoch: Long = if (eventhubsParams.contains("eventhubs.epoch")) eventhubsParams("eventhubs.epoch").toLong
-    else -1
+    else 0
 
     //Determine the offset to start receiving data
 
@@ -79,9 +79,11 @@ class EventHubsClientWrapper extends Serializable {
 
     MAXIMUM_EVENT_RATE = maximumEventRate
 
-    MAXIMUM_PREFETCH_COUNT = if (maximumEventRate < MINIMUM_PREFETCH_COUNT) MINIMUM_PREFETCH_COUNT
-    else if (maximumEventRate > MAXIMUM_EVENT_RATE) MAXIMUM_PREFETCH_COUNT
-    else maximumEventRate
+    if (maximumEventRate > 0 && maximumEventRate < MINIMUM_PREFETCH_COUNT)
+      MAXIMUM_PREFETCH_COUNT = MINIMUM_PREFETCH_COUNT
+    else if (maximumEventRate >= MINIMUM_PREFETCH_COUNT && maximumEventRate < MAXIMUM_PREFETCH_COUNT)
+      MAXIMUM_PREFETCH_COUNT = MAXIMUM_EVENT_RATE + 1
+    else MAXIMUM_EVENT_RATE = MAXIMUM_PREFETCH_COUNT - 1
 
     createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)

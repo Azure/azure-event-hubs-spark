@@ -93,7 +93,7 @@ object EventHubsUtils {
     storageLevel: StorageLevel,
     offsetStore: OffsetStore,
     receiverClient: EventHubsClientWrapper): Receiver[Array[Byte]] = {
-    val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", -1)
+    val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", 0)
     val walEnabled = streamingContext.conf.getBoolean("spark.streaming.receiver.writeAheadLog.enable", false)
 
     if (walEnabled) {

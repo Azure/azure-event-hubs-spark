@@ -20,25 +20,28 @@ import org.apache.spark.storage.StorageLevel
 import scala.collection.Map
 import org.apache.spark.Logging
 import org.apache.spark.streaming.receiver.Receiver
-import com.microsoft.eventhubs.client.EventHubMessage
+import com.microsoft.azure.eventhubs._
 import scala.util.control.ControlThrowable
 
 import org.apache.spark.util.ThreadUtils
 
-// Spark 1.6
+// Spark 1.6.x
 
 private[eventhubs]
 class EventHubsReceiver(
-    eventhubsParams: Map[String, String],
-    partitionId: String,
-    storageLevel: StorageLevel,
-    offsetStore: OffsetStore,
-    receiverClient: EventHubsClientWrapper
-    ) extends Receiver[Array[Byte]](storageLevel) with Logging {
+                         eventhubsParams: Map[String, String],
+                         partitionId: String,
+                         storageLevel: StorageLevel,
+                         offsetStore: OffsetStore,
+                         receiverClient: EventHubsClientWrapper,
+                         maximumEventRate: Int
+                       ) extends Receiver[Array[Byte]](storageLevel) with Logging {
 
   /** If offset store is empty we construct one using provided parameters */
   var myOffsetStore: OffsetStore = offsetStore
+
   if(myOffsetStore == null) {
+
     myOffsetStore = new DfsBasedOffsetStore(
       eventhubsParams("eventhubs.checkpoint.dir"),
       eventhubsParams("eventhubs.namespace"),
@@ -58,10 +61,10 @@ class EventHubsReceiver(
   private var latestSequence: Long = Long.MinValue
 
   /** The offset to be saved after current checkpoint interval */
-  protected var offsetToSave: String = null
+  protected var offsetToSave: String = _
 
   /** The last saved offset */
-  protected var savedOffset: String = null
+  protected var savedOffset: String = _
 
   def onStop() {
     logInfo("Stopping EventHubsReceiver for partition " + partitionId)
@@ -75,52 +78,72 @@ class EventHubsReceiver(
     logInfo("Starting EventHubsReceiver for partition " + partitionId)
 
     stopMessageHandler = false
-    val executorPool =
-      ThreadUtils.newDaemonFixedThreadPool(1, "EventHubsMessageHandler")
+    val executorPool = ThreadUtils.newDaemonFixedThreadPool(1, "EventHubsMessageHandler")
+
     try {
+
       executorPool.submit(new EventHubsMessageHandler)
+
     } finally {
+
       executorPool.shutdown() // Just causes threads to terminate after work is done
+
     }
   }
 
-  def processReceivedMessage(message: EventHubMessage): Unit = {
-    // Just store the message to Spark and update offsetToSave
-    store(message.getData)
-    offsetToSave = message.getOffset
+  def processReceivedMessage(eventData: EventData): Unit = {
+
+    // Just store the event data to Spark and update offsetToSave
+    store(eventData.getBody)
+
+    offsetToSave = eventData.getSystemProperties.getOffset
   }
 
   // Handles EventHubs messages
   private[eventhubs]
   class EventHubsMessageHandler()
     extends Runnable {
+
     // The checkpoint interval defaults to 10 seconds if not provided
-    val checkpointInterval = if (eventhubsParams.contains("eventhubs.checkpoint.interval")) {
+
+    val checkpointInterval = if (eventhubsParams.contains("eventhubs.checkpoint.interval"))
       eventhubsParams("eventhubs.checkpoint.interval").toInt * 1000
-    }
-    else {
-      10000
-    }
+    else 10000
+
     var nextTime = System.currentTimeMillis() + checkpointInterval
 
     def run() {
+
       logInfo("Begin EventHubsMessageHandler for partition " + partitionId)
 
       try {
+
         myOffsetStore.open()
 
         // Create an EventHubs client receiver
-        receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore)
+
+        receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore, maximumEventRate)
 
         while (!stopMessageHandler) {
-          val message = receiverClient.receive()
-          if (message != null && message.getSequence > latestSequence) {
-            latestSequence = message.getSequence
-            processReceivedMessage(message)
+
+          val receivedEvents: Iterable[EventData] = receiverClient.receive()
+
+          if (receivedEvents != null) {
+            receivedEvents.foreach(x => {
+              if (x.getSystemProperties.getSequenceNumber > latestSequence) {
+                latestSequence = x.getSystemProperties.getSequenceNumber
+                processReceivedMessage(x)
+              }
+            })
           }
 
           val now = System.currentTimeMillis()
-          if(now > nextTime) {
+
+          if(now >= nextTime) {
+
+            //logInfo("now: " + now + ", nextTime: " + nextTime)
+            //logInfo("offsetToSave: " + offsetToSave + ", savedOffset: " + savedOffset)
+
             if(offsetToSave != savedOffset) {
               logInfo("writing offset to store: " + offsetToSave + ", partition: " + partitionId)
               myOffsetStore.write(offsetToSave)
@@ -130,10 +153,11 @@ class EventHubsReceiver(
           }
         }
       } catch {
+
         case c: ControlThrowable => throw c // propagate these bad throwable
-        case e: Throwable =>
-          restart("Error handling message; restarting receiver", e)
+        case e: Throwable => restart("Error handling message, restarting receiver", e)
       } finally {
+
         myOffsetStore.close()
         receiverClient.close()
         logInfo("End EventHubsMessageHandler for partition " + partitionId)

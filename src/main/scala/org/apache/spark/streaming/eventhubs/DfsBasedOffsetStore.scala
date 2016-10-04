@@ -22,19 +22,19 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.Logging
 
 /**
- * A DFS based OffsetStore implementation
- */
+  * A DFS based OffsetStore implementation
+  */
 @SerialVersionUID(1L)
 class DfsBasedOffsetStore(
-    directory: String,
-    namespace: String,
-    name: String,
-    partition: String) extends OffsetStore with Logging {
+                           directory: String,
+                           namespace: String,
+                           name: String,
+                           partition: String) extends OffsetStore with Logging {
 
-  var path: Path = null
-  var backupPath: Path = null
-  var checkpointFile: FileSystem = null
-  var backupCheckpointFile: FileSystem = null
+  var path: Path = _
+  var backupPath: Path = _
+  var checkpointFile: FileSystem = _
+  var backupCheckpointFile: FileSystem = _
 
   /**
     * Open two files, the actual checkpoint file and the backup checkpoint file

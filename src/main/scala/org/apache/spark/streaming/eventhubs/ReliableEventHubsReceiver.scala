@@ -17,14 +17,13 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.util.concurrent.ConcurrentHashMap
-import com.microsoft.eventhubs.client.EventHubMessage
+//import com.microsoft.eventhubs.client.EventHubMessage
 import org.apache.spark.{SparkEnv, Logging}
 import org.apache.spark.storage.{StreamBlockId, StorageLevel}
-import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener, Receiver}
-import org.apache.spark.util.Utils
-
+import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener}
 import scala.collection.{mutable, Map}
-import scala.util.control.ControlThrowable
+
+import com.microsoft.azure.eventhubs._
 
 /**
  * ReliableEventHubsReceiver offers the ability to reliably store data into BlockManager without
@@ -37,14 +36,17 @@ import scala.util.control.ControlThrowable
  * problem of EventHubsReceiver can be eliminated.
  */
 private[eventhubs]
-class ReliableEventHubsReceiver(
-    eventhubsParams: Map[String, String],
-    partitionId: String,
-    storageLevel: StorageLevel,
-    offsetStore: OffsetStore,
-    receiverClient: EventHubsClientWrapper
-    ) extends EventHubsReceiver(eventhubsParams, partitionId, storageLevel, offsetStore,
-      receiverClient) {
+class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
+                                partitionId: String,
+                                storageLevel: StorageLevel,
+                                offsetStore: OffsetStore,
+                                receiverClient: EventHubsClientWrapper,
+                                maximumEventRate: Int) extends EventHubsReceiver(eventhubsParams,
+                                                                                 partitionId,
+                                                                                 storageLevel,
+                                                                                 offsetStore,
+                                                                                 receiverClient,
+                                                                                 maximumEventRate) {
 
   /** Use block generator to generate blocks to Spark block manager synchronously */
   private var blockGenerator: BlockGenerator = null
@@ -77,8 +79,8 @@ class ReliableEventHubsReceiver(
     super.onStart()
   }
 
-  override def processReceivedMessage(message: EventHubMessage): Unit = {
-    blockGenerator.addDataWithCallback(message.getData, message.getOffset)
+  override def processReceivedMessage(eventData: EventData): Unit = {
+    blockGenerator.addDataWithCallback(eventData.getBody, eventData.getSystemProperties.getOffset)
   }
 
   /**
@@ -123,11 +125,13 @@ class ReliableEventHubsReceiver(
     }
 
     def onGenerateBlock(blockId: StreamBlockId): Unit = {
+
       // Remember the offsets when a block has been generated
       blockOffsetMap.put(blockId, latestOffsetCurBlock)
     }
 
     def onPushBlock(blockId: StreamBlockId, arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
+
       // Store block and commit the blocks offset
       storeBlockAndCommitOffset(blockId, arrayBuffer)
     }

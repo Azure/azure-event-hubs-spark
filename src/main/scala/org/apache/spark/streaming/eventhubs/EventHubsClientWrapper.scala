@@ -58,7 +58,13 @@ class EventHubsClientWrapper extends Serializable {
     }
     val name = eventhubsParams("eventhubs.name")
 
-    createReceiverProxy(connectionString, name, partitionId, consumerGroup, -1, filter)
+    // Set credits if provided by user
+    var credits: Int = -1
+    if (eventhubsParams.contains("eventhubs.receiver.credits")) {
+      credits = eventhubsParams("eventhubs.receiver.credits").toInt
+    }
+
+    createReceiverProxy(connectionString, name, partitionId, consumerGroup, credits, filter)
   }
 
   private[eventhubs]
@@ -69,7 +75,7 @@ class EventHubsClientWrapper extends Serializable {
       defaultCredits: Int,
       filter: IEventHubFilter): Unit = {
     receiver = new ResilientEventHubReceiver(
-      connectionString, name, partitionId, consumerGroup, -1, filter)
+      connectionString, name, partitionId, consumerGroup, defaultCredits, filter)
     receiver.initialize()
   }
 

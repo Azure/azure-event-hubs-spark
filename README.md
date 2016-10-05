@@ -6,7 +6,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 
 ## Project References
 
-#### Maven Dependency
+### Maven Dependency
     <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11 -->
     <dependency>
         <groupId>com.microsoft.azure</groupId>

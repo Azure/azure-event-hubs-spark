@@ -21,8 +21,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>spark-streaming-eventhubs_2.10</artifactId>
-  <version>1.6.0</version>
+  <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+  <version>2.0.0</version>
   <licenses>
     <license>
       <name>The Apache License, Version 2.0</name>
@@ -44,8 +44,8 @@
   </scm>
   <properties>
     <sbt.project.name>spark-streaming-eventhubs</sbt.project.name>
-    <scala.binary.version>2.10</scala.binary.version>
-    <spark.version>1.6.2</spark.version>
+    <scala.binary.version>2.11</scala.binary.version>
+    <spark.version>2.0.0</spark.version>
     <github.global.server>github</github.global.server>
   </properties>
   <packaging>jar</packaging>

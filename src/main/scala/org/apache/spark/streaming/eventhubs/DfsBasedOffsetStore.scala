@@ -19,7 +19,7 @@ package org.apache.spark.streaming.eventhubs
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.Logging
+import org.apache.spark.internal.Logging
 
 /**
   * A DFS based OffsetStore implementation

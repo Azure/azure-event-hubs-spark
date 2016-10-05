@@ -1,50 +1,36 @@
 # spark-eventhubs
 This is the source code of EventHubsReceiver for Spark Streaming. 
 
-[Here](https://github.com/hdinsight/spark-streaming-data-persistence-examples) is an example project that uses EventHubsReceiver to count and persist messages from Azure Eventhubs.
+[Here](https://github.com/hdinsight/spark-streaming-data-persistence-examples/2.x) is an example project that uses EventHubsReceiver to count and persist messages from Azure Eventhubs.
+(Not available yet)
 
 ## Project References
 
-### Maven
-
-#### Repository
-    <repository>
-      <id>spark-eventhubs</id>
-      <url>https://raw.github.com/hdinsight/spark-eventhubs/maven-repo/</url>
-      <snapshots>
-        <enabled>true</enabled>
-        <updatePolicy>always</updatePolicy>
-      </snapshots>
-    </repository>
-
-#### Dependency
+#### Maven Dependency
+    <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11 -->
     <dependency>
-      <groupId>com.microsoft.azure</groupId>
-      <artifactId>spark-streaming-eventhubs_2.10</artifactId>
-      <version>2.0.0</version>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+        <version>2.0.0</version>
     </dependency>
     
-### SBT
+### SBT Dependency
+    // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.0"
 
-#### Repository
-    scalaVersion := "2.10.0"
+### Maven Central for other dependency co-ordinates
 
-    resolvers += "spark-eventhubs" at "https://raw.github.com/hdinsight/spark-eventhubs/maven-repo"
+https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.0
 
-#### Dependency
-    libraryDependencies ++= Seq(
-        "com.microsoft.azure" %% "spark-streaming-eventhubs" % "2.0.0"
-    )
-
-### Build Prerequisites
+## Build Prerequisites
 
 In order to build and run the examples, you need to have:
 
 1. Java 1.8 SDK.
 2. Maven 3.x
-3. Scala 2.10
+3. Scala 2.11
 
-### Build Command
+## Build Command
     mvn clean
     mvn package
 This command builds and installs EventHubsReceiver jar to local maven cache. Subsequently you can build any Spark Streaming application that references this jar.

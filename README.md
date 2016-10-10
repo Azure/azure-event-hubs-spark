@@ -1,8 +1,6 @@
 # spark-eventhubs
 This is the source code of EventHubsReceiver for Spark Streaming. 
 
-[comment]: # [Here](https://github.com/hdinsight/spark-streaming-data-persistence-examples) is an example project that uses EventHubsReceiver to count and persist messages from Azure Eventhubs.
-
 ## Project References
 
 ### Maven Dependency

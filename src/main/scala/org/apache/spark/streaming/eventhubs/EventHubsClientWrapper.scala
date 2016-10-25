@@ -124,10 +124,8 @@ class EventHubsClientWrapper extends Serializable {
   }
 
   def receive(): Iterable[EventData] = {
-
-    val receivedEvents: Iterable[EventData] = eventhubsReceiver.receive(MAXIMUM_EVENT_RATE).get().asScala
-
-    if (receivedEvents == null) List.empty[EventData] else receivedEvents
+    val events = eventhubsReceiver.receive(MAXIMUM_EVENT_RATE).get()
+    if (events == null) Iterable.empty else events.asScala
   }
 
   def close(): Unit = if(eventhubsReceiver != null) eventhubsReceiver.close()

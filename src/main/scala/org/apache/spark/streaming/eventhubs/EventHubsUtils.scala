@@ -50,7 +50,7 @@ object EventHubsUtils {
   def createUnionStream (
       streamingContext: StreamingContext,
       eventhubsParams: Map[String, String],
-      storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK
+      storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK_SER
     ): DStream[Array[Byte]] = {
     val partitionCount = eventhubsParams("eventhubs.partition.count").toInt
     val streams = (0 until partitionCount).map{
@@ -74,7 +74,7 @@ object EventHubsUtils {
     streamingContext: StreamingContext,
     eventhubsParams: Map[String, String],
     partitionId: String,
-    storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK,
+    storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK_SER,
     offsetStore: OffsetStore = null,
     receiverClient: EventHubsClientWrapper = new EventHubsClientWrapper
   ): ReceiverInputDStream[Array[Byte]] = {

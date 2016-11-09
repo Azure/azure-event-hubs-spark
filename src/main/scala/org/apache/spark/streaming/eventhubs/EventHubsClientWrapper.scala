@@ -16,6 +16,7 @@
  */
 package org.apache.spark.streaming.eventhubs
 
+import java.net.URI
 import java.time.Instant
 
 import com.microsoft.azure.eventhubs._
@@ -37,11 +38,23 @@ class EventHubsClientWrapper extends Serializable {
                      maximumEventRate: Int
                     ): Unit = {
 
-    //Create Eventhubs connection string
+    //Create Eventhubs connection string either from namespace (with default URI) or from specified URI
 
-    val connectionString: ConnectionStringBuilder = new ConnectionStringBuilder(eventhubsParams("eventhubs.namespace"),
-      eventhubsParams("eventhubs.name"), eventhubsParams("eventhubs.policyname"),
-      eventhubsParams("eventhubs.policykey"))
+    if(eventhubsParams.contains("eventhubs.uri") && eventhubsParams.contains("eventhubs.namespace")) {
+
+      throw new IllegalArgumentException(s"Eventhubs URI and namespace cannot both be specified at the same time.")
+    }
+
+    val connectionString: ConnectionStringBuilder = if(eventhubsParams.contains("eventhubs.namespace"))
+      new ConnectionStringBuilder(eventhubsParams("eventhubs.namespace"),
+        eventhubsParams("eventhubs.name"), eventhubsParams("eventhubs.policyname"),
+        eventhubsParams("eventhubs.policykey"))
+    else if (eventhubsParams.contains("eventhubs.uri"))
+      new ConnectionStringBuilder(new URI(eventhubsParams("eventhubs.uri")),
+        eventhubsParams("eventhubs.name"), eventhubsParams("eventhubs.policyname"),
+        eventhubsParams("eventhubs.policykey"))
+    else
+      throw new IllegalArgumentException(s"Either Eventhubs URI or namespace nust be specified.")
 
     //Set the consumer group if specified.
 
@@ -52,7 +65,7 @@ class EventHubsClientWrapper extends Serializable {
     //Set the epoch if specified
 
     val receiverEpoch: Long = if (eventhubsParams.contains("eventhubs.epoch")) eventhubsParams("eventhubs.epoch").toLong
-    else 0
+    else DEFAULT_RECEIVER_EPOCH
 
     //Determine the offset to start receiving data
 
@@ -103,20 +116,21 @@ class EventHubsClientWrapper extends Serializable {
     //Create Eventhubs receiver  based on the offset type and specification
     offsetType match  {
 
-      case EventhubsOffsetType.None => eventhubsReceiver = if(receiverEpoch > 0)
+      case EventhubsOffsetType.None => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
         eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, receiverEpoch)
       else eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
 
-      case EventhubsOffsetType.PreviousCheckpoint => eventhubsReceiver = if(receiverEpoch > 0)
+      case EventhubsOffsetType.PreviousCheckpoint => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
         eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, false, receiverEpoch)
       else  eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset, false)
 
-      case EventhubsOffsetType.InputByteOffset => eventhubsReceiver = if(receiverEpoch > 0)
+      case EventhubsOffsetType.InputByteOffset => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
         eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, false, receiverEpoch)
       else eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset, false)
 
-      case EventhubsOffsetType.InputTimeOffset => eventhubsReceiver = if(receiverEpoch > 0)
-        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch)
+      case EventhubsOffsetType.InputTimeOffset => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
+        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong),
+          receiverEpoch)
       else eventhubsClient.createReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong))
     }
 
@@ -131,9 +145,9 @@ class EventHubsClientWrapper extends Serializable {
 
   def close(): Unit = if(eventhubsReceiver != null) eventhubsReceiver.close()
 
-
   private var eventhubsReceiver: PartitionReceiver = _
   private val MINIMUM_PREFETCH_COUNT: Int = 10
   private var MAXIMUM_PREFETCH_COUNT: Int = 999
   private var MAXIMUM_EVENT_RATE: Int = 0
+  private val DEFAULT_RECEIVER_EPOCH: Long = -1
 }

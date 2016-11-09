@@ -49,13 +49,13 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
                                                                                  maximumEventRate) {
 
   /** Use block generator to generate blocks to Spark block manager synchronously */
-  private var blockGenerator: BlockGenerator = null
+  private var blockGenerator: BlockGenerator = _
 
   /** A string to store the latest offset in the current block for the current partition. */
-  private var latestOffsetCurBlock: String = null
+  private var latestOffsetCurBlock: String = _
 
   /** A concurrent HashMap to store the stream block id and related offset snapshot. */
-  private var blockOffsetMap: ConcurrentHashMap[StreamBlockId, String] = null
+  private var blockOffsetMap: ConcurrentHashMap[StreamBlockId, String] = _
 
   override def onStop() {
     super.onStop()

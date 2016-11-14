@@ -80,14 +80,16 @@ class DfsBasedOffsetStore(
       }
     }
 
-    val backupStream = backupCheckpointFile.create(backupPath, true)
-    try {
-      backupStream.writeUTF(offset)
-      writeSuccessful = true
-    } catch {
-      case e: Exception => logError(s"Failed to write offset to backup checkpoint file $backupPath", e)
-    } finally {
-      backupStream.close()
+    if(readSuccessful) {
+      val backupStream = backupCheckpointFile.create(backupPath, true)
+      try {
+        backupStream.writeUTF(offset)
+        writeSuccessful = true
+      } catch {
+        case e: Exception => logError(s"Failed to write offset to backup checkpoint file $backupPath", e)
+      } finally {
+        backupStream.close()
+      }
     }
 
     if (writeSuccessful || !readSuccessful) {

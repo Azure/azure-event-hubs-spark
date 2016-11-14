@@ -151,8 +151,8 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     Thread sleep 1000
     receiver.onStop()
 
-    verify(executorMock, times(1)).restartReceiver("Error handling message, restarting receiver",
-      Some(eventhubException))
+    verify(executorMock, times(1)).restartReceiver(s"Error handling message," +
+      s" restarting receiver for partition $eventhubPartitionId", Some(eventhubException))
 
     verify(offsetStoreMock, times(1)).open()
     verify(offsetStoreMock, times(1)).close()

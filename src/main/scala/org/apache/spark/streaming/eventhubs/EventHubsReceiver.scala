@@ -17,17 +17,16 @@
 package org.apache.spark.streaming.eventhubs
 
 import org.apache.spark.storage.StorageLevel
+
 import scala.collection.Map
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.receiver.Receiver
 import com.microsoft.azure.eventhubs._
-import scala.util.control.ControlThrowable
 
+import scala.util.control.ControlThrowable
 import org.apache.spark.util.ThreadUtils
 
-/**
-Spark 2.0.0+
- */
+// Spark 1.6.x
 
 private[eventhubs]
 class EventHubsReceiver(
@@ -60,7 +59,7 @@ class EventHubsReceiver(
     * It is used to throw away messages with backwards sequence number, to avoid duplicates
     * when receiver is restarted due to transient errors.
     * Note that Sequence number is monotonically increasing */
-  private var latestSequence: Long = Long.MinValue
+  //private var latestSequence: Long = Long.MinValue
 
   /** The offset to be saved after current checkpoint interval */
   protected var offsetToSave: String = _
@@ -89,7 +88,6 @@ class EventHubsReceiver(
     } finally {
 
       executorPool.shutdown() // Just causes threads to terminate after work is done
-
     }
   }
 
@@ -112,7 +110,7 @@ class EventHubsReceiver(
       eventhubsParams("eventhubs.checkpoint.interval").toInt * 1000
     else 10000
 
-    var nextTime = System.currentTimeMillis() + checkpointInterval
+    var nextCheckpointTime = System.currentTimeMillis() + checkpointInterval
 
     def run() {
 
@@ -126,38 +124,58 @@ class EventHubsReceiver(
 
         receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore, maximumEventRate)
 
+        var lastMaximumSequence: Long  = 0
+
         while (!stopMessageHandler) {
 
           val receivedEvents: Iterable[EventData] = receiverClient.receive()
 
-          if (receivedEvents != null) {
-            receivedEvents.foreach(x => {
-              if (x.getSystemProperties.getSequenceNumber > latestSequence) {
-                latestSequence = x.getSystemProperties.getSequenceNumber
-                processReceivedMessage(x)
-              }
-            })
+          if (receivedEvents != null && receivedEvents.nonEmpty) {
+
+            val eventCount = receivedEvents.count(x => x.getBodyLength > 0)
+            val sequenceNumbers: Iterable[Long] = receivedEvents.map(x => x.getSystemProperties.getSequenceNumber)
+
+            if (sequenceNumbers != null && sequenceNumbers.nonEmpty) {
+
+              val maximumSequenceNumber: Long = sequenceNumbers.reduceLeft { (x, y) => if (x > y) x else y }
+              val minimumSequenceNumber: Long = sequenceNumbers.reduceLeft { (x, y) => if (x < y) x else y }
+              val missingSequenceCount: Long = maximumSequenceNumber - minimumSequenceNumber - eventCount + 1
+              val sequenceNumberDiscontinuity: Long = minimumSequenceNumber - (lastMaximumSequence + 1)
+
+              lastMaximumSequence = maximumSequenceNumber
+
+              logDebug(s"Partition Id: $partitionId, Event Count: $eventCount," +
+                s" Maximum Sequence Number: $maximumSequenceNumber, Minimum Sequence Number: $minimumSequenceNumber," +
+                s" Missing Sequence Count: $missingSequenceCount," +
+                s" Sequence Number Discontinuity = $sequenceNumberDiscontinuity")
+            }
+            else {
+
+              logDebug(s"Partition Id: $partitionId, Event Count: $eventCount")
+            }
+
+            receivedEvents.foreach(x => processReceivedMessage(x))
           }
 
-          val now = System.currentTimeMillis()
+          val currentTime = System.currentTimeMillis()
 
-          if(now >= nextTime) {
-
-            //logInfo("now: " + now + ", nextTime: " + nextTime)
-            //logInfo("offsetToSave: " + offsetToSave + ", savedOffset: " + savedOffset)
+          if(currentTime >= nextCheckpointTime) {
 
             if(offsetToSave != savedOffset) {
-              logInfo("writing offset to store: " + offsetToSave + ", partition: " + partitionId)
+              logInfo(s"Partition Id: $partitionId, Current Time: $currentTime," +
+                s" Next Checkpoint Time: $nextCheckpointTime, Saved Offset: $offsetToSave")
+
               myOffsetStore.write(offsetToSave)
               savedOffset = offsetToSave
-              nextTime = now + checkpointInterval
+              nextCheckpointTime = currentTime + checkpointInterval
             }
           }
         }
       } catch {
 
-        case c: ControlThrowable => throw c // propagate these bad throwable
-        case e: Throwable => restart("Error handling message, restarting receiver", e)
+        //case c: ControlThrowable => throw c // propagate these bad throwable
+        case e: Throwable => restart(s"Error handling message, restarting receiver for partition $partitionId", e)
+
       } finally {
 
         myOffsetStore.close()

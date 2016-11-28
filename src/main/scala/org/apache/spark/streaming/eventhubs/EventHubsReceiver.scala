@@ -91,6 +91,7 @@ class EventHubsReceiver(
     }
   }
 
+  @deprecated
   def processReceivedMessage(eventData: EventData): Unit = {
 
     // Just store the event data to Spark and update offsetToSave
@@ -98,6 +99,22 @@ class EventHubsReceiver(
 
     offsetToSave = eventData.getSystemProperties.getOffset
   }
+
+  def processReceivedMessagesInBatch(eventDataBatch: Iterable[EventData]): Unit = {
+
+    store(eventDataBatch.map(x => x.getBody).toIterator)
+
+    val maximumSequenceNumber: Long = eventDataBatch.map(x => x.getSystemProperties.getSequenceNumber)
+      .reduceLeft { (x, y) => if (x > y) x else y }
+
+    /**
+      * It is guaranteed by Eventhubs that the event data with the highest sequence number has the largest offset
+      */
+
+    offsetToSave = eventDataBatch.find(x => x.getSystemProperties.getSequenceNumber == maximumSequenceNumber).get
+      .getSystemProperties.getOffset
+  }
+
 
   // Handles EventHubs messages
   private[eventhubs]
@@ -154,7 +171,9 @@ class EventHubsReceiver(
               logDebug(s"Partition Id: $partitionId, Event Count: $eventCount")
             }
 
-            receivedEvents.foreach(x => processReceivedMessage(x))
+            //receivedEvents.foreach(x => processReceivedMessage(x))
+
+            processReceivedMessagesInBatch(receivedEvents)
           }
 
           val currentTime = System.currentTimeMillis()

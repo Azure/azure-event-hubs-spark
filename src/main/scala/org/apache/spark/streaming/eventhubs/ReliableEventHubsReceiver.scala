@@ -17,6 +17,7 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.util.concurrent.ConcurrentHashMap
+//import com.microsoft.eventhubs.client.EventHubMessage
 import org.apache.spark.SparkEnv
 import org.apache.spark.storage.{StreamBlockId, StorageLevel}
 import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener}
@@ -47,15 +48,6 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
                                                                                  receiverClient,
                                                                                  maximumEventRate) {
 
-  /** Use block generator to generate blocks to Spark block manager synchronously */
-  private var blockGenerator: BlockGenerator = _
-
-  /** A string to store the latest offset in the current block for the current partition. */
-  private var latestOffsetCurBlock: String = _
-
-  /** A concurrent HashMap to store the stream block id and related offset snapshot. */
-  private var blockOffsetMap: ConcurrentHashMap[StreamBlockId, String] = _
-
   override def onStop() {
     super.onStop()
 
@@ -78,36 +70,57 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
     super.onStart()
   }
 
+  @deprecated
   override def processReceivedMessage(eventData: EventData): Unit = {
     blockGenerator.addDataWithCallback(eventData.getBody, eventData.getSystemProperties.getOffset)
   }
 
+  override def processReceivedMessagesInBatch(eventDataBatch: Iterable[EventData]): Unit = {
+
+    val maximumSequenceNumber: Long = eventDataBatch.map(x => x.getSystemProperties.getSequenceNumber)
+      .reduceLeft { (x, y) => if (x > y) x else y }
+
+    val offsetMetadata = eventDataBatch.find(x => x.getSystemProperties.getSequenceNumber == maximumSequenceNumber).get
+      .getSystemProperties.getOffset
+
+    /**
+      * It is guaranteed by Eventhubs that the event data with the highest sequence number has the largest offset
+      */
+
+    blockGenerator.addMultipleDataWithCallback(eventDataBatch.map(x => x.getBody).toIterator, offsetMetadata)
+  }
+
   /**
-   * Store the ready-to-be-stored block and commit the related offsets to OffsetStore. This method
-   * will try a fixed number of times to push the block. If the push fails, the receiver is stopped.
-   */
-  private def storeBlockAndCommitOffset(
-      blockId: StreamBlockId,
-      arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
+    * Store the ready-to-be-stored block and commit the related offsets to OffsetStore. This method
+    * will try a fixed number of times to push the block. If the push fails, the receiver is stopped.
+    */
+  private def storeBlockAndCommitOffset(blockId: StreamBlockId, arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
+
     var count = 0
     var pushed = false
     var exception: Exception = null
-    while (!pushed && count <= 3) {
+
+    while (!pushed && count < RETRY_COUNT) {
       try {
         store(arrayBuffer.asInstanceOf[mutable.ArrayBuffer[Array[Byte]]])
         pushed = true
       } catch {
-        case ex: Exception =>
+        case e: Exception =>
           count += 1
-          exception = ex
+          exception = e
+          Thread.sleep(SECONDS_BETWEEN_RETRY * 1000)
       }
     }
+
     if (pushed) {
+
       // commit the latest offset of the block to offsetToSave, when the checkpoint interval
       // passes the offset is saved to offset store
       offsetToSave = blockOffsetMap.get(blockId)
       blockOffsetMap.remove(blockId)
+
     } else {
+
       stop("Error while storing block into Spark", exception)
     }
   }
@@ -139,4 +152,17 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
       reportError(message, throwable)
     }
   }
+
+  /** Use block generator to generate blocks to Spark block manager synchronously */
+  private var blockGenerator: BlockGenerator = _
+
+  /** A string to store the latest offset in the current block for the current partition. */
+  private var latestOffsetCurBlock: String = _
+
+  /** A concurrent HashMap to store the stream block id and related offset snapshot. */
+  private var blockOffsetMap: ConcurrentHashMap[StreamBlockId, String] = _
+
+  private val RETRY_COUNT: Int = 10
+
+  private val SECONDS_BETWEEN_RETRY = 1
 }

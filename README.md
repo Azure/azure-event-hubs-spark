@@ -10,16 +10,16 @@ This is the source code of EventHubsReceiver for Spark Streaming.
     <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>spark-streaming-eventhubs_2.11</artifactId>
-        <version>2.0.1</version>
+        <version>2.0.2</version>
     </dependency>
     
 ### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.1"
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.2"
 
 ### Maven Central for other dependency co-ordinates
 
-https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.1
+https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.2
 
 ## Build Prerequisites
 

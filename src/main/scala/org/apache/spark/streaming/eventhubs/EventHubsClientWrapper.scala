@@ -113,24 +113,14 @@ class EventHubsClientWrapper extends Serializable {
     //Create Eventhubs client
     val eventhubsClient: EventHubClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
-    //Create Eventhubs receiver  based on the offset type and specification
-    offsetType match  {
-
-      case EventhubsOffsetType.None => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
+    eventhubsReceiver = offsetType match  {
+      case EventhubsOffsetType.None | EventhubsOffsetType.PreviousCheckpoint
+           | EventhubsOffsetType.InputByteOffset  => if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
         eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, receiverEpoch)
       else eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
 
-      case EventhubsOffsetType.PreviousCheckpoint => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
-        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, false, receiverEpoch)
-      else  eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset, false)
-
-      case EventhubsOffsetType.InputByteOffset => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
-        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset, false, receiverEpoch)
-      else eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset, false)
-
-      case EventhubsOffsetType.InputTimeOffset => eventhubsReceiver = if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
-        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong),
-          receiverEpoch)
+      case EventhubsOffsetType.InputTimeOffset => if(receiverEpoch > DEFAULT_RECEIVER_EPOCH)
+        eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch)
       else eventhubsClient.createReceiverSync(consumerGroup, partitionId, Instant.ofEpochSecond(currentOffset.toLong))
     }
 

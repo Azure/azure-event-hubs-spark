@@ -23,8 +23,8 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.SparkConf
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.dstream.ReceiverInputDStream
+import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}
+import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 import org.apache.spark.streaming.receiver.Receiver
 
 
@@ -100,11 +100,17 @@ object EventHubsUtils {
       storageLevel, Option(offsetStore), receiverClient))
   }
 
+  def createDirectStreams(
+      ssc: StreamingContext,
+      connectionString: String): Unit = {
+    // TODO: is there any other parameters
+  }
+
   /**
    * A helper function to get EventHubsReceiver or ReliableEventHubsReceiver based on whether
    * Write Ahead Log is enabled or not ("spark.streaming.receiver.writeAheadLog.enable")
    */
-  private def getReceiver(streamingContext: StreamingContext,
+  private[eventhubs] def getReceiver(streamingContext: StreamingContext,
                           eventhubsParams: Map[String, String],
                           partitionId: String,
                           storageLevel: StorageLevel,

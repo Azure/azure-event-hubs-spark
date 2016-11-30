@@ -22,6 +22,7 @@ import com.microsoft.azure.eventhubs._
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.streaming.eventhubs.checkpoint.{DfsBasedOffsetStore, OffsetStore}
 import org.apache.spark.streaming.receiver.Receiver
 import org.apache.spark.util.ThreadUtils
 

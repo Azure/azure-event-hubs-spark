@@ -22,6 +22,7 @@ import scala.language.implicitConversions
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 
 /**

@@ -21,7 +21,7 @@ import java.io.File
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
-import org.apache.spark.streaming.eventhubs.EventhubsOffsetType.EventhubsOffsetType
+import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.util.Utils
 
 import scala.concurrent.duration._
@@ -164,7 +164,7 @@ class MyMockedEventHubsClientWrapper(
                                       currentOffset: String,
                                       receiverEpoch: Long): Unit = {
 
-    if (offsetType != EventhubsOffsetType.None) {
+    if (offsetType != EventhubsOffsetTypes.None) {
 
       offset = currentOffset.toInt
       partition = partitionId

@@ -1,4 +1,4 @@
 set -e
-mvn scalastyle:test
+mvn scalastyle:check
 mvn package
 mvn test        

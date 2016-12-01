@@ -17,13 +17,14 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.util.concurrent.ConcurrentHashMap
-//import com.microsoft.eventhubs.client.EventHubMessage
-import org.apache.spark.SparkEnv
-import org.apache.spark.storage.{StreamBlockId, StorageLevel}
-import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener}
+
 import scala.collection.{mutable, Map}
 
 import com.microsoft.azure.eventhubs._
+
+import org.apache.spark.SparkEnv
+import org.apache.spark.storage.{StorageLevel, StreamBlockId}
+import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener}
 
 /**
  * ReliableEventHubsReceiver offers the ability to reliably store data into BlockManager without
@@ -36,21 +37,18 @@ import com.microsoft.azure.eventhubs._
  * problem of EventHubsReceiver can be eliminated.
  */
 private[eventhubs]
-class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
-                                partitionId: String,
-                                storageLevel: StorageLevel,
-                                offsetStore: OffsetStore,
-                                receiverClient: EventHubsClientWrapper,
-                                maximumEventRate: Int) extends EventHubsReceiver(eventhubsParams,
-                                                                                 partitionId,
-                                                                                 storageLevel,
-                                                                                 offsetStore,
-                                                                                 receiverClient,
-                                                                                 maximumEventRate) {
+class ReliableEventHubsReceiver(
+    eventhubsParams: Map[String, String],
+    partitionId: String,
+    storageLevel: StorageLevel,
+    offsetStore: Option[OffsetStore],
+    receiverClient: EventHubsClientWrapper,
+    maximumEventRate: Int)
+  extends EventHubsReceiver(
+    eventhubsParams, partitionId, storageLevel, offsetStore, receiverClient, maximumEventRate) {
 
   override def onStop() {
     super.onStop()
-
     if (blockGenerator != null) {
       blockGenerator.stop()
       blockGenerator = null
@@ -62,8 +60,7 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
   }
 
   override def onStart() {
-    blockOffsetMap = new ConcurrentHashMap[StreamBlockId,String]
-
+    blockOffsetMap = new ConcurrentHashMap[StreamBlockId, String]
     // Initialize the block generator for storing EventHubs message.
     blockGenerator = new BlockGenerator(new GeneratedBlockHandler, streamId, SparkEnv.get.conf)
     blockGenerator.start()
@@ -76,30 +73,29 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
   }
 
   override def processReceivedMessagesInBatch(eventDataBatch: Iterable[EventData]): Unit = {
-
-    val maximumSequenceNumber: Long = eventDataBatch.map(x => x.getSystemProperties.getSequenceNumber)
-      .reduceLeft { (x, y) => if (x > y) x else y }
-
-    val offsetMetadata = eventDataBatch.find(x => x.getSystemProperties.getSequenceNumber == maximumSequenceNumber).get
-      .getSystemProperties.getOffset
-
+    val maximumSequenceNumber = eventDataBatch.map(x => x.getSystemProperties.getSequenceNumber).
+      reduceLeft { (x, y) => if (x > y) x else y }
+    val offsetMetadata = eventDataBatch.find(x =>
+      x.getSystemProperties.getSequenceNumber == maximumSequenceNumber).get.getSystemProperties.
+      getOffset
     /**
-      * It is guaranteed by Eventhubs that the event data with the highest sequence number has the largest offset
-      */
-
-    blockGenerator.addMultipleDataWithCallback(eventDataBatch.map(x => x.getBody).toIterator, offsetMetadata)
+     * It is guaranteed by Eventhubs that the event data with the highest sequence number has the
+     * largest offset
+     */
+    blockGenerator.addMultipleDataWithCallback(eventDataBatch.map(x => x.getBody).toIterator,
+      offsetMetadata)
   }
 
   /**
-    * Store the ready-to-be-stored block and commit the related offsets to OffsetStore. This method
-    * will try a fixed number of times to push the block. If the push fails, the receiver is stopped.
-    */
-  private def storeBlockAndCommitOffset(blockId: StreamBlockId, arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
-
+   * Store the ready-to-be-stored block and commit the related offsets to OffsetStore. This method
+   * will try a fixed number of times to push the block. If the push fails, the receiver is stopped.
+   */
+  private def storeBlockAndCommitOffset(
+      blockId: StreamBlockId,
+      arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
     var count = 0
     var pushed = false
     var exception: Exception = null
-
     while (!pushed && count < RETRY_COUNT) {
       try {
         store(arrayBuffer.asInstanceOf[mutable.ArrayBuffer[Array[Byte]]])
@@ -111,16 +107,12 @@ class ReliableEventHubsReceiver(eventhubsParams: Map[String, String],
           Thread.sleep(SECONDS_BETWEEN_RETRY * 1000)
       }
     }
-
     if (pushed) {
-
       // commit the latest offset of the block to offsetToSave, when the checkpoint interval
       // passes the offset is saved to offset store
       offsetToSave = blockOffsetMap.get(blockId)
       blockOffsetMap.remove(blockId)
-
     } else {
-
       stop("Error while storing block into Spark", exception)
     }
   }

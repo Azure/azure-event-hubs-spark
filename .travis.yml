@@ -6,4 +6,4 @@ jdk:
   - oraclejdk8
 
 script:
-  - run_test.sh
+  - run_tests.sh

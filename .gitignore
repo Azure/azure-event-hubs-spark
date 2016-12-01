@@ -5,3 +5,4 @@
 .idea/
 target/
 *.iml
+scalastyle-output.xml

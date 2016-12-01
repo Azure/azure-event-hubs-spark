@@ -18,22 +18,23 @@ package org.apache.spark.streaming.eventhubs
 
 import java.io.File
 
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration._
+
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
+import org.mockito.internal.util.reflection.Whitebox
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.concurrent.Eventually
+import org.scalatest.mock.MockitoSugar
+
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.SparkConf
 import org.apache.spark.util.Utils
 
-import scala.concurrent.duration._
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.SparkConf
-import org.apache.spark.streaming.{Milliseconds, StreamingContext}
-import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
-import org.scalatest.mock.MockitoSugar
-import org.mockito.internal.util.reflection.Whitebox
-
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * Test suite for ReliableEventHubsReceiver
@@ -90,15 +91,13 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
     }
   }
 
-  //Test ignored due to an issue with mocking library unavailable to the executors.
+  // Test ignored due to an issue with mocking library unavailable to the executors.
 
   test("Reliable EventHubs input stream") {
     // after 100 messages then start to receive null
     ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, -1)
-
-    val stream = EventHubsUtils.createStream(streamingContext, eventhubParameters, "0", StorageLevel.MEMORY_ONLY,
-      offsetStoreMock, ehClientWrapperMock)
-
+    val stream = EventHubsUtils.createStream(streamingContext, eventhubParameters, "0",
+      StorageLevel.MEMORY_ONLY, offsetStoreMock, ehClientWrapperMock)
     var count = 0
     stream.map { v => v }.foreachRDD { r =>
       val ret = r.collect()
@@ -107,23 +106,19 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
       }
     }
     streamingContext.start()
-
     eventually(timeout(4000.milliseconds), interval(200.milliseconds)) {
-
       // Make sure we have received 100 messages
       assert(count === 100)
     }
   }
 
-  //Test ignored due to an issue with mocking library unavailable to the executors.
+  // Test ignored due to an issue with mocking library unavailable to the executors.
 
   test("Reliable EventHubs input stream recover from exception") {
     // After 60 messages then exception, after 100 messages then receive null
     ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, 60)
-
-    val stream = EventHubsUtils.createStream(streamingContext, eventhubParameters, "0", StorageLevel.MEMORY_ONLY,
-      offsetStoreMock, ehClientWrapperMock)
-
+    val stream = EventHubsUtils.createStream(streamingContext, eventhubParameters, "0",
+      StorageLevel.MEMORY_ONLY, offsetStoreMock, ehClientWrapperMock)
     var count = 0
     stream.map { v => v }.foreachRDD { r =>
       val ret = r.collect()
@@ -173,7 +168,7 @@ class MyMockedEventHubsClientWrapper(
 
   override def receive(): Iterable[EventData] = {
 
-    if(count == myExceptionCount) {
+    if (count == myExceptionCount) {
       // make sure we only throw exception once
       myExceptionCount = -1
       throw new RuntimeException("count = " + count)
@@ -183,25 +178,18 @@ class MyMockedEventHubsClientWrapper(
     // do not send more than emitCount number of messages
     if(count <= emitCount) {
 
-      val eventData: EventData = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))
-
-      val systemPropertiesMap: java.util.HashMap[String, AnyRef] = new java.util.HashMap[String, AnyRef]()
-
+      val eventData = new EventData(Array.fill(8)(
+        (scala.util.Random.nextInt(256) - 128).toByte))
+      val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()
       systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME, offset.toString)
       systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, Long.box(count))
       systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, partition)
-
-      val systemProperties : SystemProperties =  new SystemProperties(systemPropertiesMap)
-
+      val systemProperties = new SystemProperties(systemPropertiesMap)
       Whitebox.setInternalState(eventData, "systemProperties", systemProperties)
-
       val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
       eventDataCollection += eventData
-
       eventDataCollection
-    }
-    else {
-
+    } else {
       Thread sleep 1000
       null
     }

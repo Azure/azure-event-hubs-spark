@@ -91,7 +91,7 @@ class EventHubsClientWrapper extends Serializable {
       MAXIMUM_PREFETCH_COUNT = MINIMUM_PREFETCH_COUNT
     } else if (maximumEventRate >= MINIMUM_PREFETCH_COUNT &&
       maximumEventRate < MAXIMUM_PREFETCH_COUNT) {
-      MAXIMUM_PREFETCH_COUNT = MAXIMUM_EVENT_RATE + 1
+      MAXIMUM_PREFETCH_COUNT = maximumEventRate + 1
     } else {
       MAXIMUM_EVENT_RATE = MAXIMUM_PREFETCH_COUNT - 1
     }

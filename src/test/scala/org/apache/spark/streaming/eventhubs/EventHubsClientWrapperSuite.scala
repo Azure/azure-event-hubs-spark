@@ -23,10 +23,7 @@ import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
-<<<<<<< HEAD
-=======
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
->>>>>>> direct stream based on eventhub
 
 /**
  * Test suite for EventHubsClientWrapper

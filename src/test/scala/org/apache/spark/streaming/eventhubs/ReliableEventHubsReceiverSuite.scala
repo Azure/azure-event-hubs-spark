@@ -33,10 +33,7 @@ import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.SparkConf
-<<<<<<< HEAD
-=======
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
->>>>>>> direct stream based on eventhub
 import org.apache.spark.util.Utils
 
 

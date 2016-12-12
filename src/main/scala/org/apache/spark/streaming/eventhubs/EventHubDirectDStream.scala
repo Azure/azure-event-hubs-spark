@@ -43,7 +43,7 @@ class EventHubDirectDStream(
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
-  @transient private[eventhubs] var _eventHubClient: RestfulEventHubClient = _
+  @transient private[eventhubs] var _eventHubClient: EventHubClient = _
 
   @transient private[eventhubs] var _offsetStore: OffsetStoreNew = _
 
@@ -68,6 +68,15 @@ class EventHubDirectDStream(
     _eventHubClient
   }
 
+  private[eventhubs] def setOffsetStore(offsetStore: OffsetStoreNew): Unit = {
+    _offsetStore = offsetStore
+  }
+
+  // Only for test
+  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
+    _eventHubClient = eventHubClient
+  }
+
   private[eventhubs] def offsetStore = {
     if (_offsetStore == null) {
       _offsetStore = OffsetStoreNew.newInstance(
@@ -81,7 +90,7 @@ class EventHubDirectDStream(
   }
 
   // from eventHubName to offset
-  private var currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)] =
+  private[eventhubs] var currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)] =
     Map[EventHubNameAndPartition, (Long, Long)]()
 
   override def start(): Unit = {

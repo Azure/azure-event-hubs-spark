@@ -22,10 +22,5 @@ trait EventHubClient extends Serializable {
 
   def endPointOfPartition(): Option[Map[EventHubNameAndPartition, (Long, Long)]]
 
-  protected[eventhubs] def fromOffsetToSeqIDs(
-      eventHubParameters: Map[String, Map[String, String]],
-      offsets: Option[Map[EventHubNameAndPartition, Long]]):
-    Option[Map[EventHubNameAndPartition, Long]]
-
   def close(): Unit
 }

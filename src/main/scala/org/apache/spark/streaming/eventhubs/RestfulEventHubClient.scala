@@ -127,36 +127,4 @@ private[eventhubs] class RestfulEventHubClient(
   override def endPointOfPartition(): Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     queryPartitionRuntimeInfo(fromResponseBodyToEndpoint)
   }
-
-  override protected[eventhubs] def fromOffsetToSeqIDs(
-      eventHubParameters: Map[String, Map[String, String]],
-      offsets: Option[Map[EventHubNameAndPartition, Long]]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    if (offsets.isEmpty) {
-      None
-    } else {
-      // create a set of consumers
-      val consumers = offsets.get.map {
-        case (eventHubNameAndPartition, offset) =>
-          (eventHubNameAndPartition,
-            EventHubsClientWrapper.getEventHubClient(
-              eventHubParameters(eventHubNameAndPartition.toString),
-              eventHubNameAndPartition.partitionId, offset, maximumEventRate = 1))
-      }
-      val futures = consumers.map { case (nameAndPartition, consumer) =>
-        Future {
-          val offset = consumer.receive().head
-          (nameAndPartition, offset.getSystemProperties.getSequenceNumber)
-        }
-      }
-      var ret: Option[Map[EventHubNameAndPartition, Long]] = None
-      Future.sequence(futures).onComplete {
-        case Success(seqIDs) =>
-          ret = Some(seqIDs.toMap)
-        case Failure(err) =>
-          err.printStackTrace()
-      }
-      ret
-    }
-  }
 }

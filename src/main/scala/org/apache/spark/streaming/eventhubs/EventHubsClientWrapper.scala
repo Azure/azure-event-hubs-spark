@@ -171,14 +171,6 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
   private var MAXIMUM_EVENT_RATE: Int = 0
   private val DEFAULT_RECEIVER_EPOCH = -1L
 
-  override protected[eventhubs] def fromOffsetToSeqIDs(
-      eventHubParameters: Predef.Map[String, Predef.Map[String, String]],
-      offsets: Option[Predef.Map[EventHubNameAndPartition, Long]]):
-    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
-    throw new UnsupportedOperationException("fromOffsetToSeqIDs is not supported by this client" +
-      " yet, please use RestfulEventHubClient")
-  }
-
   override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
       " yet, please use RestfulEventHubClient")

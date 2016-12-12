@@ -21,15 +21,18 @@ import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.mockito.{Matchers, Mockito}
+import org.mockito.Mockito._
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Checkpoint, Duration, StreamingContext, Time}
-import org.apache.spark.streaming.eventhubs.checkpoint.DfsBasedOffsetStore2
+import org.apache.spark.streaming.eventhubs.checkpoint.{DfsBasedOffsetStore2, OffsetStore}
 import org.apache.spark.util.Utils
 
 
-class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfterAll {
+class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
 
   var ssc: StreamingContext = _
   val eventhubParameters = Map[String, String] (
@@ -41,15 +44,44 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfterAll {
     "eventhubs.consumergroup" -> "$Default"
   )
 
-  override def beforeAll(): Unit = {
+  before {
     ssc = new StreamingContext(new SparkContext(new SparkConf().
       set("spark.master", "local[*]").set("spark.app.name", "EventHubDirectDStreamSuite")),
       Duration(10000))
-    ssc.sparkContext.setLogLevel("ERROR")
   }
 
-  override def afterAll(): Unit = {
+  after {
     ssc.stop()
+  }
+
+  test("skip the batch when detecting the same offset") {
+    val offsetStoreMock = mock[DfsBasedOffsetStore2]
+    Mockito.when(offsetStoreMock.read()).thenReturn(
+      Map(EventHubNameAndPartition("eh1", 1) -> (1L, 1L)))
+    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
+    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
+    val fs = tempPath.getFileSystem(new Configuration())
+    fs.mkdirs(tempPath)
+    ehDStream.setOffsetStore(offsetStoreMock)
+    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("eh1", 1) -> (1L, 1L))
+    ssc.scheduler.start()
+    assert(ehDStream.compute(Time(1000)).get.count() === 0)
+  }
+
+  test("skip the batch when failed to fetch the latest offset of partitions") {
+    val eventHubClientMock = mock[EventHubClient]
+    Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
+    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
+    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
+    val fs = tempPath.getFileSystem(new Configuration())
+    fs.mkdirs(tempPath)
+    ehDStream.setEventHubClient(eventHubClientMock)
+    ssc.scheduler.start()
+    assert(ehDStream.compute(Time(1000)).get.count() === 0)
   }
 
   test("checkpoint directories are configured correctly when EventHubDirectDStream" +

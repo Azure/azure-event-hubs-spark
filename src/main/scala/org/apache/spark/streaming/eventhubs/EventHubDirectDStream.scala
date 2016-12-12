@@ -48,14 +48,17 @@ private[eventhubs] class EventHubDirectDStream(
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
+  @transient private var _eventHubClient: EventHubClient = _
+  @transient private var _offsetStore: OffsetStoreNew = _
+
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
-    EventHubDirectDStream._eventHubClient = eventHubClient
+    _eventHubClient = eventHubClient
   }
 
   private[eventhubs] def eventHubClient = {
-    if (EventHubDirectDStream._eventHubClient == null) {
+    if (_eventHubClient == null) {
       // TODO: enable customized implementation in future
-      EventHubDirectDStream._eventHubClient = new RestfulEventHubClient(eventHubNameSpace,
+      _eventHubClient = new RestfulEventHubClient(eventHubNameSpace,
         numPartitionsEventHubs = {
           eventhubsParams.map { case (eventhubName, params) => (eventhubName,
             params("eventhubs.partition.count").toInt)
@@ -71,25 +74,25 @@ private[eventhubs] class EventHubDirectDStream(
         },
         threadNum = 15)
     }
-    EventHubDirectDStream._eventHubClient
+    _eventHubClient
   }
 
   private[eventhubs] def setOffsetStore(offsetStore: OffsetStoreNew): Unit = {
-    EventHubDirectDStream._offsetStore = offsetStore
+    _offsetStore = offsetStore
   }
 
   // Only for test
   private[eventhubs] def offsetStore = {
-    if (EventHubDirectDStream._offsetStore == null) {
+    if (_offsetStore == null) {
       // TODO: enable customized implementation in future
-      EventHubDirectDStream._offsetStore = OffsetStoreNew.newInstance(
+      _offsetStore = OffsetStoreNew.newInstance(
         checkpointDir,
         ssc.sparkContext.appName,
         this.id,
         eventHubNameSpace,
         ssc.sparkContext.hadoopConfiguration)
     }
-    EventHubDirectDStream._offsetStore
+    _offsetStore
   }
 
   // from eventHubName to offset
@@ -267,10 +270,3 @@ private[eventhubs] class EventHubDirectDStream(
     }
   }
 }
-
-private[eventhubs] object EventHubDirectDStream {
-
-  @transient private var _eventHubClient: EventHubClient = _
-  @transient private var _offsetStore: OffsetStoreNew = _
-}
-

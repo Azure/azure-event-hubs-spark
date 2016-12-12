@@ -115,6 +115,7 @@ class DfsBasedOffsetStore2Suite extends FunSuite with BeforeAndAfterAll with Bef
       offsetStore.read()
     }
     assert(caught.getMessage == s"detect inconsistent checkpoint at 1000 $nameSpace 0 0 0," +
-      s" expected timestamp: 2000")
+      s" expected timestamp: 2000," +
+      s" it might be a bug in the implementation of underlying file system")
   }
 }

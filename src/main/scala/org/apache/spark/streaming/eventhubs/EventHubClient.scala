@@ -15,12 +15,18 @@
  * limitations under the License.
  */
 
-
 package org.apache.spark.streaming.eventhubs
 
-trait EventHubClient extends Serializable {
+private[eventhubs] trait EventHubClient extends Serializable {
 
+  /**
+   * return the end point of each partition
+   * @return a map from eventhubName-partition to (offset, seq)
+   */
   def endPointOfPartition(): Option[Map[EventHubNameAndPartition, (Long, Long)]]
 
+  /**
+   * close this client
+   */
   def close(): Unit
 }

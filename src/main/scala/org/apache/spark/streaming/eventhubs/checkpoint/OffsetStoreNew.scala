@@ -24,27 +24,56 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
-trait OffsetStoreNew {
+// NOTE: since we have some logic to workaround the limitation from eventhubs, we shall not
+// open this interface to the user to implement their own offsetstore for now
+private[eventhubs] trait OffsetStoreNew {
 
+  /**
+   * this method will be called when creating a new instance of OffsetStoreNew
+   */
   private[checkpoint] def init(): Unit
-  def write(time: Time,
-            eventHubNameAndPartition: EventHubNameAndPartition, cpOffset: Long, cpSeq: Long): Unit
+
+  /**
+   * write starting offset in the next batch to checkpoint
+   * @param time the batch time
+   * @param eventHubNameAndPartition the eventHubNameAndPartition
+   * @param startingOffset the starting offset
+   * @param startingSeq the staring sequence
+   */
+  def write(
+      time: Time,
+      eventHubNameAndPartition: EventHubNameAndPartition,
+      startingOffset: Long,
+      startingSeq: Long): Unit
+
+  /**
+   * read the checkpoint records
+   * @return a map from eventhub-partition to (startOffset, startSeq)
+   */
   def read(): Map[EventHubNameAndPartition, (Long, Long)]
-  def commit(commitTime: Time): Unit
-  def checkpointPath(): String
+
+  /**
+   * commit checkpoint file
+   * @param batchTime the batch time of the checkpoint file
+   */
+  def commit(batchTime: Time): Unit
+
+  /**
+   * clsoe checkpoint
+   */
   def close(): Unit
 }
 
-object OffsetStoreNew {
+private[eventhubs] object OffsetStoreNew {
 
   private[eventhubs] val streamIdToOffstore = new mutable.HashMap[Int, OffsetStoreNew]()
 
   def newInstance(checkpointDir: String, appName: String, streamId: Int, namespace: String,
-                  hadoopConfiguration: Configuration, runOnExecutor: Boolean = false):
+                  hadoopConfiguration: Configuration, runOnDriver: Boolean = true):
                   OffsetStoreNew = {
     val offsetStore =
       new DfsBasedOffsetStore2(checkpointDir, appName, streamId, namespace, hadoopConfiguration,
-        !runOnExecutor)
+        runOnDriver)
     offsetStore.init()
     streamIdToOffstore += streamId -> offsetStore
     offsetStore

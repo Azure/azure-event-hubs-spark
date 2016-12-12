@@ -17,5 +17,6 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-case class OffsetStoreParams(checkpointDir: String, appName: String, streamId: Int,
-                             eventHubNamespace: String)
+// a bridging object to avoid serialzing offsetstore instances
+private[eventhubs] case class OffsetStoreParams(checkpointDir: String, appName: String,
+                                                streamId: Int, eventHubNamespace: String)

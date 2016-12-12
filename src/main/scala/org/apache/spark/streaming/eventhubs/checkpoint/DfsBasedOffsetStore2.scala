@@ -28,6 +28,16 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
+/**
+ * the offsetStore which reads checkpoint directory, writes temp checkpoint files and atomically
+ * commits the temp checkpoints
+ * @param checkpointDir the directory of checkpoint files
+ * @param appName the name of Spark application
+ * @param streamId the id of input stream
+ * @param namespace the namespace of eventhubs
+ * @param hadoopConfiguration the hadoop configuration instance
+ * @param runOnDriver whether the OffsetStore runs on driver or executor
+ */
 private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
     checkpointDir: String,
     appName: String,
@@ -47,22 +57,28 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
   private[eventhubs] val checkpointTempDirPath = new Path(checkpointTempDirStr)
   private[eventhubs] val checkpointBackupDirPath = new Path(checkpointBackupDirStr)
 
+  // the lock synchronizing the read and committing operations, since they are executed in driver
+  // and listener thread respectively.
   private val driverLock = new Object
 
   /**
-   * in this method, we have to cleanup the partially executed commit
+   * in this method, we have to cleanup the partially executed commit operation
    * there are four steps in a commit
-   * step 1. rename the checkpoint path to backup dir
+   *
+   * step 1. move the checkpoint path to backup dir
    * step 2. rename the temp checkpoint path (latest checkpoint path) to checkpoint path
    * step 3. create empty temp checkpoint path
+   * step 4. create timestamp file in the directory
+   *
+   * NOTE: we rely on the atomic implementation of these operations in HDFS
    *
    * we describe the state of the commit execution with a 2-tuple
-   * (checkpointDirExisted, checkpointTempDirExisted, checkpointBackupDirExisted)
-   * if the commit quits at step 1, we have (true, true) or (false, true),
-   * sharing the same state with a
-   * successfully executed commit or partially written temp checkpoint path (for the first time to
-   * run program?), we need to distinguish by looking at whether temp dir is empty
-   * if the commit quits at step 3, (true, false)
+   * (checkpointDirExisted, checkpointTempDirExisted)
+   *
+   * the strategy to recover from a failure is that, when we found an existing temp checkpoint file
+   * we should conservatively delete it to prevent a partially written checkpoint file being
+   * committed; otherwise, we just create temp checkpoint directory to facilitate the further
+   * processing
    */
   override protected[checkpoint] def init(): Unit = {
     // recover from partially executed checkpoint commit
@@ -112,6 +128,8 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
         new Path(s"$checkpointTempDirStr/${eventHubNameAndPartition.toString}"), true)
       cpFileStream.writeBytes(s"${time.milliseconds} ${eventHubNameAndPartition.eventHubName}" +
         s" ${eventHubNameAndPartition.partitionId} $cpOffset $cpSeq")
+      logDebug(s"${time.milliseconds} ${eventHubNameAndPartition.eventHubName}" +
+        s" ${eventHubNameAndPartition.partitionId} $cpOffset $cpSeq")
     } catch {
       case ioe: IOException =>
         ioe.printStackTrace()
@@ -129,15 +147,21 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
     }
   }
 
+  private def fetchCheckpointTimestamp(fs: FileSystem): Long = {
+    val tsFile = fs.open(new Path(checkpointDirPath.toString + "/timestamp"))
+    val timestamp = tsFile.readLong()
+    tsFile.close()
+    timestamp
+  }
+
   override def read(): Map[EventHubNameAndPartition, (Long, Long)] = driverLock.synchronized {
+    require(runOnDriver, "read operation is supposed to be executed only on driver")
     val fs = checkpointDirPath.getFileSystem(hadoopConfiguration)
     val ret = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)]
     var br: BufferedReader = null
     if (fs.exists(checkpointDirPath)) {
       // read timestamp
-      val tsFile = fs.open(new Path(checkpointDirPath.toString + "/timestamp"))
-      val timestamp = tsFile.readLong()
-      tsFile.close()
+      val timestamp = fetchCheckpointTimestamp(fs)
       val files = fs.listFiles(checkpointDirPath, false)
       try {
         while (files.hasNext) {
@@ -149,12 +173,14 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
             val line = br.readLine()
             if (line == null) {
               logError(s"corrupted checkpoint file in ${file.getPath}")
-              throw new IllegalStateException(s"corrupted checkpoint file in ${file.getPath}")
+              throw new IllegalStateException(s"corrupted checkpoint file in ${file.getPath}" +
+                s", it might be a bug in the implementation of underlying file system")
             }
             val Array(batchTime, eventHubName, partitionID, offsetStr, seqNumStr) = line.split(" ")
             if (batchTime.toLong != timestamp) {
-              throw new RuntimeException(s"detect inconsistent checkpoint at $line, expected" +
-                s" timestamp: $timestamp")
+              throw new IllegalStateException(s"detect inconsistent checkpoint at $line, expected" +
+                s" timestamp: $timestamp, it might be a bug in the implementation of" +
+                s" underlying file system")
             }
             ret += EventHubNameAndPartition(eventHubName, partitionID.toInt) -> (offsetStr.toLong,
               seqNumStr.toLong)
@@ -189,7 +215,6 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
   }
 
   private def transaction(fs: FileSystem, time: Time): Unit = {
-    // write timestamp file
     if (fs.exists(checkpointDirPath)) {
       val backupTarget = backupLocation(fs)
       fs.rename(checkpointDirPath, backupTarget)
@@ -197,6 +222,7 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
     if (fs.listStatus(checkpointTempDirPath).length > 0) {
       fs.rename(checkpointTempDirPath, checkpointDirPath)
       fs.mkdirs(checkpointTempDirPath)
+      // write timestamp file
       val oos = fs.create(new Path(checkpointDirPath.toString + "/timestamp"))
       oos.writeLong(time.milliseconds)
       oos.close()
@@ -204,6 +230,7 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
   }
 
   override def commit(commitTime: Time): Unit = driverLock.synchronized {
+    require(runOnDriver, "commit operation is supposed to be executed only on driver")
     val fs = new Path(checkpointDir).getFileSystem(hadoopConfiguration)
     try {
       transaction(fs, commitTime)
@@ -212,12 +239,8 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
         ioe.printStackTrace()
         throw ioe
     } finally {
-      // we do not need to recover partially executed transaction here,
-      // because the failed transaction is likely to be caused by the file system
+      // EMPTY, we leave the cleanup of partially executed transaction to the moment when recovering
+      // from failure
     }
-  }
-
-  override def checkpointPath(): String = {
-    checkpointDir
   }
 }

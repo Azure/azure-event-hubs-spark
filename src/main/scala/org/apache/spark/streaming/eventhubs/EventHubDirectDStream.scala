@@ -27,9 +27,17 @@ import org.apache.spark.streaming.{StreamingContext, Time}
 import org.apache.spark.streaming.dstream.{DStreamCheckpointData, InputDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint._
 import org.apache.spark.streaming.scheduler.StreamInputInfo
-import org.apache.spark.util.Utils
 
-class EventHubDirectDStream(
+/**
+ * implementation of EventHub-based direct stream
+ * @param _ssc the streaming context this stream belongs to
+ * @param eventHubNameSpace the namespace of evenhub instances
+ * @param checkpointDir the checkpoint directory path (we only support HDFS-based checkpoint
+ *                      storage for now, so you have to prefix your path with hdfs://clustername/
+ * @param eventhubsParams the parameters of your eventhub instances, format:
+ *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
+ */
+private[eventhubs] class EventHubDirectDStream(
     _ssc: StreamingContext,
     eventHubNameSpace: String,
     checkpointDir: String,
@@ -40,13 +48,14 @@ class EventHubDirectDStream(
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
-  @transient private[eventhubs] var _eventHubClient: EventHubClient = _
-
-  @transient private[eventhubs] var _offsetStore: OffsetStoreNew = _
+  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
+    EventHubDirectDStream._eventHubClient = eventHubClient
+  }
 
   private[eventhubs] def eventHubClient = {
-    if (_eventHubClient == null) {
-      _eventHubClient = new RestfulEventHubClient(eventHubNameSpace,
+    if (EventHubDirectDStream._eventHubClient == null) {
+      // TODO: enable customized implementation in future
+      EventHubDirectDStream._eventHubClient = new RestfulEventHubClient(eventHubNameSpace,
         numPartitionsEventHubs = {
           eventhubsParams.map { case (eventhubName, params) => (eventhubName,
             params("eventhubs.partition.count").toInt)
@@ -62,28 +71,25 @@ class EventHubDirectDStream(
         },
         threadNum = 15)
     }
-    _eventHubClient
+    EventHubDirectDStream._eventHubClient
   }
 
   private[eventhubs] def setOffsetStore(offsetStore: OffsetStoreNew): Unit = {
-    _offsetStore = offsetStore
+    EventHubDirectDStream._offsetStore = offsetStore
   }
 
   // Only for test
-  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
-    _eventHubClient = eventHubClient
-  }
-
   private[eventhubs] def offsetStore = {
-    if (_offsetStore == null) {
-      _offsetStore = OffsetStoreNew.newInstance(
+    if (EventHubDirectDStream._offsetStore == null) {
+      // TODO: enable customized implementation in future
+      EventHubDirectDStream._offsetStore = OffsetStoreNew.newInstance(
         checkpointDir,
         ssc.sparkContext.appName,
         this.id,
         eventHubNameSpace,
         ssc.sparkContext.hadoopConfiguration)
     }
-    _offsetStore
+    EventHubDirectDStream._offsetStore
   }
 
   // from eventHubName to offset
@@ -98,9 +104,8 @@ class EventHubDirectDStream(
   }
 
   override def stop(): Unit = {
-    // step 1: stop driver-side consumer
     eventHubClient.close()
-    // step 2: ??? what and how we shall stop
+    offsetStore.close()
   }
 
   private def clamp(latestOffsets: Option[Map[EventHubNameAndPartition, (Long, Long)]],
@@ -114,7 +119,18 @@ class EventHubDirectDStream(
     }
   }
 
-  private def calculateStartOffsetForEachPartition(validTime: Time):
+  /**
+   * EventHub uses *Number Of Messages* for rate control, but uses *offset* to setup of the start
+   * point of the receivers. As a result, we need to translate the sequence number to offset to
+   * start receiver in the next batch, which is a functionality not provided by EventHub. We use
+   * checkpoint file to communicate this information between executors and driver.
+   *
+   * In this function, we either read startpoint from checkpoint file or start processing from
+   * the very beginning of the streams
+   *
+   * @return EventHubName-Partition -> (offset, seq)
+   */
+  private def fetchStartOffsetForEachPartition(validTime: Time):
     Map[EventHubNameAndPartition, (Long, Long)] = {
     val checkpoints = offsetStore.read()
     if (checkpoints.nonEmpty) {
@@ -166,7 +182,7 @@ class EventHubDirectDStream(
     ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
   }
 
-  private def validateNewlyCalculatedPartitions(
+  private def validatePartitions(
       validTime: Time,
       calculatedPartitions: List[EventHubNameAndPartition]): Unit = {
     if (currentOffsetsAndSeqNums.nonEmpty) {
@@ -182,7 +198,7 @@ class EventHubDirectDStream(
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     // step 1, detect the highest offset of each eventhub instance
     // we need to create the driver-side & restful API based consumer in step 1
-    val newOffsetsAndSeqNums = calculateStartOffsetForEachPartition(validTime)
+    val newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
     val sameCheckpoint = newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums)
     if (sameCheckpoint || !canStartNextBatch) {
       reportInputInto(validTime, List(), 0)
@@ -190,7 +206,7 @@ class EventHubDirectDStream(
     } else {
       val endPoints = clamp(eventHubClient.endPointOfPartition(), validTime)
       if (endPoints.nonEmpty) {
-        validateNewlyCalculatedPartitions(validTime, newOffsetsAndSeqNums.keys.toList)
+        validatePartitions(validTime, newOffsetsAndSeqNums.keys.toList)
         currentOffsetsAndSeqNums = newOffsetsAndSeqNums
         logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
         val offsetRanges = endPoints.map {
@@ -217,8 +233,7 @@ class EventHubDirectDStream(
     }
   }
 
-  private[eventhubs]
-  class EventHubDirectDStreamCheckpointData(dstream: EventHubDirectDStream)
+  private[eventhubs] class EventHubDirectDStreamCheckpointData(dstream: EventHubDirectDStream)
     extends DStreamCheckpointData(this) {
 
     def batchForTime: mutable.HashMap[Time,
@@ -252,3 +267,10 @@ class EventHubDirectDStream(
     }
   }
 }
+
+private[eventhubs] object EventHubDirectDStream {
+
+  @transient private var _eventHubClient: EventHubClient = _
+  @transient private var _offsetStore: OffsetStoreNew = _
+}
+

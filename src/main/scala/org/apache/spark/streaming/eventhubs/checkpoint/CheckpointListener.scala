@@ -17,14 +17,13 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-import java.io.IOException
-
-import org.apache.hadoop.fs.Path
-
 import org.apache.spark.internal.Logging
-import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListenerBatchCompleted}
 
+/**
+ * The listener asynchronously commits the temp checkpoint to the path which is read by DStream
+ * driver. It monitors the input size to prevent those empty batches from committing checkpoints
+ */
 private[eventhubs] class CheckpointListener extends StreamingListener with Logging {
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {

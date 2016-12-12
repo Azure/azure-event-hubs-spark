@@ -75,7 +75,7 @@ class EventHubRDD(
   override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
     val offsetStore = OffsetStoreNew.newInstance(offsetParams.checkpointDir,
       offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      new Configuration(), runOnExecutor = true)
+      new Configuration(), runOnDriver = false)
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
     val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq > eventHubPartition.untilSeq) {

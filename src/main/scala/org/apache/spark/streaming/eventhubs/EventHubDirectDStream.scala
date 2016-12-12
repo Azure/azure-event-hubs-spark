@@ -41,7 +41,9 @@ private[eventhubs] class EventHubDirectDStream(
     _ssc: StreamingContext,
     eventHubNameSpace: String,
     checkpointDir: String,
-    eventhubsParams: Map[String, Map[String, String]])
+    eventhubsParams: Map[String, Map[String, String]],
+    eventhubClientCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
+                                              EventHubsClientWrapper.getEventHubClient)
   extends InputDStream[EventData](_ssc) with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
@@ -225,7 +227,8 @@ private[eventhubs] class EventHubDirectDStream(
           eventhubsParams,
           offsetRanges,
           validTime,
-          OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, this.id, eventHubNameSpace))
+          OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, this.id, eventHubNameSpace),
+          eventhubClientCreator)
         reportInputInto(validTime, offsetRanges,
           offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq + 1).sum.toInt)
         Some(eventHubRDD)
@@ -264,8 +267,8 @@ private[eventhubs] class EventHubDirectDStream(
           b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq) =>
             OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq)}.toList,
           t,
-          OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, id, eventHubNameSpace)
-        )
+          OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, id, eventHubNameSpace),
+          eventhubClientCreator)
       }
     }
   }

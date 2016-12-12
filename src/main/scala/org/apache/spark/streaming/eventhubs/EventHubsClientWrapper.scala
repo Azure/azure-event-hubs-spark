@@ -148,7 +148,6 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
             Instant.ofEpochSecond(currentOffset.toLong))
         }
     }
-    println(s"prefetch count is $MAXIMUM_PREFETCH_COUNT")
     eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
   }
 

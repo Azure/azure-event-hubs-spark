@@ -43,7 +43,9 @@ class EventHubRDD(
     eventHubsParamsMap: Map[String, Map[String, String]],
     val offsetRanges: List[OffsetRange],
     batchTime: Time,
-    offsetParams: OffsetStoreParams) extends RDD[EventData](sc, Nil) {
+    offsetParams: OffsetStoreParams,
+    eventHubClientCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
+  extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
     offsetRanges.zipWithIndex.map { case (o, i) =>
@@ -93,9 +95,8 @@ class EventHubRDD(
         s" ${eventHubPartition.untilSeq}")
       val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
         eventHubName)
-      val eventHubClient = EventHubsClientWrapper.getEventHubClient(
-        eventHubParameters, eventHubPartition.eventHubNameAndPartitionID.partitionId,
-        fromOffset, maxRate)
+      val eventHubClient = eventHubClientCreator(eventHubParameters,
+        eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
         eventHubClient, maxRate)// eventHubClient.receive().toList
       logInfo(s"${eventHubPartition.eventHubNameAndPartitionID} received ${receivedEvents.size}" +

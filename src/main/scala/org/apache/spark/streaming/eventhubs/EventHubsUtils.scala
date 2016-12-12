@@ -100,10 +100,22 @@ object EventHubsUtils {
       storageLevel, Option(offsetStore), receiverClient))
   }
 
+  /**
+   * create direct stream based on eventhubs
+   * @param ssc the streaming context this stream belongs to
+   * @param eventHubNamespace the namespace of eventhubs
+   * @param checkpointDir the checkpoint directory path (we only support HDFS-based checkpoint
+   *                      storage for now, so you have to prefix your path with hdfs://clustername/
+   * @param eventParams the parameters of your eventhub instances, format:
+   *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
+   */
   def createDirectStreams(
       ssc: StreamingContext,
-      connectionString: String): Unit = {
-    // TODO: is there any other parameters
+      eventHubNamespace: String,
+      checkpointDir: String,
+      eventParams: Predef.Map[String, Predef.Map[String, String]]): Unit = {
+    require(checkpointDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
+    new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
   }
 
   /**

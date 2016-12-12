@@ -17,12 +17,9 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.io.{IOException, ObjectOutputStream}
-
 import scala.collection.mutable
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
-import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD

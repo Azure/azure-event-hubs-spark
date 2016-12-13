@@ -172,8 +172,7 @@ private[eventhubs] class EventHubDirectDStream(
 
   private def reportInputInto(validTime: Time,
                               offsetRanges: List[OffsetRange], inputSize: Int): Unit = {
-    // step 3: report the metadata to InputInfoTracker
-    // Report the record number and metadata of this batch interval to InputInfoTracker.
+    require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
     val description = offsetRanges.map { offsetRange =>
       s"topic: ${offsetRange.eventHubNameAndPartition}\t" +
         s"starting offsets: ${offsetRange.fromOffset}" +
@@ -215,7 +214,7 @@ private[eventhubs] class EventHubDirectDStream(
         currentOffsetsAndSeqNums = newOffsetsAndSeqNums
         logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
         val offsetRanges = endPoints.map {
-          case (eventHubNameAndPartition, (endOffset, endSeqNum)) =>
+          case (eventHubNameAndPartition, (_, endSeqNum)) =>
             OffsetRange(eventHubNameAndPartition,
               fromOffset = currentOffsetsAndSeqNums(eventHubNameAndPartition)._1,
               fromSeq = currentOffsetsAndSeqNums(eventHubNameAndPartition)._2,

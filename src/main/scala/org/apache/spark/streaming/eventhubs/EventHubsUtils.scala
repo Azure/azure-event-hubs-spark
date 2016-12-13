@@ -113,7 +113,7 @@ object EventHubsUtils {
       ssc: StreamingContext,
       eventHubNamespace: String,
       checkpointDir: String,
-      eventParams: Predef.Map[String, Predef.Map[String, String]]): Unit = {
+      eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
     require(checkpointDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
     new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
   }

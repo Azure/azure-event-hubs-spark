@@ -51,7 +51,7 @@ private[eventhubs] class EventHubDirectDStream(
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
   @transient private var _eventHubClient: EventHubClient = _
-  @transient private var _offsetStore: OffsetStoreNew = _
+  @transient private var _offsetStore: OffsetStoreDirectStreaming = _
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
     _eventHubClient = eventHubClient
@@ -79,7 +79,7 @@ private[eventhubs] class EventHubDirectDStream(
     _eventHubClient
   }
 
-  private[eventhubs] def setOffsetStore(offsetStore: OffsetStoreNew): Unit = {
+  private[eventhubs] def setOffsetStore(offsetStore: OffsetStoreDirectStreaming): Unit = {
     _offsetStore = offsetStore
   }
 
@@ -87,7 +87,7 @@ private[eventhubs] class EventHubDirectDStream(
   private[eventhubs] def offsetStore = {
     if (_offsetStore == null) {
       // TODO: enable customized implementation in future
-      _offsetStore = OffsetStoreNew.newInstance(
+      _offsetStore = OffsetStoreDirectStreaming.newInstance(
         checkpointDir,
         ssc.sparkContext.appName,
         this.id,
@@ -219,10 +219,13 @@ private[eventhubs] class EventHubDirectDStream(
               fromOffset = currentOffsetsAndSeqNums(eventHubNameAndPartition)._1,
               fromSeq = currentOffsetsAndSeqNums(eventHubNameAndPartition)._2,
               untilSeq =
-                math.min(currentOffsetsAndSeqNums(eventHubNameAndPartition)._2 + 999, endSeqNum))
+                math.min(currentOffsetsAndSeqNums(eventHubNameAndPartition)._2 +
+                  eventhubsParams(eventHubNameAndPartition.eventHubName).
+                    getOrElse("eventhubs.maxEventRate", "10000").toInt,
+                  endSeqNum))
         }.toList
         val eventHubRDD = new EventHubRDD(
-          this.context.sparkContext,
+          context.sparkContext,
           eventhubsParams,
           offsetRanges,
           validTime,
@@ -250,8 +253,8 @@ private[eventhubs] class EventHubDirectDStream(
     override def update(time: Time): Unit = {
       batchForTime.clear()
       generatedRDDs.foreach { kv =>
-        val a = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
-        batchForTime += kv._1 -> a
+        val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
+        batchForTime += kv._1 -> offsetRangeOfRDD
       }
     }
 

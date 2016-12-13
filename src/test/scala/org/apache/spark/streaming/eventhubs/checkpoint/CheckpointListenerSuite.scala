@@ -46,7 +46,7 @@ class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with Befor
 
   test("checkpoint files are created correctly") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val offsetStore = OffsetStoreNew.newInstance(
+    val offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     offsetStore.write(Time(10), EventHubNameAndPartition(nameSpace, 0), 0, 0)
@@ -86,7 +86,7 @@ class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with Befor
 
   test("empty batch is skipped properly") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val offsetStore = OffsetStoreNew.newInstance(
+    val offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     val listener = new CheckpointListener

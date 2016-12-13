@@ -47,7 +47,7 @@ class DfsBasedOffsetStore2Suite extends FunSuite with BeforeAndAfterAll with Bef
 
   test("checkpoint temp directory is created properly when checkpoint and checkpoint temp" +
     " directory do not exist") {
-    offsetStore = OffsetStoreNew.newInstance(
+    offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     assert(fs.exists(offsetStore.checkpointTempDirPath))
@@ -58,7 +58,7 @@ class DfsBasedOffsetStore2Suite extends FunSuite with BeforeAndAfterAll with Bef
     " temp does not") {
     fs.mkdirs(new Path(PathTools.tempCheckpointDirStr(checkpointRootPath.toString + "/checkpoint",
       appName, streamId, nameSpace)))
-    offsetStore = OffsetStoreNew.newInstance(
+    offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     assert(fs.exists(offsetStore.checkpointTempDirPath))
@@ -72,7 +72,7 @@ class DfsBasedOffsetStore2Suite extends FunSuite with BeforeAndAfterAll with Bef
     fs.create(new Path(tempPath.toString + "/temp_file"))
     val filesBefore = fs.listStatus(tempPath)
     assert(filesBefore.size === 1)
-    offsetStore = OffsetStoreNew.newInstance(
+    offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     assert(fs.exists(offsetStore.checkpointTempDirPath))
@@ -81,7 +81,7 @@ class DfsBasedOffsetStore2Suite extends FunSuite with BeforeAndAfterAll with Bef
   }
 
   test("checkpoint directory can be constructed correctly") {
-    offsetStore = OffsetStoreNew.newInstance(
+    offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     for (time <- List(2000, 3000, 4000)) {
@@ -103,7 +103,7 @@ class DfsBasedOffsetStore2Suite extends FunSuite with BeforeAndAfterAll with Bef
   }
 
   test("inconsistent checkpoint file is detected") {
-    offsetStore = OffsetStoreNew.newInstance(
+    offsetStore = OffsetStoreDirectStreaming.newInstance(
       checkpointRootPath.toString + "/checkpoint", appName, streamId,
       nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
     offsetStore.write(Time(1000), EventHubNameAndPartition(nameSpace, 0), 0, 0)

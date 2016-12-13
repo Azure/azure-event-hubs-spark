@@ -26,7 +26,7 @@ import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
 // NOTE: since we have some logic to workaround the limitation from eventhubs, we shall not
 // open this interface to the user to implement their own offsetstore for now
-private[eventhubs] trait OffsetStoreNew {
+private[eventhubs] trait OffsetStoreDirectStreaming {
 
   /**
    * this method will be called when creating a new instance of OffsetStoreNew
@@ -64,13 +64,13 @@ private[eventhubs] trait OffsetStoreNew {
   def close(): Unit
 }
 
-private[eventhubs] object OffsetStoreNew {
+private[eventhubs] object OffsetStoreDirectStreaming {
 
-  private[eventhubs] val streamIdToOffstore = new mutable.HashMap[Int, OffsetStoreNew]()
+  private[eventhubs] val streamIdToOffstore = new mutable.HashMap[Int, OffsetStoreDirectStreaming]()
 
   def newInstance(checkpointDir: String, appName: String, streamId: Int, namespace: String,
                   hadoopConfiguration: Configuration, runOnDriver: Boolean = true):
-                  OffsetStoreNew = {
+                  OffsetStoreDirectStreaming = {
     val offsetStore =
       new DfsBasedOffsetStore2(checkpointDir, appName, streamId, namespace, hadoopConfiguration,
         runOnDriver)

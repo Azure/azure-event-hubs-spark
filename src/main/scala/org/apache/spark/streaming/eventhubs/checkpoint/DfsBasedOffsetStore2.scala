@@ -44,7 +44,7 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
     streamId: Int,
     namespace: String,
     private val hadoopConfiguration: Configuration,
-    runOnDriver: Boolean = true) extends OffsetStoreNew with Logging {
+    runOnDriver: Boolean = true) extends OffsetStoreDirectStreaming with Logging {
 
   private val checkpointDirStr = PathTools.checkpointDirPathStr(checkpointDir, appName,
     streamId, namespace)
@@ -223,9 +223,19 @@ private[eventhubs] class DfsBasedOffsetStore2 private[checkpoint] (
       fs.rename(checkpointTempDirPath, checkpointDirPath)
       fs.mkdirs(checkpointTempDirPath)
       // write timestamp file
-      val oos = fs.create(new Path(checkpointDirPath.toString + "/timestamp"))
-      oos.writeLong(time.milliseconds)
-      oos.close()
+      var oos: FSDataOutputStream = null
+      try {
+        oos = fs.create(new Path(checkpointDirPath.toString + "/timestamp"))
+        oos.writeLong(time.milliseconds)
+      } catch {
+        case ioe: IOException =>
+          ioe.printStackTrace()
+          throw ioe
+      } finally {
+        if (oos != null) {
+          oos.close()
+        }
+      }
     }
   }
 

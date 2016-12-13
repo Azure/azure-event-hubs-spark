@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreNew, OffsetStoreParams}
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreDirectStreaming$, OffsetStoreParams}
 import org.apache.spark.streaming.Time
 
 private[eventhubs] class EventHubRDDPartition(
@@ -48,23 +48,24 @@ class EventHubRDD(
   extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
-    offsetRanges.zipWithIndex.map { case (o, i) =>
-      new EventHubRDDPartition(i, o.eventHubNameAndPartition, o.fromOffset, o.fromSeq, o.untilSeq)
+    offsetRanges.zipWithIndex.map { case (offsetRange, index) =>
+      new EventHubRDDPartition(index, offsetRange.eventHubNameAndPartition, offsetRange.fromOffset,
+        offsetRange.fromSeq, offsetRange.untilSeq)
     }.toArray
   }
 
   private def wrappingReceive(eventHubNameAndPartition: EventHubNameAndPartition,
-                              eventHubClient: EventHubsClientWrapper, expectedReceivedRate: Int):
+                              eventHubClient: EventHubsClientWrapper, expectedEventNumber: Int):
     List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
     val receivingTrace = new ListBuffer[Long]
     var cnt = 0
-    while (receivedBuffer.size < expectedReceivedRate) {
-      if (cnt > expectedReceivedRate * 2) {
+    while (receivedBuffer.size < expectedEventNumber) {
+      if (cnt > expectedEventNumber * 2) {
         throw new Exception(s"$eventHubNameAndPartition cannot return data, the trace is" +
           s" ${receivingTrace.toList}")
       }
-      val receivedEvents = eventHubClient.receive(expectedReceivedRate - receivedBuffer.size).
+      val receivedEvents = eventHubClient.receive(expectedEventNumber - receivedBuffer.size).
         toList
       receivingTrace += receivedEvents.length
       cnt += 1
@@ -75,7 +76,7 @@ class EventHubRDD(
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
-    val offsetStore = OffsetStoreNew.newInstance(offsetParams.checkpointDir,
+    val offsetStore = OffsetStoreDirectStreaming.newInstance(offsetParams.checkpointDir,
       offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
       new Configuration(), runOnDriver = false)
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]

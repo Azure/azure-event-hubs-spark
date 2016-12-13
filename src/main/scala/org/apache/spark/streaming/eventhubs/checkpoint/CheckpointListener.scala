@@ -32,7 +32,7 @@ private[eventhubs] class CheckpointListener extends StreamingListener with Loggi
         (batchInfo.inputStreamId, batchInfo.numRecords)
     }.filter(_._2 > 0).keys
     inputStreamIds.foreach(streamId => {
-      OffsetStoreNew.streamIdToOffstore(streamId).commit(batchCompleted.batchInfo.batchTime)
+      OffsetStoreDirectStreaming.streamIdToOffstore(streamId).commit(batchCompleted.batchInfo.batchTime)
       logInfo(s"commit checkpoint for batch ${batchCompleted.batchInfo.batchTime}, Stream" +
         s" $streamId")
     })

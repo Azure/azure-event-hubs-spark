@@ -24,9 +24,10 @@ import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
-import org.apache.spark.streaming.dstream.{DStreamCheckpointData, InputDStream}
+import org.apache.spark.streaming.dstream.{DStream, DStreamCheckpointData, InputDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint._
-import org.apache.spark.streaming.scheduler.StreamInputInfo
+import org.apache.spark.streaming.scheduler.{RateController, StreamInputInfo}
+import org.apache.spark.streaming.scheduler.rate.RateEstimator
 
 /**
  * implementation of EventHub-based direct stream
@@ -48,7 +49,22 @@ private[eventhubs] class EventHubDirectDStream(
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
-  protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
+  protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
+
+  override protected[streaming] val rateController: Option[RateController] = {
+    if (RateController.isBackPressureEnabled(ssc.sparkContext.conf)) {
+      Some(new EventHubDirectDStreamRateController(id, RateEstimator.create(ssc.sparkContext.conf,
+        graph.batchDuration)))
+    } else {
+      None
+    }
+  }
+
+  private def maxRateLimitPerPartition(eventHubName: String): Int = {
+    val x = eventhubsParams(eventHubName).getOrElse("eventhubs.maxRate", "10000").toInt
+    require(x > 0, s"eventhubs.maxRate has to be larger than zero, violated by $eventHubName ($x)")
+    x
+  }
 
   @transient private var _eventHubClient: EventHubClient = _
   @transient private var _offsetStore: OffsetStoreDirectStreaming = _
@@ -113,9 +129,9 @@ private[eventhubs] class EventHubDirectDStream(
     offsetStore.close()
   }
 
-  private def clamp(latestOffsets: Option[Map[EventHubNameAndPartition, (Long, Long)]],
-                    validTime: Time): Map[EventHubNameAndPartition, (Long, Long)] = {
+  private def fetchLatestOffset(validTime: Time): Map[EventHubNameAndPartition, (Long, Long)] = {
     // TODO: rate control
+    val latestOffsets = eventHubClient.endPointOfPartition()
     if (latestOffsets.isDefined) {
       latestOffsets.get
     } else {
@@ -199,6 +215,44 @@ private[eventhubs] class EventHubDirectDStream(
     }
   }
 
+  private def defaultRateControl(latestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
+      Map[EventHubNameAndPartition, Long] = {
+    latestEndpoints.map{
+      case (eventHubNameAndPar, (_, latestSeq)) =>
+        val maximumAllowedMessageCnt = maxRateLimitPerPartition(eventHubNameAndPar.eventHubName)
+        (eventHubNameAndPar, math.min(latestSeq,
+          maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2 - 1))
+    }
+  }
+
+  private def clamp(latestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
+      Map[EventHubNameAndPartition, Long] = {
+    if (rateController.isEmpty) {
+      defaultRateControl(latestEndpoints)
+    } else {
+      val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
+      estimateRateLimit.filter(_ > 0) match {
+        case None =>
+          defaultRateControl(latestEndpoints)
+        case Some(allowedRate) =>
+          val lagPerPartition = latestEndpoints.map {
+            case (eventHubNameAndPartition, (_, latestSeq)) =>
+              eventHubNameAndPartition -> math.max(latestSeq -
+                currentOffsetsAndSeqNums(eventHubNameAndPartition)._2, 0)
+          }
+          val totalLag = lagPerPartition.values.sum
+          lagPerPartition.map {
+            case (eventHubNameAndPartition, lag) =>
+              val backpressureRate = math.round(lag / totalLag.toFloat * allowedRate)
+              eventHubNameAndPartition ->
+                (math.min(backpressureRate,
+                  maxRateLimitPerPartition(eventHubNameAndPartition.eventHubName)) +
+                  currentOffsetsAndSeqNums(eventHubNameAndPartition)._2 - 1)
+          }
+      }
+    }
+  }
+
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     // step 1, detect the highest offset of each eventhub instance
     // we need to create the driver-side & restful API based consumer in step 1
@@ -208,21 +262,18 @@ private[eventhubs] class EventHubDirectDStream(
       reportInputInto(validTime, List(), 0)
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
-      val endPoints = clamp(eventHubClient.endPointOfPartition(), validTime)
+      val endPoints = fetchLatestOffset(validTime)
       if (endPoints.nonEmpty) {
         validatePartitions(validTime, newOffsetsAndSeqNums.keys.toList)
         currentOffsetsAndSeqNums = newOffsetsAndSeqNums
+        val clampedSeqIDs = clamp(endPoints)
         logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
         val offsetRanges = endPoints.map {
           case (eventHubNameAndPartition, (_, endSeqNum)) =>
             OffsetRange(eventHubNameAndPartition,
               fromOffset = currentOffsetsAndSeqNums(eventHubNameAndPartition)._1,
               fromSeq = currentOffsetsAndSeqNums(eventHubNameAndPartition)._2,
-              untilSeq =
-                math.min(currentOffsetsAndSeqNums(eventHubNameAndPartition)._2 +
-                  eventhubsParams(eventHubNameAndPartition.eventHubName).
-                    getOrElse("eventhubs.maxEventRate", "10000").toInt,
-                  endSeqNum))
+              untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
         }.toList
         val eventHubRDD = new EventHubRDD(
           context.sparkContext,
@@ -241,7 +292,7 @@ private[eventhubs] class EventHubDirectDStream(
     }
   }
 
-  private[eventhubs] class EventHubDirectDStreamCheckpointData(dstream: EventHubDirectDStream)
+  private[eventhubs] class EventHubDirectDStreamCheckpointData
     extends DStreamCheckpointData(this) {
 
     def batchForTime: mutable.HashMap[Time,
@@ -272,6 +323,13 @@ private[eventhubs] class EventHubDirectDStream(
           OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, id, eventHubNameSpace),
           eventhubClientCreator)
       }
+    }
+  }
+
+  private[eventhubs] class EventHubDirectDStreamRateController(id: Int, estimator: RateEstimator)
+    extends RateController(id, estimator) {
+    override protected def publish(rate: Long): Unit = {
+      // publish nothing as there is no receiver
     }
   }
 }

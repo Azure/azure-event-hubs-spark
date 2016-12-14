@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreDirectStreaming$, OffsetStoreParams}
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreDirectStreaming, OffsetStoreParams}
 import org.apache.spark.streaming.Time
 
 private[eventhubs] class EventHubRDDPartition(

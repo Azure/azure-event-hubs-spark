@@ -18,5 +18,13 @@
 package org.apache.spark.streaming.eventhubs
 
 private[eventhubs] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
+
   override def toString: String = s"$eventHubName-partition-$partitionId"
+}
+
+private[eventhubs] object EventHubNameAndPartition {
+  def fromString(str: String): EventHubNameAndPartition = {
+    val Array(name, partition) = str.split("-partition-")
+    EventHubNameAndPartition(name, partition.toInt)
+  }
 }

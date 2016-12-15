@@ -17,6 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
+// scalastyle:off
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
@@ -25,8 +26,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreDirectStreaming, OffsetStoreParams}
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreParams, ProgressWriter}
 import org.apache.spark.streaming.Time
+// scalastyle:on
 
 private[eventhubs] class EventHubRDDPartition(
     val sparkPartitionId: Int,
@@ -76,21 +78,21 @@ class EventHubRDD(
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
-    val offsetStore = OffsetStoreDirectStreaming.newInstance(offsetParams.checkpointDir,
-      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      new Configuration(), runOnDriver = false)
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
+    val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
+      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
+      eventHubPartition.eventHubNameAndPartitionID, new Configuration())
     val fromOffset = eventHubPartition.fromOffset
-    if (eventHubPartition.fromSeq > eventHubPartition.untilSeq) {
+    if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
       logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID}")
-      offsetStore.write(batchTime, eventHubPartition.eventHubNameAndPartitionID,
-        eventHubPartition.fromOffset, eventHubPartition.fromSeq)
+      progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
+        eventHubPartition.fromSeq)
       logInfo(s"write offset $fromOffset, sequence number" +
         s" ${eventHubPartition.fromSeq} for batch" +
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
       Iterator()
     } else {
-      val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt + 1
+      val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt
       logInfo(s"${eventHubPartition.eventHubNameAndPartitionID}" +
         s" expected rate $maxRate, fromSeq ${eventHubPartition.fromSeq} untilSeq" +
         s" ${eventHubPartition.untilSeq}")
@@ -99,17 +101,15 @@ class EventHubRDD(
       val eventHubClient = eventHubClientCreator(eventHubParameters,
         eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
-        eventHubClient, maxRate)// eventHubClient.receive().toList
+        eventHubClient, maxRate)
       logInfo(s"${eventHubPartition.eventHubNameAndPartitionID} received ${receivedEvents.size}" +
         s" events")
       val lastEvent = receivedEvents.last
       val endOffset = lastEvent.getSystemProperties.getOffset.toLong
-      // the contract is that we always start from offset "non-inclusively" and from sequence number
-      // inclusively (i.e. we write sequence number + 1 to checkpoint)
-      offsetStore.write(batchTime, eventHubPartition.eventHubNameAndPartitionID, endOffset,
-        lastEvent.getSystemProperties.getSequenceNumber + 1)
+      progressWriter.write(batchTime.milliseconds, endOffset,
+        lastEvent.getSystemProperties.getSequenceNumber)
       logInfo(s"write offset $endOffset, sequence number" +
-        s" ${lastEvent.getSystemProperties.getSequenceNumber + 1} for batch" +
+        s" ${lastEvent.getSystemProperties.getSequenceNumber} for batch" +
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
       eventHubClient.close()
       receivedEvents.iterator

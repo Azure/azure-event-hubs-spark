@@ -17,92 +17,75 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.nio.file.Files
-
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
-import org.mockito.{Matchers, Mockito}
-import org.mockito.Mockito._
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.streaming.{Checkpoint, Duration, StreamingContext, Time}
-import org.apache.spark.streaming.eventhubs.checkpoint.{DfsBasedOffsetStore2, OffsetStore}
+import org.apache.spark.streaming.{Checkpoint, Seconds, StreamingContext, Time}
+import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 import org.apache.spark.util.Utils
 
 
-class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
+class EventHubDirectDStreamSuite extends SharedUtils with MockitoSugar {
 
-  var ssc: StreamingContext = _
   val eventhubParameters = Map[String, String] (
     "eventhubs.policyname" -> "policyName",
     "eventhubs.policykey" -> "policykey",
-    "eventhubs.namespace" -> "namespace",
+    "eventhubs.namespace" -> "eventhubs",
     "eventhubs.name" -> "eh1",
     "eventhubs.partition.count" -> "32",
     "eventhubs.consumergroup" -> "$Default"
   )
 
-  before {
-    ssc = new StreamingContext(new SparkContext(new SparkConf().
-      set("spark.master", "local[*]").set("spark.app.name", "EventHubDirectDStreamSuite")),
-      Duration(10000))
-  }
-
-  after {
-    ssc.stop()
-  }
-
-  test("skip the batch when detecting the same offset") {
-    val offsetStoreMock = mock[DfsBasedOffsetStore2]
-    Mockito.when(offsetStoreMock.read()).thenReturn(
-      Map(EventHubNameAndPartition("eh1", 1) -> (1L, 1L)))
-    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
-      Map("eh1" -> eventhubParameters))
-    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
-    val fs = tempPath.getFileSystem(new Configuration())
-    fs.mkdirs(tempPath)
-    ehDStream.setOffsetStore(offsetStoreMock)
-    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("eh1", 1) -> (1L, 1L))
-    ssc.scheduler.start()
-    assert(ehDStream.compute(Time(1000)).get.count() === 0)
-  }
 
   test("skip the batch when failed to fetch the latest offset of partitions") {
     val eventHubClientMock = mock[EventHubClient]
     Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
-    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> eventhubParameters))
-    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
-    val fs = tempPath.getFileSystem(new Configuration())
-    fs.mkdirs(tempPath)
     ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()
     assert(ehDStream.compute(Time(1000)).get.count() === 0)
   }
 
-  test("checkpoint directories are configured correctly when EventHubDirectDStream" +
-    " is deserialized") {
-    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+  test("currentOffset are setup correctly when EventHubDirectDStream is deserialized") {
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> eventhubParameters))
-    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
-    val fs = tempPath.getFileSystem(new Configuration())
+    ehDStream.start()
+    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
     val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
-    fs.mkdirs(tempPath)
-    fs.create(new Path(tempPath + "/temp_file"))
-    val filesBefore = fs.listStatus(tempPath)
-    assert(filesBefore.size === 1)
     val deserCp = Utils.deserialize[Checkpoint](cp)
     assert(deserCp.graph.getInputStreams().length === 1)
     val deserEhDStream = deserCp.graph.getInputStreams()(0).asInstanceOf[EventHubDirectDStream]
     deserEhDStream.setContext(ssc)
-    assert(deserEhDStream.offsetStore != null)
-    assert(fs.exists(tempPath))
-    val filesAfter = fs.listStatus(tempPath)
-    assert(filesAfter.size === 0)
+    assert(deserEhDStream.currentOffsetsAndSeqNums ===
+      Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L)))
+  }
+
+  test("ProgressTracker, ProgressTrackingListener and EventHubClient are registered correctly" +
+    " when EventHubDirectDStream is deserialized") {
+    import scala.collection.JavaConverters._
+    val eventHubClientMock = mock[EventHubClient]
+    Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    val ehDStream1 = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
+    reset()
+    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
+      setMaster("local[*]")), Seconds(5))
+    val deserCp = Utils.deserialize[Checkpoint](cp)
+    val allEventhubDStreams = deserCp.graph.getInputStreams().filter(
+      _.isInstanceOf[EventHubDirectDStream]).map(_.asInstanceOf[EventHubDirectDStream])
+    allEventhubDStreams.foreach(_.setEventHubClient(eventHubClientMock).setContext(ssc))
+    allEventhubDStreams.foreach(eh => eh.compute(Time(1000L)))
+    assert(ProgressTracker.eventHubDirectDStreams.length == 2)
+    assert(ehDStream.eventHubClient != null)
+    assert(ehDStream1.eventHubClient != null)
+    assert(ssc.scheduler.listenerBus.listeners.asScala.count(
+      _.isInstanceOf[ProgressTrackingListener]) === 1)
+    assert(ssc.scheduler.listenerBus.listeners.get(0).isInstanceOf[ProgressTrackingListener])
+    ssc.stop()
   }
 }

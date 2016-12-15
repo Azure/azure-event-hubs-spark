@@ -48,8 +48,7 @@ private[eventhubs] class RestfulEventHubClient(
     threadNum: Int) extends EventHubClient with Logging {
 
   // will be used to execute requests to EventHub
-  private implicit val exec = ExecutionContext.
-    fromExecutor(Executors.newFixedThreadPool(threadNum))
+  import Implicits.exec
 
   private def createSasToken(eventHubName: String, policyName: String, policyKey: String):
       String = {
@@ -126,5 +125,26 @@ private[eventhubs] class RestfulEventHubClient(
 
   override def endPointOfPartition(): Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     queryPartitionRuntimeInfo(fromResponseBodyToEndpoint)
+  }
+}
+
+private[eventhubs] object RestfulEventHubClient {
+  def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
+  RestfulEventHubClient = {
+    new RestfulEventHubClient(eventHubNameSpace,
+      numPartitionsEventHubs = {
+        eventhubsParams.map { case (eventhubName, params) => (eventhubName,
+          params("eventhubs.partition.count").toInt)
+        }
+      },
+      consumerGroups = {
+        eventhubsParams.map { case (eventhubName, params) => (eventhubName,
+          params("eventhubs.consumergroup"))
+        }
+      },
+      policyKeys = eventhubsParams.map { case (eventhubName, params) => (eventhubName,
+        (params("eventhubs.policyname"), params("eventhubs.policykey")))
+      },
+      threadNum = 15)
   }
 }

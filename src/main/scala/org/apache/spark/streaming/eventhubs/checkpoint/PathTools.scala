@@ -17,28 +17,23 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
+import org.apache.spark.streaming.Time
+import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
+
 private[checkpoint] object PathTools extends Serializable {
 
-  def checkpointDirPathStr(checkpointDir: String, appName: String, streamId: Int,
-                           eventHubNamespace: String): String = {
-    s"$checkpointDir/$appName/$streamId/$eventHubNamespace"
+  def progressDirPathStr(checkpointDir: String, appName: String): String = {
+    s"$checkpointDir/$appName"
   }
 
-  def tempCheckpointDirStr(checkpointDir: String, appName: String,
-                           streamId: Int,
-                           eventHubNamespace: String): String = {
-    s"${checkpointDirPathStr(checkpointDir, appName, streamId, eventHubNamespace)}_temp"
+  def tempProgressDirStr(checkpointDir: String, appName: String): String = {
+    s"$checkpointDir/${appName}_temp"
   }
 
-  def checkpointBackupDirStr(checkpointDir: String, appName: String,
-                             streamId: Int): String = {
-    s"${checkpointDir}_backup/$appName/$streamId/"
-  }
-
-  def checkpointFilePathStr(checkpointDir: String, appName: String, streamId: Int,
-                            eventHubNamespace: String,
-                            eventHubName: String, partitionId: Int): String = {
-    val tempDir = tempCheckpointDirStr(checkpointDir, appName, streamId, eventHubNamespace)
-    s"$tempDir/$eventHubName-partition-$partitionId"
+  def progressFilePathStr(basePath: String,
+                          streamId: Int,
+                          namespace: String,
+                          eventHubNameAndPartition: EventHubNameAndPartition): String = {
+    basePath + s"/$streamId-$namespace-$eventHubNameAndPartition"
   }
 }

@@ -18,23 +18,35 @@
 package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListenerBatchCompleted}
 
 /**
  * The listener asynchronously commits the temp checkpoint to the path which is read by DStream
  * driver. It monitors the input size to prevent those empty batches from committing checkpoints
  */
-private[eventhubs] class CheckpointListener extends StreamingListener with Logging {
+private[eventhubs] class CheckpointListener(checkpointDirectory: String, ssc: StreamingContext)
+  extends StreamingListener with Logging {
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
-    val inputStreamIds = batchCompleted.batchInfo.streamIdToInputInfo.map {
-      case (_, batchInfo) =>
-        (batchInfo.inputStreamId, batchInfo.numRecords)
-    }.filter(_._2 > 0).keys
-    inputStreamIds.foreach(streamId => {
-      OffsetStoreDirectStreaming.streamIdToOffstore(streamId).commit(batchCompleted.batchInfo.batchTime)
-      logInfo(s"commit checkpoint for batch ${batchCompleted.batchInfo.batchTime}, Stream" +
-        s" $streamId")
-    })
+
+    if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
+      val progressTracker = ProgressTracker.getInstance(checkpointDirectory,
+        ssc.sparkContext.appName,
+        ssc.sparkContext.hadoopConfiguration)
+      // build current offsets
+      val allEventDStreams = EventHubDirectDStream.getDirectStreams
+      allEventDStreams.map(dstream =>
+        (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums)).toMap
+      // merge with the temp directory
+      val progressInLastBatch = progressTracker.snapshot()
+      val contentToCommit = allEventDStreams.map {
+        dstream => ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums)
+      }.toMap.map { case (namespace, currentOffsets) =>
+        (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
+      }
+      progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime)
+    }
   }
 }

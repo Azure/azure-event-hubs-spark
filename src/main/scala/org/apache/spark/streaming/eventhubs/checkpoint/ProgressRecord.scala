@@ -15,16 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.streaming.eventhubs.checkpoint
 
-private[eventhubs] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
-
-  override def toString: String = s"$eventHubName-partition-$partitionId"
+private[checkpoint] case class ProgressRecord(timestamp: Long, namespace: String, streamId: Int,
+                                              eventHubName: String, partitionId: Int, offset: Long,
+                                              seqId: Long) {
+  override def toString: String = {
+    s"$timestamp $namespace $streamId $eventHubName $partitionId $offset $seqId"
+  }
 }
 
-private[eventhubs] object EventHubNameAndPartition {
-  def fromString(str: String): EventHubNameAndPartition = {
-    val Array(name, partition) = str.split("-partition-")
-    EventHubNameAndPartition(name, partition.toInt)
+private[checkpoint] object ProgressRecord {
+
+  def parse(line: String): ProgressRecord = {
+    val Array(timestampStr, namespace, streamId, eventHubName, partitionIdStr, offsetStr, seqStr) =
+      line.split(" ")
+    ProgressRecord(timestampStr.toLong, namespace, streamId.toInt, eventHubName,
+      partitionIdStr.toInt, offsetStr.toLong, seqStr.toLong)
   }
 }

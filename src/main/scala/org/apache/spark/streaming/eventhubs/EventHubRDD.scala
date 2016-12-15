@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreDirectStreaming, OffsetStoreParams}
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreParams, ProgressWriter}
 import org.apache.spark.streaming.Time
 
 private[eventhubs] class EventHubRDDPartition(
@@ -76,15 +76,15 @@ class EventHubRDD(
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
-    val offsetStore = OffsetStoreDirectStreaming.newInstance(offsetParams.checkpointDir,
-      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      new Configuration(), runOnDriver = false)
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
+    val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
+      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
+      eventHubPartition.eventHubNameAndPartitionID, new Configuration())
     val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq > eventHubPartition.untilSeq) {
       logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID}")
-      offsetStore.write(batchTime, eventHubPartition.eventHubNameAndPartitionID,
-        eventHubPartition.fromOffset, eventHubPartition.fromSeq)
+      progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
+        eventHubPartition.fromSeq)
       logInfo(s"write offset $fromOffset, sequence number" +
         s" ${eventHubPartition.fromSeq} for batch" +
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
@@ -106,7 +106,7 @@ class EventHubRDD(
       val endOffset = lastEvent.getSystemProperties.getOffset.toLong
       // the contract is that we always start from offset "non-inclusively" and from sequence number
       // inclusively (i.e. we write sequence number + 1 to checkpoint)
-      offsetStore.write(batchTime, eventHubPartition.eventHubNameAndPartitionID, endOffset,
+      progressWriter.write(batchTime.milliseconds, endOffset,
         lastEvent.getSystemProperties.getSequenceNumber + 1)
       logInfo(s"write offset $endOffset, sequence number" +
         s" ${lastEvent.getSystemProperties.getSequenceNumber + 1} for batch" +

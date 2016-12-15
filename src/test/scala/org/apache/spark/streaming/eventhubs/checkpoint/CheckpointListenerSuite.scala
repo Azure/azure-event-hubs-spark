@@ -44,6 +44,7 @@ class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with Befor
     fs = checkpointRootPath.getFileSystem(new Configuration())
   }
 
+  /*
   test("checkpoint files are created correctly") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
     val offsetStore = OffsetStoreDirectStreaming.newInstance(
@@ -106,4 +107,5 @@ class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with Befor
     assert(!fs.exists(new Path(offsetStore.checkpointBackupDirPath.toString +
       s"/$nameSpace-10")))
   }
+  */
 }

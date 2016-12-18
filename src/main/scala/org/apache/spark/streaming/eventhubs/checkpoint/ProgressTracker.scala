@@ -227,16 +227,16 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   private def transaction(
       offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       fs: FileSystem,
-      time: Time): Unit = {
+      time: Long): Unit = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr + s"/progress-${time.milliseconds}"))
+      oos = fs.create(new Path(progressDirStr + s"/progress-$time"))
       offsetToCommit.foreach {
         case ((namespace, streamId), ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
             case (nameAndPartitionId, (offset, seq)) =>
               oos.writeBytes(
-                ProgressRecord(time.milliseconds, namespace, streamId,
+                ProgressRecord(time, namespace, streamId,
                   nameAndPartitionId.eventHubName, nameAndPartitionId.partitionId, offset,
                   seq).toString + "\n"
               )
@@ -257,7 +257,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
 
   def commit(
       offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
-      commitTime: Time): Unit = driverLock.synchronized {
+      commitTime: Long): Unit = driverLock.synchronized {
     val fs = new Path(checkpointDir).getFileSystem(hadoopConfiguration)
     try {
       transaction(offsetToCommit, fs, commitTime)

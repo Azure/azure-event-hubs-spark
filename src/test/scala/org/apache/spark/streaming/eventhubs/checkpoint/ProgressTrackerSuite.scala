@@ -329,5 +329,36 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     }
   }
 
-
+  test("latest offsets can be committed correctly and temp directory is cleaned") {
+    val progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress",
+      appName, new Configuration())
+    val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
+      "/progress", appName))
+    fs.mkdirs(progressTempPath)
+    val oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-1"))
+    oos.writeBytes(ProgressRecord(1000L, "namespace1", 0, "eh1", 0, 0, 1).toString + "\n")
+    oos.close()
+    assert(fs.exists(new Path(progressTempPath.toString + "/progress-1000-1")))
+    val offsetToCommit = Map(
+      ("namespace1", 1) -> Map(
+        EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
+        EventHubNameAndPartition("eh2", 1) -> (1L, 1L)),
+      ("namespace2", 2) -> Map(
+        EventHubNameAndPartition("eh1", 3) -> (0L, 0L),
+        EventHubNameAndPartition("eh2", 4) -> (1L, 1L)))
+    progressTracker.commit(offsetToCommit, 3000L)
+    val namespace1Offsets = progressTracker.read("namespace1", 1, 3000L)
+    assert(namespace1Offsets === Map(
+      EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
+      EventHubNameAndPartition("eh2", 1) -> (1L, 1L)))
+    val namespace2Offsets = progressTracker.read("namespace2", 2, 3000L)
+    assert(namespace2Offsets === Map(
+      EventHubNameAndPartition("eh1", 3) -> (0L, 0L),
+      EventHubNameAndPartition("eh2", 4) -> (1L, 1L)))
+    // test temp directory cleanup
+    assert(fs.exists(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
+      "/progress", appName))))
+    assert(fs.listStatus(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
+      "/progress", appName))).length === 0)
+  }
 }

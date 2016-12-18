@@ -46,7 +46,7 @@ private[eventhubs] class CheckpointListener(checkpointDirectory: String, ssc: St
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
-      progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime)
+      progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
     }
   }
 }

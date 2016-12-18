@@ -52,7 +52,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   extends Logging {
 
   private val progressDirStr = PathTools.progressDirPathStr(checkpointDir, appName)
-  private val progressTempDirStr = PathTools.tempProgressDirStr(checkpointDir,
+  private val progressTempDirStr = PathTools.progressTempDirPathStr(checkpointDir,
     appName)
 
   private[eventhubs] val progressDirPath = new Path(progressDirStr)
@@ -271,10 +271,6 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  /**
-   * read the temp checkpoint directory
-   * @return a map from eventhub-partition to (startOffset, startSeq)
-   */
   def snapshot(): Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
     val records = new ListBuffer[ProgressRecord]

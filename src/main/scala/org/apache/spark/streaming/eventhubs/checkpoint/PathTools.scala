@@ -26,7 +26,7 @@ private[checkpoint] object PathTools extends Serializable {
     s"$checkpointDir/$appName"
   }
 
-  def tempProgressDirStr(checkpointDir: String, appName: String): String = {
+  def progressTempDirPathStr(checkpointDir: String, appName: String): String = {
     s"$checkpointDir/${appName}_temp"
   }
 

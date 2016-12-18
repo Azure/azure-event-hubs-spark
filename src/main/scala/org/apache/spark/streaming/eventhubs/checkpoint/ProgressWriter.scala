@@ -34,7 +34,7 @@ private[eventhubs] class ProgressWriter(
     hadoopConfiguration: Configuration) extends Logging {
 
   private val tempProgressTrackingPoint = PathTools.progressFilePathStr(
-    PathTools.tempProgressDirStr(checkpointDir, appName),
+    PathTools.progressTempDirPathStr(checkpointDir, appName),
     streamId, namespace, eventHubNameAndPartition)
 
   private[eventhubs] val checkpointTempDirPath = new Path(tempProgressTrackingPoint)

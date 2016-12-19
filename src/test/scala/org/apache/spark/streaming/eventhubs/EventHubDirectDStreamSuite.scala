@@ -24,15 +24,15 @@ import org.mockito.Mockito
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Checkpoint, Duration, StreamingContext, Time}
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
 import org.apache.spark.util.Utils
 
 
-class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
+class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with MockitoSugar
+  with SharedUtils {
 
-  var ssc: StreamingContext = _
   val eventhubParameters = Map[String, String] (
     "eventhubs.policyname" -> "policyName",
     "eventhubs.policykey" -> "policykey",
@@ -56,7 +56,7 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
     val eventHubClientMock = mock[EventHubClient]
     Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))
     ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()
@@ -65,7 +65,7 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
 
   test("currentOffset are setup correctly when EventHubDirectDStream is deserialized") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))
     ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
     val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
@@ -79,7 +79,7 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
 
   test("syncLatch are setup correctly when EventHubDirectDStream is deserialized") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))
     ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
     val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))

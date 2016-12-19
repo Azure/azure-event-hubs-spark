@@ -25,7 +25,7 @@ import org.scalatest.{Assertions, BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
-import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, EventHubsUtils}
+import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, EventHubsUtils, SharedUtils}
 
 class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
   with SharedUtils {

@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.streaming.eventhubs
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
+import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 
 private[checkpoint] trait SharedUtils {
 

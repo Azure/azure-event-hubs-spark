@@ -33,11 +33,11 @@ private[eventhubs] class ProgressTrackingListener(
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
 
     if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-      val progressTracker = ProgressTracker.getInstance(progressDirectory,
+      val progressTracker = ProgressTracker.getInstance(ssc, progressDirectory,
         ssc.sparkContext.appName,
         ssc.sparkContext.hadoopConfiguration)
       // build current offsets
-      val allEventDStreams = EventHubDirectDStream.getDirectStreams
+      val allEventDStreams = EventHubDirectDStream.getDirectStreams(ssc)
       allEventDStreams.map(dstream =>
         (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums)).toMap
       // merge with the temp directory

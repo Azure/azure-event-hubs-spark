@@ -51,8 +51,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                                               EventHubsClientWrapper.getEventHubClient)
   extends InputDStream[EventData](_ssc) with Logging {
 
-  EventHubDirectDStream.registerNewStream(this)
-
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
@@ -84,7 +82,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   @transient private var _eventHubClient: EventHubClient = _
 
-  private def progressTracker = ProgressTracker.getInstance(checkpointDir,
+  private def progressTracker = ProgressTracker.getInstance(ssc, checkpointDir,
     context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
@@ -327,19 +325,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
 private[eventhubs] object EventHubDirectDStream {
 
-  private val directDStreams = new mutable.HashMap[String, EventHubDirectDStream]
-
-  private[eventhubs] def registerNewStream(newStream: EventHubDirectDStream): Unit = {
-    require(!directDStreams.contains(newStream.eventHubNameSpace),
-      "EventHubDirectDStream and EventHubNamespace must be one-one mapping, and there are two" +
-        s" EventHubDirectDStreams ($newStream ${directDStreams(newStream.eventHubNameSpace)})" +
-        s" handling the same namespace ${newStream.eventHubNameSpace}")
-    directDStreams += newStream.eventHubNameSpace -> newStream
+  private[eventhubs] def getDirectStreams(ssc: StreamingContext) = {
+    ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
+      _.asInstanceOf[EventHubDirectDStream])
   }
-
-  private[eventhubs] def destory() = {
-    directDStreams.clear()
-  }
-
-  private[eventhubs] def getDirectStreams = directDStreams.values.toList
 }

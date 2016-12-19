@@ -33,7 +33,7 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.scheduler.{BatchInfo, StreamInputInfo, StreamingListenerBatchCompleted}
 // scalastyle:on
 
-class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
+class ProgressListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
   with SharedUtils {
 
   before {
@@ -42,12 +42,11 @@ class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with Befor
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
       setMaster("local[*]")), Seconds(5))
     progressListner = new ProgressTrackingListener(progressRootPath.toString, ssc, new Object)
-    progressTracker = ProgressTracker.getInstance(progressRootPath.toString, appName,
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
       new Configuration())
   }
 
   after {
-    EventHubDirectDStream.destory()
     ProgressTracker.destory()
     progressTracker = null
     progressListner = null

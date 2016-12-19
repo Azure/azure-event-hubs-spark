@@ -51,7 +51,6 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
   }
 
   after {
-    EventHubDirectDStream.destory()
     ssc.stop()
   }
 

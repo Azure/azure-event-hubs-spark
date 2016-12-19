@@ -342,6 +342,7 @@ private[eventhubs] object ProgressTracker {
   }
 
   def getInstance(
+      ssc: StreamingContext,
       progressDirStr: String,
       appName: String,
       hadoopConfiguration: Configuration): ProgressTracker = this.synchronized {
@@ -349,7 +350,7 @@ private[eventhubs] object ProgressTracker {
       _progressTracker = new ProgressTracker(progressDirStr,
         appName,
         hadoopConfiguration,
-        EventHubDirectDStream.getDirectStreams.map{directStream =>
+        EventHubDirectDStream.getDirectStreams(ssc).map{directStream =>
           val namespace = directStream.eventHubNameSpace
           val ehSpace = directStream.eventhubNameAndPartitions
           (namespace, ehSpace.toList)

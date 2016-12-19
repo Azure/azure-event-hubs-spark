@@ -38,7 +38,6 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
   }
 
   after {
-    EventHubDirectDStream.destory()
     ProgressTracker.destory()
     progressTracker = null
     ssc.stop()
@@ -47,6 +46,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
   test("progress temp directory is created properly when progress and progress temp" +
     " directory do not exist") {
     progressTracker = ProgressTracker.getInstance(
+      ssc,
       progressRootPath.toString + "/progress", appName, new Configuration())
     assert(fs.exists(progressTracker.progressDirPath))
     assert(fs.exists(progressTracker.progressTempDirPath))
@@ -57,6 +57,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     fs.mkdirs(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString + "/progress",
       appName)))
     progressTracker = ProgressTracker.getInstance(
+      ssc,
       progressRootPath.toString + "/progress", appName, new Configuration())
     assert(fs.exists(progressTracker.progressTempDirPath))
     assert(fs.exists(progressTracker.progressDirPath))
@@ -70,7 +71,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     val filesBefore = fs.listStatus(tempPath)
     assert(filesBefore.size === 1)
     progressTracker =
-      ProgressTracker.getInstance(progressRootPath.toString + "/progress", appName,
+      ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress", appName,
         new Configuration())
     assert(fs.exists(progressTracker.progressTempDirPath))
     val filesAfter = fs.listStatus(progressTracker.progressTempDirPath)
@@ -102,8 +103,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     oos2.writeBytes(ProgressRecord(2000L, "namespace1", dStream.id, "eh2", 0, 0, 0).toString + "\n")
     oos2.writeBytes(ProgressRecord(2000L, "namespace1", dStream.id, "eh2", 1, 0, 0).toString + "\n")
     oos2.close()
-    progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress", appName,
-      new Configuration())
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+      appName, new Configuration())
     assert(!fs.exists(new Path(progressPath.toString + "/progress-2000")))
     assert(fs.exists(new Path(progressPath.toString + "/progress-1000")))
   }
@@ -126,8 +127,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 1, 0, 0).toString + "\n")
     oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 2, 0, 0).toString + "\n")
     oos.close()
-    progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress", appName,
-      new Configuration())
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+      appName, new Configuration())
     assert(fs.exists(new Path(progressPath.toString + "/progress-1000")))
   }
 
@@ -146,8 +147,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
       "/progress", appName))
     fs.mkdirs(progressPath)
-    progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress", appName,
-      new Configuration())
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+      appName, new Configuration())
     val ehMap = progressTracker.read("namespace2", dStream1.id, 1000L)
     assert(ehMap(EventHubNameAndPartition("eh11", 0)) === (-1, 0))
     assert(ehMap(EventHubNameAndPartition("eh12", 0)) === (-1, 0))
@@ -199,8 +200,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 2, 6, 7).toString +
       "\n")
     oos.close()
-    progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress", appName,
-      new Configuration())
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+      appName, new Configuration())
     val ehMap = progressTracker.read("namespace2", dStream1.id, 1000L)
     assert(ehMap(EventHubNameAndPartition("eh11", 0)) === (1, 2))
     assert(ehMap(EventHubNameAndPartition("eh12", 0)) === (2, 3))
@@ -231,8 +232,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
           "eh13" -> Map("eventhubs.partition.count" -> "3")))
     val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
       "/progress", appName))
-    progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress", appName,
-      new Configuration())
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+      appName, new Configuration())
     fs.mkdirs(progressPath)
     val oos = fs.create(new Path(progressPath.toString + "/progress-1000"))
     oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh1", 0, 0, 1).toString + "\n")
@@ -261,7 +262,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
 
   test("snapshot progress tracking records can be read correctly") {
     // generate 6 EventHubAndPartitions
-    val progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress",
+    val progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
       appName, new Configuration())
     val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
       "/progress", appName))
@@ -289,7 +290,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
 
   test("inconsistent timestamp in temp progress directory can be detected") {
     // generate 6 EventHubAndPartitions
-    val progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress",
+    val progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
       appName, new Configuration())
     val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
       "/progress", appName))
@@ -312,7 +313,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
   }
 
   test("latest offsets can be committed correctly and temp directory is cleaned") {
-    val progressTracker = ProgressTracker.getInstance(progressRootPath.toString + "/progress",
+    val progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
       appName, new Configuration())
     val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
       "/progress", appName))

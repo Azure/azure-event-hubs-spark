@@ -35,10 +35,13 @@ object Test {
       "eventhubs.namespace" -> namespace,
       "eventhubs.name" -> name,
       "eventhubs.partition.count" -> "32",
-      "eventhubs.consumergroup" -> "$Default"
+      "eventhubs.consumergroup" -> "$Default",
+      "eventhubs.maxRate" -> "1000"
     )
 
-    val ssc = new StreamingContext(new SparkContext(), Seconds(10))
+    val ssc = StreamingContext.getOrCreate("hdfs://mycluster/checkpoint_spark",
+      () => new StreamingContext(new SparkContext(), Seconds(10)))
+
     val inputDirectStream = new EventHubDirectDStream(ssc, namespace,
       checkpointDir, Map(name -> eventhubParameters))
     var l = 0L

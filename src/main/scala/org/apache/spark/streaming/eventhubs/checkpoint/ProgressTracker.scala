@@ -178,7 +178,8 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         // if no progress file, then start from the beginning of the streams
         val namespaceToEventHubs = eventHubNameAndPartitions.find {
           case (ehNamespace, ehList) => ehNamespace == namespace}
-        require(namespaceToEventHubs.isDefined, s"cannot find $namespace")
+        require(namespaceToEventHubs.isDefined, s"cannot find $namespace in" +
+          s" $eventHubNameAndPartitions")
         ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, 0L))).
           toMap
       } else {

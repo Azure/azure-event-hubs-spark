@@ -26,9 +26,10 @@ import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListene
  * The listener asynchronously commits the temp checkpoint to the path which is read by DStream
  * driver. It monitors the input size to prevent those empty batches from committing checkpoints
  */
-private[eventhubs] class ProgressTrackingListener(
-    progressDirectory: String, ssc: StreamingContext, syncLatch: Object)
-  extends StreamingListener with Logging {
+private[eventhubs] class ProgressTrackingListener private (
+    ssc: StreamingContext, progressDirectory: String) extends StreamingListener with Logging {
+
+  private val syncLatch: Object = new Serializable {}
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
 
@@ -51,8 +52,34 @@ private[eventhubs] class ProgressTrackingListener(
       syncLatch.synchronized {
         progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
         logInfo(s"commit offset at ${batchCompleted.batchInfo.batchTime}")
-        syncLatch.notify()
+        // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
+        syncLatch.notifyAll()
       }
     }
   }
 }
+
+private[eventhubs] object ProgressTrackingListener {
+
+  private var _progressTrackerListener: ProgressTrackingListener = _
+
+  private def getOrCreateProgressTrackerListener(
+      ssc: StreamingContext,
+      progressDirectory: String) = {
+    if (_progressTrackerListener == null) {
+      _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
+      ssc.addStreamingListener(_progressTrackerListener)
+    }
+    _progressTrackerListener
+  }
+
+  def getInstance(ssc: StreamingContext, progressDirectory: String): ProgressTrackingListener =
+    this.synchronized {
+      getOrCreateProgressTrackerListener(ssc, progressDirectory)
+    }
+
+  def getSyncLatch(ssc: StreamingContext, progressDirectory: String): Object = this.synchronized {
+      getOrCreateProgressTrackerListener(ssc, progressDirectory).syncLatch
+  }
+}
+

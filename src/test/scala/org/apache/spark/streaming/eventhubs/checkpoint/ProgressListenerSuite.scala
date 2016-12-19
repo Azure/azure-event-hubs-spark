@@ -41,7 +41,7 @@ class ProgressListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeA
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
       setMaster("local[*]")), Seconds(5))
-    progressListner = new ProgressTrackingListener(progressRootPath.toString, ssc, new Object)
+    progressListner = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
     progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
       new Configuration())
   }

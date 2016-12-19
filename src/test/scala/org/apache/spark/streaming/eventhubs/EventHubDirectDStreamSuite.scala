@@ -19,16 +19,14 @@ package org.apache.spark.streaming.eventhubs
 
 import java.nio.file.Files
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.mockito.{Matchers, Mockito}
-import org.mockito.Mockito._
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.mockito.Mockito
+import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
+import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Checkpoint, Duration, StreamingContext, Time}
-import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker$, OffsetStore}
 import org.apache.spark.util.Utils
 
 
@@ -77,5 +75,19 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
     deserEhDStream.setContext(ssc)
     assert(deserEhDStream.currentOffsetsAndSeqNums ===
       Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L)))
+  }
+
+  test("syncLatch are setup correctly when EventHubDirectDStream is deserialized") {
+    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
+    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
+    val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
+    val deserCp = Utils.deserialize[Checkpoint](cp)
+    assert(deserCp.graph.getInputStreams().length === 1)
+    val deserEhDStream = deserCp.graph.getInputStreams()(0).asInstanceOf[EventHubDirectDStream]
+    deserEhDStream.setContext(ssc)
+    assert(deserEhDStream.latchWithListener == ProgressTrackingListener.getSyncLatch(ssc,
+      checkpointRootPath.toString))
   }
 }

@@ -55,9 +55,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
 
-  private val latchWithListener = new Serializable{}
-
-  ssc.addStreamingListener(new ProgressTrackingListener(checkpointDir, ssc, latchWithListener))
+  private[eventhubs] val latchWithListener = ProgressTrackingListener.getSyncLatch(ssc,
+    checkpointDir)
 
   private[eventhubs] val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;

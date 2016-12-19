@@ -182,13 +182,14 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, 0L))).
           toMap
       } else {
+        val expectedTimestamp = fromPathToTimestamp(progressFileOption.get)
         val progressFilePath = progressFileOption.get
         ins = fs.open(progressFilePath)
         br = new BufferedReader(new InputStreamReader(ins, "UTF-8"))
         var line = br.readLine()
         while (line != null) {
           val progressRecord = ProgressRecord.parse(line)
-          if (progressRecord.timestamp != timestamp) {
+          if (progressRecord.timestamp != expectedTimestamp) {
             throw new IllegalStateException(s"detect inconsistent checkpoint at $line, expected" +
               s" timestamp: $timestamp, it might be a bug in the implementation of" +
               s" underlying file system")

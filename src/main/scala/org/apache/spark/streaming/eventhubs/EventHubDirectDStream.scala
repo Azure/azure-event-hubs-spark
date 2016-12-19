@@ -17,8 +17,11 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.util.concurrent.locks.ReentrantLock
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.Lock
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 
@@ -54,7 +57,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
 
-  private val latchWithListener = new Object()
+  private val latchWithListener = new Serializable{}
 
   ssc.addStreamingListener(new ProgressTrackingListener(checkpointDir, ssc, latchWithListener))
 
@@ -258,20 +261,18 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     Some(eventHubRDD)
   }
 
-  override def compute(validTime: Time): Option[RDD[EventData]] = {
+  override def compute(validTime: Time): Option[RDD[EventData]] = latchWithListener.synchronized {
     var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
     val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     if (latestOffsetOfAllPartitions.isEmpty) {
-      logError("EventHub Rest endpoint is not responsive, will skip this micro batch and process" +
-        " later")
+      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
+        s" micro batch and process it later")
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
       while (newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums) &&
         !newOffsetsAndSeqNums.equals(latestOffsetOfAllPartitions)) {
         // we shall synchronize with listener threads
-        latchWithListener.synchronized {
-          latchWithListener.wait()
-        }
+        latchWithListener.wait()
         newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
       }
       proceedWithNonEmptyRDD(validTime, newOffsetsAndSeqNums, latestOffsetOfAllPartitions)

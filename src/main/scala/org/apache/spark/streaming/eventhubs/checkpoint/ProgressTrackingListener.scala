@@ -47,8 +47,8 @@ private[eventhubs] class ProgressTrackingListener(
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
-      progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
       syncLatch.synchronized {
+        progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
         syncLatch.notify()
       }
     }

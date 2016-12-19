@@ -54,23 +54,18 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
     ssc.stop()
   }
 
-  /*
-  test("skip the batch when detecting the same offset") {
-    val offsetStoreMock = mock[DfsBasedOffsetStore2]
-    Mockito.when(offsetStoreMock.read()).thenReturn(
-      Map(EventHubNameAndPartition("eh1", 1) -> (1L, 1L)))
+  test("skip the batch when failed to fetch the latest offset of partitions") {
+    val eventHubClientMock = mock[EventHubClient]
+    Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
     val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))
-    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
-    val fs = tempPath.getFileSystem(new Configuration())
-    fs.mkdirs(tempPath)
-    ehDStream.setOffsetStore(offsetStoreMock)
-    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("eh1", 1) -> (1L, 1L))
+    ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()
     assert(ehDStream.compute(Time(1000)).get.count() === 0)
   }
 
+  /*
   test("skip the batch when failed to fetch the latest offset of partitions") {
     val eventHubClientMock = mock[EventHubClient]
     Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)

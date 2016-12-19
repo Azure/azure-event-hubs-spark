@@ -180,7 +180,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
           case (ehNamespace, ehList) => ehNamespace == namespace}
         require(namespaceToEventHubs.isDefined, s"cannot find $namespace in" +
           s" $eventHubNameAndPartitions")
-        ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, 0L))).
+        ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, -1L))).
           toMap
       } else {
         val expectedTimestamp = fromPathToTimestamp(progressFileOption.get)

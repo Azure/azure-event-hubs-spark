@@ -20,12 +20,12 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.Path
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, EventHubsUtils, SharedUtils}
+import org.apache.spark.streaming.eventhubs.{EventHubNameAndPartition, SharedUtils}
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
 
 // scalastyle:off

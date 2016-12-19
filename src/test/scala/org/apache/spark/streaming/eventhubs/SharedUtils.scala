@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 
-private[checkpoint] trait SharedUtils {
+private[eventhubs] trait SharedUtils {
 
   val appName = "dummyapp"
   val streamId = 0

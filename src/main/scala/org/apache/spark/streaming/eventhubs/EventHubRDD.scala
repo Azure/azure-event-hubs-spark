@@ -81,7 +81,7 @@ class EventHubRDD(
       offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
       eventHubPartition.eventHubNameAndPartitionID, new Configuration())
     val fromOffset = eventHubPartition.fromOffset
-    if (eventHubPartition.fromSeq > eventHubPartition.untilSeq) {
+    if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
       logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID}")
       progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
         eventHubPartition.fromSeq)
@@ -99,17 +99,15 @@ class EventHubRDD(
       val eventHubClient = eventHubClientCreator(eventHubParameters,
         eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
-        eventHubClient, maxRate)// eventHubClient.receive().toList
+        eventHubClient, maxRate)
       logInfo(s"${eventHubPartition.eventHubNameAndPartitionID} received ${receivedEvents.size}" +
         s" events")
       val lastEvent = receivedEvents.last
       val endOffset = lastEvent.getSystemProperties.getOffset.toLong
-      // the contract is that we always start from offset "non-inclusively" and from sequence number
-      // inclusively (i.e. we write sequence number + 1 to checkpoint)
       progressWriter.write(batchTime.milliseconds, endOffset,
-        lastEvent.getSystemProperties.getSequenceNumber + 1)
+        lastEvent.getSystemProperties.getSequenceNumber)
       logInfo(s"write offset $endOffset, sequence number" +
-        s" ${lastEvent.getSystemProperties.getSequenceNumber + 1} for batch" +
+        s" ${lastEvent.getSystemProperties.getSequenceNumber} for batch" +
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
       eventHubClient.close()
       receivedEvents.iterator

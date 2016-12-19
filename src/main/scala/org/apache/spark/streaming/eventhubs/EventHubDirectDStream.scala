@@ -54,6 +54,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
 
+  private val latchWithListener = new Object()
+
+  ssc.addStreamingListener(new ProgressTrackingListener(checkpointDir, ssc, latchWithListener))
+
   private[eventhubs] val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;
          partitionId <- 0 until eventhubsParams(eventHubName)(
@@ -158,24 +162,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def canStartNextBatch: Boolean = {
-    progressTracker match {
-      case dfsOffsetStore: ProgressTracker =>
-        val fs = dfsOffsetStore.progressTempDirPath.getFileSystem(
-          ssc.sparkContext.hadoopConfiguration)
-        if (fs.exists(dfsOffsetStore.progressTempDirPath) &&
-          fs.listStatus(dfsOffsetStore.progressTempDirPath).length > 0) {
-          logInfo(s"checkpoint hasn't been cleaned up" +
-            s" ${fs.listFiles(dfsOffsetStore.progressTempDirPath, false).next().toString}")
-          false
-        } else {
-          true
-        }
-      case _ =>
-        true
-    }
-  }
-
   private def reportInputInto(validTime: Time,
                               offsetRanges: List[OffsetRange], inputSize: Int): Unit = {
     require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
@@ -243,40 +229,52 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
+  private def proceedWithNonEmptyRDD(
+      validTime: Time,
+      newOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+      latestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
+    Option[EventHubRDD] = {
+    // normal processing
+    validatePartitions(validTime, newOffsetsAndSeqNums.keys.toList)
+    currentOffsetsAndSeqNums = newOffsetsAndSeqNums
+    val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
+    logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
+    val offsetRanges = latestOffsetOfAllPartitions.map {
+      case (eventHubNameAndPartition, (_, endSeqNum)) =>
+        OffsetRange(eventHubNameAndPartition,
+          fromOffset = currentOffsetsAndSeqNums(eventHubNameAndPartition)._1,
+          fromSeq = currentOffsetsAndSeqNums(eventHubNameAndPartition)._2,
+          untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
+    }.toList
+    val eventHubRDD = new EventHubRDD(
+      context.sparkContext,
+      eventhubsParams,
+      offsetRanges,
+      validTime,
+      OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, this.id, eventHubNameSpace),
+      eventhubClientCreator)
+    reportInputInto(validTime, offsetRanges,
+      offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
+    Some(eventHubRDD)
+  }
+
   override def compute(validTime: Time): Option[RDD[EventData]] = {
-    val newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
-    val sameCheckpoint = newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums)
-    if (sameCheckpoint || !canStartNextBatch) {
-      reportInputInto(validTime, List(), 0)
+    var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+    val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+    if (latestOffsetOfAllPartitions.isEmpty) {
+      logError("EventHub Rest endpoint is not responsive, will skip this micro batch and process" +
+        " later")
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
-      val endPoints = fetchLatestOffset(validTime)
-      if (endPoints.nonEmpty) {
-        validatePartitions(validTime, newOffsetsAndSeqNums.keys.toList)
-        currentOffsetsAndSeqNums = newOffsetsAndSeqNums
-        val clampedSeqIDs = clamp(endPoints)
-        logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
-        val offsetRanges = endPoints.map {
-          case (eventHubNameAndPartition, (_, endSeqNum)) =>
-            OffsetRange(eventHubNameAndPartition,
-              fromOffset = currentOffsetsAndSeqNums(eventHubNameAndPartition)._1,
-              fromSeq = currentOffsetsAndSeqNums(eventHubNameAndPartition)._2,
-              untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
-        }.toList
-        val eventHubRDD = new EventHubRDD(
-          context.sparkContext,
-          eventhubsParams,
-          offsetRanges,
-          validTime,
-          OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, this.id, eventHubNameSpace),
-          eventhubClientCreator)
-        reportInputInto(validTime, offsetRanges,
-          offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq + 1).sum.toInt)
-        Some(eventHubRDD)
-      } else {
-        reportInputInto(validTime, List(), 0)
-        Some(ssc.sparkContext.emptyRDD[EventData])
+      while (newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums) &&
+        !newOffsetsAndSeqNums.equals(latestOffsetOfAllPartitions)) {
+        // we shall synchronize with listener threads
+        latchWithListener.synchronized {
+          latchWithListener.wait()
+        }
+        newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
       }
+      proceedWithNonEmptyRDD(validTime, newOffsetsAndSeqNums, latestOffsetOfAllPartitions)
     }
   }
 

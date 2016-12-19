@@ -26,7 +26,8 @@ import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListene
  * The listener asynchronously commits the temp checkpoint to the path which is read by DStream
  * driver. It monitors the input size to prevent those empty batches from committing checkpoints
  */
-private[eventhubs] class ProgressTrackingListener(progressDirectory: String, ssc: StreamingContext)
+private[eventhubs] class ProgressTrackingListener(
+    progressDirectory: String, ssc: StreamingContext, syncLatch: Object)
   extends StreamingListener with Logging {
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
@@ -47,6 +48,9 @@ private[eventhubs] class ProgressTrackingListener(progressDirectory: String, ssc
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
       progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
+      syncLatch.synchronized {
+        syncLatch.notify()
+      }
     }
   }
 }

@@ -39,7 +39,6 @@ private[checkpoint] trait SharedUtils {
       eventHubNamespace: String,
       checkpointDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    ssc.addStreamingListener(new ProgressTrackingListener(checkpointDir, ssc))
     val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
     newStream
   }

@@ -115,7 +115,6 @@ object EventHubsUtils {
       checkpointDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
     require(checkpointDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
-    ssc.addStreamingListener(new ProgressTrackingListener(checkpointDir, ssc))
     val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
     newStream
   }

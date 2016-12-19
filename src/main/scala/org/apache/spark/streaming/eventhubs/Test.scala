@@ -36,7 +36,7 @@ object Test {
       "eventhubs.name" -> name,
       "eventhubs.partition.count" -> "32",
       "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.maxRate" -> "1000"
+      "eventhubs.maxRate" -> s"${args(5)}"
     )
 
     val ssc = StreamingContext.getOrCreate("hdfs://mycluster/checkpoint_spark",

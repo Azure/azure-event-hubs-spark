@@ -90,7 +90,7 @@ class EventHubRDD(
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
       Iterator()
     } else {
-      val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt + 1
+      val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt
       logInfo(s"${eventHubPartition.eventHubNameAndPartitionID}" +
         s" expected rate $maxRate, fromSeq ${eventHubPartition.fromSeq} untilSeq" +
         s" ${eventHubPartition.untilSeq}")

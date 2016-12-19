@@ -194,13 +194,18 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
+  /**
+   * return the last sequence number of each partition, which are to be received in this micro batch
+   * @param latestEndpoints the latest offset/seq of each partition
+   */
   private def defaultRateControl(latestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
       Map[EventHubNameAndPartition, Long] = {
     latestEndpoints.map{
       case (eventHubNameAndPar, (_, latestSeq)) =>
         val maximumAllowedMessageCnt = maxRateLimitPerPartition(eventHubNameAndPar.eventHubName)
-        (eventHubNameAndPar, math.min(latestSeq,
-          maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2 - 1))
+        val endSeq = math.min(latestSeq,
+          maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2)
+        (eventHubNameAndPar, endSeq)
     }
   }
 
@@ -216,17 +221,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         case Some(allowedRate) =>
           val lagPerPartition = latestEndpoints.map {
             case (eventHubNameAndPartition, (_, latestSeq)) =>
-              eventHubNameAndPartition -> math.max(latestSeq -
-                currentOffsetsAndSeqNums(eventHubNameAndPartition)._2, 0)
+              eventHubNameAndPartition ->
+                math.max(latestSeq - currentOffsetsAndSeqNums(eventHubNameAndPartition)._2, 0)
           }
           val totalLag = lagPerPartition.values.sum
           lagPerPartition.map {
             case (eventHubNameAndPartition, lag) =>
               val backpressureRate = math.round(lag / totalLag.toFloat * allowedRate)
               eventHubNameAndPartition ->
-                (math.min(backpressureRate,
-                  maxRateLimitPerPartition(eventHubNameAndPartition.eventHubName)) +
-                  currentOffsetsAndSeqNums(eventHubNameAndPartition)._2 - 1)
+                (backpressureRate + currentOffsetsAndSeqNums(eventHubNameAndPartition)._2)
           }
       }
     }

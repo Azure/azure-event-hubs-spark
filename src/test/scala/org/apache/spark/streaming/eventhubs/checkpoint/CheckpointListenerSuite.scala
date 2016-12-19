@@ -23,89 +23,78 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, EventHubsUtils}
+import org.apache.spark.streaming.scheduler.OutputOperationInfo
 
 // scalastyle:off
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.scheduler.{BatchInfo, StreamInputInfo, StreamingListenerBatchCompleted}
 // scalastyle:on
 
-class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter {
-
-  val appName = "dummyapp"
-  val streamId = 0
-  val nameSpace = "eventhubs"
-
-  var fs: FileSystem = _
-  var checkpointRootPath: Path = _
+class CheckpointListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
+  with SharedUtils {
 
   before {
-    checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    fs = checkpointRootPath.getFileSystem(new Configuration())
+    progressRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
+    fs = progressRootPath.getFileSystem(new Configuration())
+    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
+      setMaster("local[*]")), Seconds(5))
+    progressListner = new ProgressTrackingListener(progressRootPath.toString, ssc)
+    progressTracker = ProgressTracker.getInstance(progressRootPath.toString, appName,
+      new Configuration())
   }
 
-  /*
-  test("checkpoint files are created correctly") {
-    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val offsetStore = OffsetStoreDirectStreaming.newInstance(
-      checkpointRootPath.toString + "/checkpoint", appName, streamId,
-      nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
-    offsetStore.write(Time(10), EventHubNameAndPartition(nameSpace, 0), 0, 0)
-    offsetStore.write(Time(10), EventHubNameAndPartition(nameSpace, 1), 100, 100)
-    offsetStore.write(Time(10), EventHubNameAndPartition(nameSpace, 2), 200, 200)
-    offsetStore.write(Time(10), EventHubNameAndPartition(nameSpace, 3), 300, 300)
-    val listener = new CheckpointListener
-    val batchCompleted = StreamingListenerBatchCompleted(
-      BatchInfo(
-        Time(10),
-        Map(streamId -> StreamInputInfo(streamId, 400)),
-        submissionTime = 0L,
-        None,
-        None,
-        Map()))
-    listener.onBatchCompleted(batchCompleted)
-    offsetStore.write(Time(20), EventHubNameAndPartition(nameSpace, 0), 0, 0)
-    offsetStore.write(Time(20), EventHubNameAndPartition(nameSpace, 1), 100, 100)
-    offsetStore.write(Time(20), EventHubNameAndPartition(nameSpace, 2), 200, 200)
-    offsetStore.write(Time(20), EventHubNameAndPartition(nameSpace, 3), 300, 300)
-    val batchCompleted2 = StreamingListenerBatchCompleted(
-      BatchInfo(
-        Time(20),
-        Map(streamId -> StreamInputInfo(streamId, 400)),
-        submissionTime = 0L,
-        None,
-        None,
-        Map()))
-    listener.onBatchCompleted(batchCompleted2)
-    assert(fs.exists(offsetStore.checkpointDirPath))
-    assert(fs.exists(offsetStore.checkpointTempDirPath))
-    assert(fs.listStatus(offsetStore.checkpointTempDirPath).isEmpty)
-    assert(fs.exists(offsetStore.checkpointBackupDirPath))
-    assert(fs.exists(new Path(offsetStore.checkpointBackupDirPath.toString +
-      s"/$nameSpace-10")))
+  after {
+    EventHubDirectDStream.destory()
+    ProgressTracker.destory()
+    progressTracker = null
+    progressListner = null
+    ssc.stop()
   }
 
-  test("empty batch is skipped properly") {
-    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val offsetStore = OffsetStoreDirectStreaming.newInstance(
-      checkpointRootPath.toString + "/checkpoint", appName, streamId,
-      nameSpace, new Configuration()).asInstanceOf[DfsBasedOffsetStore2]
-    val listener = new CheckpointListener
-    val batchCompleted = StreamingListenerBatchCompleted(
-      BatchInfo(
-        Time(10),
-        Map(streamId -> StreamInputInfo(streamId, 0)),
-        0,
-        None,
-        None,
-        Map()))
-    listener.onBatchCompleted(batchCompleted)
-    assert(!fs.exists(offsetStore.checkpointDirPath))
-    assert(fs.exists(offsetStore.checkpointTempDirPath))
-    assert(fs.listStatus(offsetStore.checkpointTempDirPath).isEmpty)
-    assert(fs.exists(offsetStore.checkpointBackupDirPath))
-    assert(!fs.exists(new Path(offsetStore.checkpointBackupDirPath.toString +
-      s"/$nameSpace-10")))
+  test("commit offsets with a successful micro batch correctly") {
+    val batchCompletedEvent = StreamingListenerBatchCompleted(BatchInfo(
+      Time(1000L),
+      Map(0 -> StreamInputInfo(0, 10000)),
+      0L,
+      None,
+      None,
+      Map(1 -> OutputOperationInfo(Time(1000L), 1, "output", "", None, None, None))
+    ))
+    val dstream = createDirectStreams(ssc, nameSpace, progressRootPath.toString,
+      Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
+    val progressWriter = new ProgressWriter(progressRootPath.toString,
+      appName, streamId, nameSpace, EventHubNameAndPartition("eh1", 1), new Configuration())
+    progressWriter.write(1000L, 1L, 2L)
+    assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
+    progressListner.onBatchCompleted(batchCompletedEvent)
+    assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
+    assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
+    val record = progressTracker.read(nameSpace, streamId, 1000L)
+    assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
   }
-  */
+
+  test("do not commit offsets when there is a failure in microbatch") {
+    val batchCompletedEvent = StreamingListenerBatchCompleted(BatchInfo(
+      Time(1000L),
+      Map(0 -> StreamInputInfo(0, 10000)),
+      0L,
+      None,
+      None,
+      Map(
+        1 -> OutputOperationInfo(Time(1000L), 1, "outputWithFailure", "", None, None,
+          Some("instrumented failure")),
+        2 -> OutputOperationInfo(Time(1000L), 2, "correct output", "", None, None, None)))
+    )
+    // build temp directories
+    val progressWriter = new ProgressWriter(progressTracker.progressTempDirPath.toString,
+      appName, streamId, nameSpace, EventHubNameAndPartition("eh1", 1), new Configuration())
+    progressWriter.write(1000L, 0L, 0L)
+    assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
+    progressListner.onBatchCompleted(batchCompletedEvent)
+    assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
+    assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
+  }
 }

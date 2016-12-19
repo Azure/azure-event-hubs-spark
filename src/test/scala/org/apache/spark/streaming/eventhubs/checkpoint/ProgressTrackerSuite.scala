@@ -27,26 +27,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
 import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, EventHubsUtils}
 
-class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter {
-
-  private val appName = "dummyapp"
-  private val streamId = 0
-  private val nameSpace = "eventhubs"
-
-  var progressTracker: ProgressTracker = _
-  var progressRootPath: Path = _
-  var fs: FileSystem = _
-  var ssc: StreamingContext = _
-
-  private def createDirectStreams(
-      ssc: StreamingContext,
-      eventHubNamespace: String,
-      checkpointDir: String,
-      eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    ssc.addStreamingListener(new CheckpointListener(checkpointDir, ssc))
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
-    newStream
-  }
+class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
+  with SharedUtils {
 
   before {
     progressRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)

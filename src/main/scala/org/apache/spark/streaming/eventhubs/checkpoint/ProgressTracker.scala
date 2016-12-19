@@ -255,8 +255,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  def commit(
-      offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+  def commit(offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = driverLock.synchronized {
     val fs = new Path(checkpointDir).getFileSystem(hadoopConfiguration)
     try {

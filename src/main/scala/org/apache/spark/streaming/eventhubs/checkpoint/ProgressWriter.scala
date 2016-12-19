@@ -33,24 +33,23 @@ private[eventhubs] class ProgressWriter(
     eventHubNameAndPartition: EventHubNameAndPartition,
     hadoopConfiguration: Configuration) extends Logging {
 
-  private val tempProgressTrackingPoint = PathTools.progressFilePathStr(
+  private val tempProgressTrackingPointStr = PathTools.progressFilePathStr(
     PathTools.progressTempDirPathStr(checkpointDir, appName),
     streamId, namespace, eventHubNameAndPartition)
 
-  private[eventhubs] val checkpointTempDirPath = new Path(tempProgressTrackingPoint)
+  private[eventhubs] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
 
   def write(time: Long, cpOffset: Long, cpSeq: Long): Unit = {
-    val fs = checkpointTempDirPath.getFileSystem(hadoopConfiguration)
+    val fs = tempProgressTrackingPointPath.getFileSystem(hadoopConfiguration)
     var cpFileStream: FSDataOutputStream = null
     try {
       // it would be safe to overwrite checkpoint, since we will not start a new job when
       // checkpoint hasn't been committed
-      cpFileStream = fs.create(new Path(s"$tempProgressTrackingPoint"), true)
+      cpFileStream = fs.create(new Path(s"$tempProgressTrackingPointStr"), true)
       val record = ProgressRecord(time, namespace, streamId,
         eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
         cpSeq)
       cpFileStream.writeBytes(s"$record")
-      logDebug(s"$record")
     } catch {
       case ioe: IOException =>
         ioe.printStackTrace()

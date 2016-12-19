@@ -26,7 +26,7 @@ private[checkpoint] trait SharedUtils {
 
   val appName = "dummyapp"
   val streamId = 0
-  val nameSpace = "eventhubs"
+  val eventhubNamespace = "eventhubs"
 
   var fs: FileSystem = _
   var progressRootPath: Path = _

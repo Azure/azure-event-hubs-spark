@@ -62,16 +62,16 @@ class ProgressListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeA
       None,
       Map(1 -> OutputOperationInfo(Time(1000L), 1, "output", "", None, None, None))
     ))
-    val dstream = createDirectStreams(ssc, nameSpace, progressRootPath.toString,
+    val dstream = createDirectStreams(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
     val progressWriter = new ProgressWriter(progressRootPath.toString,
-      appName, streamId, nameSpace, EventHubNameAndPartition("eh1", 1), new Configuration())
+      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 1L, 2L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListner.onBatchCompleted(batchCompletedEvent)
     assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
-    val record = progressTracker.read(nameSpace, streamId, 1000L)
+    val record = progressTracker.read(eventhubNamespace, streamId, 1000L)
     assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
   }
 
@@ -89,7 +89,7 @@ class ProgressListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeA
     )
     // build temp directories
     val progressWriter = new ProgressWriter(progressTracker.progressTempDirPath.toString,
-      appName, streamId, nameSpace, EventHubNameAndPartition("eh1", 1), new Configuration())
+      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 0L, 0L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListner.onBatchCompleted(batchCompletedEvent)

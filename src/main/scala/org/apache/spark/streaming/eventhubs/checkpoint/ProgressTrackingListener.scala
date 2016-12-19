@@ -39,8 +39,6 @@ private[eventhubs] class ProgressTrackingListener private (
         ssc.sparkContext.hadoopConfiguration)
       // build current offsets
       val allEventDStreams = EventHubDirectDStream.getDirectStreams(ssc)
-      allEventDStreams.map(dstream =>
-        (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums)).toMap
       // merge with the temp directory
       val progressInLastBatch = progressTracker.snapshot()
       val contentToCommit = allEventDStreams.map {

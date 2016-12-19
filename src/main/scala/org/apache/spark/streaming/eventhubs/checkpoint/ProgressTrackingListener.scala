@@ -47,6 +47,7 @@ private[eventhubs] class ProgressTrackingListener(
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
+      logInfo(s"latest offsets: $contentToCommit")
       syncLatch.synchronized {
         progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
         logInfo(s"commit offset at ${batchCompleted.batchInfo.batchTime}")

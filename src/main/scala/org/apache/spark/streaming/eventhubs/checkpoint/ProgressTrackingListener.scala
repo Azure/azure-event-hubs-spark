@@ -49,6 +49,7 @@ private[eventhubs] class ProgressTrackingListener(
       }
       syncLatch.synchronized {
         progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
+        logInfo(s"commit offset at ${batchCompleted.batchInfo.batchTime}")
         syncLatch.notify()
       }
     }

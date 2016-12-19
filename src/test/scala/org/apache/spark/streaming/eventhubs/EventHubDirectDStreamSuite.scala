@@ -65,41 +65,17 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
     assert(ehDStream.compute(Time(1000)).get.count() === 0)
   }
 
-  /*
-  test("skip the batch when failed to fetch the latest offset of partitions") {
-    val eventHubClientMock = mock[EventHubClient]
-    Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
+  test("currentOffset are setup correctly when EventHubDirectDStream is deserialized") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
     val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))
-    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
-    val fs = tempPath.getFileSystem(new Configuration())
-    fs.mkdirs(tempPath)
-    ehDStream.setEventHubClient(eventHubClientMock)
-    ssc.scheduler.start()
-    assert(ehDStream.compute(Time(1000)).get.count() === 0)
-  }
-
-  test("checkpoint directories are configured correctly when EventHubDirectDStream" +
-    " is deserialized") {
-    val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    val ehDStream = new EventHubDirectDStream(ssc, "ehs", checkpointRootPath.toString,
-      Map("eh1" -> eventhubParameters))
-    val tempPath = ehDStream.offsetStore.asInstanceOf[DfsBasedOffsetStore2].checkpointTempDirPath
-    val fs = tempPath.getFileSystem(new Configuration())
+    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
     val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
-    fs.mkdirs(tempPath)
-    fs.create(new Path(tempPath + "/temp_file"))
-    val filesBefore = fs.listStatus(tempPath)
-    assert(filesBefore.size === 1)
     val deserCp = Utils.deserialize[Checkpoint](cp)
     assert(deserCp.graph.getInputStreams().length === 1)
     val deserEhDStream = deserCp.graph.getInputStreams()(0).asInstanceOf[EventHubDirectDStream]
     deserEhDStream.setContext(ssc)
-    assert(deserEhDStream.offsetStore != null)
-    assert(fs.exists(tempPath))
-    val filesAfter = fs.listStatus(tempPath)
-    assert(filesAfter.size === 0)
+    assert(deserEhDStream.currentOffsetsAndSeqNums ===
+      Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L)))
   }
-  */
 }

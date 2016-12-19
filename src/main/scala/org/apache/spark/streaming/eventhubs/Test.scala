@@ -22,6 +22,24 @@ import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 // TODO: delete this file right before merge
 object Test {
+
+  private def createNewStreamingContext(namespace: String, checkpointDir: String,
+      eventHubName: String, eventhubParameters: Map[String, String]): StreamingContext = {
+    val ssc = new StreamingContext(new SparkContext(), Seconds(10))
+    ssc.checkpoint("hdfs://mycluster/checkpoint_spark")
+
+    val inputDirectStream = new EventHubDirectDStream(ssc, namespace,
+      checkpointDir, Map(eventHubName -> eventhubParameters))
+    var l = 0L
+    inputDirectStream.foreachRDD { rdd =>
+      val r = rdd.count()
+      l += r
+      println("current long " + r)
+    }
+
+    ssc
+  }
+
   def main(args: Array[String]): Unit = {
     val checkpointDir = args(0)
     val policyName = args(1)
@@ -40,16 +58,7 @@ object Test {
     )
 
     val ssc = StreamingContext.getOrCreate("hdfs://mycluster/checkpoint_spark",
-      () => new StreamingContext(new SparkContext(), Seconds(10)))
-
-    val inputDirectStream = new EventHubDirectDStream(ssc, namespace,
-      checkpointDir, Map(name -> eventhubParameters))
-    var l = 0L
-    inputDirectStream.foreachRDD { rdd =>
-      val r = rdd.count()
-      l += r
-      println("current long " + r)
-    }
+      () => createNewStreamingContext(namespace, checkpointDir, name, eventhubParameters))
     ssc.start()
     ssc.awaitTermination()
   }

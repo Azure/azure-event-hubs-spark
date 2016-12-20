@@ -162,7 +162,23 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   }
 
   private def locateProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
-    getLastestFile(progressDirPath, fs)
+    val latestFilePathOpt = getLastestFile(progressDirPath, fs)
+    if (latestFilePathOpt.isDefined) {
+      val latestFile = latestFilePathOpt.get
+      val latestTimestamp = fromPathToTimestamp(latestFile)
+      if (latestTimestamp <= timestamp) {
+        latestFilePathOpt
+      } else {
+        val allFiles = fs.listStatus(progressDirPath)
+        Some(
+          allFiles.filter(fileStatus => fromPathToTimestamp(fileStatus.getPath) <= timestamp).
+            sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath)).
+            head.getPath
+        )
+      }
+    } else {
+      latestFilePathOpt
+    }
   }
 
   def read(namespace: String, streamId: Int, timestamp: Long):

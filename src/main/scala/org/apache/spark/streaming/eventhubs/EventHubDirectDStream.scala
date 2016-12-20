@@ -272,7 +272,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       while (newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums) &&
         !newOffsetsAndSeqNums.equals(latestOffsetOfAllPartitions)) {
         // we shall synchronize with listener threads
+        logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
+          s" ${validTime.milliseconds}")
         latchWithListener.wait()
+        logInfo(s"wake up at Batch ${validTime.milliseconds}")
         newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
       }
       proceedWithNonEmptyRDD(validTime, newOffsetsAndSeqNums, latestOffsetOfAllPartitions)

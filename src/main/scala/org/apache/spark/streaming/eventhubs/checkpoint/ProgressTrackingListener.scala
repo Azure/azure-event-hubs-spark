@@ -66,10 +66,14 @@ private[eventhubs] object ProgressTrackingListener {
       progressDirectory: String) = {
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
+      println("logging")
       ssc.addStreamingListener(_progressTrackerListener)
     }
-    println("logging")
     _progressTrackerListener
+  }
+
+  private[checkpoint] def reset(): Unit = {
+    _progressTrackerListener = null
   }
 
   def getInstance(ssc: StreamingContext, progressDirectory: String): ProgressTrackingListener =

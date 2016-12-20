@@ -41,7 +41,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
       setMaster("local[*]")), Seconds(5))
-    progressListner = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
+    progressListenr = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
     progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
       new Configuration())
   }
@@ -49,7 +49,8 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
   after {
     ProgressTracker.destory()
     progressTracker = null
-    progressListner = null
+    progressListenr = null
+    ProgressTrackingListener.reset()
     ssc.stop()
   }
 
@@ -68,7 +69,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
       appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 1L, 2L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-    progressListner.onBatchCompleted(batchCompletedEvent)
+    progressListenr.onBatchCompleted(batchCompletedEvent)
     assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
     val record = progressTracker.read(eventhubNamespace, streamId, 1000L)
@@ -92,7 +93,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
       appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 0L, 0L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-    progressListner.onBatchCompleted(batchCompletedEvent)
+    progressListenr.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
   }

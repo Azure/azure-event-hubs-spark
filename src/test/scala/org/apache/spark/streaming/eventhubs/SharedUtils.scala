@@ -30,7 +30,7 @@ private[eventhubs] trait SharedUtils {
 
   var fs: FileSystem = _
   var progressRootPath: Path = _
-  var progressListner: ProgressTrackingListener = _
+  var progressListenr: ProgressTrackingListener = _
   var ssc: StreamingContext = _
   var progressTracker: ProgressTracker = _
 

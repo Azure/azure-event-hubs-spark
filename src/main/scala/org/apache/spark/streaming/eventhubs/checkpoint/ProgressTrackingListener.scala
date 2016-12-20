@@ -72,11 +72,11 @@ private[eventhubs] object ProgressTrackingListener {
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
       println("logging")
-      if (eventHubDirectDStream != null) {
-        ssc.addStreamingListener(_progressTrackerListener)
-      }
+      ssc.addStreamingListener(_progressTrackerListener)
     }
-    eventHubDirectDStreams += eventHubDirectDStream
+    if (eventHubDirectDStream != null) {
+      eventHubDirectDStreams += eventHubDirectDStream
+    }
     _progressTrackerListener
   }
 

@@ -271,28 +271,30 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     Some(eventHubRDD)
   }
 
-  override def compute(validTime: Time): Option[RDD[EventData]] = latchWithListener.synchronized {
+  override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       latchWithListener = ProgressTrackingListener.getSyncLatch(ssc, checkpointDir, this)
       initialized = true
     }
-    var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
-    val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
-    if (latestOffsetOfAllPartitions.isEmpty) {
-      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
-        s" micro batch and process it later")
-      Some(ssc.sparkContext.emptyRDD[EventData])
-    } else {
-      while (newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums) &&
-        !newOffsetsAndSeqNums.equals(latestOffsetOfAllPartitions)) {
-        // we shall synchronize with listener threads
-        logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
-          s" ${validTime.milliseconds}")
-        latchWithListener.wait()
-        logInfo(s"wake up at Batch ${validTime.milliseconds}")
-        newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+    latchWithListener.synchronized {
+      var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+      val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+      if (latestOffsetOfAllPartitions.isEmpty) {
+        logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
+          s" micro batch and process it later")
+        Some(ssc.sparkContext.emptyRDD[EventData])
+      } else {
+        while (newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums) &&
+          !newOffsetsAndSeqNums.equals(latestOffsetOfAllPartitions)) {
+          // we shall synchronize with listener threads
+          logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
+            s" ${validTime.milliseconds}")
+          latchWithListener.wait()
+          logInfo(s"wake up at Batch ${validTime.milliseconds}")
+          newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+        }
+        proceedWithNonEmptyRDD(validTime, newOffsetsAndSeqNums, latestOffsetOfAllPartitions)
       }
-      proceedWithNonEmptyRDD(validTime, newOffsetsAndSeqNums, latestOffsetOfAllPartitions)
     }
   }
 

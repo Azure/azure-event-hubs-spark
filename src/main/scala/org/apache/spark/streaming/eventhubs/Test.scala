@@ -17,6 +17,8 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import scala.util.Random
+
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
@@ -32,9 +34,8 @@ object Test {
       checkpointDir, Map(eventHubName -> eventhubParameters))
     var l = 0L
     inputDirectStream.foreachRDD { rdd =>
-      val r = rdd.count()
-      l += r
-      println("current long " + r)
+      val r = Random.nextInt(32) + 1
+      println("current length: " + rdd.take(r * 1000).length)
     }
 
     ssc

@@ -309,7 +309,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
     override def update(time: Time): Unit = {
       batchForTime.clear()
-      generatedRDDs.foreach { kv =>
+      generatedRDDs.filter(_._2.isInstanceOf[EventHubRDD]).foreach { kv =>
         val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
         batchForTime += kv._1 -> offsetRangeOfRDD
       }

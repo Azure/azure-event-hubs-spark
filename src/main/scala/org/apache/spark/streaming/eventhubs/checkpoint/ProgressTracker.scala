@@ -166,7 +166,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     if (latestFilePathOpt.isDefined) {
       val latestFile = latestFilePathOpt.get
       val latestTimestamp = fromPathToTimestamp(latestFile)
-      if (latestTimestamp <= timestamp) {
+      if (latestTimestamp < timestamp) {
         latestFilePathOpt
       } else {
         val allFiles = fs.listStatus(progressDirPath)

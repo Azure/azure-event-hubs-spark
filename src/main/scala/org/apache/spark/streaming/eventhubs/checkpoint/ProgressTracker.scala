@@ -171,7 +171,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       } else {
         val allFiles = fs.listStatus(progressDirPath)
         Some(
-          allFiles.filter(fileStatus => fromPathToTimestamp(fileStatus.getPath) <= timestamp).
+          allFiles.filter(fileStatus => fromPathToTimestamp(fileStatus.getPath) < timestamp).
             sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath)).
             head.getPath
         )

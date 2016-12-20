@@ -68,6 +68,7 @@ private[eventhubs] object ProgressTrackingListener {
       ssc: StreamingContext,
       progressDirectory: String,
       eventHubDirectDStream: EventHubDirectDStream) = {
+    println("create new instance")
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
       ssc.addStreamingListener(_progressTrackerListener)
@@ -94,6 +95,7 @@ private[eventhubs] object ProgressTrackingListener {
       ssc: StreamingContext,
       progressDirectory: String,
       eventHubDirectDStream: EventHubDirectDStream): Object = this.synchronized {
+    println("getSyncLatch")
       getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream).syncLatch
   }
 }

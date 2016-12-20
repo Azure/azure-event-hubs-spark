@@ -86,6 +86,7 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
     val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
+    println("------------------------------------------------")
     // simulate the program crashes
     ProgressTrackingListener.reset()
     val deserCp = Utils.deserialize[Checkpoint](cp)

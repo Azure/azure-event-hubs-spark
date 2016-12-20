@@ -77,7 +77,7 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
       Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L)))
   }
 
-  test("syncLatch are setup correctly when EventHubDirectDStream is deserialized") {
+  test("progressTrackingListener are setup correctly when EventHubDirectDStream is deserialized") {
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
     val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))

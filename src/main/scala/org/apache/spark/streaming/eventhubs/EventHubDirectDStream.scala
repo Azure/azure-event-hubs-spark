@@ -17,6 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
 import java.util.concurrent.locks.ReentrantLock
 
 import scala.collection.mutable
@@ -32,6 +33,7 @@ import org.apache.spark.streaming.dstream.{DStream, DStreamCheckpointData, Input
 import org.apache.spark.streaming.eventhubs.checkpoint._
 import org.apache.spark.streaming.scheduler.{RateController, StreamInputInfo}
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
+import org.apache.spark.util.Utils
 
 /**
  * implementation of EventHub-based direct stream
@@ -55,7 +57,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
 
-  private[eventhubs] val latchWithListener = ProgressTrackingListener.getSyncLatch(ssc,
+  private[eventhubs] var latchWithListener = ProgressTrackingListener.getSyncLatch(ssc,
     checkpointDir, this)
 
   private[eventhubs] val eventhubNameAndPartitions = {
@@ -132,6 +134,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       logWarning(s"cannot get latest offset at time $validTime")
       Map()
     }
+  }
+
+  @throws(classOf[IOException])
+  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
+    ois.defaultReadObject()
+    latchWithListener = ProgressTrackingListener.getSyncLatch(ssc, checkpointDir, this)
   }
 
   /**

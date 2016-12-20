@@ -244,12 +244,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private def proceedWithNonEmptyRDD(
       validTime: Time,
-      newOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)],
       latestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
     Option[EventHubRDD] = {
     // normal processing
-    validatePartitions(validTime, newOffsetsAndSeqNums.keys.toList)
-    currentOffsetsAndSeqNums = newOffsetsAndSeqNums
+    validatePartitions(validTime, startOffsetInNextBatch.keys.toList)
+    currentOffsetsAndSeqNums = startOffsetInNextBatch
     val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
     logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
     val offsetRanges = latestOffsetOfAllPartitions.map {
@@ -277,23 +277,23 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       initialized = true
     }
     latchWithListener.synchronized {
-      var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+      var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
       if (latestOffsetOfAllPartitions.isEmpty) {
         logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
           s" micro batch and process it later")
         Some(ssc.sparkContext.emptyRDD[EventData])
       } else {
-        while (newOffsetsAndSeqNums.equals(currentOffsetsAndSeqNums) &&
-          !newOffsetsAndSeqNums.equals(latestOffsetOfAllPartitions)) {
+        while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
+          !startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
           // we shall synchronize with listener threads
           logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
             s" ${validTime.milliseconds}")
           latchWithListener.wait()
           logInfo(s"wake up at Batch ${validTime.milliseconds}")
-          newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+          startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
         }
-        proceedWithNonEmptyRDD(validTime, newOffsetsAndSeqNums, latestOffsetOfAllPartitions)
+        proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
       }
     }
   }

@@ -78,16 +78,20 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
   }
 
   test("progressTrackingListener are setup correctly when EventHubDirectDStream is deserialized") {
+    import scala.collection.JavaConverters._
     val checkpointRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
     val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, checkpointRootPath.toString,
       Map("eh1" -> eventhubParameters))
     ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
     val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
+    assert(ssc.scheduler.listenerBus.listeners.asScala.count(
+      _.isInstanceOf[ProgressTrackingListener]) === 1)
     val deserCp = Utils.deserialize[Checkpoint](cp)
-    assert(deserCp.graph.getInputStreams().length === 1)
+    // simulate the program crashes
+    ProgressTrackingListener.reset()
+    assert(deserCp.graph.getInputStreams().count(_.isInstanceOf[EventHubDirectDStream]) === 1)
     val deserEhDStream = deserCp.graph.getInputStreams()(0).asInstanceOf[EventHubDirectDStream]
     deserEhDStream.setContext(ssc)
-    import scala.collection.JavaConverters._
     assert(deserEhDStream.context.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
   }

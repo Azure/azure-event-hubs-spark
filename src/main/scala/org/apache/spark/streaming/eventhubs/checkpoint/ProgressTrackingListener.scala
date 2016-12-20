@@ -17,6 +17,8 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
+import scala.collection.mutable.ListBuffer
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
@@ -38,7 +40,7 @@ private[eventhubs] class ProgressTrackingListener private (
         ssc.sparkContext.appName,
         ssc.sparkContext.hadoopConfiguration)
       // build current offsets
-      val allEventDStreams = EventHubDirectDStream.getDirectStreams(ssc)
+      val allEventDStreams = ProgressTrackingListener.eventHubDirectDStreams
       // merge with the temp directory
       val progressInLastBatch = progressTracker.snapshot()
       val contentToCommit = allEventDStreams.map {
@@ -61,14 +63,20 @@ private[eventhubs] object ProgressTrackingListener {
 
   private var _progressTrackerListener: ProgressTrackingListener = _
 
+  private[checkpoint] val eventHubDirectDStreams = new ListBuffer[EventHubDirectDStream]
+
   private def getOrCreateProgressTrackerListener(
       ssc: StreamingContext,
-      progressDirectory: String) = {
+      progressDirectory: String,
+      eventHubDirectDStream: EventHubDirectDStream) = {
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
       println("logging")
-      ssc.addStreamingListener(_progressTrackerListener)
+      if (eventHubDirectDStream != null) {
+        ssc.addStreamingListener(_progressTrackerListener)
+      }
     }
+    eventHubDirectDStreams += eventHubDirectDStream
     _progressTrackerListener
   }
 
@@ -76,13 +84,18 @@ private[eventhubs] object ProgressTrackingListener {
     _progressTrackerListener = null
   }
 
-  def getInstance(ssc: StreamingContext, progressDirectory: String): ProgressTrackingListener =
+  def getInstance(ssc: StreamingContext,
+                  progressDirectory: String,
+                  eventHubDirectDStream: EventHubDirectDStream): ProgressTrackingListener =
     this.synchronized {
-      getOrCreateProgressTrackerListener(ssc, progressDirectory)
+      getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream)
     }
 
-  def getSyncLatch(ssc: StreamingContext, progressDirectory: String): Object = this.synchronized {
-      getOrCreateProgressTrackerListener(ssc, progressDirectory).syncLatch
+  def getSyncLatch(
+      ssc: StreamingContext,
+      progressDirectory: String,
+      eventHubDirectDStream: EventHubDirectDStream): Object = this.synchronized {
+      getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream).syncLatch
   }
 }
 

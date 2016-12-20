@@ -41,7 +41,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
       setMaster("local[*]")), Seconds(5))
-    progressListenr = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
+    progressListener = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString, null)
     progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
       new Configuration())
   }
@@ -49,7 +49,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
   after {
     ProgressTracker.destory()
     progressTracker = null
-    progressListenr = null
+    progressListener = null
     ProgressTrackingListener.reset()
     ssc.stop()
   }
@@ -69,7 +69,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
       appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 1L, 2L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-    progressListenr.onBatchCompleted(batchCompletedEvent)
+    progressListener.onBatchCompleted(batchCompletedEvent)
     assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
     val record = progressTracker.read(eventhubNamespace, streamId, 1000L)
@@ -93,12 +93,13 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
       appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 0L, 0L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-    progressListenr.onBatchCompleted(batchCompletedEvent)
+    progressListener.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
   }
 
-  test("there are only one ProgressTrackingListener") {
+  test("EventHubDStreams are registered to the singleton ProgressTrackingListener correctly") {
+    ProgressTrackingListener.reset()
     createDirectStreams(ssc, "namespace1", progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
         "eh2" -> Map("eventhubs.partition.count" -> "2"),
@@ -110,5 +111,6 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
+    assert(ProgressTrackingListener.eventHubDirectDStreams.length === 2)
   }
 }

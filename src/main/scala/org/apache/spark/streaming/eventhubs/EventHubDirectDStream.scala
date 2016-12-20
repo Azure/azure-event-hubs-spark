@@ -56,7 +56,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
 
   private[eventhubs] val latchWithListener = ProgressTrackingListener.getSyncLatch(ssc,
-    checkpointDir)
+    checkpointDir, this)
 
   private[eventhubs] val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;
@@ -318,14 +318,5 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     override protected def publish(rate: Long): Unit = {
       // publish nothing as there is no receiver
     }
-  }
-}
-
-
-private[eventhubs] object EventHubDirectDStream {
-
-  private[eventhubs] def getDirectStreams(ssc: StreamingContext) = {
-    ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
-      _.asInstanceOf[EventHubDirectDStream])
   }
 }

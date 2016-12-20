@@ -262,6 +262,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = latchWithListener.synchronized {
+    import scala.collection.JavaConverters._
+    logInfo(s"TEST: ${ssc.scheduler.listenerBus.listeners.asScala.foreach(listener =>
+      listener.getClass.getName)}")
     var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
     val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     if (latestOffsetOfAllPartitions.isEmpty) {

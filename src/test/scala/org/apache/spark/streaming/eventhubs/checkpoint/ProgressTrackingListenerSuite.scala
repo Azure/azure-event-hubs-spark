@@ -75,20 +75,6 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
   }
 
-  test("there are only one ProgressTrackingListener") {
-    createDirectStreams(ssc, "namespace1", progressRootPath.toString,
-      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-        "eh2" -> Map("eventhubs.partition.count" -> "2"),
-        "eh3" -> Map("eventhubs.partition.count" -> "3")))
-    createDirectStreams(ssc, "namespace2", progressRootPath.toString,
-      Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-        "eh12" -> Map("eventhubs.partition.count" -> "2"),
-        "eh13" -> Map("eventhubs.partition.count" -> "3")))
-    import scala.collection.JavaConverters._
-    assert(ssc.scheduler.listenerBus.listeners.asScala.count(
-      _.isInstanceOf[ProgressTrackingListener]) === 1)
-  }
-
   test("do not commit offsets when there is a failure in microbatch") {
     val batchCompletedEvent = StreamingListenerBatchCompleted(BatchInfo(
       Time(1000L),
@@ -109,5 +95,20 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     progressListner.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
+  }
+
+  test("there are only one ProgressTrackingListener") {
+    createDirectStreams(ssc, "namespace1", progressRootPath.toString,
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3")))
+    createDirectStreams(ssc, "namespace2", progressRootPath.toString,
+      Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
+        "eh12" -> Map("eventhubs.partition.count" -> "2"),
+        "eh13" -> Map("eventhubs.partition.count" -> "3")))
+    ssc.start()
+    import scala.collection.JavaConverters._
+    assert(ssc.scheduler.listenerBus.listeners.asScala.count(
+      _.isInstanceOf[ProgressTrackingListener]) === 1)
   }
 }

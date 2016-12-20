@@ -68,6 +68,7 @@ private[eventhubs] object ProgressTrackingListener {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
       ssc.addStreamingListener(_progressTrackerListener)
     }
+    println("logging")
     _progressTrackerListener
   }
 

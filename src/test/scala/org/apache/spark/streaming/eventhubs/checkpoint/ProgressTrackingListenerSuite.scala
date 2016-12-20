@@ -33,7 +33,7 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.scheduler.{BatchInfo, StreamInputInfo, StreamingListenerBatchCompleted}
 // scalastyle:on
 
-class ProgressListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
+class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
   with SharedUtils {
 
   before {
@@ -73,6 +73,20 @@ class ProgressListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeA
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
     val record = progressTracker.read(eventhubNamespace, streamId, 1000L)
     assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
+  }
+
+  test("there are only one ProgressTrackingListener") {
+    createDirectStreams(ssc, "namespace1", progressRootPath.toString,
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3")))
+    createDirectStreams(ssc, "namespace2", progressRootPath.toString,
+      Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
+        "eh12" -> Map("eventhubs.partition.count" -> "2"),
+        "eh13" -> Map("eventhubs.partition.count" -> "3")))
+    import scala.collection.JavaConverters._
+    assert(ssc.scheduler.listenerBus.listeners.asScala.filter(
+      _.isInstanceOf[ProgressTrackingListener]).length === 1)
   }
 
   test("do not commit offsets when there is a failure in microbatch") {

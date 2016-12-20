@@ -106,7 +106,6 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
       Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
         "eh12" -> Map("eventhubs.partition.count" -> "2"),
         "eh13" -> Map("eventhubs.partition.count" -> "3")))
-    ssc.start()
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)

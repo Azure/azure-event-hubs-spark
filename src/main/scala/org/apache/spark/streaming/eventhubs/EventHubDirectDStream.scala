@@ -55,7 +55,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
-  protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
+  protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
   private[eventhubs] var latchWithListener = ProgressTrackingListener.getSyncLatch(ssc,
     checkpointDir, this)
@@ -134,12 +134,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       logWarning(s"cannot get latest offset at time $validTime")
       Map()
     }
-  }
-
-  @throws(classOf[IOException])
-  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
-    ois.defaultReadObject()
-    latchWithListener = ProgressTrackingListener.getSyncLatch(context, checkpointDir, this)
   }
 
   /**
@@ -293,8 +287,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private[eventhubs] class EventHubDirectDStreamCheckpointData
-    extends DStreamCheckpointData(this) {
+  private[eventhubs] class EventHubDirectDStreamCheckpointData(
+      eventHubDirectDStream: EventHubDirectDStream) extends DStreamCheckpointData(this) {
 
     def batchForTime: mutable.HashMap[Time,
       Array[(EventHubNameAndPartition, Long, Long, Long)]] = {
@@ -313,6 +307,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     override def cleanup(time: Time): Unit = { }
 
     override def restore(): Unit = {
+      eventHubDirectDStream.latchWithListener = ProgressTrackingListener.getSyncLatch(
+        ssc, checkpointDir, eventHubDirectDStream)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
         logInfo(s"Restoring EventHub for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubRDD(

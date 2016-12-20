@@ -87,6 +87,8 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
     assert(deserCp.graph.getInputStreams().length === 1)
     val deserEhDStream = deserCp.graph.getInputStreams()(0).asInstanceOf[EventHubDirectDStream]
     deserEhDStream.setContext(ssc)
-    assert(deserEhDStream.latchWithListener != null)
+    import scala.collection.JavaConverters._
+    assert(deserEhDStream.context.scheduler.listenerBus.listeners.asScala.count(
+      _.isInstanceOf[ProgressTrackingListener]) === 1)
   }
 }

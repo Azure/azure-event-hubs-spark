@@ -38,7 +38,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
   }
 
   after {
-    ProgressTracker.destory()
+    ProgressTrackingListener.reset()
+    ProgressTracker.reset()
     progressTracker = null
     ssc.stop()
   }

@@ -47,7 +47,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
   }
 
   after {
-    ProgressTracker.destory()
+    ProgressTracker.reset()
     progressTracker = null
     progressListener = null
     ProgressTrackingListener.reset()

@@ -337,7 +337,7 @@ private[eventhubs] object ProgressTracker {
 
   private var _progressTracker: ProgressTracker = _
 
-  private[checkpoint] def destory(): Unit = {
+  private[checkpoint] def reset(): Unit = {
     _progressTracker = null
   }
 

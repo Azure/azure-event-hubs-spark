@@ -99,7 +99,12 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
   }
 
   test("EventHubDStreams are registered to the singleton ProgressTrackingListener correctly") {
+    // reset env first
     ProgressTrackingListener.reset()
+    ssc.stop()
+    // create new streaming context
+    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
+      setMaster("local[*]")), Seconds(5))
     createDirectStreams(ssc, "namespace1", progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
         "eh2" -> Map("eventhubs.partition.count" -> "2"),
@@ -112,5 +117,6 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
     assert(ProgressTrackingListener.eventHubDirectDStreams.length === 2)
+    ssc.stop()
   }
 }

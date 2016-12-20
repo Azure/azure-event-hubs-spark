@@ -81,6 +81,7 @@ private[eventhubs] object ProgressTrackingListener {
   }
 
   private[checkpoint] def reset(): Unit = {
+    eventHubDirectDStreams.clear()
     _progressTrackerListener = null
   }
 

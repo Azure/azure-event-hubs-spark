@@ -34,7 +34,7 @@ private[eventhubs] class ProgressTrackingListener private (
   private val syncLatch: Object = new Serializable {}
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
-
+    logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
     if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
       val progressTracker = ProgressTracker.getInstance(ssc, progressDirectory,
         ssc.sparkContext.appName,
@@ -48,7 +48,6 @@ private[eventhubs] class ProgressTrackingListener private (
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
-      logInfo(s"latest offsets: $contentToCommit")
       syncLatch.synchronized {
         progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
         logInfo(s"commit offset at ${batchCompleted.batchInfo.batchTime}")

@@ -303,9 +303,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         br = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"))
         val line = br.readLine()
         if (line == null) {
-          logError(s"corrupted checkpoint file in ${file.getPath}")
-          throw new IllegalStateException(s"corrupted checkpoint file in ${file.getPath}" +
-            s", it might be a bug in the implementation of underlying file system")
+          logError(s"cannot read progress file in ${file.getPath}")
+          // throw new IllegalStateException(s"corrupted checkpoint file in ${file.getPath}" +
+            // s", it might be a bug in the implementation of underlying file system")
+          return ret.toMap
         }
         val progressRecord = ProgressRecord.parse(line)
         if (timestamp == -1L) {

@@ -85,8 +85,8 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
         "eh12" -> Map("eventhubs.partition.count" -> "2"),
         "eh13" -> Map("eventhubs.partition.count" -> "3")))
     import scala.collection.JavaConverters._
-    assert(ssc.scheduler.listenerBus.listeners.asScala.filter(
-      _.isInstanceOf[ProgressTrackingListener]).length === 1)
+    assert(ssc.scheduler.listenerBus.listeners.asScala.count(
+      _.isInstanceOf[ProgressTrackingListener]) === 1)
   }
 
   test("do not commit offsets when there is a failure in microbatch") {

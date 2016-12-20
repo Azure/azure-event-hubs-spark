@@ -60,6 +60,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private[eventhubs] var latchWithListener = ProgressTrackingListener.getSyncLatch(ssc,
     checkpointDir, this)
 
+  private var initialized = false
+
   private[eventhubs] val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;
          partitionId <- 0 until eventhubsParams(eventHubName)(
@@ -73,6 +75,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     } else {
       None
     }
+  }
+
+  @throws(classOf[IOException])
+  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
+    ois.defaultReadObject()
+    initialized = false
   }
 
   private def maxRateLimitPerPartition(eventHubName: String): Int = {
@@ -264,9 +272,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = latchWithListener.synchronized {
-    import scala.collection.JavaConverters._
-    logInfo(s"TEST: ${ssc.scheduler.listenerBus.listeners.asScala.foreach(listener =>
-      listener.getClass.getName)}")
+    if (!initialized) {
+      latchWithListener = ProgressTrackingListener.getSyncLatch(ssc, checkpointDir, this)
+      initialized = true
+    }
     var newOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
     val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     if (latestOffsetOfAllPartitions.isEmpty) {
@@ -307,8 +316,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     override def cleanup(time: Time): Unit = { }
 
     override def restore(): Unit = {
-      eventHubDirectDStream.latchWithListener = ProgressTrackingListener.getSyncLatch(
-        ssc, checkpointDir, eventHubDirectDStream)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
         logInfo(s"Restoring EventHub for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubRDD(

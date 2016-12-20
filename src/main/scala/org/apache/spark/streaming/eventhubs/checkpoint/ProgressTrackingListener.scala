@@ -83,12 +83,12 @@ private[eventhubs] object ProgressTrackingListener {
     _progressTrackerListener = null
   }
 
-  def getInstance(ssc: StreamingContext,
-                  progressDirectory: String,
-                  eventHubDirectDStream: EventHubDirectDStream): ProgressTrackingListener =
-    this.synchronized {
-      getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream)
-    }
+  def getInstance(
+      ssc: StreamingContext,
+      progressDirectory: String,
+      eventHubDirectDStream: EventHubDirectDStream): ProgressTrackingListener = this.synchronized {
+    getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream)
+  }
 
   def getSyncLatch(
       ssc: StreamingContext,

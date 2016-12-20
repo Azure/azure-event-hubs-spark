@@ -139,7 +139,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   @throws(classOf[IOException])
   private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
     ois.defaultReadObject()
-    latchWithListener = ProgressTrackingListener.getSyncLatch(ssc, checkpointDir, this)
+    latchWithListener = ProgressTrackingListener.getSyncLatch(context, checkpointDir, this)
   }
 
   /**

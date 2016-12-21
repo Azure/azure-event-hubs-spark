@@ -72,7 +72,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     progressListener.onBatchCompleted(batchCompletedEvent)
     assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
-    val record = progressTracker.read(eventhubNamespace, streamId, 1000L)
+    val record = progressTracker.read(eventhubNamespace, streamId, 2000L)
     assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
   }
 

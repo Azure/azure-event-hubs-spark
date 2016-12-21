@@ -220,12 +220,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
 
   private def readProgressRecordLines(
       progressFilePath: Path,
-      fs: FileSystem,
-      expectedTimestampOpt: Option[Long]): List[ProgressRecord] = {
+      fs: FileSystem): List[ProgressRecord] = {
     val ret = new ListBuffer[ProgressRecord]
     var ins: FSDataInputStream = null
     var br: BufferedReader = null
-    var expectedTimestamp = -1L
     try {
       ins = fs.open(progressFilePath)
       br = new BufferedReader(new InputStreamReader(ins, "UTF-8"))
@@ -233,19 +231,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       while (line != null) {
         val progressRecordOpt = ProgressRecord.parse(line)
         if (progressRecordOpt.isEmpty) {
-          throw new IllegalStateException(s"detect corrupt checkpoint at $line, it might be a" +
-            s" bug in the implementation of underlying file system")
+          throw new IllegalStateException(s"detect corrupt progress tracking file at $line" +
+            s" it might be a bug in the implementation of underlying file system")
         }
         val progressRecord = progressRecordOpt.get
-        if (expectedTimestampOpt.isEmpty && expectedTimestamp == -1L) {
-          expectedTimestamp = progressRecord.timestamp
-        } else {
-          if (progressRecord.timestamp != expectedTimestampOpt.getOrElse(expectedTimestamp)) {
-            throw new IllegalStateException(s"detect inconsistent checkpoint at $line, expected" +
-              s" timestamp: $expectedTimestamp, it might be a bug in the implementation of" +
-              s" underlying file system")
-          }
-        }
         ret += progressRecord
         line = br.readLine()
       }
@@ -253,9 +242,6 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       case ios: IOException =>
         ios.printStackTrace()
         throw ios
-      case ise: IllegalStateException =>
-        ise.printStackTrace()
-        throw ise
     } finally {
       if (br != null) {
         br.close()
@@ -285,7 +271,9 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       } else {
         val expectedTimestamp = fromPathToTimestamp(progressFileOption.get)
         val progressFilePath = progressFileOption.get
-        val recordLines = readProgressRecordLines(progressFilePath, fs, Some(expectedTimestamp))
+        val recordLines = readProgressRecordLines(progressFilePath, fs)
+        require(recordLines.count(_.timestamp != expectedTimestamp) == 0, "detected inconsistent" +
+          s" progress record, expected timestamp $expectedTimestamp")
         ret = recordLines.filter(progressRecord => progressRecord.streamId == streamId).
           map(progressRecord => EventHubNameAndPartition(progressRecord.eventHubName,
             progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId)).toMap
@@ -354,14 +342,25 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   def snapshot(): Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
+    var timestamp = -1L
     try {
       val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
       val files = fs.listFiles(progressTempDirPath, false)
       while (files.hasNext) {
         val file = files.next()
-        val progressRecords = readProgressRecordLines(file.getPath, fs, None)
+        val progressRecords = readProgressRecordLines(file.getPath, fs)
         records ++= progressRecords
       }
+      // check timestamp consistency
+      records.foreach(progressRecord =>
+        if (timestamp == -1L) {
+          timestamp = progressRecord.timestamp
+        } else {
+          throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
+            s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
+            s" implementation of underlying file system")
+        }
+      )
     } catch {
       case ioe: IOException =>
         logError(s"error: ${ioe.getMessage}")

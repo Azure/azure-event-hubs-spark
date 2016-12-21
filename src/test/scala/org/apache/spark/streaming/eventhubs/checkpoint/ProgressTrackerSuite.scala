@@ -203,14 +203,14 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     oos.close()
     progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
       appName, new Configuration())
-    val ehMap = progressTracker.read("namespace2", dStream1.id, 1000L)
+    val ehMap = progressTracker.read("namespace2", dStream1.id, 2000L)
     assert(ehMap(EventHubNameAndPartition("eh11", 0)) === (1, 2))
     assert(ehMap(EventHubNameAndPartition("eh12", 0)) === (2, 3))
     assert(ehMap(EventHubNameAndPartition("eh12", 1)) === (3, 4))
     assert(ehMap(EventHubNameAndPartition("eh13", 0)) === (4, 5))
     assert(ehMap(EventHubNameAndPartition("eh13", 1)) === (5, 6))
     assert(ehMap(EventHubNameAndPartition("eh13", 2)) === (6, 7))
-    val ehMap1 = progressTracker.read("namespace1", dStream.id, 1000L)
+    val ehMap1 = progressTracker.read("namespace1", dStream.id, 2000L)
     assert(ehMap1(EventHubNameAndPartition("eh1", 0)) === (0, 1))
     assert(ehMap1(EventHubNameAndPartition("eh2", 0)) === (0, 2))
     assert(ehMap1(EventHubNameAndPartition("eh2", 1)) === (0, 3))
@@ -331,11 +331,11 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
         EventHubNameAndPartition("eh1", 3) -> (0L, 0L),
         EventHubNameAndPartition("eh2", 4) -> (1L, 1L)))
     progressTracker.commit(offsetToCommit, 3000L)
-    val namespace1Offsets = progressTracker.read("namespace1", 1, 3000L)
+    val namespace1Offsets = progressTracker.read("namespace1", 1, 4000L)
     assert(namespace1Offsets === Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
       EventHubNameAndPartition("eh2", 1) -> (1L, 1L)))
-    val namespace2Offsets = progressTracker.read("namespace2", 2, 3000L)
+    val namespace2Offsets = progressTracker.read("namespace2", 2, 4000L)
     assert(namespace2Offsets === Map(
       EventHubNameAndPartition("eh1", 3) -> (0L, 0L),
       EventHubNameAndPartition("eh2", 4) -> (1L, 1L)))

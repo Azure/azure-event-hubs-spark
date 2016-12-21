@@ -31,8 +31,6 @@ import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListene
 private[eventhubs] class ProgressTrackingListener private (
     ssc: StreamingContext, progressDirectory: String) extends StreamingListener with Logging {
 
-  private val syncLatch: Object = new Serializable {}
-
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
     logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
     if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
@@ -48,11 +46,11 @@ private[eventhubs] class ProgressTrackingListener private (
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
-      syncLatch.synchronized {
+      ssc.graph.synchronized {
         progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
         logInfo(s"commit ending offset of Batch ${batchCompleted.batchInfo.batchTime}")
         // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
-        syncLatch.notifyAll()
+        ssc.graph.notifyAll()
       }
     }
   }
@@ -88,13 +86,6 @@ private[eventhubs] object ProgressTrackingListener {
       progressDirectory: String,
       eventHubDirectDStream: EventHubDirectDStream): ProgressTrackingListener = this.synchronized {
     getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream)
-  }
-
-  def getSyncLatch(
-      ssc: StreamingContext,
-      progressDirectory: String,
-      eventHubDirectDStream: EventHubDirectDStream): Object = this.synchronized {
-    getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream).syncLatch
   }
 }
 

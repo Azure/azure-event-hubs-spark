@@ -17,6 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
+// scalastyle:off
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
@@ -27,6 +28,7 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreParams, ProgressWriter}
 import org.apache.spark.streaming.Time
+// scalastyle:on
 
 private[eventhubs] class EventHubRDDPartition(
     val sparkPartitionId: Int,

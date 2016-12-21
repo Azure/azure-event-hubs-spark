@@ -78,17 +78,25 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     if (allFiles.length < 1) {
       None
     } else {
-      // getModificationTime is not reliable for unit test and some extreme case in file system
       Some(allFiles.sortWith((f1, f2) =>
-        f1.getPath.getName.split("-").last.toLong > f2.getPath.getName.split("-").last.toLong)(0).
-        getPath)
+        fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))(0).getPath)
     }
   }
 
+  // getModificationTime is not reliable for unit test and some extreme case in distributed
+  // file system so that we have to derive timestamp from the file names
   private def fromPathToTimestamp(path: Path): Long = {
     path.getName.split("-").last.toLong
   }
 
+  /**
+   * this method is called when ProgressTracker is started for the first time (including recovering
+   * from checkpoint). This method validate the latest progress file by checking whether it
+   * contains progress of all partitions we subscribe to. If not, we will delete the corrupt
+   * progress file
+   * @return (whether the latest file pass the validation, whether the latest file exists)
+   *          (false, Some(x)) does not exist
+   */
   private def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
     val latestFileOpt = getLastestFile(progressDirPath, fs)
     val allCheckpointedNameAndPartitions = new mutable.HashMap[String,
@@ -103,7 +111,11 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       var cpRecord: String = br.readLine()
       var timestamp = -1L
       while (cpRecord != null) {
-        val progressRecord = ProgressRecord.parse(cpRecord)
+        val progressRecordOpt = ProgressRecord.parse(cpRecord)
+        if (progressRecordOpt.isEmpty) {
+          return (false, latestFileOpt)
+        }
+        val progressRecord = progressRecordOpt.get
         val newList = allCheckpointedNameAndPartitions.getOrElseUpdate(progressRecord.namespace,
           List[EventHubNameAndPartition]()) :+
           EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
@@ -130,6 +142,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     (allEventNameAndPartitionExist(allCheckpointedNameAndPartitions.toMap), latestFileOpt)
   }
 
+  /**
+   * called when ProgressTracker is called for the first time, including recovering from the
+   * checkpoint
+   */
   private def init(): Unit = {
     // recover from partially executed checkpoint commit
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
@@ -161,31 +177,99 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
+  /**
+   * locate the progress file according to the timestamp
+   * when the timestamp of the latest file in the progress tracking directory is earlier than
+   * the passed-in timestamp we return the latest file; otherwise we return the file which is
+   * committed at batch (timestamp - batchDuratiuon)
+   */
   private def locateProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
-    val latestFilePathOpt = getLastestFile(progressDirPath, fs)
-    if (latestFilePathOpt.isDefined) {
-      val latestFile = latestFilePathOpt.get
-      val latestTimestamp = fromPathToTimestamp(latestFile)
-      if (latestTimestamp < timestamp) {
-        latestFilePathOpt
+    try {
+      val latestFilePathOpt = getLastestFile(progressDirPath, fs)
+      if (latestFilePathOpt.isDefined) {
+        val latestFile = latestFilePathOpt.get
+        val latestTimestamp = fromPathToTimestamp(latestFile)
+        if (latestTimestamp < timestamp) {
+          latestFilePathOpt
+        } else {
+          val allFiles = fs.listStatus(progressDirPath)
+          Some(
+            allFiles.filter(fileStatus => fromPathToTimestamp(fileStatus.getPath) < timestamp).
+              sortWith((f1, f2) =>
+                fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath)).head.getPath
+          )
+        }
       } else {
-        val allFiles = fs.listStatus(progressDirPath)
-        Some(
-          allFiles.filter(fileStatus => fromPathToTimestamp(fileStatus.getPath) < timestamp).
-            sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath)).
-            head.getPath
-        )
+        latestFilePathOpt
       }
-    } else {
-      latestFilePathOpt
+    } catch {
+      case ioe: IOException =>
+        logError(ioe.getMessage)
+        ioe.printStackTrace()
+        throw ioe
+      case ias: IllegalArgumentException =>
+        logError(ias.getMessage)
+        ias.printStackTrace()
+        throw ias
+      case t: Throwable =>
+        logError(s"unknown error ${t.getMessage}")
+        t.printStackTrace()
+        throw t
     }
   }
 
+  private def readProgressRecordLines(
+      progressFilePath: Path,
+      fs: FileSystem,
+      expectedTimestampOpt: Option[Long]): List[ProgressRecord] = {
+    val ret = new ListBuffer[ProgressRecord]
+    var ins: FSDataInputStream = null
+    var br: BufferedReader = null
+    var expectedTimestamp = -1L
+    try {
+      ins = fs.open(progressFilePath)
+      br = new BufferedReader(new InputStreamReader(ins, "UTF-8"))
+      var line = br.readLine()
+      while (line != null) {
+        val progressRecordOpt = ProgressRecord.parse(line)
+        if (progressRecordOpt.isEmpty) {
+          throw new IllegalStateException(s"detect corrupt checkpoint at $line, it might be a" +
+            s" bug in the implementation of underlying file system")
+        }
+        val progressRecord = progressRecordOpt.get
+        if (expectedTimestampOpt.isEmpty && expectedTimestamp == -1L) {
+          expectedTimestamp = progressRecord.timestamp
+        } else {
+          if (progressRecord.timestamp != expectedTimestampOpt.getOrElse(expectedTimestamp)) {
+            throw new IllegalStateException(s"detect inconsistent checkpoint at $line, expected" +
+              s" timestamp: $expectedTimestamp, it might be a bug in the implementation of" +
+              s" underlying file system")
+          }
+        }
+        ret += progressRecord
+        line = br.readLine()
+      }
+    } catch {
+      case ios: IOException =>
+        ios.printStackTrace()
+        throw ios
+      case ise: IllegalStateException =>
+        ise.printStackTrace()
+        throw ise
+    } finally {
+      if (br != null) {
+        br.close()
+      }
+    }
+    ret.toList
+  }
+
+  /**
+   * read the progress record for the specified namespace, streamId and timestamp
+   */
   def read(namespace: String, streamId: Int, timestamp: Long):
       Map[EventHubNameAndPartition, (Long, Long)] = driverLock.synchronized {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
-    var ins: FSDataInputStream = null
-    var br: BufferedReader = null
     var ret = Map[EventHubNameAndPartition, (Long, Long)]()
     var progressFileOption: Option[Path] = null
     try {
@@ -201,47 +285,23 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       } else {
         val expectedTimestamp = fromPathToTimestamp(progressFileOption.get)
         val progressFilePath = progressFileOption.get
-        ins = fs.open(progressFilePath)
-        br = new BufferedReader(new InputStreamReader(ins, "UTF-8"))
-        var line = br.readLine()
-        while (line != null) {
-          val progressRecord = ProgressRecord.parse(line)
-          if (progressRecord.timestamp != expectedTimestamp) {
-            throw new IllegalStateException(s"detect inconsistent checkpoint at $line, expected" +
-              s" timestamp: $timestamp, it might be a bug in the implementation of" +
-              s" underlying file system")
-          }
-          if (progressRecord.streamId == streamId) {
-            ret +=
-              EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) ->
-                (progressRecord.offset, progressRecord.seqId)
-          }
-          line = br.readLine()
-        }
+        val recordLines = readProgressRecordLines(progressFilePath, fs, Some(expectedTimestamp))
+        ret = recordLines.filter(progressRecord => progressRecord.streamId == streamId).
+          map(progressRecord => EventHubNameAndPartition(progressRecord.eventHubName,
+            progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId)).toMap
       }
     } catch {
-      case ioe: IOException =>
-        logError(ioe.getMessage)
-        ioe.printStackTrace()
-        throw ioe
-      case ils: IllegalStateException =>
-        logError(ils.getMessage)
-        ils.printStackTrace()
-        throw ils
-      case t: Throwable =>
-        logError(s"unknown error ${t.getMessage}")
-        t.printStackTrace()
-        throw t
-    } finally {
-      if (br != null) {
-        br.close()
-      }
+      case ias: IllegalArgumentException =>
+        logError(ias.getMessage)
+        ias.printStackTrace()
+        throw ias
     }
     ret
   }
 
   def close(): Unit = {}
 
+  // write offsetToCommit to a progress tracking file
   private def transaction(
       offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       fs: FileSystem,
@@ -262,10 +322,6 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       }
       fs.delete(progressTempDirPath, true)
       fs.mkdirs(progressTempDirPath)
-    } catch {
-      case ioe: IOException =>
-        ioe.printStackTrace()
-        throw ioe
     } finally {
       if (oos != null) {
         oos.close()
@@ -273,6 +329,9 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
+  /**
+   * commit offsetToCommit to a new progress tracking file
+   */
   def commit(offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = driverLock.synchronized {
     val fs = new Path(checkpointDir).getFileSystem(hadoopConfiguration)
@@ -288,53 +347,30 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
+  /**
+   * read progress records from temp directories
+   * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
+   */
   def snapshot(): Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
-    val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
-    var br: BufferedReader = null
-    // read timestamp
-    val files = fs.listFiles(progressTempDirPath, false)
     try {
-      var timestamp = -1L
+      val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
+      val files = fs.listFiles(progressTempDirPath, false)
       while (files.hasNext) {
         val file = files.next()
-        val inputStream = fs.open(file.getPath)
-        br = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"))
-        val line = br.readLine()
-        if (line == null) {
-          throw new IOException(s"cannot read progress file in ${file.getPath}")
-        }
-        val progressRecord = ProgressRecord.parse(line)
-        if (timestamp == -1L) {
-          timestamp = progressRecord.timestamp
-        } else {
-          if (progressRecord.timestamp != timestamp) {
-            throw new IllegalStateException(s"detect inconsistent checkpoint at $line," +
-              s" expected timestamp: $timestamp, it might be a bug in the implementation of" +
-              s" underlying file system")
-          }
-        }
-        records += progressRecord
-        br.close()
+        val progressRecords = readProgressRecordLines(file.getPath, fs, None)
+        records ++= progressRecords
       }
     } catch {
       case ioe: IOException =>
         logError(s"error: ${ioe.getMessage}")
         ioe.printStackTrace()
         throw ioe
-      case ise: IllegalStateException =>
-        logError(s"error ${ise.getMessage}")
-        ise.printStackTrace()
-        throw ise
       case t: Throwable =>
         logError(s"unknown error ${t.getMessage}")
         t.printStackTrace()
         throw t
-    } finally {
-      if (br != null) {
-        br.close()
-      }
     }
     // produce the return value
     records.foreach { progressRecord =>

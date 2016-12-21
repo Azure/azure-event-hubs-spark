@@ -256,7 +256,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 2, 6, 7).toString +
       "\n")
     oos.close()
-    intercept[IllegalStateException] {
+    intercept[IllegalArgumentException] {
       progressTracker.read("namespace2", dStream1.id, 2000L)
     }
   }

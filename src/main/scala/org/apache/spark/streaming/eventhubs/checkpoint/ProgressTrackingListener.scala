@@ -48,10 +48,9 @@ private[eventhubs] class ProgressTrackingListener private (
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
-
       syncLatch.synchronized {
         progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
-        logInfo(s"commit offset at ${batchCompleted.batchInfo.batchTime}")
+        logInfo(s"commit ending offset of Batch ${batchCompleted.batchInfo.batchTime}")
         // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
         syncLatch.notifyAll()
       }

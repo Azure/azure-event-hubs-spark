@@ -257,7 +257,7 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
       "\n")
     oos.close()
     intercept[IllegalStateException] {
-      progressTracker.read("namespace2", dStream1.id, 1000L)
+      progressTracker.read("namespace2", dStream1.id, 2000L)
     }
   }
 

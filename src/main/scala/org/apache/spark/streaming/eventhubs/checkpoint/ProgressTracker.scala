@@ -356,9 +356,11 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         if (timestamp == -1L) {
           timestamp = progressRecord.timestamp
         } else {
-          throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
-            s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
-            s" implementation of underlying file system")
+          if (timestamp != progressRecord.timestamp) {
+            throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
+              s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
+              s" implementation of underlying file system")
+          }
         }
       )
     } catch {

@@ -20,6 +20,7 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 import scala.collection.mutable.ListBuffer
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListenerBatchCompleted}
@@ -34,27 +35,28 @@ private[eventhubs] class ProgressTrackingListener private (
   private val syncLatch: Object = new Serializable {}
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
-    logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
-    if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-      val progressTracker = ProgressTracker.getInstance(ssc, progressDirectory,
-        ssc.sparkContext.appName,
-        ssc.sparkContext.hadoopConfiguration)
-      // build current offsets
-      val allEventDStreams = ProgressTrackingListener.eventHubDirectDStreams
-      // merge with the temp directory
-      val progressInLastBatch = progressTracker.snapshot()
-      val contentToCommit = allEventDStreams.map {
-        dstream => ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums)
-      }.toMap.map { case (namespace, currentOffsets) =>
-        (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
+    case batchCompleted: StreamingListenerBatchCompleted =>
+      logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
+      if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
+        val progressTracker = ProgressTracker.getInstance(ssc, progressDirectory,
+          ssc.sparkContext.appName,
+          ssc.sparkContext.hadoopConfiguration)
+        // build current offsets
+        val allEventDStreams = ProgressTrackingListener.eventHubDirectDStreams
+        // merge with the temp directory
+        val progressInLastBatch = progressTracker.snapshot()
+        val contentToCommit = allEventDStreams.map {
+          dstream => ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums)
+        }.toMap.map { case (namespace, currentOffsets) =>
+          (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
+        }
+        syncLatch.synchronized {
+          progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
+          logInfo(s"commit ending offset of Batch ${batchCompleted.batchInfo.batchTime}")
+          // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
+          syncLatch.notifyAll()
+        }
       }
-      syncLatch.synchronized {
-        progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
-        logInfo(s"commit ending offset of Batch ${batchCompleted.batchInfo.batchTime}")
-        // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
-        syncLatch.notifyAll()
-      }
-    }
   }
 }
 
@@ -70,7 +72,7 @@ private[eventhubs] object ProgressTrackingListener {
       eventHubDirectDStream: EventHubDirectDStream) = {
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
-      ssc.addStreamingListener(_progressTrackerListener)
+      ssc.scheduler.listenerBus.listeners.add(0, _progressTrackerListener)
     }
     if (eventHubDirectDStream != null) {
       eventHubDirectDStreams += eventHubDirectDStream

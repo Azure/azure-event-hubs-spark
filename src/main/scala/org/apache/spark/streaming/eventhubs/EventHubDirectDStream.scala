@@ -139,7 +139,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     if (latestOffsets.isDefined) {
       latestOffsets.get
     } else {
-      logWarning(s"cannot get latest offset at time $validTime")
+      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
+        s" micro batch and process it later")
       Map()
     }
   }
@@ -278,20 +279,24 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
     latchWithListener.synchronized {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
-      val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+      var latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
       if (latestOffsetOfAllPartitions.isEmpty) {
-        logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
-          s" micro batch and process it later")
         Some(ssc.sparkContext.emptyRDD[EventData])
       } else {
-        while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
+        if (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
           !startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
-          // we shall synchronize with listener threads
           logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
             s" ${validTime.milliseconds}")
           latchWithListener.wait()
           logInfo(s"wake up at Batch ${validTime.milliseconds}")
           startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
+          latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+          if (latestOffsetOfAllPartitions.isEmpty) {
+            return Some(ssc.sparkContext.emptyRDD[EventData])
+          }
+          require(!(startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
+            !startPointInNextBatch.equals(latestOffsetOfAllPartitions)), "expect to fetch new" +
+            " offset after waking up")
         }
         proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
       }

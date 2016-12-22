@@ -17,19 +17,16 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.io.{IOException, ObjectInputStream, ObjectOutputStream}
-import java.util.concurrent.locks.ReentrantLock
+import java.io.{IOException, ObjectInputStream}
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.Lock
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
-import org.apache.spark.streaming.dstream.{DStream, DStreamCheckpointData, InputDStream}
+import org.apache.spark.streaming.dstream.{DStreamCheckpointData, InputDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint._
 import org.apache.spark.streaming.scheduler.{RateController, StreamInputInfo}
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
@@ -39,7 +36,7 @@ import org.apache.spark.util.Utils
  * implementation of EventHub-based direct stream
  * @param _ssc the streaming context this stream belongs to
  * @param eventHubNameSpace the namespace of evenhub instances
- * @param checkpointDir the checkpoint directory path (we only support HDFS-based checkpoint
+ * @param progressDir the checkpoint directory path (we only support HDFS-based checkpoint
  *                      storage for now, so you have to prefix your path with hdfs://clustername/
  * @param eventhubsParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
@@ -47,15 +44,17 @@ import org.apache.spark.util.Utils
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _ssc: StreamingContext,
     private[eventhubs] val eventHubNameSpace: String,
-    checkpointDir: String,
+    progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
     eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
                                               EventHubsClientWrapper.getEventHubClient,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
-                                                  RestfulEventHubClient.getInstance)
+                                              RestfulEventHubClient.getInstance)
   extends InputDStream[EventData](_ssc) with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
+
+  private var initialized = false
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
@@ -82,7 +81,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   @transient private var _eventHubClient: EventHubClient = _
 
-  private def progressTracker = ProgressTracker.getInstance(ssc, checkpointDir,
+  private def progressTracker = ProgressTracker.getInstance(ssc, progressDir,
     context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
@@ -250,7 +249,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       eventhubsParams,
       offsetRanges,
       validTime,
-      OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, this.id, eventHubNameSpace),
+      OffsetStoreParams(progressDir, ssc.sparkContext.appName, this.id, eventHubNameSpace),
       eventhubReceiverCreator)
     reportInputInto(validTime, offsetRanges,
       offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
@@ -258,6 +257,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
+    if (!initialized) {
+      ProgressTrackingListener.getInstance(ssc, progressDir, this)
+      initialized = true
+    }
     var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
     var latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     if (latestOffsetOfAllPartitions.isEmpty) {
@@ -277,6 +280,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       }
     }
     proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
+  }
+
+  @throws(classOf[IOException])
+  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
+    ois.defaultReadObject()
+    initialized = false
   }
 
   private[eventhubs] class EventHubDirectDStreamCheckpointData(
@@ -307,7 +316,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq) =>
             OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq)}.toList,
           t,
-          OffsetStoreParams(checkpointDir, ssc.sparkContext.appName, id, eventHubNameSpace),
+          OffsetStoreParams(progressDir, ssc.sparkContext.appName, id, eventHubNameSpace),
           eventhubReceiverCreator)
       }
     }

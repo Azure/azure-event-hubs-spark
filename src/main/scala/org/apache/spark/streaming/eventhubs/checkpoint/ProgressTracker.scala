@@ -386,9 +386,12 @@ private[eventhubs] class ProgressTracker private[checkpoint](
 
 private[eventhubs] object ProgressTracker {
 
+  private[eventhubs] val eventHubDirectDStreams = new ListBuffer[EventHubDirectDStream]
+
   private var _progressTracker: ProgressTracker = _
 
   private[checkpoint] def reset(): Unit = {
+    eventHubDirectDStreams.clear()
     _progressTracker = null
   }
 
@@ -401,7 +404,7 @@ private[eventhubs] object ProgressTracker {
       _progressTracker = new ProgressTracker(progressDirStr,
         appName,
         hadoopConfiguration,
-        ProgressTrackingListener.eventHubDirectDStreams.map{directStream =>
+        eventHubDirectDStreams.map{directStream =>
           val namespace = directStream.eventHubNameSpace
           val ehSpace = directStream.eventhubNameAndPartitions
           (namespace, ehSpace.toList)

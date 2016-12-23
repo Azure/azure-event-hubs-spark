@@ -41,7 +41,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
       setMaster("local[*]")), Seconds(5))
-    progressListener = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString, null)
+    progressListener = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
     progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
       new Configuration())
   }
@@ -50,7 +50,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     ProgressTracker.reset()
     progressTracker = null
     progressListener = null
-    ProgressTrackingListener.reset()
+    ProgressTrackingListener.reset(ssc)
     ssc.stop()
   }
 
@@ -100,7 +100,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
 
   test("EventHubDStreams are registered to the singleton ProgressTrackingListener correctly") {
     // reset env first
-    ProgressTrackingListener.reset()
+    ProgressTrackingListener.reset(ssc)
     ssc.stop()
     // create new streaming context
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
@@ -116,7 +116,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
-    assert(ProgressTrackingListener.eventHubDirectDStreams.length === 2)
+    assert(ProgressTracker.eventHubDirectDStreams.length === 2)
     ssc.stop()
   }
 }

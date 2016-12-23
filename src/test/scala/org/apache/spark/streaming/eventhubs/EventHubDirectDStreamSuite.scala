@@ -49,7 +49,7 @@ class EventHubDirectDStreamSuite extends FunSuite with BeforeAndAfter with Mocki
   }
 
   after {
-    ProgressTrackingListener.reset()
+    ProgressTrackingListener.reset(ssc)
     ssc.stop()
   }
 

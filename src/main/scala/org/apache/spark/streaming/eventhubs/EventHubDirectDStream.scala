@@ -56,6 +56,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
+  ProgressTracker.eventHubDirectDStreams += this
+
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
   private[eventhubs] val eventhubNameAndPartitions = {
@@ -258,7 +260,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
-      ProgressTrackingListener.getInstance(ssc, progressDir, this)
+      ProgressTrackingListener.getInstance(ssc, progressDir)
       initialized = true
     }
     var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)

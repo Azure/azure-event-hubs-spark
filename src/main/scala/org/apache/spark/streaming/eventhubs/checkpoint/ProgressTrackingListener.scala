@@ -38,7 +38,7 @@ private[eventhubs] class ProgressTrackingListener private (
         ssc.sparkContext.appName,
         ssc.sparkContext.hadoopConfiguration)
       // build current offsets
-      val allEventDStreams = ProgressTrackingListener.eventHubDirectDStreams
+      val allEventDStreams = ProgressTracker.eventHubDirectDStreams
       // merge with the temp directory
       val progressInLastBatch = progressTracker.snapshot()
       val contentToCommit = allEventDStreams.map {
@@ -60,32 +60,25 @@ private[eventhubs] object ProgressTrackingListener {
 
   private var _progressTrackerListener: ProgressTrackingListener = _
 
-  private[checkpoint] val eventHubDirectDStreams = new ListBuffer[EventHubDirectDStream]
-
   private def getOrCreateProgressTrackerListener(
       ssc: StreamingContext,
-      progressDirectory: String,
-      eventHubDirectDStream: EventHubDirectDStream) = {
+      progressDirectory: String) = {
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
       ssc.scheduler.listenerBus.listeners.add(0, _progressTrackerListener)
     }
-    if (eventHubDirectDStream != null) {
-      eventHubDirectDStreams += eventHubDirectDStream
-    }
     _progressTrackerListener
   }
 
-  private[eventhubs] def reset(): Unit = {
-    eventHubDirectDStreams.clear()
+  private[eventhubs] def reset(ssc: StreamingContext): Unit = {
+    ssc.scheduler.listenerBus.listeners.remove(0)
     _progressTrackerListener = null
   }
 
   def getInstance(
       ssc: StreamingContext,
-      progressDirectory: String,
-      eventHubDirectDStream: EventHubDirectDStream): ProgressTrackingListener = this.synchronized {
-    getOrCreateProgressTrackerListener(ssc, progressDirectory, eventHubDirectDStream)
+      progressDirectory: String): ProgressTrackingListener = this.synchronized {
+    getOrCreateProgressTrackerListener(ssc, progressDirectory)
   }
 }
 

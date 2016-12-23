@@ -98,7 +98,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
   }
 
-  test("EventHubDStreams are registered to the singleton ProgressTrackingListener correctly") {
+  test("ProgressTrackingListener is registered correctly correctly") {
     // reset env first
     ProgressTrackingListener.reset(ssc)
     ssc.stop()

@@ -104,6 +104,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
     require(concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
+    ProgressTrackingListener.getInstance(ssc, progressDir)
   }
 
   override def stop(): Unit = {

@@ -45,7 +45,7 @@ private[eventhubs] class EventHubsReceiver(
    * Note we cannot use Receiver.isStopped() because there could be race condition when the
    * MessageHandler thread is started the state of the receiver has not been updated yet.
    */
-  private var stopMessageHandler = false
+  @volatile private var stopMessageHandler = false
 
   /**
    * The latest sequence number this receiver has seen in messages from EventHubs.

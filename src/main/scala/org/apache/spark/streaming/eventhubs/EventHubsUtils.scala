@@ -104,7 +104,7 @@ object EventHubsUtils {
    * create direct stream based on eventhubs
    * @param ssc the streaming context this stream belongs to
    * @param eventHubNamespace the namespace of eventhubs
-   * @param checkpointDir the checkpoint directory path (we only support HDFS-based checkpoint
+   * @param progressDir the checkpoint directory path (we only support HDFS-based checkpoint
    *                      storage for now, so you have to prefix your path with hdfs://clustername/
    * @param eventParams the parameters of your eventhub instances, format:
    *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
@@ -112,10 +112,10 @@ object EventHubsUtils {
   def createDirectStreams(
       ssc: StreamingContext,
       eventHubNamespace: String,
-      checkpointDir: String,
+      progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    require(checkpointDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
+    require(progressDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
+    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
     newStream
   }
 

@@ -138,7 +138,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   private def fetchStartOffsetForEachPartition(validTime: Time):
     Map[EventHubNameAndPartition, (Long, Long)] = {
-    val checkpoints = progressTracker.read(eventHubNameSpace, id, validTime.milliseconds)
+    val checkpoints = progressTracker.read(eventHubNameSpace, validTime.milliseconds)
     if (checkpoints.nonEmpty) {
       logInfo(s"get checkpoint at $validTime: $checkpoints")
       checkpoints
@@ -267,6 +267,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       initialized = true
     }
     var latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+    println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
     if (latestOffsetOfAllPartitions.isEmpty) {
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
@@ -316,7 +317,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
     override def restore(): Unit = {
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
-        logInfo(s"Restoring EventHub for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubRDD(
           context.sparkContext,
           eventhubsParams,

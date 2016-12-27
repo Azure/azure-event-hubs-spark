@@ -26,30 +26,32 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
 private[eventhubs] class ProgressWriter(
-    checkpointDir: String,
-    appName: String,
-    streamId: Int,
-    namespace: String,
-    eventHubNameAndPartition: EventHubNameAndPartition,
-    hadoopConfiguration: Configuration) extends Logging {
+     progressDir: String,
+     appName: String,
+     streamId: Int,
+     namespace: String,
+     eventHubNameAndPartition: EventHubNameAndPartition,
+     timestamp: Long,
+     hadoopConfiguration: Configuration) extends Logging {
 
-  private val tempProgressTrackingPointStr = PathTools.progressFilePathStr(
-    PathTools.progressTempDirPathStr(checkpointDir, appName),
-    streamId, namespace, eventHubNameAndPartition)
+  private val tempProgressTrackingPointStr = PathTools.progressTempFileStr(
+    PathTools.progressTempDirPathStr(progressDir, appName),
+    streamId, namespace, eventHubNameAndPartition, timestamp)
 
   private[eventhubs] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
 
-  def write(time: Long, cpOffset: Long, cpSeq: Long): Unit = {
+  def write(recordTime: Long, cpOffset: Long, cpSeq: Long): Unit = {
     val fs = tempProgressTrackingPointPath.getFileSystem(hadoopConfiguration)
     var cpFileStream: FSDataOutputStream = null
     try {
       // it would be safe to overwrite checkpoint, since we will not start a new job when
       // checkpoint hasn't been committed
-      cpFileStream = fs.create(new Path(s"$tempProgressTrackingPointStr"), true)
-      val record = ProgressRecord(time, namespace, streamId,
+      cpFileStream = fs.create(tempProgressTrackingPointPath, true)
+      val record = ProgressRecord(recordTime, namespace, streamId,
         eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
         cpSeq)
       cpFileStream.writeBytes(s"$record")
+      logInfo(s"writing to $tempProgressTrackingPointStr")
     } catch {
       case ioe: IOException =>
         ioe.printStackTrace()

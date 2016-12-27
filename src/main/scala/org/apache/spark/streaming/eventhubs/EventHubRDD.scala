@@ -46,7 +46,7 @@ class EventHubRDD(
     val offsetRanges: List[OffsetRange],
     batchTime: Time,
     offsetParams: OffsetStoreParams,
-    eventHubClientCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
+    eventHubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
   extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
@@ -81,14 +81,14 @@ class EventHubRDD(
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
     val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
       offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      eventHubPartition.eventHubNameAndPartitionID, new Configuration())
+      eventHubPartition.eventHubNameAndPartitionID, batchTime.milliseconds, new Configuration())
     val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
       logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID}")
       progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
         eventHubPartition.fromSeq)
       logInfo(s"write offset $fromOffset, sequence number" +
-        s" ${eventHubPartition.fromSeq} for batch" +
+        s" ${eventHubPartition.fromSeq} for EventHub" +
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
       Iterator()
     } else {
@@ -98,7 +98,7 @@ class EventHubRDD(
         s" ${eventHubPartition.untilSeq}")
       val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
         eventHubName)
-      val eventHubClient = eventHubClientCreator(eventHubParameters,
+      val eventHubClient = eventHubReceiverCreator(eventHubParameters,
         eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
         eventHubClient, maxRate)
@@ -109,7 +109,7 @@ class EventHubRDD(
       progressWriter.write(batchTime.milliseconds, endOffset,
         lastEvent.getSystemProperties.getSequenceNumber)
       logInfo(s"write offset $endOffset, sequence number" +
-        s" ${lastEvent.getSystemProperties.getSequenceNumber} for batch" +
+        s" ${lastEvent.getSystemProperties.getSequenceNumber} for EventHub" +
         s" ${eventHubPartition.eventHubNameAndPartitionID}")
       eventHubClient.close()
       receivedEvents.iterator

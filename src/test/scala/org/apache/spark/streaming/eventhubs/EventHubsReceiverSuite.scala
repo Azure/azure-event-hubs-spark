@@ -110,6 +110,8 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     Thread sleep eventCheckpointIntervalInSeconds * 1000
     receiver.onStop()
 
+    Thread sleep eventCheckpointIntervalInSeconds * 1000
+
     verify(offsetStoreMock, times(1)).open()
     verify(offsetStoreMock, times(1)).write(eventOffset)
     verify(offsetStoreMock, times(1)).close()

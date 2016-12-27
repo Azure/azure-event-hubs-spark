@@ -45,13 +45,14 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
     dstream.start()
     val progressWriter = new ProgressWriter(progressRootPath.toString,
-      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
+      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), 1000L,
+      new Configuration())
     progressWriter.write(1000L, 1L, 2L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListener.onBatchCompleted(batchCompletedEvent)
-    assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
+    assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
-    val record = progressTracker.read(eventhubNamespace, streamId, 2000L)
+    val record = progressTracker.read(eventhubNamespace, 2000L)
     assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
   }
 
@@ -69,7 +70,8 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     )
     // build temp directories
     val progressWriter = new ProgressWriter(progressTracker.progressTempDirPath.toString,
-      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
+      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), 1000L,
+      new Configuration())
     progressWriter.write(1000L, 0L, 0L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListener.onBatchCompleted(batchCompletedEvent)

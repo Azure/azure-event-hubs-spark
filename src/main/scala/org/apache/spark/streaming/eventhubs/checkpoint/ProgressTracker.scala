@@ -24,7 +24,7 @@ import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FSDataInputStream, FSDataOutputStream, Path}
+import org.apache.hadoop.fs._
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.{StreamingContext, Time}
@@ -101,11 +101,11 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    */
   private def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
     val latestFileOpt = getLastestFile(progressDirPath, fs)
-    val allCheckpointedNameAndPartitions = new mutable.HashMap[String,
-      List[EventHubNameAndPartition]]
+    val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
     var br: BufferedReader = null
     try {
       if (latestFileOpt.isEmpty) {
+        println("latest file does not exist")
         return (false, None)
       }
       val cpFile = fs.open(latestFileOpt.get)
@@ -118,10 +118,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
           return (false, latestFileOpt)
         }
         val progressRecord = progressRecordOpt.get
-        val newList = allCheckpointedNameAndPartitions.getOrElseUpdate(progressRecord.namespace,
+        val newList = allProgressFiles.getOrElseUpdate(progressRecord.namespace,
           List[EventHubNameAndPartition]()) :+
           EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
-        allCheckpointedNameAndPartitions(progressRecord.namespace) = newList
+        allProgressFiles(progressRecord.namespace) = newList
         if (timestamp == -1L) {
           timestamp = progressRecord.timestamp
         } else if (progressRecord.timestamp != timestamp) {
@@ -141,7 +141,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         br.close()
       }
     }
-    (allEventNameAndPartitionExist(allCheckpointedNameAndPartitions.toMap), latestFileOpt)
+    (allEventNameAndPartitionExist(allProgressFiles.toMap), latestFileOpt)
   }
 
   /**
@@ -185,7 +185,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    * the passed-in timestamp we return the latest file; otherwise we return the file which is
    * committed at batch (timestamp - batchDuratiuon)
    */
-  private def locateProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
+  private[checkpoint] def locateProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {
       val latestFilePathOpt = getLastestFile(progressDirPath, fs)
       if (latestFilePathOpt.isDefined) {
@@ -195,11 +195,15 @@ private[eventhubs] class ProgressTracker private[checkpoint](
           latestFilePathOpt
         } else {
           val allFiles = fs.listStatus(progressDirPath)
-          Some(
-            allFiles.filter(fileStatus => fromPathToTimestamp(fileStatus.getPath) < timestamp).
-              sortWith((f1, f2) =>
-                fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath)).head.getPath
-          )
+          val sortedFiles = allFiles.filter(fileStatus =>
+            fromPathToTimestamp(fileStatus.getPath) < timestamp).
+            sortWith((f1, f2) =>
+              fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))
+          if (sortedFiles.length < 1) {
+            None
+          } else {
+            Some(sortedFiles.head.getPath)
+          }
         }
       } else {
         latestFilePathOpt
@@ -255,7 +259,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   /**
    * read the progress record for the specified namespace, streamId and timestamp
    */
-  def read(namespace: String, streamId: Int, timestamp: Long):
+  def read(namespace: String, timestamp: Long):
       Map[EventHubNameAndPartition, (Long, Long)] = driverLock.synchronized {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     var ret = Map[EventHubNameAndPartition, (Long, Long)]()
@@ -276,7 +280,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         val recordLines = readProgressRecordLines(progressFilePath, fs)
         require(recordLines.count(_.timestamp != expectedTimestamp) == 0, "detected inconsistent" +
           s" progress record, expected timestamp $expectedTimestamp")
-        ret = recordLines.filter(progressRecord => progressRecord.streamId == streamId).
+        ret = recordLines.filter(progressRecord => progressRecord.namespace == namespace).
           map(progressRecord => EventHubNameAndPartition(progressRecord.eventHubName,
             progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId)).toMap
       }
@@ -295,23 +299,21 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   private def transaction(
       offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       fs: FileSystem,
-      time: Long): Unit = {
+      commitTime: Long): Unit = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr + s"/progress-$time"))
+      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"))
       offsetToCommit.foreach {
         case ((namespace, streamId), ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
             case (nameAndPartitionId, (offset, seq)) =>
               oos.writeBytes(
-                ProgressRecord(time, namespace, streamId,
+                ProgressRecord(commitTime, namespace, streamId,
                   nameAndPartitionId.eventHubName, nameAndPartitionId.partitionId, offset,
                   seq).toString + "\n"
               )
           }
       }
-      fs.delete(progressTempDirPath, true)
-      fs.mkdirs(progressTempDirPath)
     } finally {
       if (oos != null) {
         oos.close()
@@ -337,17 +339,28 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
+  private def allProgressRecords(timestamp: Long): List[FileStatus] = {
+    val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
+    val r = fs.listStatus(progressTempDirPath, new PathFilter {
+      override def accept(path: Path) = {
+        path.getName.split("-").last == timestamp.toString
+      }
+    }).toList
+    println(r)
+    r
+  }
+
   /**
    * read progress records from temp directories
    * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
    */
-  def snapshot(): Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
+  def collectProgressRecordsForBatch(timestamp: Long):
+      Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
-    var timestamp = -1L
     try {
-      val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-      val files = fs.listFiles(progressTempDirPath, false)
+      val fs = progressTempDirPath.getFileSystem(new Configuration())
+      val files = allProgressRecords(timestamp).iterator
       while (files.hasNext) {
         val file = files.next()
         val progressRecords = readProgressRecordLines(file.getPath, fs)
@@ -355,16 +368,11 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       }
       // check timestamp consistency
       records.foreach(progressRecord =>
-        if (timestamp == -1L) {
-          timestamp = progressRecord.timestamp
-        } else {
-          if (timestamp != progressRecord.timestamp) {
+        if (timestamp != progressRecord.timestamp) {
             throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
               s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
               s" implementation of underlying file system")
-          }
-        }
-      )
+        })
     } catch {
       case ioe: IOException =>
         logError(s"error: ${ioe.getMessage}")
@@ -397,8 +405,9 @@ private[eventhubs] object ProgressTracker {
     _progressTracker = null
   }
 
-  def getInstance(
-      ssc: StreamingContext,
+  def getInstance: ProgressTracker = _progressTracker
+
+  private[eventhubs] def initInstance(
       progressDirStr: String,
       appName: String,
       hadoopConfiguration: Configuration): ProgressTracker = this.synchronized {

@@ -46,7 +46,7 @@ class EventHubRDD(
     val offsetRanges: List[OffsetRange],
     batchTime: Time,
     offsetParams: OffsetStoreParams,
-    eventHubClientCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
+    eventHubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
   extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
@@ -81,36 +81,34 @@ class EventHubRDD(
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
     val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
       offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      eventHubPartition.eventHubNameAndPartitionID, new Configuration())
+      eventHubPartition.eventHubNameAndPartitionID, batchTime.milliseconds, new Configuration())
     val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
-      logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID}")
+      logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
       progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
         eventHubPartition.fromSeq)
       logInfo(s"write offset $fromOffset, sequence number" +
-        s" ${eventHubPartition.fromSeq} for batch" +
-        s" ${eventHubPartition.eventHubNameAndPartitionID}")
+        s" ${eventHubPartition.fromSeq} for EventHub" +
+        s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
       Iterator()
     } else {
       val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt
       logInfo(s"${eventHubPartition.eventHubNameAndPartitionID}" +
-        s" expected rate $maxRate, fromSeq ${eventHubPartition.fromSeq} untilSeq" +
-        s" ${eventHubPartition.untilSeq}")
+        s" expected rate $maxRate, fromSeq ${eventHubPartition.fromSeq} (exclusive) untilSeq" +
+        s" ${eventHubPartition.untilSeq} (inclusive) at $batchTime")
       val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
         eventHubName)
-      val eventHubClient = eventHubClientCreator(eventHubParameters,
+      val eventHubClient = eventHubReceiverCreator(eventHubParameters,
         eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
         eventHubClient, maxRate)
-      logInfo(s"${eventHubPartition.eventHubNameAndPartitionID} received ${receivedEvents.size}" +
-        s" events")
       val lastEvent = receivedEvents.last
       val endOffset = lastEvent.getSystemProperties.getOffset.toLong
       progressWriter.write(batchTime.milliseconds, endOffset,
         lastEvent.getSystemProperties.getSequenceNumber)
       logInfo(s"write offset $endOffset, sequence number" +
-        s" ${lastEvent.getSystemProperties.getSequenceNumber} for batch" +
-        s" ${eventHubPartition.eventHubNameAndPartitionID}")
+        s" ${lastEvent.getSystemProperties.getSequenceNumber} for EventHub" +
+        s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
       eventHubClient.close()
       receivedEvents.iterator
     }

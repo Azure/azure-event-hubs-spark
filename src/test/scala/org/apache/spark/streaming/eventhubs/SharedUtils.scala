@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterEach, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 
 private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
@@ -39,6 +39,8 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
   var ssc: StreamingContext = _
   var progressTracker: ProgressTracker = _
 
+  protected val streamingClock = "org.apache.spark.util.SystemClock"
+
   override def beforeEach(): Unit = {
     init()
   }
@@ -47,13 +49,15 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     reset()
   }
 
+  def batchDuration: Duration = Seconds(5)
+
   protected def init(): Unit = {
-    progressRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
+    progressRootPath = new Path(Files.createTempDirectory("progress_root").toString)
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
-      setMaster("local[*]")), Seconds(5))
-    progressListener = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
+      setMaster("local[*]").set("spark.streaming.clock", streamingClock)), batchDuration)
+    progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
   }
 

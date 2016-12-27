@@ -83,8 +83,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var _eventHubClient: EventHubClient = _
 
-  private def progressTracker = ProgressTracker.getInstance(ssc, progressDir,
-    context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
+  private def progressTracker = ProgressTracker.getInstance
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
       EventHubDirectDStream = {
@@ -106,7 +105,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
     require(concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
-    ProgressTrackingListener.getInstance(ssc, progressDir)
+    ProgressTracker.initInstance(progressDir,
+      context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
+    ProgressTrackingListener.initInstance(ssc, progressDir)
   }
 
   override def stop(): Unit = {
@@ -138,7 +139,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   private def fetchStartOffsetForEachPartition(validTime: Time):
     Map[EventHubNameAndPartition, (Long, Long)] = {
-    val checkpoints = progressTracker.read(eventHubNameSpace, id, validTime.milliseconds)
+    val checkpoints = progressTracker.read(eventHubNameSpace, validTime.milliseconds)
     if (checkpoints.nonEmpty) {
       logInfo(s"get checkpoint at $validTime: $checkpoints")
       checkpoints
@@ -263,10 +264,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
-      ProgressTrackingListener.getInstance(ssc, progressDir)
+      ProgressTrackingListener.initInstance(ssc, progressDir)
       initialized = true
     }
+    require(progressTracker != null, "ProgressTracker hasn't been initialized")
     var latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+    println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
     if (latestOffsetOfAllPartitions.isEmpty) {
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
@@ -315,8 +318,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     override def cleanup(time: Time): Unit = { }
 
     override def restore(): Unit = {
+      // we have to initialize here, otherwise there is a race condition when recovering from spark
+      // checkpoint
+      logInfo("initialized ProgressTracker")
+      ProgressTracker.initInstance(progressDir, context.sparkContext.appName,
+        context.sparkContext.hadoopConfiguration)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
-        logInfo(s"Restoring EventHub for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubRDD(
           context.sparkContext,
           eventhubsParams,

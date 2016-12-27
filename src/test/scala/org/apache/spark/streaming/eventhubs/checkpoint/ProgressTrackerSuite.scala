@@ -17,10 +17,13 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import java.io.File
+import java.nio.file.{Files, Paths, StandardOpenOption}
 
-import org.apache.spark.streaming.eventhubs.{EventHubNameAndPartition, SharedUtils}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+
+import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, SharedUtils}
 
 class ProgressTrackerSuite extends SharedUtils {
 
@@ -31,20 +34,18 @@ class ProgressTrackerSuite extends SharedUtils {
 
   test("progress temp directory is created properly when progress and progress temp" +
     " directory do not exist") {
-    progressTracker = ProgressTracker.getInstance(
-      ssc,
-      progressRootPath.toString + "/progress", appName, new Configuration())
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
     assert(fs.exists(progressTracker.progressDirPath))
     assert(fs.exists(progressTracker.progressTempDirPath))
   }
 
   test("progress temp directory is created properly when progress exists while progress" +
     " temp does not") {
-    fs.mkdirs(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString + "/progress",
+    fs.mkdirs(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString,
       appName)))
-    progressTracker = ProgressTracker.getInstance(
-      ssc,
-      progressRootPath.toString + "/progress", appName, new Configuration())
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
     assert(fs.exists(progressTracker.progressTempDirPath))
     assert(fs.exists(progressTracker.progressDirPath))
   }
@@ -56,67 +57,77 @@ class ProgressTrackerSuite extends SharedUtils {
     fs.create(new Path(tempPath.toString + "/temp_file"))
     val filesBefore = fs.listStatus(tempPath)
     assert(filesBefore.size === 1)
-    progressTracker =
-      ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress", appName,
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
         new Configuration())
     assert(fs.exists(progressTracker.progressTempDirPath))
     val filesAfter = fs.listStatus(progressTracker.progressTempDirPath)
     assert(filesAfter.size === 0)
   }
 
+  private def writeProgressFile(
+      progressPath: String,
+      streamId: Int,
+      fs: FileSystem,
+      timestamp: Long,
+      namespace: String,
+      ehName: String,
+      partitionRange: Range,
+      offset: Int,
+      seq: Int): Unit = {
+    for (partitionId <- partitionRange) {
+      Files.write(
+        Paths.get(progressPath + s"/progress-$timestamp"),
+        (ProgressRecord(timestamp, namespace, streamId, ehName, partitionId, offset,
+          seq).toString + "\n").getBytes, {
+          if (Files.exists(Paths.get(progressPath + s"/progress-$timestamp"))) {
+            StandardOpenOption.APPEND
+          } else {
+            StandardOpenOption.CREATE
+          }
+        })
+    }
+  }
+
   test("incomplete progress would be discarded") {
-    // create direct streams
-    // generate 6 EventHubAndPartitions
-    val dStream =
     createDirectStreams(ssc, "namespace1", progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
         "eh2" -> Map("eventhubs.partition.count" -> "2"),
         "eh3" -> Map("eventhubs.partition.count" -> "3")))
-    dStream.start()
-    val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressPath)
-    val oos = fs.create(new Path(progressPath.toString + "/progress-1000"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh1", 0, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 0, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 1, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 0, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 1, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 2, 0, 0).toString + "\n")
-    oos.close()
-
-    val oos2 = fs.create(new Path(progressPath.toString + "/progress-2000"))
-    oos2.writeBytes(ProgressRecord(2000L, "namespace1", dStream.id, "eh1", 0, 0, 0).toString + "\n")
-    oos2.writeBytes(ProgressRecord(2000L, "namespace1", dStream.id, "eh2", 0, 0, 0).toString + "\n")
-    oos2.writeBytes(ProgressRecord(2000L, "namespace1", dStream.id, "eh2", 1, 0, 0).toString + "\n")
-    oos2.close()
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
-      appName, new Configuration())
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 0)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2", 0 to 1, 0, 0)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3", 0 to 2, 0, 0)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1", 0 to 0, 1, 1)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh2", 0 to 1, 1, 1)
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
     assert(!fs.exists(new Path(progressPath.toString + "/progress-2000")))
     assert(fs.exists(new Path(progressPath.toString + "/progress-1000")))
   }
 
   test("health progress file is kept") {
     // create direct streams, generate 6 EventHubAndPartitions
-    val dStream =
-      createDirectStreams(ssc, "namespace1", progressRootPath.toString,
-        Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3")))
-    val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressPath)
-    val oos = fs.create(new Path(progressPath.toString + "/progress-1000"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh1", 0, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 0, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 1, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 0, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 1, 0, 0).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 2, 0, 0).toString + "\n")
-    oos.close()
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
-      appName, new Configuration())
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 0)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2", 0 to 1, 0, 0)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3", 0 to 2, 0, 0)
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
     assert(fs.exists(new Path(progressPath.toString + "/progress-1000")))
+  }
+
+  private def verifyProgressFile(
+      namespace: String, ehName: String, partitionRange: Range,
+      timestamp: Long, expectedOffsetAndSeq: Seq[(Long, Long)]): Unit = {
+    val ehMap = progressTracker.read(namespace, timestamp)
+    var expectedOffsetAndSeqIdx = 0
+    for (partitionId <- partitionRange) {
+      assert(ehMap(EventHubNameAndPartition(ehName, partitionId)) ===
+        expectedOffsetAndSeq(expectedOffsetAndSeqIdx))
+      expectedOffsetAndSeqIdx += 1
+    }
   }
 
   test("start from the beginning of the streams when the latest progress file does not exist") {
@@ -133,142 +144,80 @@ class ProgressTrackerSuite extends SharedUtils {
           "eh13" -> Map("eventhubs.partition.count" -> "3")))
     dStream.start()
     dStream1.start()
-    val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressPath)
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
-      appName, new Configuration())
-    val ehMap = progressTracker.read("namespace2", dStream1.id, 1000L)
-    assert(ehMap(EventHubNameAndPartition("eh11", 0)) === (-1, -1))
-    assert(ehMap(EventHubNameAndPartition("eh12", 0)) === (-1, -1))
-    assert(ehMap(EventHubNameAndPartition("eh12", 1)) === (-1, -1))
-    assert(ehMap(EventHubNameAndPartition("eh13", 0)) === (-1, -1))
-    assert(ehMap(EventHubNameAndPartition("eh13", 1)) === (-1, -1))
-    assert(ehMap(EventHubNameAndPartition("eh13", 2)) === (-1, -1))
-    val ehMap1 = progressTracker.read("namespace1", dStream.id, 1000L)
-    assert(ehMap1(EventHubNameAndPartition("eh1", 0)) === (-1, -1))
-    assert(ehMap1(EventHubNameAndPartition("eh2", 0)) === (-1, -1))
-    assert(ehMap1(EventHubNameAndPartition("eh2", 1)) === (-1, -1))
-    assert(ehMap1(EventHubNameAndPartition("eh3", 0)) === (-1, -1))
-    assert(ehMap1(EventHubNameAndPartition("eh3", 1)) === (-1, -1))
-    assert(ehMap1(EventHubNameAndPartition("eh3", 2)) === (-1, -1))
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 1000L, Seq((-1L, -1L)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 1000L, Seq((-1L, -1L), (-1L, -1L)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 1000L, Seq((-1L, -1L), (-1L, -1L), (-1L, -1L)))
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 1000L, Seq((-1L, -1L)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 1000L, Seq((-1L, -1L), (-1L, -1L)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 1000L, Seq((-1L, -1L), (-1L, -1L), (-1L, -1L)))
   }
 
   test("the progress tracks can be read correctly") {
     // generate 6 EventHubAndPartitions
-    val dStream =
-      createDirectStreams(ssc, "namespace1", progressRootPath.toString,
-        Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3")))
-    val dStream1 =
-      createDirectStreams(ssc, "namespace2", progressRootPath.toString,
-        Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-          "eh12" -> Map("eventhubs.partition.count" -> "2"),
-          "eh13" -> Map("eventhubs.partition.count" -> "3")))
-    val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressPath)
-    val oos = fs.create(new Path(progressPath.toString + "/progress-1000"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh1", 0, 0, 1).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 0, 0, 2).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 1, 0, 3).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 0, 0, 4).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 1, 0, 5).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 2, 0, 6).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh11", 0, 1, 2).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh12", 0, 2, 3).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh12", 1, 3, 4).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 0, 4, 5).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 1, 5, 6).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 2, 6, 7).toString +
-      "\n")
-    oos.close()
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2", 0 to 1, 0, 2)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3", 0 to 2, 0, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh11", 0 to 0, 1, 2)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh12", 0 to 1, 2, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
+
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
-    val ehMap = progressTracker.read("namespace2", dStream1.id, 2000L)
-    assert(ehMap(EventHubNameAndPartition("eh11", 0)) === (1, 2))
-    assert(ehMap(EventHubNameAndPartition("eh12", 0)) === (2, 3))
-    assert(ehMap(EventHubNameAndPartition("eh12", 1)) === (3, 4))
-    assert(ehMap(EventHubNameAndPartition("eh13", 0)) === (4, 5))
-    assert(ehMap(EventHubNameAndPartition("eh13", 1)) === (5, 6))
-    assert(ehMap(EventHubNameAndPartition("eh13", 2)) === (6, 7))
-    val ehMap1 = progressTracker.read("namespace1", dStream.id, 2000L)
-    assert(ehMap1(EventHubNameAndPartition("eh1", 0)) === (0, 1))
-    assert(ehMap1(EventHubNameAndPartition("eh2", 0)) === (0, 2))
-    assert(ehMap1(EventHubNameAndPartition("eh2", 1)) === (0, 3))
-    assert(ehMap1(EventHubNameAndPartition("eh3", 0)) === (0, 4))
-    assert(ehMap1(EventHubNameAndPartition("eh3", 1)) === (0, 5))
-    assert(ehMap1(EventHubNameAndPartition("eh3", 2)) === (0, 6))
+
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 2000L, Seq((0, 1)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 2000L, Seq((0, 2), (0, 2)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 2000L, Seq((0, 3), (0, 3), (0, 3)))
+
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 2000L, Seq((1, 2)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 2000L, Seq((2, 3), (2, 3)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
   }
 
   test("inconsistent timestamp in the progress tracks can be detected") {
-    // generate 6 EventHubAndPartitions
-    val dStream =
-      createDirectStreams(ssc, "namespace1", progressRootPath.toString,
-        Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3")))
-    val dStream1 =
-      createDirectStreams(ssc, "namespace2", progressRootPath.toString,
-        Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-          "eh12" -> Map("eventhubs.partition.count" -> "2"),
-          "eh13" -> Map("eventhubs.partition.count" -> "3")))
-    val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
-      appName, new Configuration())
-    fs.mkdirs(progressPath)
-    val oos = fs.create(new Path(progressPath.toString + "/progress-1000"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh1", 0, 0, 1).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 0, 0, 2).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh2", 1, 0, 3).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 0, 0, 4).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 1, 0, 5).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", dStream.id, "eh3", 2, 0, 6).toString + "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh11", 0, 1, 2).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh12", 0, 2, 3).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(2000L, "namespace2", dStream1.id, "eh12", 1, 3, 4).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 0, 4, 5).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 1, 5, 6).toString +
-      "\n")
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", dStream1.id, "eh13", 2, 6, 7).toString +
-      "\n")
-    oos.close()
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
+
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2", 0 to 1, 0, 2)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3", 0 to 2, 0, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh11", 0 to 0, 1, 2)
+    // write wrong record
+    Files.write(
+      Paths.get(progressPath + s"/progress-1000"),
+      (ProgressRecord(2000L, "namespace2", 1, "eh12", 0, 2, 3).toString + "\n").getBytes,
+      StandardOpenOption.APPEND)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh12", 1 to 1, 2, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
+
     intercept[IllegalArgumentException] {
-      progressTracker.read("namespace2", dStream1.id, 2000L)
+      progressTracker.read("namespace2", 2000L)
     }
   }
 
   test("snapshot progress tracking records can be read correctly") {
-    // generate 6 EventHubAndPartitions
-    val progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
-    val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressTempPath)
-    var oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-1"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", 0, "eh1", 0, 0, 1).toString + "\n")
-    oos.close()
-    oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-2"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", 0, "eh2", 0, 0, 1).toString + "\n")
-    oos.close()
-    oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-3"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", 0, "eh1", 0, 10, 20).toString + "\n")
-    oos.close()
-    oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-4"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", 0, "eh2", 0, 20, 30).toString + "\n")
-    oos.close()
-    val s = progressTracker.snapshot()
+    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 0, 1)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+      EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 0, 1)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 10, 20)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+      EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 20, 30)
+    val s = progressTracker.collectProgressRecordsForBatch(1000L)
     assert(s.contains("namespace1"))
     assert(s.contains("namespace2"))
     assert(s("namespace1")(EventHubNameAndPartition("eh1", 0)) === (0, 1))
@@ -278,59 +227,124 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   test("inconsistent timestamp in temp progress directory can be detected") {
-    // generate 6 EventHubAndPartitions
-    val progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
-    val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressTempPath)
-    var oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-1"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", 0, "eh1", 0, 0, 1).toString + "\n")
-    oos.close()
-    oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-2"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", 0, "eh2", 0, 0, 1).toString + "\n")
-    oos.close()
-    oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-3"))
-    oos.writeBytes(ProgressRecord(2000L, "namespace2", 0, "eh1", 0, 10, 20).toString + "\n")
-    oos.close()
-    oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-4"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace2", 0, "eh2", 0, 20, 30).toString + "\n")
-    oos.close()
+    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 0, 1)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+      EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 0, 1)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
+    progressWriter.write(2000L, 10, 20)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+      EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 20, 30)
     intercept[IllegalStateException] {
-      progressTracker.snapshot()
+      progressTracker.collectProgressRecordsForBatch(1000L)
     }
   }
 
-  test("latest offsets can be committed correctly and temp directory is cleaned") {
-    val progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString + "/progress",
+  test("latest offsets can be committed correctly and temp directory is not cleaned") {
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
-    val progressTempPath = new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
-      "/progress", appName))
-    fs.mkdirs(progressTempPath)
-    val oos = fs.create(new Path(progressTempPath.toString + "/progress-1000-1"))
-    oos.writeBytes(ProgressRecord(1000L, "namespace1", 0, "eh1", 0, 0, 1).toString + "\n")
-    oos.close()
-    assert(fs.exists(new Path(progressTempPath.toString + "/progress-1000-1")))
+
+    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 0, 0)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+      EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 1, 1)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 2, 2)
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+      EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
+    progressWriter.write(1000L, 3, 3)
+
     val offsetToCommit = Map(
       ("namespace1", 1) -> Map(
         EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
         EventHubNameAndPartition("eh2", 1) -> (1L, 1L)),
       ("namespace2", 2) -> Map(
-        EventHubNameAndPartition("eh1", 3) -> (0L, 0L),
-        EventHubNameAndPartition("eh2", 4) -> (1L, 1L)))
-    progressTracker.commit(offsetToCommit, 3000L)
-    val namespace1Offsets = progressTracker.read("namespace1", 1, 4000L)
+        EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
+        EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
+    progressTracker.commit(offsetToCommit, 1000L)
+    val namespace1Offsets = progressTracker.read("namespace1", 2000L)
     assert(namespace1Offsets === Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
       EventHubNameAndPartition("eh2", 1) -> (1L, 1L)))
-    val namespace2Offsets = progressTracker.read("namespace2", 2, 4000L)
+    val namespace2Offsets = progressTracker.read("namespace2", 2000L)
     assert(namespace2Offsets === Map(
-      EventHubNameAndPartition("eh1", 3) -> (0L, 0L),
-      EventHubNameAndPartition("eh2", 4) -> (1L, 1L)))
+      EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
+      EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
     // test temp directory cleanup
-    assert(fs.exists(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
-      "/progress", appName))))
-    assert(fs.listStatus(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString +
-      "/progress", appName))).length === 0)
+    assert(fs.exists(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString,
+      appName))))
+    assert(fs.listStatus(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString,
+      appName))).length === 4)
+  }
+
+  test("locate ProgressFile correctly") {
+    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
+    assert(progressTracker.locateProgressFile(fs, 1000L) === None)
+
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+
+    // 1000
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2", 0 to 1, 0, 2)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3", 0 to 2, 0, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh11", 0 to 0, 1, 2)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh12", 0 to 1, 2, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
+
+    // 2000
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1", 0 to 0, 1, 2)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh2", 0 to 1, 1, 3)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh3", 0 to 2, 1, 4)
+    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh11", 0 to 0, 2, 3)
+    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh12", 0 to 1, 3, 4)
+    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh13", 0 to 2, 4, 5)
+
+    // 3000
+    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh1", 0 to 0, 2, 3)
+    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh2", 0 to 1, 2, 4)
+    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh3", 0 to 2, 2, 5)
+    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh11", 0 to 0, 3, 4)
+    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh12", 0 to 1, 4, 5)
+    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh13", 0 to 2, 5, 6)
+
+
+    // if latest timestamp is earlier than the specified timestamp, we shall return the latest
+    // offsets
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 5000L, Seq((2, 3)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 5000L, Seq((2, 4), (2, 4)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 5000L, Seq((2, 5), (2, 5), (2, 5)))
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 5000L, Seq((3, 4)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 5000L, Seq((4, 5), (4, 5)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 5000L, Seq((5, 6), (5, 6), (5, 6)))
+
+    // locate file correctly
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 3000L, Seq((1, 2)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 3000L, Seq((1, 3), (1, 3)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 3000L, Seq((1, 4), (1, 4), (1, 4)))
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 3000L, Seq((2, 3)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 3000L, Seq((3, 4), (3, 4)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 3000L, Seq((4, 5), (4, 5), (4, 5)))
+
+    // locate file correctly
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 2000L, Seq((0, 1)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 2000L, Seq((0, 2), (0, 2)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 2000L, Seq((0, 3), (0, 3), (0, 3)))
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 2000L, Seq((1, 2)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 2000L, Seq((2, 3), (2, 3)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
+
+    assert(progressTracker.locateProgressFile(fs, 1000L) === None)
+    assert(progressTracker.locateProgressFile(fs, 500L) === None)
   }
 }

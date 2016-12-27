@@ -33,22 +33,22 @@ private[eventhubs] class ProgressTrackingListener private (
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
     logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
+    val batchTime = batchCompleted.batchInfo.batchTime.milliseconds
     if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-      val progressTracker = ProgressTracker.getInstance(ssc, progressDirectory,
-        ssc.sparkContext.appName,
-        ssc.sparkContext.hadoopConfiguration)
+      val progressTracker = ProgressTracker.getInstance
       // build current offsets
       val allEventDStreams = ProgressTracker.eventHubDirectDStreams
       // merge with the temp directory
-      val progressInLastBatch = progressTracker.snapshot()
+      val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
+      logInfo(s"progressInLastBatch $progressInLastBatch")
       val contentToCommit = allEventDStreams.map {
         dstream => ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums)
       }.toMap.map { case (namespace, currentOffsets) =>
         (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
       }
       ssc.graph.synchronized {
-        progressTracker.commit(contentToCommit, batchCompleted.batchInfo.batchTime.milliseconds)
-        logInfo(s"commit ending offset of Batch ${batchCompleted.batchInfo.batchTime}")
+        progressTracker.commit(contentToCommit, batchTime)
+        logInfo(s"commit ending offset of Batch $batchTime $contentToCommit")
         // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
         ssc.graph.notifyAll()
       }
@@ -75,7 +75,7 @@ private[eventhubs] object ProgressTrackingListener {
     _progressTrackerListener = null
   }
 
-  def getInstance(
+  def initInstance(
       ssc: StreamingContext,
       progressDirectory: String): ProgressTrackingListener = this.synchronized {
     getOrCreateProgressTrackerListener(ssc, progressDirectory)

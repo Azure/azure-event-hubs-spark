@@ -48,8 +48,7 @@ private[eventhubs] class RestfulEventHubClient(
     threadNum: Int) extends EventHubClient with Logging {
 
   // will be used to execute requests to EventHub
-  private implicit val exec = ExecutionContext.
-    fromExecutor(Executors.newFixedThreadPool(threadNum))
+  import Implicits.exec
 
   private def createSasToken(eventHubName: String, policyName: String, policyKey: String):
       String = {

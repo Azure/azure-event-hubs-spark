@@ -17,12 +17,17 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import org.apache.hadoop.fs.{FileSystem, Path}
+import java.nio.file.Files
 
-import org.apache.spark.streaming.StreamingContext
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterEach, FunSuite}
+
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
 
-private[eventhubs] trait SharedUtils {
+private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   val appName = "dummyapp"
   val streamId = 0
@@ -34,12 +39,38 @@ private[eventhubs] trait SharedUtils {
   var ssc: StreamingContext = _
   var progressTracker: ProgressTracker = _
 
+  override def beforeEach(): Unit = {
+    init()
+  }
+
+  override def afterEach(): Unit = {
+    reset()
+  }
+
+  protected def init(): Unit = {
+    progressRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
+    fs = progressRootPath.getFileSystem(new Configuration())
+    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
+      setMaster("local[*]")), Seconds(5))
+    progressListener = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
+    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
+      new Configuration())
+  }
+
+  protected def reset(): Unit = {
+    ProgressTracker.reset()
+    progressTracker = null
+    progressListener = null
+    ProgressTrackingListener.reset(ssc)
+    ssc.stop()
+  }
+
   protected def createDirectStreams(
       ssc: StreamingContext,
       eventHubNamespace: String,
-      checkpointDir: String,
+      progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
+    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
     newStream
   }
 }

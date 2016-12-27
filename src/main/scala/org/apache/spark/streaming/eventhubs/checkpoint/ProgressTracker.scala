@@ -37,22 +37,17 @@ import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubName
  * batch to start. The basic idea is that the tasks running on executors writes the offset of the
  * last message to HDFS and we gather those files into a progress tracking point for a certain batch
  *
- * @param checkpointDir the directory of checkpoint files
+ * @param progressDir the directory of checkpoint files
  * @param appName the name of Spark application
  * @param hadoopConfiguration the hadoop configuration instance
- * @param eventHubNameAndPartitions the list of EventHubNameAndPartition instances which this
- *                                  progress tracker take care of, this parameter is used to verify
- *                                  whether the progress tracker is broken
  */
 private[eventhubs] class ProgressTracker private[checkpoint](
-    checkpointDir: String,
+    progressDir: String,
     appName: String,
-    private val hadoopConfiguration: Configuration,
-    private[eventhubs] val eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]])
-  extends Logging {
+    private val hadoopConfiguration: Configuration) extends Logging {
 
-  private val progressDirStr = PathTools.progressDirPathStr(checkpointDir, appName)
-  private val progressTempDirStr = PathTools.progressTempDirPathStr(checkpointDir,
+  private val progressDirStr = PathTools.progressDirPathStr(progressDir, appName)
+  private val progressTempDirStr = PathTools.progressTempDirPathStr(progressDir,
     appName)
 
   private[eventhubs] val progressDirPath = new Path(progressDirStr)
@@ -62,6 +57,13 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   // and listener thread respectively.
   private val driverLock = new Object
 
+  def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
+    ProgressTracker.eventHubDirectDStreams.map { directStream =>
+      val namespace = directStream.eventHubNameSpace
+      val ehSpace = directStream.eventhubNameAndPartitions
+      (namespace, ehSpace.toList)
+    }.toMap
+  }
 
   private def allEventNameAndPartitionExist(
     candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
@@ -263,7 +265,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       if (progressFileOption.isEmpty) {
         // if no progress file, then start from the beginning of the streams
         val namespaceToEventHubs = eventHubNameAndPartitions.find {
-          case (ehNamespace, ehList) => ehNamespace == namespace}
+          case (ehNamespace, _) => ehNamespace == namespace}
         require(namespaceToEventHubs.isDefined, s"cannot find $namespace in" +
           s" $eventHubNameAndPartitions")
         ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, -1L))).
@@ -322,7 +324,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    */
   def commit(offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = driverLock.synchronized {
-    val fs = new Path(checkpointDir).getFileSystem(hadoopConfiguration)
+    val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     try {
       transaction(offsetToCommit, fs, commitTime)
     } catch {
@@ -390,7 +392,7 @@ private[eventhubs] object ProgressTracker {
 
   private var _progressTracker: ProgressTracker = _
 
-  private[checkpoint] def reset(): Unit = {
+  private[eventhubs] def reset(): Unit = {
     eventHubDirectDStreams.clear()
     _progressTracker = null
   }
@@ -403,12 +405,7 @@ private[eventhubs] object ProgressTracker {
     if (_progressTracker == null) {
       _progressTracker = new ProgressTracker(progressDirStr,
         appName,
-        hadoopConfiguration,
-        eventHubDirectDStreams.map{directStream =>
-          val namespace = directStream.eventHubNameSpace
-          val ehSpace = directStream.eventhubNameAndPartitions
-          (namespace, ehSpace.toList)
-        }.toMap)
+        hadoopConfiguration)
       _progressTracker.init()
     }
     _progressTracker

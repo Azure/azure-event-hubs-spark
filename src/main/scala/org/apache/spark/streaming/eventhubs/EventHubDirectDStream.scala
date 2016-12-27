@@ -81,13 +81,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     x
   }
 
-  @transient private var _eventHubClient: EventHubClient = _
+  private var _eventHubClient: EventHubClient = _
 
   private def progressTracker = ProgressTracker.getInstance(ssc, progressDir,
     context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
 
-  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): Unit = {
+  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
+      EventHubDirectDStream = {
     _eventHubClient = eventHubClient
+    this
   }
 
   private[eventhubs] def eventHubClient = {
@@ -97,8 +99,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _eventHubClient
   }
 
-  ProgressTrackingListener.getInstance(ssc, progressDir)
-
   // from eventHubName to offset
   private[eventhubs] var currentOffsetsAndSeqNums = Map[EventHubNameAndPartition, (Long, Long)]()
 
@@ -106,6 +106,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
     require(concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
+    ProgressTrackingListener.getInstance(ssc, progressDir)
   }
 
   override def stop(): Unit = {
@@ -147,7 +148,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         for (eventHubName <- eventhubsParams.keys;
              p <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
           yield (EventHubNameAndPartition(eventHubName, p),
-            (PartitionReceiver.START_OF_STREAM.toLong, 0L))
+            (PartitionReceiver.START_OF_STREAM.toLong, -1L))
       }.toMap
     }
   }
@@ -240,12 +241,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       currentOffsetsAndSeqNums = startOffsetInNextBatch
     }
     val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
-    logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNums")
+    logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
     val offsetRanges = latestOffsetOfAllPartitions.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
-          fromOffset = currentOffsetsAndSeqNums(eventHubNameAndPartition)._1,
-          fromSeq = currentOffsetsAndSeqNums(eventHubNameAndPartition)._2,
+          fromOffset = startOffsetInNextBatch(eventHubNameAndPartition)._1,
+          fromSeq = startOffsetInNextBatch(eventHubNameAndPartition)._2,
           untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
     }.toList
     val eventHubRDD = new EventHubRDD(
@@ -265,30 +266,32 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       ProgressTrackingListener.getInstance(ssc, progressDir)
       initialized = true
     }
-    var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
     var latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     if (latestOffsetOfAllPartitions.isEmpty) {
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
+      var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
+        logInfo(s"wake up at Batch ${validTime.milliseconds}")
         startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
         latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
       }
-      logInfo(s"wake up at Batch ${validTime.milliseconds}")
       if (latestOffsetOfAllPartitions.isEmpty) {
-        return Some(ssc.sparkContext.emptyRDD[EventData])
+        Some(ssc.sparkContext.emptyRDD[EventData])
+      } else {
+        proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
       }
     }
-    proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
   }
 
   @throws(classOf[IOException])
   private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
     ois.defaultReadObject()
+    ProgressTracker.eventHubDirectDStreams += this
     initialized = false
   }
 

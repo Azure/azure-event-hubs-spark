@@ -17,31 +17,16 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-import java.nio.file.Files
-
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.scalatest.{Assertions, BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.apache.hadoop.fs.Path
 
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.streaming.{Seconds, StreamingContext, Time}
-import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, EventHubsUtils, SharedUtils}
+import org.apache.spark.streaming.eventhubs.{EventHubNameAndPartition, SharedUtils}
 
-class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
-  with SharedUtils {
+class ProgressTrackerSuite extends SharedUtils {
 
-  before {
-    progressRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    fs = progressRootPath.getFileSystem(new Configuration())
-    ssc = new StreamingContext(new SparkContext(
-      new SparkConf().setAppName(appName).setMaster("local[*]")), Seconds(5))
-  }
-
-  after {
-    ProgressTrackingListener.reset(ssc)
+  override def beforeEach(): Unit = {
+    super.beforeEach()
     ProgressTracker.reset()
-    progressTracker = null
-    ssc.stop()
   }
 
   test("progress temp directory is created properly when progress and progress temp" +
@@ -83,10 +68,11 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
     // create direct streams
     // generate 6 EventHubAndPartitions
     val dStream =
-      createDirectStreams(ssc, "namespace1", progressRootPath.toString,
-        Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3")))
+    createDirectStreams(ssc, "namespace1", progressRootPath.toString,
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3")))
+    dStream.start()
     val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
       "/progress", appName))
     fs.mkdirs(progressPath)
@@ -145,6 +131,8 @@ class ProgressTrackerSuite extends FunSuite with BeforeAndAfterAll with BeforeAn
         Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
           "eh12" -> Map("eventhubs.partition.count" -> "2"),
           "eh13" -> Map("eventhubs.partition.count" -> "3")))
+    dStream.start()
+    dStream1.start()
     val progressPath = new Path(PathTools.progressDirPathStr(progressRootPath.toString +
       "/progress", appName))
     fs.mkdirs(progressPath)

@@ -17,11 +17,8 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-import java.nio.file.Files
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
@@ -33,26 +30,7 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.scheduler.{BatchInfo, StreamInputInfo, StreamingListenerBatchCompleted}
 // scalastyle:on
 
-class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with BeforeAndAfter
-  with SharedUtils {
-
-  before {
-    progressRootPath = new Path(Files.createTempDirectory("checkpoint_root").toString)
-    fs = progressRootPath.getFileSystem(new Configuration())
-    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
-      setMaster("local[*]")), Seconds(5))
-    progressListener = ProgressTrackingListener.getInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTracker.getInstance(ssc, progressRootPath.toString, appName,
-      new Configuration())
-  }
-
-  after {
-    ProgressTracker.reset()
-    progressTracker = null
-    progressListener = null
-    ProgressTrackingListener.reset(ssc)
-    ssc.stop()
-  }
+class ProgressTrackingListenerSuite extends SharedUtils {
 
   test("commit offsets with a successful micro batch correctly") {
     val batchCompletedEvent = StreamingListenerBatchCompleted(BatchInfo(
@@ -65,6 +43,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     ))
     val dstream = createDirectStreams(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
+    dstream.start()
     val progressWriter = new ProgressWriter(progressRootPath.toString,
       appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), new Configuration())
     progressWriter.write(1000L, 1L, 2L)
@@ -98,7 +77,7 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
   }
 
-  test("ProgressTrackingListener is registered correctly correctly") {
+  test("ProgressTrackingListener is registered correctly") {
     // reset env first
     ProgressTrackingListener.reset(ssc)
     ssc.stop()
@@ -108,11 +87,11 @@ class ProgressTrackingListenerSuite extends FunSuite with BeforeAndAfterAll with
     createDirectStreams(ssc, "namespace1", progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
         "eh2" -> Map("eventhubs.partition.count" -> "2"),
-        "eh3" -> Map("eventhubs.partition.count" -> "3")))
+        "eh3" -> Map("eventhubs.partition.count" -> "3"))).start()
     createDirectStreams(ssc, "namespace2", progressRootPath.toString,
       Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
         "eh12" -> Map("eventhubs.partition.count" -> "2"),
-        "eh13" -> Map("eventhubs.partition.count" -> "3")))
+        "eh13" -> Map("eventhubs.partition.count" -> "3"))).start()
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)

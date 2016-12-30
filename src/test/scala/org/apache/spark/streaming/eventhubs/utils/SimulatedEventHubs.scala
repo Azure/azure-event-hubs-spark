@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.evenhubs
+package org.apache.spark.streaming.eventhubs.utils
 
 import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
@@ -24,9 +24,9 @@ import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper}
 
-class SimulatedEventHubs(
+private[eventhubs] class SimulatedEventHubs(
     namespace: String,
-    messagesStore: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
+    val messagesStore: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
 
   def search(ehPartition: EventHubNameAndPartition, offset: Int, eventNum: Int):
       List[EventData] = {
@@ -60,13 +60,10 @@ private[eventhubs] class TestEventHubsReceiver(
 }
 
 private[eventhubs] class TestRestEventHubClient(
-    eventHubNameAndPartitions: List[EventHubNameAndPartition]) extends EventHubClient {
-
-  private val latestRecords = eventHubNameAndPartitions.map(ehNameAndPartition =>
-    (ehNameAndPartition, (Long.MaxValue, Long.MaxValue))).toMap
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
 
   override def endPointOfPartition():
-  Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+      Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     Some(latestRecords)
   }
 

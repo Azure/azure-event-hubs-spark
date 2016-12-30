@@ -33,7 +33,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
-import org.apache.spark.streaming.eventhubs.evenhubs.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
+import org.apache.spark.streaming.eventhubs.utils.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
 import org.apache.spark.util.{ManualClock, Utils}
 
 
@@ -107,14 +107,18 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]):
     EventHubDirectDStream = {
+
+    val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
+      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
+        (messageQueue.length.toLong, messageQueue.length.toLong - 1))
+    }
+
     new EventHubDirectDStream(ssc, namespace,
       self.progressRootPath.toString, eventhubsParams,
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(eventhubsParams.keys.flatMap(eventHubName =>
-          for (i <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
-            yield EventHubNameAndPartition(eventHubName, i)).toList))
+        new TestRestEventHubClient(maxOffsetForEachEventHub))
   }
 
   def runEventHubStreams[V: ClassTag](

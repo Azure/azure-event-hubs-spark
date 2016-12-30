@@ -23,12 +23,9 @@ import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.mockito.Mockito
 
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
-import org.apache.spark.util.Utils
 
 class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTestSuiteBase
   with SharedUtils {

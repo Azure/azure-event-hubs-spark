@@ -22,10 +22,11 @@ import java.nio.file.Files
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.util.ManualClock
 
 class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTestSuiteBase
   with SharedUtils {
@@ -86,7 +87,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val expectedOutputBeforeRestart = Seq(
       Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart = Seq(
-      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq())
 
     testCheckpointedOperation(
       input,
@@ -107,9 +108,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutputBeforeRestart,
-      expectedOutputAfterRestart,
-      Duration(2 * batchDuration.milliseconds)
-    )
+      expectedOutputAfterRestart)
   }
 
   test("test integration of spark checkpoint and progress tracking (single stream +" +
@@ -124,7 +123,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val expectedOutputAfterRestart = Seq(
       Seq(4, 5, 7, 8, 10, 2, 6, 7, 9, 10, 3, 4),
       Seq(6, 7, 9, 10, 3, 4, 8, 9, 11, 2, 5, 6),
-      Seq(8, 9, 11, 2, 5, 6, 10, 11, 3, 4, 7, 8))
+      Seq(8, 9, 11, 2, 5, 6, 10, 11, 3, 4, 7, 8), Seq(10, 11, 3, 4, 7, 8))
 
     testCheckpointedOperation(
       input,
@@ -146,9 +145,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         inputDStream.window(Seconds(2), Seconds(1)).map(
           eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutputBeforeRestart,
-      expectedOutputAfterRestart,
-      Duration(2 * batchDuration.milliseconds)
-    )
+      expectedOutputAfterRestart)
   }
 
   test("test integration of spark checkpoint and progress tracking (multi-streams join)") {
@@ -169,7 +166,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       Seq("d" -> 8, "e" -> 10, "f" -> 12, "j" -> 14, "k" -> 16, "l" -> 18, "p" -> 2, "q" -> 4,
         "r" -> 6),
       Seq("g" -> 8, "h" -> 10, "i" -> 12, "m" -> 14, "n" -> 16, "o" -> 18,
-        "a" -> 2, "b" -> 4, "c" -> 6))
+        "a" -> 2, "b" -> 4, "c" -> 6), Seq())
 
     testCheckpointedOperation(
       input1,
@@ -201,8 +198,140 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           join(inputDStream2.flatMap(eventData => eventData.getProperties.asScala)).
           map{case (key, (v1, v2)) => (key, v1.toInt + v2.toInt)},
       expectedOutputBeforeRestart,
-      expectedOutputAfterRestart,
-      Duration(batchDuration.milliseconds)
-    )
+      expectedOutputAfterRestart)
+  }
+
+
+  test("recover from progress after updating code (no checkpoint provided)") {
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutputBeforeRestart)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L)),
+      4000L)
+
+    ssc.stop()
+    reset()
+
+    ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
+
+    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(3000)
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutputAfterRestart)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
+      7000L)
+  }
+
+  test("recover from progress after updating code (no checkpoint provided and roll back)") {
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutputBeforeRestart)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L)),
+      4000L)
+
+    val progressDir = ProgressTracker.getInstance.progressDirPath.toString
+
+    ssc.stop()
+    reset()
+    ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
+    val fs = FileSystem.get(ssc.sparkContext.hadoopConfiguration)
+    fs.delete(new Path(progressDir + "/progress-3000"), true)
+
+    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(3000)
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutputAfterRestart)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
+      7000L)
   }
 }

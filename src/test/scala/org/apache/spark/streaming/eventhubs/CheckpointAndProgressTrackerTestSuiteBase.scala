@@ -62,8 +62,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
        expectedStartingOffsetsAndSeqs2: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
        operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
        expectedOutputBeforeRestart: Seq[Seq[W]],
-       expectedOutputAfterRestart: Seq[Seq[W]],
-       downTime: Duration) {
+       expectedOutputAfterRestart: Seq[Seq[W]]) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
@@ -77,9 +76,6 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedStartingOffsetsAndSeqs2,
       operation,
       expectedOutputBeforeRestart)
-
-    val manualClock = ssc.scheduler.clock.asInstanceOf[ManualClock]
-    manualClock.setTime(expectedOutputBeforeRestart.size * batchDuration.milliseconds)
 
     val currentCheckpointDir = ssc.checkpointDir
 
@@ -97,7 +93,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     )
 
     runStreamsWithEventHubInput(ssc,
-      expectedOutputAfterRestart.length,
+      expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = true)
   }
 
@@ -116,9 +112,6 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
 
-    var manualClock = ssc.scheduler.clock.asInstanceOf[ManualClock]
-    manualClock.setTime(expectedOutputBeforeRestart.size * batchDuration.milliseconds)
-
     val currentCheckpointDir = ssc.checkpointDir
 
     // simulate down
@@ -135,8 +128,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
       operation: EventHubDirectDStream => DStream[V],
       expectedOutputBeforeRestart: Seq[Seq[V]],
-      expectedOutputAfterRestart: Seq[Seq[V]],
-      downTime: Duration) {
+      expectedOutputAfterRestart: Seq[Seq[V]]) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
@@ -151,8 +143,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
         "\n-------------------------------------------\n"
     )
 
-    runStreamsWithEventHubInput(ssc,
-      expectedOutputAfterRestart.length,
+    runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = false)
   }
 }

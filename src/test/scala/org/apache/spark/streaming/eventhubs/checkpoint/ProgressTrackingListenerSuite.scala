@@ -50,7 +50,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     progressWriter.write(1000L, 1L, 2L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListener.onBatchCompleted(batchCompletedEvent)
-    assert(!fs.exists(progressWriter.tempProgressTrackingPointPath))
+    assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
     val record = progressTracker.read(eventhubNamespace, 2000L)
     assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))

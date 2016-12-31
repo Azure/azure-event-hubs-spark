@@ -101,8 +101,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    */
   private def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
     val latestFileOpt = getLastestFile(progressDirPath, fs)
-    val allCheckpointedNameAndPartitions = new mutable.HashMap[String,
-      List[EventHubNameAndPartition]]
+    val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
     var br: BufferedReader = null
     try {
       if (latestFileOpt.isEmpty) {
@@ -118,10 +117,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
           return (false, latestFileOpt)
         }
         val progressRecord = progressRecordOpt.get
-        val newList = allCheckpointedNameAndPartitions.getOrElseUpdate(progressRecord.namespace,
+        val newList = allProgressFiles.getOrElseUpdate(progressRecord.namespace,
           List[EventHubNameAndPartition]()) :+
           EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
-        allCheckpointedNameAndPartitions(progressRecord.namespace) = newList
+        allProgressFiles(progressRecord.namespace) = newList
         if (timestamp == -1L) {
           timestamp = progressRecord.timestamp
         } else if (progressRecord.timestamp != timestamp) {
@@ -141,7 +140,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         br.close()
       }
     }
-    (allEventNameAndPartitionExist(allCheckpointedNameAndPartitions.toMap), latestFileOpt)
+    (allEventNameAndPartitionExist(allProgressFiles.toMap), latestFileOpt)
   }
 
   /**
@@ -314,7 +313,6 @@ private[eventhubs] class ProgressTracker private[checkpoint](
               )
           }
       }
-      allProgressRecords(commitTime).foreach(fileStatus => fs.delete(fileStatus.getPath, true))
     } finally {
       if (oos != null) {
         oos.close()
@@ -342,9 +340,11 @@ private[eventhubs] class ProgressTracker private[checkpoint](
 
   private def allProgressRecords(timestamp: Long): List[FileStatus] = {
     val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-    val r = fs.listStatus(progressTempDirPath).filter(fileStatus =>
-      fileStatus.getPath.getName.split("-").last == timestamp.toString).toList
-    println(r)
+    val r = fs.listStatus(progressTempDirPath, new PathFilter {
+      override def accept(path: Path) = {
+        path.getName.split("-").last == timestamp.toString
+      }
+    }).toList
     r
   }
 
@@ -403,8 +403,9 @@ private[eventhubs] object ProgressTracker {
     _progressTracker = null
   }
 
-  def getInstance(
-      ssc: StreamingContext,
+  def getInstance: ProgressTracker = _progressTracker
+
+  private[eventhubs] def initInstance(
       progressDirStr: String,
       appName: String,
       hadoopConfiguration: Configuration): ProgressTracker = this.synchronized {

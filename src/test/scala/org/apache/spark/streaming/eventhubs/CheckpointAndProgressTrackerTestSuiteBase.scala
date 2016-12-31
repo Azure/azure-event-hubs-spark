@@ -53,29 +53,29 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     }.head
   }
 
-  protected def testCheckpointedOperation[U: ClassTag, V: ClassTag](
-      input: Seq[Seq[U]],
-      eventhubsParams: Map[String, Map[String, String]],
-      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
-      operation: EventHubDirectDStream => DStream[V],
-      expectedOutputBeforeRestart: Seq[Seq[V]],
-      expectedOutputAfterRestart: Seq[Seq[V]],
-      downTime: Duration) {
+  protected def testCheckpointedOperation[U: ClassTag, V: ClassTag, W: ClassTag](
+       input1: Seq[Seq[U]],
+       input2: Seq[Seq[V]],
+       eventhubsParams1: Map[String, Map[String, String]],
+       eventhubsParams2: Map[String, Map[String, String]],
+       expectedStartingOffsetsAndSeqs1: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+       expectedStartingOffsetsAndSeqs2: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+       operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
+       expectedOutputBeforeRestart: Seq[Seq[W]],
+       expectedOutputAfterRestart: Seq[Seq[W]]) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
 
-    testUnaryOperation(
-      input,
-      eventhubsParams,
-      expectedStartingOffsetsAndSeqs,
+    testBinaryOperation(
+      input1,
+      input2,
+      eventhubsParams1,
+      eventhubsParams2,
+      expectedStartingOffsetsAndSeqs1,
+      expectedStartingOffsetsAndSeqs2,
       operation,
       expectedOutputBeforeRestart)
-    testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
-
-    var manualClock = ssc.scheduler.clock.asInstanceOf[ManualClock]
-    manualClock.setTime(expectedOutputBeforeRestart.size * batchDuration.milliseconds)
 
     val currentCheckpointDir = ssc.checkpointDir
 
@@ -92,8 +92,58 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
         "\n-------------------------------------------\n"
     )
 
-    runStreamWithSingleEventHubInputStream(ssc,
+    runStreamsWithEventHubInput(ssc,
       expectedOutputAfterRestart.length - 1,
+      expectedOutputAfterRestart, useSet = true)
+  }
+
+  protected def runStopAndRecover[U: ClassTag, V: ClassTag](
+      input: Seq[Seq[U]],
+      eventhubsParams: Map[String, Map[String, String]],
+      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      operation: EventHubDirectDStream => DStream[V],
+      expectedOutputBeforeRestart: Seq[Seq[V]]): Unit = {
+    testUnaryOperation(
+      input,
+      eventhubsParams,
+      expectedStartingOffsetsAndSeqs,
+      operation,
+      expectedOutputBeforeRestart)
+    testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
+
+    val currentCheckpointDir = ssc.checkpointDir
+
+    // simulate down
+    reset()
+
+    // restart
+    ssc = new StreamingContext(currentCheckpointDir)
+  }
+
+  protected def testCheckpointedOperation[U: ClassTag, V: ClassTag](
+      input: Seq[Seq[U]],
+      eventhubsParams: Map[String, Map[String, String]],
+      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      operation: EventHubDirectDStream => DStream[V],
+      expectedOutputBeforeRestart: Seq[Seq[V]],
+      expectedOutputAfterRestart: Seq[Seq[V]]) {
+
+    require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
+      "Cannot run test without manual clock in the conf")
+
+    runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
+      expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
+
+    // Restart and complete the computation from checkpoint file
+    logInfo(
+      "\n-------------------------------------------\n" +
+        s"        Restarting stream computation at ${ssc.initialCheckpoint.checkpointTime}    " +
+        "\n-------------------------------------------\n"
+    )
+
+    runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = false)
   }
 }

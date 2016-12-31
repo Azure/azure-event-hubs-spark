@@ -35,9 +35,7 @@ private[eventhubs] class ProgressTrackingListener private (
     logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
     val batchTime = batchCompleted.batchInfo.batchTime.milliseconds
     if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-      val progressTracker = ProgressTracker.getInstance(ssc, progressDirectory,
-        ssc.sparkContext.appName,
-        ssc.sparkContext.hadoopConfiguration)
+      val progressTracker = ProgressTracker.getInstance
       // build current offsets
       val allEventDStreams = ProgressTracker.eventHubDirectDStreams
       // merge with the temp directory
@@ -77,7 +75,7 @@ private[eventhubs] object ProgressTrackingListener {
     _progressTrackerListener = null
   }
 
-  def getInstance(
+  def initInstance(
       ssc: StreamingContext,
       progressDirectory: String): ProgressTrackingListener = this.synchronized {
     getOrCreateProgressTrackerListener(ssc, progressDirectory)

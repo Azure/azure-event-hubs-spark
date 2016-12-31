@@ -33,7 +33,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
-import org.apache.spark.streaming.eventhubs.evenhubs.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
+import org.apache.spark.streaming.eventhubs.utils.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
 import org.apache.spark.util.{ManualClock, Utils}
 
 
@@ -107,14 +107,18 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]):
     EventHubDirectDStream = {
+
+    val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
+      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
+        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
+    }
+
     new EventHubDirectDStream(ssc, namespace,
       self.progressRootPath.toString, eventhubsParams,
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(eventhubsParams.keys.flatMap(eventHubName =>
-          for (i <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
-            yield EventHubNameAndPartition(eventHubName, i)).toList))
+        new TestRestEventHubClient(maxOffsetForEachEventHub))
   }
 
   def runEventHubStreams[V: ClassTag](
@@ -256,8 +260,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace: String,
       expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
       timestamp: Long): Unit = {
-    val producedOffsetsAndSeqs = ProgressTracker.getInstance(ssc, progressRootPath.toString,
-      appName, ssc.sparkContext.hadoopConfiguration).read(namespace, timestamp)
+    val producedOffsetsAndSeqs = ProgressTracker.getInstance.read(namespace, timestamp)
     assert(producedOffsetsAndSeqs === expectedOffsetsAndSeqs)
   }
 
@@ -270,8 +273,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       expectedOffsetsAndSeqs2: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
       operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
       expectedOutput: Seq[Seq[W]],
-      numBatches: Int = -1,
-      useSet: Boolean = false) {
+      numBatches: Int = -1) {
 
     val numBatches_ = if (numBatches > 0) numBatches else expectedOutput.size
     // transform input to EventData instances
@@ -280,14 +282,13 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
     withStreamingContext(setupMultiEventHubStreams(simulatedEventHubs1, simulatedEventHubs2,
       eventhubsParams1, eventhubsParams2, "namespace1", "namespace2", operation)) { ssc =>
-      val output = runEventHubStreams[V](ssc, numBatches_, expectedOutput.size)
-      verifyOutput(output, expectedOutput, useSet)
+        runStreamsWithEventHubInput(ssc, numBatches_, expectedOutput, useSet = true)
     }
     verifyOffsetsAndSeqs(ssc, "namespace1", expectedOffsetsAndSeqs1)
     verifyOffsetsAndSeqs(ssc, "namespace2", expectedOffsetsAndSeqs2)
   }
 
-  protected def runStreamWithSingleEventHubInputStream[V: ClassTag](
+  protected def runStreamsWithEventHubInput[V: ClassTag](
       ssc: StreamingContext,
       numBatches: Int,
       expectedOutput: Seq[Seq[V]],
@@ -313,7 +314,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     withStreamingContext(
       setupSingleEventHubStream(simulatedEventHubs, eventhubsParams, operation, rddOperation)) {
       ssc =>
-        runStreamWithSingleEventHubInputStream(ssc, numBatches_, expectedOutput, useSet)
+        runStreamsWithEventHubInput(ssc, numBatches_, expectedOutput, useSet)
     }
     verifyOffsetsAndSeqs(ssc, eventhubNamespace, expectedOffsetsAndSeqs)
   }

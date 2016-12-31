@@ -51,7 +51,6 @@ private[eventhubs] class ProgressWriter(
         eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
         cpSeq)
       cpFileStream.writeBytes(s"$record")
-      logInfo(s"writing to $tempProgressTrackingPointStr")
     } catch {
       case ioe: IOException =>
         ioe.printStackTrace()

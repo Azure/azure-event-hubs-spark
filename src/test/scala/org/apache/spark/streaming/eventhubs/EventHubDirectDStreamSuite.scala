@@ -53,47 +53,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     assert(ehDStream.compute(Time(1000)).get.count() === 0)
   }
 
-  test("currentOffset are setup correctly when EventHubDirectDStream is deserialized") {
-    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
-      Map("eh1" -> eventhubParameters))
-    ehDStream.start()
-    ehDStream.currentOffsetsAndSeqNums = Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L))
-    val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
-    val deserCp = Utils.deserialize[Checkpoint](cp)
-    assert(deserCp.graph.getInputStreams().length === 1)
-    val deserEhDStream = deserCp.graph.getInputStreams()(0).asInstanceOf[EventHubDirectDStream]
-    deserEhDStream.setContext(ssc)
-    assert(deserEhDStream.currentOffsetsAndSeqNums ===
-      Map(EventHubNameAndPartition("ehName1", 1) -> (12L, 21L)))
-  }
-
-  test("ProgressTracker, ProgressTrackingListener and EventHubClient are registered correctly" +
-    " when EventHubDirectDStream is deserialized") {
-    import scala.collection.JavaConverters._
-    val eventHubClientMock = mock[EventHubClient]
-    Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
-    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
-      Map("eh1" -> eventhubParameters))
-    val ehDStream1 = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
-      Map("eh1" -> eventhubParameters))
-    val cp = Utils.serialize(new Checkpoint(ssc, Time(1000)))
-    reset()
-    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
-      setMaster("local[*]")), Seconds(5))
-    val deserCp = Utils.deserialize[Checkpoint](cp)
-    val allEventhubDStreams = deserCp.graph.getInputStreams().filter(
-      _.isInstanceOf[EventHubDirectDStream]).map(_.asInstanceOf[EventHubDirectDStream])
-    allEventhubDStreams.foreach(_.setEventHubClient(eventHubClientMock).setContext(ssc))
-    allEventhubDStreams.foreach(eh => eh.compute(Time(1000L)))
-    assert(ProgressTracker.eventHubDirectDStreams.length == 2)
-    assert(ehDStream.eventHubClient != null)
-    assert(ehDStream1.eventHubClient != null)
-    assert(ssc.scheduler.listenerBus.listeners.asScala.count(
-      _.isInstanceOf[ProgressTrackingListener]) === 1)
-    assert(ssc.scheduler.listenerBus.listeners.get(0).isInstanceOf[ProgressTrackingListener])
-    ssc.stop()
-  }
-
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(
@@ -191,8 +150,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         inputDStream1.flatMap(eventData => eventData.getProperties.asScala).
           join(inputDStream2.flatMap(eventData => eventData.getProperties.asScala)).
           map{case (key, (v1, v2)) => (key, v1.toInt + v2.toInt)},
-      expectedOutput,
-      useSet = true)
+      expectedOutput)
     testProgressTracker("namespace1", Map(EventHubNameAndPartition("eh11", 0) -> (5L, 5L),
       EventHubNameAndPartition("eh11", 1) -> (5L, 5L),
       EventHubNameAndPartition("eh11", 2) -> (5L, 5L)), 3000L)

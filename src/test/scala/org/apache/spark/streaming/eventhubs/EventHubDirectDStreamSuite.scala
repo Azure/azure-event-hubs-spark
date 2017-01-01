@@ -17,13 +17,19 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.util.concurrent.ConcurrentLinkedQueue
+
+import scala.reflect.ClassTag
+
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
+import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.utils.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
 import org.apache.spark.util.Utils
 
 
@@ -188,5 +194,32 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
         EventHubNameAndPartition("eh1", 2) -> (-1L, -1L)),
       4000L)
+  }
+
+  test("continue stream correctly when there is fluctuation") {
+    val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
+    val expectedOutput = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(), Seq(), Seq(), Seq(6, 7, 9, 10, 3, 4))
+    testFluctuatedStream(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutput,
+      messagesBeforeEmpty = 4,
+      numBatchesBeforeNewData = 5)
+    testProgressTracker(eventhubNamespace, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+      EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+      EventHubNameAndPartition("eh1", 2) -> (5L, 5L)), 7000L)
   }
 }

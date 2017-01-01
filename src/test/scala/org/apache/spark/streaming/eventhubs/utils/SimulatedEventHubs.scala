@@ -22,7 +22,8 @@ import scala.reflect.ClassTag
 
 import com.microsoft.azure.eventhubs.EventData
 
-import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper}
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper, TestEventHubOutputStream}
 
 private[eventhubs] class SimulatedEventHubs(
     namespace: String,
@@ -62,9 +63,33 @@ private[eventhubs] class TestEventHubsReceiver(
 private[eventhubs] class TestRestEventHubClient(
     latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
 
-  override def endPointOfPartition():
-      Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     Some(latestRecords)
+  }
+
+  override def close(): Unit = {}
+}
+
+
+private[eventhubs] class FluctuatedEventHubClient(
+    ssc: StreamingContext,
+    messagesBeforeEmpty: Long,
+    numBatchesBeforeNewData: Int,
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+
+  private var callIndex = -1
+
+  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+    callIndex += 1
+    println(s"callIndex $callIndex")
+    if (callIndex < numBatchesBeforeNewData) {
+      Some(latestRecords.map{
+        case (ehNameAndPartition, _) =>
+          (ehNameAndPartition, (messagesBeforeEmpty - 1, messagesBeforeEmpty - 1))
+      })
+    } else {
+      Some(latestRecords)
+    }
   }
 
   override def close(): Unit = {}

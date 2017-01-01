@@ -56,6 +56,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
+  private var consumedAllMessages = false
+
   ProgressTracker.eventHubDirectDStreams += this
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
@@ -268,26 +270,27 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       initialized = true
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    var latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
+    val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
     if (latestOffsetOfAllPartitions.isEmpty) {
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
-        !startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
+        !startPointInNextBatch.equals(latestOffsetOfAllPartitions) && !consumedAllMessages) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
         logInfo(s"wake up at Batch ${validTime.milliseconds}")
         startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
-        latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
       }
-      if (latestOffsetOfAllPartitions.isEmpty) {
-        Some(ssc.sparkContext.emptyRDD[EventData])
+      // keep this state to prevent dstream dying
+      if (startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
+        consumedAllMessages = true
       } else {
-        proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
+        consumedAllMessages = false
       }
+      proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
     }
   }
 

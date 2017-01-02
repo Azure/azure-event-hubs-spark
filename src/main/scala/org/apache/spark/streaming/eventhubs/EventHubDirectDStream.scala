@@ -287,7 +287,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // keep this state to prevent dstream dying
       if (startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
         consumedAllMessages = true
-      } else {
+      } else if (latestOffsetOfAllPartitions.nonEmpty) {
+        // if latestOffsetOfAllPartitions is empty, i.e. eventhub REST die, we shall keep the status
         consumedAllMessages = false
       }
       proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)

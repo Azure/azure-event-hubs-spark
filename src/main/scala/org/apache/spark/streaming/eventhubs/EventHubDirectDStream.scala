@@ -160,7 +160,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                               offsetRanges: List[OffsetRange], inputSize: Int): Unit = {
     require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
     val description = offsetRanges.map { offsetRange =>
-      s"topic: ${offsetRange.eventHubNameAndPartition}\t" +
+      s"eventhub: ${offsetRange.eventHubNameAndPartition}\t" +
         s"starting offsets: ${offsetRange.fromOffset}" +
         s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
     }.mkString("\n")
@@ -240,9 +240,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     Option[EventHubRDD] = {
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.keys.toList)
-    if (currentOffsetEarlierThanCheckpoint(startOffsetInNextBatch)) {
-      currentOffsetsAndSeqNums = startOffsetInNextBatch
-    }
+    currentOffsetsAndSeqNums = startOffsetInNextBatch
     val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
     logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
     val offsetRanges = latestOffsetOfAllPartitions.map {
@@ -273,6 +271,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
     if (latestOffsetOfAllPartitions.isEmpty) {
+      currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
@@ -287,8 +286,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // keep this state to prevent dstream dying
       if (startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
         consumedAllMessages = true
-      } else if (latestOffsetOfAllPartitions.nonEmpty) {
-        // if latestOffsetOfAllPartitions is empty, i.e. eventhub REST die, we shall keep the status
+      } else {
+        // if latestOffsetOfAllPartitions is empty, i.e. eventhub REST die, we shall keep unchanged
         consumedAllMessages = false
       }
       proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)

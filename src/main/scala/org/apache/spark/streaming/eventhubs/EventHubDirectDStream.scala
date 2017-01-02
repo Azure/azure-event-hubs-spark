@@ -272,6 +272,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
     if (latestOffsetOfAllPartitions.isEmpty) {
       currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+      consumedAllMessages = true
       Some(ssc.sparkContext.emptyRDD[EventData])
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
@@ -287,7 +288,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       if (startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
         consumedAllMessages = true
       } else {
-        // if latestOffsetOfAllPartitions is empty, i.e. eventhub REST die, we shall keep unchanged
         consumedAllMessages = false
       }
       proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)

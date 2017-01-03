@@ -1,5 +1,5 @@
 # spark-eventhubs [![Build Status](https://travis-ci.org/hdinsight/spark-eventhubs.svg?branch=master)](https://travis-ci.org/hdinsight/spark-eventhubs)
-This is the source code of EventHubsReceiver for Spark Streaming. 
+This is the source code of EventHubsReceiver for Spark Streaming.
 
 [Here](https://github.com/hdinsight/spark-streaming-data-persistence-examples) is an example project that uses EventHubsReceiver to count and persist messages from Azure Eventhubs.
 
@@ -12,7 +12,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
         <artifactId>spark-streaming-eventhubs_2.11</artifactId>
         <version>2.0.2</version>
     </dependency>
-    
+
 ### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
     libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.2"
@@ -33,4 +33,3 @@ In order to build and run the examples, you need to have:
     mvn clean
     mvn package
 This command builds and installs EventHubsReceiver jar to local maven cache. Subsequently you can build any Spark Streaming application that references this jar.
-

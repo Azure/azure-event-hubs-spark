@@ -46,5 +46,6 @@ class EventhubsImplicitsSuite
 
     val stream = ssc.unionedEventHubStream(ehParams)
     val stream2 = ssc.eventHubStream(ehParams, "0")
+    ssc.stop()
   }
 }

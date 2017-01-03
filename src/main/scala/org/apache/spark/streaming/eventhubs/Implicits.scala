@@ -17,6 +17,9 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.util.concurrent.Executors
+
+import scala.concurrent.ExecutionContext
 import scala.language.implicitConversions
 
 import org.apache.spark.storage.StorageLevel
@@ -30,6 +33,10 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * eventhubStream methods on the StreamingContext instead of the EventHubsUtils class.
  */
 object Implicits {
+
+  // will be used to execute requests to EventHub
+  private[eventhubs] implicit val exec = ExecutionContext.
+    fromExecutor(Executors.newFixedThreadPool(15))
 
   /**
    * Converts the StreamingContext into an EventHub enabled streaming context

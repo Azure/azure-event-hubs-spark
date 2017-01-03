@@ -24,7 +24,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}
-import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
+import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTrackingListener, OffsetStore, ProgressTracker}
 import org.apache.spark.streaming.receiver.Receiver
 
 
@@ -115,7 +115,8 @@ object EventHubsUtils {
       checkpointDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
     require(checkpointDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
-    new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
+    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, checkpointDir, eventParams)
+    newStream
   }
 
   /**

@@ -17,11 +17,30 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import scala.util.Random
+
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 
 // TODO: delete this file right before merge
 object Test {
+
+  private def createNewStreamingContext(namespace: String, checkpointDir: String,
+      eventHubName: String, eventhubParameters: Map[String, String]): StreamingContext = {
+    val ssc = new StreamingContext(new SparkContext(), Seconds(10))
+    ssc.checkpoint("hdfs://mycluster/checkpoint_spark")
+
+    val inputDirectStream = new EventHubDirectDStream(ssc, namespace,
+      checkpointDir, Map(eventHubName -> eventhubParameters))
+    var l = 0L
+    inputDirectStream.foreachRDD { rdd =>
+      val r = Random.nextInt(32) + 1
+      println("current length: " + rdd.take(r * 1000).length)
+    }
+
+    ssc
+  }
+
   def main(args: Array[String]): Unit = {
     val checkpointDir = args(0)
     val policyName = args(1)
@@ -35,18 +54,12 @@ object Test {
       "eventhubs.namespace" -> namespace,
       "eventhubs.name" -> name,
       "eventhubs.partition.count" -> "32",
-      "eventhubs.consumergroup" -> "$Default"
+      "eventhubs.consumergroup" -> "$Default",
+      "eventhubs.maxRate" -> s"${args(5)}"
     )
 
-    val ssc = new StreamingContext(new SparkContext(), Seconds(10))
-    val inputDirectStream = new EventHubDirectDStream(ssc, namespace,
-      checkpointDir, Map(name -> eventhubParameters))
-    var l = 0L
-    inputDirectStream.foreachRDD { rdd =>
-      val r = rdd.count()
-      l += r
-      println("current long " + r)
-    }
+    val ssc = StreamingContext.getOrCreate("hdfs://mycluster/checkpoint_spark",
+      () => createNewStreamingContext(namespace, checkpointDir, name, eventhubParameters))
     ssc.start()
     ssc.awaitTermination()
   }

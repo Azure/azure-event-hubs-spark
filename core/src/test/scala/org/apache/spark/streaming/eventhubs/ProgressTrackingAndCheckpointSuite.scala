@@ -296,9 +296,9 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       expectedOutputBeforeRestart)
     Thread.sleep(10000)
     val fs = FileSystem.get(new Configuration())
-    assert(!fs.exists(new Path(progressRootPath.toString + "/progress-1000")))
-    assert(!fs.exists(new Path(progressRootPath.toString + "/progress-2000")))
-    assert(fs.exists(new Path(progressRootPath.toString + "/progress-3000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-1000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-2000")))
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-3000")))
   }
 
   test("recover from progress after updating code (no checkpoint provided and roll back)") {

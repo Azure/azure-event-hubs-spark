@@ -67,6 +67,7 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     ProgressTracker.reset()
     progressTracker = null
     progressListener = null
+    EventHubDirectDStream.lastCleanupTime = -1
     ProgressTrackingListener.reset(ssc)
     ssc.stop()
   }

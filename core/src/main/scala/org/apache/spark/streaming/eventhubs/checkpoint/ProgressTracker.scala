@@ -320,6 +320,14 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
+  def cleanProgressFile(timeThreshold: Long): Unit = {
+    val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
+    val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) < timeThreshold
+    })
+    allUselessFiles.foreach(fileStatus => fs.delete(fileStatus.getPath, true))
+  }
+
   /**
    * commit offsetToCommit to a new progress tracking file
    */

@@ -267,6 +267,38 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       7000L)
   }
 
+  test("progress files are cleaned up correctly and the crashed application can recover from" +
+    " the remaining files") {
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutputBeforeRestart)
+    Thread.sleep(100000)
+
+    
+  }
+
   test("recover from progress after updating code (no checkpoint provided and roll back)") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),

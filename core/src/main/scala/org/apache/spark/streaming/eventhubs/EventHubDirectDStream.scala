@@ -262,6 +262,14 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     Some(eventHubRDD)
   }
 
+  override private[streaming] def clearCheckpointData(time: Time): Unit =
+    EventHubDirectDStream.cleanupLock.synchronized {
+    if (EventHubDirectDStream.lastCleanupTime < time.milliseconds) {
+      progressTracker.cleanProgressFile(time.milliseconds)
+      EventHubDirectDStream.lastCleanupTime = time.milliseconds
+    }
+  }
+
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
@@ -273,7 +281,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     if (latestOffsetOfAllPartitions.isEmpty) {
       currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
       consumedAllMessages = true
-      Some(ssc.sparkContext.emptyRDD[EventData])
+      proceedWithNonEmptyRDD(validTime, currentOffsetsAndSeqNums, currentOffsetsAndSeqNums)
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
@@ -345,4 +353,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // publish nothing as there is no receiver
     }
   }
+}
+
+private[eventhubs] object EventHubDirectDStream {
+  val cleanupLock = new Object
+  var lastCleanupTime = -1L
 }

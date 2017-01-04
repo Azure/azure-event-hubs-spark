@@ -23,8 +23,8 @@ import com.microsoft.spark.streaming.examples.receiverdstream.common.{EventConte
 
 import org.apache.spark._
 import org.apache.spark.sql.{SaveMode, SparkSession}
-import org.apache.spark.streaming.eventhubs.EventHubsUtils
 import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.eventhubs.EventHubsUtils
 
 object EventhubsToAzureBlobAsJSON {
 
@@ -46,10 +46,9 @@ object EventhubsToAzureBlobAsJSON {
     // scalastyle:on
 
     /**
-      * In Spark 2.0.x, SparkConf must be initialized through EventhubsUtil so that required
-      * data structures internal to Azure Eventhubs Client get registered with the Kryo Serializer.
-      */
-
+     * In Spark 2.0.x, SparkConf must be initialized through EventhubsUtil so that required
+     * data structures internal to Azure Eventhubs Client get registered with the Kryo Serializer.
+     */
     val sparkConfiguration : SparkConf = EventHubsUtils.initializeSparkStreamingConfigurations
 
     sparkConfiguration.setAppName(this.getClass.getSimpleName)

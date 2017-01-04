@@ -18,6 +18,7 @@
 package com.microsoft.spark.streaming.examples.receiverdstream.common
 
 import java.sql.{Connection, DriverManager}
+
 import org.apache.spark.sql.DataFrame
 
 object DataFrameExtensions {

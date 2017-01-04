@@ -46,10 +46,9 @@ object EventhubsToHiveTable {
     // scalastyle:on
 
     /**
-      * In Spark 2.0.x, SparkConf must be initialized through EventhubsUtil so that required
-      * data structures internal to Azure Eventhubs Client get registered with the Kryo Serializer.
-      */
-
+     * In Spark 2.0.x, SparkConf must be initialized through EventhubsUtil so that required
+     * data structures internal to Azure Eventhubs Client get registered with the Kryo Serializer.
+     */
     val sparkConfiguration : SparkConf = EventHubsUtils.initializeSparkStreamingConfigurations
 
     sparkConfiguration.setAppName(this.getClass.getSimpleName)
@@ -85,10 +84,9 @@ object EventhubsToHiveTable {
     sparkSession.sql(hiveTableDDL)
 
     /**
-      * .saveAsTable does not work so insertInto is used.
-      * Refer to SPARK-16803 (https://issues.apache.org/jira/browse/SPARK-16803)
-      */
-
+     * .saveAsTable does not work so insertInto is used.
+     * Refer to SPARK-16803 (https://issues.apache.org/jira/browse/SPARK-16803)
+     */
     eventHubsWindowedStream.map(x => EventContent(new String(x)))
       .foreachRDD(rdd => {
         val sparkSession = SparkSession.builder.enableHiveSupport.getOrCreate

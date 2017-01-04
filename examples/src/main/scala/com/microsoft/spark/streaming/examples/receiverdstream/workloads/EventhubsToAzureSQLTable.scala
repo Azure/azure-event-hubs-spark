@@ -57,10 +57,9 @@ object EventhubsToAzureSQLTable {
       asInstanceOf[String]
 
     /**
-      * In Spark 2.0.x, SparkConf must be initialized through EventhubsUtil so that required
-      * data structures internal to Azure Eventhubs Client get registered with the Kryo Serializer.
-      */
-
+     * In Spark 2.0.x, SparkConf must be initialized through EventhubsUtil so that required
+     * data structures internal to Azure Eventhubs Client get registered with the Kryo Serializer.
+     */
     val sparkConfiguration : SparkConf = EventHubsUtils.initializeSparkStreamingConfigurations
 
     sparkConfiguration.setAppName(this.getClass.getSimpleName)

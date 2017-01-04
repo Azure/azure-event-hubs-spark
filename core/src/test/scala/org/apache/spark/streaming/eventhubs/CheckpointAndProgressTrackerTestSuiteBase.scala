@@ -111,16 +111,6 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
 
-    // test cleanup of progress files
-    val fs = progressRootPath.getFileSystem(new Configuration)
-    for (i <- 0 until expectedOutputBeforeRestart.length - 1) {
-      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
-        s"${(i + 1) * 1000}")))
-    }
-
-    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
-      s"progress-${expectedOutputBeforeRestart.length * 1000}")))
-
     val currentCheckpointDir = ssc.checkpointDir
 
     // simulate down
@@ -145,6 +135,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
       expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
 
+    // test cleanup of progress files
+    var fs = progressRootPath.getFileSystem(new Configuration)
+    for (i <- 0 until expectedOutputBeforeRestart.length - 1) {
+      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
+        s"${(i + 1) * 1000}")))
+    }
+
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
+      s"progress-${expectedOutputBeforeRestart.length * 1000}")))
+
     // Restart and complete the computation from checkpoint file
     logInfo(
       "\n-------------------------------------------\n" +
@@ -154,5 +154,17 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
     runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = false)
+
+    // test cleanup of progress files
+    fs = progressRootPath.getFileSystem(new Configuration)
+    for (i <- expectedOutputBeforeRestart.length - 1 until
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) {
+      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
+        s"${(i + 1) * 1000}")))
+    }
+
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
+      s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length) *
+        1000}")))
   }
 }

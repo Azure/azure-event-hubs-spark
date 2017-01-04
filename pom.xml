@@ -21,8 +21,8 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>spark-streaming-eventhubs_2.11</artifactId>
-  <version>2.0.2</version>
+  <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
+  <version>2.0.3</version>
   <licenses>
     <license>
       <name>The Apache License, Version 2.0</name>
@@ -37,18 +37,22 @@
       <organizationUrl>http://www.microsoft.com</organizationUrl>
     </developer>
   </developers>
+  <modules>
+    <module>core</module>
+    <module>examples</module>
+  </modules>
   <scm>
      <connection>scm:git:git:/github.com/hdinsight/spark-eventhubs.git</connection>
      <developerConnection>scm:git:ssh://github.com/hdinsight/spark-eventhubs.git</developerConnection>
      <url>https://github.com/hdinsight/spark-eventhubs/tree/master</url>
   </scm>
   <properties>
-    <sbt.project.name>spark-streaming-eventhubs</sbt.project.name>
+    <sbt.project.name>spark-streaming-eventhubs_connector</sbt.project.name>
     <scala.binary.version>2.11</scala.binary.version>
-    <spark.version>2.0.0</spark.version>
+    <spark.version>2.0.2</spark.version>
     <github.global.server>github</github.global.server>
   </properties>
-  <packaging>jar</packaging>
+  <packaging>pom</packaging>
   <name>${project.groupId}:${project.artifactId}</name>
   <description>Azure Eventhubs Connector for Spark Streaming Applications</description>
   <url>https://github.com/hdinsight/spark-eventhubs</url>
@@ -197,12 +201,12 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>
-        <version>2.6</version>
+        <version>3.0.0</version>
         <configuration>
           <descriptorRefs>
             <descriptorRef>jar-with-dependencies</descriptorRef>
           </descriptorRefs>
-
+          <skipAssembly>true</skipAssembly>
         </configuration>
         <executions>
           <execution>
@@ -263,7 +267,7 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>	
+      </plugin>
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -309,7 +313,7 @@
           <autoReleaseAfterClose>true</autoReleaseAfterClose>
         </configuration>
       </plugin>
-    
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
@@ -337,7 +341,7 @@
           </execution>
         </executions>
       </plugin>
-  
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-gpg-plugin</artifactId>
@@ -356,4 +360,3 @@
     </plugins>
   </build>
 </project>
-

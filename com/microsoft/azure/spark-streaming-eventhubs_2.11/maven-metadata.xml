@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <metadata>
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
+  <artifactId>spark-streaming-eventhubs_2.11</artifactId>
   <versioning>
     <release>2.0.3</release>
     <versions>
       <version>2.0.3</version>
     </versions>
-    <lastUpdated>20170104214835</lastUpdated>
+    <lastUpdated>20170104214859</lastUpdated>
   </versioning>
 </metadata>

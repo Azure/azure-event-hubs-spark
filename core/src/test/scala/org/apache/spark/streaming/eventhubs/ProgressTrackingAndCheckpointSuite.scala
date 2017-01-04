@@ -268,7 +268,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
   }
 
   test("progress files are cleaned up correctly and the crashed application can recover from" +
-    " the remaining files") {
+    " the remaining files (single stream)") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
@@ -301,8 +301,6 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L)),
       4000L)
-
-    val progressDir = ProgressTracker.getInstance.progressDirPath.toString
 
     ssc.stop()
     reset()
@@ -339,5 +337,90 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
         EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
       7000L)
+
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-3000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-4000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-5000")))
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-6000")))
+  }
+
+  test("progress files are cleaned up correctly and the crashed application can recover from" +
+    " the remaining files (windowing)") {
+
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(2, 3, 5, 6, 8, 9, 4, 5, 7, 8, 10, 2),
+      Seq(2, 3, 5, 6, 8, 9, 4, 5, 7, 8, 10, 2, 6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9, 4, 5, 7, 8, 10, 2, 6, 7, 9, 10, 3, 4),
+      Seq(4, 5, 7, 8, 10, 2, 6, 7, 9, 10, 3, 4, 8, 9, 11, 2, 5, 6),
+      Seq(6, 7, 9, 10, 3, 4, 8, 9, 11, 2, 5, 6, 10, 11, 3, 4, 7, 8))
+
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutputBeforeRestart)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L)),
+      4000L)
+
+    ssc.stop()
+    reset()
+
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-1000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-2000")))
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-3000")))
+
+    ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
+
+    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(3000)
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.window(Seconds(3), Seconds(1)).map(eventData =>
+          eventData.getProperties.get("output").toInt + 1),
+      expectedOutputAfterRestart)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
+      7000L)
+
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-3000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-4000")))
+    assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-5000")))
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-6000")))
   }
 }

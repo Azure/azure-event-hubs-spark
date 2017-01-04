@@ -1,4 +1,4 @@
 set -e
+mvn install -DskipTests
 mvn scalastyle:check
-mvn package
 mvn test        

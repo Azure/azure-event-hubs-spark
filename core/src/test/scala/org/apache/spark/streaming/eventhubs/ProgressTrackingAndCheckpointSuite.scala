@@ -309,7 +309,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val expectedOutputBeforeRestart = Seq(
       Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart = Seq(
-      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+      Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
 
     testUnaryOperation(
       input,
@@ -339,9 +339,10 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
 
     ssc.stop()
     reset()
+
     ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
-    val fs = FileSystem.get(ssc.sparkContext.hadoopConfiguration)
-    fs.delete(new Path(progressDir + "/progress-3000"), true)
+    // val fs = FileSystem.get(ssc.sparkContext.hadoopConfiguration)
+    // fs.delete(new Path(progressDir + "/progress-3000"), true)
 
     ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(3000)
     testUnaryOperation(

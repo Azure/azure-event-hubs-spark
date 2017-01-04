@@ -54,9 +54,10 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
   protected def init(): Unit = {
     progressRootPath = new Path(Files.createTempDirectory("progress_root").toString)
     fs = progressRootPath.getFileSystem(new Configuration())
-    ssc = new StreamingContext(new SparkContext(new SparkConf().setAppName(appName).
-      setMaster("local[*]").set("spark.streaming.clock", streamingClock)).setLogLevel("ERROR"),
-      batchDuration)
+    val sparkContext = new SparkContext(new SparkConf().setAppName(appName).
+      setMaster("local[*]").set("spark.streaming.clock", streamingClock))
+    sparkContext.setLogLevel("ERROR")
+    ssc = new StreamingContext(sparkContext, batchDuration)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
     progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())

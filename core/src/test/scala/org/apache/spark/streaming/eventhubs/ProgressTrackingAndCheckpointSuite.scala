@@ -294,7 +294,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutputBeforeRestart)
-    Thread.sleep(50000)
+    Thread.sleep(10000)
     val fs = FileSystem.get(new Configuration())
     assert(!fs.exists(new Path(progressRootPath.toString + "/progress-1000")))
     assert(!fs.exists(new Path(progressRootPath.toString + "/progress-2000")))

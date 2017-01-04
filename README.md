@@ -5,9 +5,13 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 
 For latest integration of EventHubs and Spark Streaming, the document can be found [here](docs/direct_stream.md).
 
-## Project References
+## Usage
 
-### Maven Dependency
+### Getting Officially Released Version
+
+We will have the official release in the maven central repo, you can add the following dependency to your project to reference Spark-EventHubs
+
+#### Maven Dependency
     <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11 -->
     <dependency>
         <groupId>com.microsoft.azure</groupId>
@@ -15,13 +19,42 @@ For latest integration of EventHubs and Spark Streaming, the document can be fou
         <version>2.0.2</version>
     </dependency>
 
-### SBT Dependency
+#### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
     libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.2"
 
-### Maven Central for other dependency co-ordinates
+#### Maven Central for other dependency co-ordinates
 
 https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.2
+
+### Getting Staging Version
+
+We will also publish the staging version of Spark-EventHubs in GitHub. To use the staging version of Spark-EventHubs, the first step is to indicate GitHub as the source repo by adding the following entry to pom.xml:
+
+```xml
+<repository>
+      <id>spark-eventhubs</id>
+      <url>https://raw.github.com/hdinsight/spark-eventhubs/maven-repo/</url>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
+</repository>
+```
+
+You can then add the following dependency to your project to take the pre-released version.
+
+#### Maven Dependency
+    <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11 -->
+    <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+        <version>2.0.3</version>
+    </dependency>
+
+#### SBT Dependency
+    // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.3"
 
 ## Build Prerequisites
 

@@ -189,7 +189,7 @@
             <dir>${basedir}/examples/src/main/scala</dir>
           </sourceDirectories>
           <testSourceDirectory>${basedir}/core/src/test/scala</testSourceDirectory>
-          <configLocation>${basedir}/scalastyle-config.xml</configLocation>
+          <configLocation>scalastyle-config.xml</configLocation>
           <outputFile>${project.basedir}/scalastyle-output.xml</outputFile>
           <outputEncoding>UTF-8</outputEncoding>
         </configuration>

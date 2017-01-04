@@ -17,13 +17,12 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.nio.file.Files
+import java.nio.file.FileSystem
 
-import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
-import org.scalatest.concurrent.Eventually.{eventually, timeout}
-import org.scalatest.time.SpanSugar._
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
@@ -111,6 +110,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       operation,
       expectedOutputBeforeRestart)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
+
+    // test cleanup of progress files
+    val fs = progressRootPath.getFileSystem(new Configuration)
+    for (i <- expectedOutputBeforeRestart.indices) {
+      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
+        s"${(i + 1) * 1000}")))
+    }
+
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
+      s"progress-${expectedOutputBeforeRestart.length * 1000}")))
 
     val currentCheckpointDir = ssc.checkpointDir
 

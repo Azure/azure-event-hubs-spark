@@ -288,7 +288,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     if (latestOffsetOfAllPartitions.isEmpty) {
       currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
       consumedAllMessages = true
-      proceedWithNonEmptyRDD(validTime, currentOffsetsAndSeqNums, currentOffsetsAndSeqNums)
+      Some(context.sparkContext.emptyRDD[EventData])
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&

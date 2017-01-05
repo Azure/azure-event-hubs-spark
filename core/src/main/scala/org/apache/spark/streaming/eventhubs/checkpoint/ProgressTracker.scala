@@ -321,12 +321,19 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   }
 
   // TODO: do we really need to synchronize this method?
-  def cleanProgressFile(timeThreshold: Long): Unit = synchronized {
+  // called in EventHubDirectDStream's clearCheckpointData method
+  def cleanProgressFile(checkpointTime: Long): Unit = synchronized {
+    // to handle the dead rest api, we need to always keep the latest file instead of blindly
+    // delete all files earlier than checkpointTime
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
-      override def accept(path: Path): Boolean = fromPathToTimestamp(path) < timeThreshold
-    })
-    allUselessFiles.foreach(fileStatus => fs.delete(fileStatus.getPath, true))
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) < checkpointTime
+    }).map(_.getPath)
+    val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
+      fromPathToTimestamp(p2))
+    if (sortedFileList.nonEmpty) {
+      sortedFileList.tail.foreach(filePath => fs.delete(filePath, true))
+    }
   }
 
   /**

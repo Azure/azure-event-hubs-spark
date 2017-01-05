@@ -162,7 +162,7 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
     if (events == null) Iterable.empty else events.asScala
   }
 
-  override def close(): Unit = if (eventhubsReceiver != null) eventhubsReceiver.close()
+  override def close(): Unit = if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
 
   private var eventhubsReceiver: PartitionReceiver = _
   private val MINIMUM_PREFETCH_COUNT: Int = 10

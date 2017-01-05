@@ -315,22 +315,9 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L))
 
-    testUnaryOperation(
-      input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1")
-      ),
-      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
-          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
-          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
-      ),
-      operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
-      expectedOutputAfterRestart)
+    runStreamsWithEventHubInput(ssc,
+      expectedOutputAfterRestart.length - 1,
+      expectedOutputAfterRestart, useSet = true)
 
     testProgressTracker(
       eventhubNamespace,

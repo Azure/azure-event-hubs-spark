@@ -265,7 +265,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
-      initialized = true
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
     val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
@@ -277,7 +276,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
-        !startPointInNextBatch.equals(latestOffsetOfAllPartitions) && !consumedAllMessages) {
+        !startPointInNextBatch.equals(latestOffsetOfAllPartitions) &&
+        !consumedAllMessages &&
+        initialized) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
@@ -290,6 +291,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       } else {
         consumedAllMessages = false
       }
+      initialized = true
       proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
     }
   }

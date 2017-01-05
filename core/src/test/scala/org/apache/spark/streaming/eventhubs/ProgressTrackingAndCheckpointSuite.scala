@@ -266,4 +266,34 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
       7000L)
   }
+
+  test("application can recover from progress file with a fragile rest endpoint") {
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+    testFragileStream(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
+          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+      expectedOutput = expectedOutputBeforeRestart,
+      numBatchesBeforeCrashedeEndpoint = 3,
+      numBatchesWhenCrashedeEndpoint = 3)
+
+  }
 }

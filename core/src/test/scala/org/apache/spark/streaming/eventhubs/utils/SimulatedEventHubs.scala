@@ -70,6 +70,28 @@ private[eventhubs] class TestRestEventHubClient(
   override def close(): Unit = {}
 }
 
+private[eventhubs] class FragileEventHubClient(
+    ssc: StreamingContext,
+    numBatchesBeforeCrashedEndpoint: Int,
+    numBatchesWhenCrashedEndpoint: Int,
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+
+  private var callIndex = -1
+
+  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+    callIndex += 1
+    if (callIndex < numBatchesBeforeCrashedEndpoint) {
+      Some(latestRecords)
+    } else if (callIndex < numBatchesWhenCrashedEndpoint) {
+      None
+    } else {
+      Some(latestRecords)
+    }
+  }
+
+  override def close(): Unit = {}
+}
+
 
 private[eventhubs] class FluctuatedEventHubClient(
     ssc: StreamingContext,
@@ -81,7 +103,6 @@ private[eventhubs] class FluctuatedEventHubClient(
 
   override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     callIndex += 1
-    println(s"callIndex $callIndex")
     if (callIndex < numBatchesBeforeNewData) {
       Some(latestRecords.map{
         case (ehNameAndPartition, _) =>

@@ -304,8 +304,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(latestOffsetOfAllPartitions) &&
-        !consumedAllMessages) {// &&
-        // initialized) {
+        !consumedAllMessages &&
+        initialized) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()

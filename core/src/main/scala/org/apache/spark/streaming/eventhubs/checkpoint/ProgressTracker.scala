@@ -327,7 +327,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     // delete all files earlier than checkpointTime
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
-      override def accept(path: Path): Boolean = fromPathToTimestamp(path) < checkpointTime
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime
     }).map(_.getPath)
     val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
       fromPathToTimestamp(p2))

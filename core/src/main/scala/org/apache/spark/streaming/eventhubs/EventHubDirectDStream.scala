@@ -100,7 +100,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _eventHubClient
   }
 
-  // from eventHubName to offset
   private[eventhubs] var currentOffsetsAndSeqNums = Map[EventHubNameAndPartition, (Long, Long)]()
 
   override def start(): Unit = {
@@ -286,7 +285,20 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
     println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
     if (latestOffsetOfAllPartitions.isEmpty) {
+      // we need to update currentOffsetsAndSeqNums in the case of dead rest endpoint
+      // considering the following case:
+      // assuming C is the commited offset, and H is the highest offset in EventHubs
+      // in Batch i, stream 1 commits with offset = 500, C = 400; in Batch i + 1, rest endpoint die,
+      // C = 400; in Batch i + 2, C will still be 400 and cause unnecessary reprocessing of the
+      // batch in Batch i
       currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
+      // we have to take "dead rest endpoint" as consumed all messages, considering the following
+      // example case:
+      // assuming C is the commited offset, and H is the highest offset in EventHubs
+      // in Batch i, stream 1 has consumed all messages, and
+      // C = 500; in Batch i + 1, rest endpoint die, C = 500; in Batch i + 2, new data comes, C is
+      // equal to the highest available offset in HDFS and does not equal to H, the thread will be
+      // blocked infinitely
       consumedAllMessages = true
       Some(context.sparkContext.emptyRDD[EventData])
     } else {

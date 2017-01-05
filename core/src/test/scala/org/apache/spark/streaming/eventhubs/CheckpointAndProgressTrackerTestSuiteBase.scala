@@ -157,14 +157,15 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
     // test cleanup of progress files
     fs = progressRootPath.getFileSystem(new Configuration)
-    for (i <- expectedOutputBeforeRestart.length - 1 until
-      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) {
+    // we need to minus 2 here, the reason is that we have a output which is recoverred from
+    // checkpoint, i.e. when we have 6 output in total, we actually only run for 5000 milliseconds
+    for (i <- 0 until expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2) {
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
     }
 
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
-      s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length) *
+      s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) *
         1000}")))
   }
 }

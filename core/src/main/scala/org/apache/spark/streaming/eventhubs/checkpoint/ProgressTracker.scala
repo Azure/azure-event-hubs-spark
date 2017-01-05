@@ -320,7 +320,8 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  def cleanProgressFile(timeThreshold: Long): Unit = {
+  // TODO: do we really need to synchronize this method?
+  def cleanProgressFile(timeThreshold: Long): Unit = synchronized {
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
       override def accept(path: Path): Boolean = fromPathToTimestamp(path) < timeThreshold

@@ -105,11 +105,11 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
 
   private def setupFragileInputStream(
-                                       namespace: String,
-                                       simulatedEventHubs: SimulatedEventHubs,
-                                       numBatchesBeforeCrashEndpoint: Int,
-                                       numBatchesWhenCrashEndpoint: Int,
-                                       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
+      namespace: String,
+      simulatedEventHubs: SimulatedEventHubs,
+      numBatchesBeforeCrashEndpoint: Int,
+      numBatchesWhenCrashEndpoint: Int,
+      eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
     val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
         (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
@@ -119,9 +119,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       progressRootPath.toString, eventhubsParams,
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
-      (_: String, _: Map[String, Map[String, String]]) =>
-        new FragileEventHubClient(ssc, numBatchesBeforeCrashEndpoint, numBatchesWhenCrashEndpoint,
-          maxOffsetForEachEventHub))
+      (_: String, _: Map[String, Map[String, String]]) => FragileEventHubClient.getInstance("",
+        Map()))
   }
 
   private def setupFragileEventHubStream[V: ClassTag](

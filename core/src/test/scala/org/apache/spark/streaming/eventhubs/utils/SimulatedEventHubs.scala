@@ -70,8 +70,7 @@ private[eventhubs] class TestRestEventHubClient(
   override def close(): Unit = {}
 }
 
-private[eventhubs] class FragileEventHubClient(
-    ssc: StreamingContext,
+private[eventhubs] class FragileEventHubClient private (
     numBatchesBeforeCrashedEndpoint: Int,
     numBatchesWhenCrashedEndpoint: Int,
     latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
@@ -90,6 +89,20 @@ private[eventhubs] class FragileEventHubClient(
   }
 
   override def close(): Unit = {}
+}
+
+// ugly stuff to make things checkpointable in tests
+private[eventhubs] object FragileEventHubClient {
+
+  var numBatchesBeforeCrashedEndpoint = 0
+  var numBatchesWhenCrashedEndpoint = 0
+  var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()
+
+  def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
+    FragileEventHubClient = {
+    new FragileEventHubClient(numBatchesBeforeCrashedEndpoint, numBatchesWhenCrashedEndpoint,
+      latestRecords)
+  }
 }
 
 

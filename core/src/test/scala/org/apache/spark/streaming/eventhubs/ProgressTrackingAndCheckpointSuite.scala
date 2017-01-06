@@ -327,7 +327,6 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       7000L)
   }
 
-  /*
   test("progress files are clean up correctly with a fragile rest endpoint") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -356,5 +355,5 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       numBatchesBeforeCrashedeEndpoint = 3,
       numBatchesWhenCrashedeEndpoint = 3)
 
-  }*/
+  }
 }

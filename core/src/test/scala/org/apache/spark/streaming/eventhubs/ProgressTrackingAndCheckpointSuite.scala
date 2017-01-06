@@ -361,7 +361,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
      */
 
 
-    /*
+
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
@@ -388,6 +388,6 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       expectedOutput = expectedOutputBeforeRestart,
       numBatchesBeforeCrashedeEndpoint = 3,
       numBatchesWhenCrashedeEndpoint = 3)
-    */
+
   }
 }

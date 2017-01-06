@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
 import org.apache.spark.util.ManualClock
 
 /**
@@ -57,14 +58,14 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
       new PathFilter {
         override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) < 1000 * numNonExistBatch
+          ProgressTracker.getInstance.fromPathToTimestamp(path) < 1000 * numNonExistBatch
         }
       }).length == 0)
     // we do not consider APIs like take() here
     assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
       new PathFilter {
         override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) == 1000 * numBatches
+          ProgressTracker.getInstance.fromPathToTimestamp(path) == 1000 * numBatches
         }
       }).length == expectedFileNum)
   }

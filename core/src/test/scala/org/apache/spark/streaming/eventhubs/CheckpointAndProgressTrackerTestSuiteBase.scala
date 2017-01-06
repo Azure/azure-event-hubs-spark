@@ -117,8 +117,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       operation,
       expectedOutputBeforeRestart)
 
-    validateProgressFileCleanup(expectedOutputAfterRestart.length - 2,
-      expectedOutputAfterRestart.length)
+    validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
+      expectedOutputBeforeRestart.length)
     validateTempFileCleanup(expectedOutputBeforeRestart.length - 1,
       expectedOutputBeforeRestart.length,
       expectedStartingOffsetsAndSeqs1.values.flatten.size +
@@ -167,11 +167,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
 
-    val currentCheckpointDir = ssc.checkpointDir
+    validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
+      expectedOutputBeforeRestart.length)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length - 1,
+      expectedOutputBeforeRestart.length,
+      expectedOffsetsAndSeqs.size)
 
+    val currentCheckpointDir = ssc.checkpointDir
     // simulate down
     reset()
-
     // restart
     ssc = new StreamingContext(currentCheckpointDir)
   }
@@ -190,13 +195,6 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
       expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
-
-    validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
-      expectedOutputBeforeRestart.length)
-    validateTempFileCleanup(
-      expectedOutputBeforeRestart.length - 1,
-      expectedOutputBeforeRestart.length,
-      expectedOffsetsAndSeqs.size)
 
     // Restart and complete the computation from checkpoint file
     logInfo(

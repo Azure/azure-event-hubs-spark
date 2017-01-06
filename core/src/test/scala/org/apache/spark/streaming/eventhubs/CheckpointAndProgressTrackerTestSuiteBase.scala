@@ -23,7 +23,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.reflect.ClassTag
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{Path, PathFilter}
+import sun.dc.pr.PathFiller
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
@@ -90,21 +91,34 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     // files earlier than batch t - 1 shall not exit,
     // the existence of progress-(t-1) depends on the scheduling of threads
 
-
+    // check progress directory
     var fs = progressRootPath.getFileSystem(new Configuration)
     for (i <- 0 until expectedOutputBeforeRestart.length - 2) {
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
     }
-
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
       s"progress-${expectedOutputBeforeRestart.length * 1000}")))
+    // check temp files
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) < 1000 *
+            (expectedOutputBeforeRestart.length - 1)
+        }
+      }).length == 0)
+    // we do not consider APIs like take() here
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) == 1000 * expectedOutputBeforeRestart.length
+        }
+      }).length == expectedStartingOffsetsAndSeqs1.values.size +
+      expectedStartingOffsetsAndSeqs2.values.size)
 
     val currentCheckpointDir = ssc.checkpointDir
-
     // simulate down
     reset()
-
     // restart
     ssc = new StreamingContext(currentCheckpointDir)
 
@@ -127,10 +141,27 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
     }
-
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
       s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) *
         1000}")))
+
+    // check temp files
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) < 1000 *
+            (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2)
+        }
+      }).length == 0)
+    // we do not consider APIs like take() here
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) ==
+            1000 * (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
+        }
+      }).length == expectedStartingOffsetsAndSeqs1.values.size +
+      expectedStartingOffsetsAndSeqs2.values.size)
   }
 
   protected def runStopAndRecover[U: ClassTag, V: ClassTag](
@@ -190,9 +221,24 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
     }
-
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
       s"progress-${expectedOutputBeforeRestart.length * 1000}")))
+
+    // check temp files
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) < 1000 *
+            (expectedOutputBeforeRestart.length - 1)
+        }
+      }).length == 0)
+    // we do not consider APIs like take() here
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) == 1000 * expectedOutputBeforeRestart.length
+        }
+      }).length == expectedOffsetsAndSeqs.values.size)
 
     // Restart and complete the computation from checkpoint file
     logInfo(
@@ -212,9 +258,25 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
     }
-
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
       s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) *
         1000}")))
+
+    // check temp files
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) < 1000 *
+            (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2)
+        }
+      }).length == 0)
+    // we do not consider APIs like take() here
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) ==
+            1000 * (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
+        }
+      }).length == expectedOffsetsAndSeqs.values.size)
   }
 }

@@ -70,18 +70,15 @@ private[eventhubs] class TestRestEventHubClient(
   override def close(): Unit = {}
 }
 
-private[eventhubs] class FragileEventHubClient private (
-    numBatchesBeforeCrashedEndpoint: Int,
-    numBatchesWhenCrashedEndpoint: Int,
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
-
-  private var callIndex = -1
+private[eventhubs] class FragileEventHubClient private extends EventHubClient {
 
   override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+    import FragileEventHubClient._
+
     callIndex += 1
     if (callIndex < numBatchesBeforeCrashedEndpoint) {
       Some(latestRecords)
-    } else if (callIndex < numBatchesWhenCrashedEndpoint) {
+    } else if (callIndex < lastBatchWhenEndpointCrashed) {
       None
     } else {
       Some(latestRecords)
@@ -94,14 +91,14 @@ private[eventhubs] class FragileEventHubClient private (
 // ugly stuff to make things checkpointable in tests
 private[eventhubs] object FragileEventHubClient {
 
+  var callIndex = -1
   var numBatchesBeforeCrashedEndpoint = 0
-  var numBatchesWhenCrashedEndpoint = 0
+  var lastBatchWhenEndpointCrashed = 0
   var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()
 
   def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
     FragileEventHubClient = {
-    new FragileEventHubClient(numBatchesBeforeCrashedEndpoint, numBatchesWhenCrashedEndpoint,
-      latestRecords)
+    new FragileEventHubClient()
   }
 }
 

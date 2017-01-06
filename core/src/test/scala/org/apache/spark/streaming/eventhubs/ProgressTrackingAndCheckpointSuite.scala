@@ -336,10 +336,11 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val expectedOutputBeforeRestart = Seq(
       Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart = Seq(
-      Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+      Seq(6, 7, 9, 10, 3, 4), Seq(), Seq(), Seq(), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
 
+    // ugly stuff to make things serializable
     FragileEventHubClient.numBatchesBeforeCrashedEndpoint = 3
-    FragileEventHubClient.numBatchesWhenCrashedEndpoint = 3
+    FragileEventHubClient.lastBatchWhenEndpointCrashed = 6
     FragileEventHubClient.latestRecords = Map(
       EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
       EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
@@ -360,9 +361,23 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
-      expectedOutput = expectedOutputBeforeRestart,
-      numBatchesBeforeCrashedeEndpoint = 3,
-      numBatchesWhenCrashedeEndpoint = 3)
+      expectedOutput = expectedOutputBeforeRestart)
 
+    val currentCheckpointDirectory = ssc.checkpointDir
+    ssc.stop()
+    reset()
+
+    ssc = new StreamingContext(currentCheckpointDirectory)
+
+    runStreamsWithEventHubInput(ssc,
+      expectedOutputAfterRestart.length - 1,
+      expectedOutputAfterRestart, useSet = true)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
+      10000L)
   }
 }

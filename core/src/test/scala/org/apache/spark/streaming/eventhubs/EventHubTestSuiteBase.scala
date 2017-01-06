@@ -107,13 +107,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   private def setupFragileInputStream(
       namespace: String,
       simulatedEventHubs: SimulatedEventHubs,
-      numBatchesBeforeCrashEndpoint: Int,
-      numBatchesWhenCrashEndpoint: Int,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
-    val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
-      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
-        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
-    }
 
     new EventHubDirectDStream(ssc, namespace,
       progressRootPath.toString, eventhubsParams,
@@ -126,12 +120,10 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   private def setupFragileEventHubStream[V: ClassTag](
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]],
-      operation: EventHubDirectDStream => DStream[V],
-      numBatchesBeforeCrashedEndpoint: Int,
-      numBatchesWhenCrashedEndpoint: Int): StreamingContext = {
+      operation: EventHubDirectDStream => DStream[V]): StreamingContext = {
 
     val inputStream = setupFragileInputStream(eventhubNamespace, simulatedEventHubs,
-      numBatchesBeforeCrashedEndpoint, numBatchesWhenCrashedEndpoint, eventhubsParams)
+      eventhubsParams)
     val operatedStream = operation(inputStream)
     val outputStream = new TestEventHubOutputStream(operatedStream,
       new ConcurrentLinkedQueue[Seq[Seq[V]]], None)
@@ -144,14 +136,11 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       eventhubsParams: Map[String, Map[String, String]],
       expectedOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
       operation: EventHubDirectDStream => DStream[V],
-      expectedOutput: Seq[Seq[V]],
-      numBatchesBeforeCrashedeEndpoint: Int,
-      numBatchesWhenCrashedeEndpoint: Int) {
+      expectedOutput: Seq[Seq[V]]) {
     val numBatches_ = expectedOutput.size
     val simulatedEventHubs = createSimulatedEventHub(eventhubNamespace, input, eventhubsParams)
     withStreamingContext(
-      setupFragileEventHubStream(simulatedEventHubs, eventhubsParams, operation,
-        numBatchesBeforeCrashedeEndpoint, numBatchesWhenCrashedeEndpoint)) {
+      setupFragileEventHubStream(simulatedEventHubs, eventhubsParams, operation)) {
       ssc =>
         runStreamsWithEventHubInput(ssc, numBatches_, expectedOutput, useSet = false)
     }

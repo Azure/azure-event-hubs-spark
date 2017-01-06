@@ -50,6 +50,49 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     }.head
   }
 
+  private def validateTempFileCleanup(
+      numNonExistBatch: Int,
+      numBatches: Int,
+      expectedFileNum: Int): Unit = {
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) < 1000 * numNonExistBatch
+        }
+      }).length == 0)
+    // we do not consider APIs like take() here
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          progressTracker.fromPathToTimestamp(path) == 1000 * numBatches
+        }
+      }).length == expectedFileNum)
+  }
+
+  private def validateProgressFileCleanup(numNonExistBatch: Int, numBatches: Int): Unit = {
+    // test cleanup of progress files
+    // this test is tricky: because the offset committing and checkpoint data cleanup are performed
+    // in two different threads (listener and eventloop thread of job generator respectively), there
+    // are two possible cases:
+    // a. batch t finishes, commits and cleanup all progress files which is no later than t except
+    // the closest one
+    // b. batch t finishes, cleanup all progress files which is no later than t except the closest
+    // one and commits
+    // what is determined is that after batch t finishes, progress-t shall exist and all progress
+    // files earlier than batch t - 1 shall not exit,
+    // the existence of progress-(t-1) depends on the scheduling of threads
+
+    // check progress directory
+    val fs = progressRootPath.getFileSystem(new Configuration)
+    for (i <- 0 until numNonExistBatch) {
+      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
+        s"${(i + 1) * 1000}")))
+    }
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
+      s"progress-${numBatches * 1000}")))
+  }
+
+
   protected def testCheckpointedOperation[U: ClassTag, V: ClassTag, W: ClassTag](
        input1: Seq[Seq[U]],
        input2: Seq[Seq[V]],
@@ -74,42 +117,12 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       operation,
       expectedOutputBeforeRestart)
 
-    // test cleanup of progress files
-    // this test is tricky: because the offset committing and checkpoint data cleanup are performed
-    // in two different threads (listener and eventloop thread of job generator respectively), there
-    // are two possible cases:
-    // a. batch t finishes, commits and cleanup all progress files which is no later than t except
-    // the closest one
-    // b. batch t finishes, cleanup all progress files which is no later than t except the closest
-    // one and commits
-    // what is determined is that after batch t finishes, progress-t shall exist and all progress
-    // files earlier than batch t - 1 shall not exit,
-    // the existence of progress-(t-1) depends on the scheduling of threads
-
-    // check progress directory
-    var fs = progressRootPath.getFileSystem(new Configuration)
-    for (i <- 0 until expectedOutputBeforeRestart.length - 2) {
-      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
-        s"${(i + 1) * 1000}")))
-    }
-    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
-      s"progress-${expectedOutputBeforeRestart.length * 1000}")))
-    // check temp files
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) < 1000 *
-            (expectedOutputBeforeRestart.length - 1)
-        }
-      }).length == 0)
-    // we do not consider APIs like take() here
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) == 1000 * expectedOutputBeforeRestart.length
-        }
-      }).length == expectedStartingOffsetsAndSeqs1.values.size +
-      expectedStartingOffsetsAndSeqs2.values.size)
+    validateProgressFileCleanup(expectedOutputAfterRestart.length - 2,
+      expectedOutputAfterRestart.length)
+    validateTempFileCleanup(expectedOutputBeforeRestart.length - 1,
+      expectedOutputBeforeRestart.length,
+      expectedStartingOffsetsAndSeqs1.values.flatten.size +
+        expectedStartingOffsetsAndSeqs2.values.flatten.size)
 
     val currentCheckpointDir = ssc.checkpointDir
     // simulate down
@@ -129,34 +142,14 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputAfterRestart, useSet = true)
 
     // test cleanup of progress files
-    fs = progressRootPath.getFileSystem(new Configuration)
-    // we need to minus 2 here, the reason is that we have a output which is recoverred from
-    // checkpoint, i.e. when we have 6 output in total, we actually only run for 5000 milliseconds
-    for (i <- 0 until expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3) {
-      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
-        s"${(i + 1) * 1000}")))
-    }
-    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
-      s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) *
-        1000}")))
-
-    // check temp files
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) < 1000 *
-            (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2)
-        }
-      }).length == 0)
-    // we do not consider APIs like take() here
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) ==
-            1000 * (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
-        }
-      }).length == expectedStartingOffsetsAndSeqs1.values.size +
-      expectedStartingOffsetsAndSeqs2.values.size)
+    validateProgressFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
+      expectedStartingOffsetsAndSeqs1.values.flatten.size +
+        expectedStartingOffsetsAndSeqs2.values.flatten.size)
   }
 
   protected def runStopAndRecover[U: ClassTag, V: ClassTag](
@@ -198,42 +191,12 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
       expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
 
-    // test cleanup of progress files
-    // this test is tricky: because the offset committing and checkpoint data cleanup are performed
-    // in two different threads (listener and eventloop thread of job generator respectively), there
-    // are two possible cases:
-    // a. batch t finishes, commits and cleanup all progress files which is no later than t except
-    // the closest one
-    // b. batch t finishes, cleanup all progress files which is no later than t except the closest
-    // one and commits
-    // what is determined is that after batch t finishes, progress-t shall exist and all progress
-    // files earlier than batch t - 1 shall not exit,
-    // the existence of progress-(t-1) depends on the scheduling of threads
-
-
-    var fs = progressRootPath.getFileSystem(new Configuration)
-    for (i <- 0 until expectedOutputBeforeRestart.length - 2) {
-      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
-        s"${(i + 1) * 1000}")))
-    }
-    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
-      s"progress-${expectedOutputBeforeRestart.length * 1000}")))
-
-    // check temp files
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) < 1000 *
-            (expectedOutputBeforeRestart.length - 1)
-        }
-      }).length == 0)
-    // we do not consider APIs like take() here
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) == 1000 * expectedOutputBeforeRestart.length
-        }
-      }).length == expectedOffsetsAndSeqs.values.size)
+    validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
+      expectedOutputBeforeRestart.length)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length - 1,
+      expectedOutputBeforeRestart.length,
+      expectedOffsetsAndSeqs.size)
 
     // Restart and complete the computation from checkpoint file
     logInfo(
@@ -245,33 +208,12 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = false)
 
-    // test cleanup of progress files
-    fs = progressRootPath.getFileSystem(new Configuration)
-    // we need to minus 2 here, the reason is that we have a output which is recoverred from
-    // checkpoint, i.e. when we have 6 output in total, we actually only run for 5000 milliseconds
-    for (i <- 0 until expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3) {
-      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
-        s"${(i + 1) * 1000}")))
-    }
-    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
-      s"progress-${(expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1) *
-        1000}")))
-
-    // check temp files
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) < 1000 *
-            (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2)
-        }
-      }).length == 0)
-    // we do not consider APIs like take() here
-    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
-      new PathFilter {
-        override def accept(path: Path): Boolean = {
-          progressTracker.fromPathToTimestamp(path) ==
-            1000 * (expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
-        }
-      }).length == expectedOffsetsAndSeqs.values.size)
+    validateProgressFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
+      expectedOffsetsAndSeqs.size)
   }
 }

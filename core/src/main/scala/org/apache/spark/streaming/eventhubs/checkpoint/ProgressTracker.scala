@@ -332,7 +332,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
       fromPathToTimestamp(p2))
     if (sortedFileList.nonEmpty) {
-      sortedFileList.tail.foreach(filePath => fs.delete(filePath, true))
+      sortedFileList.tail.foreach { filePath =>
+        logInfo(s"delete $filePath")
+        fs.delete(filePath, true)
+      }
     }
   }
 

@@ -262,16 +262,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override private[streaming] def clearCheckpointData(time: Time): Unit = {
-    logInfo(s"clearing checkpoint data of ${this.getClass.getName}")
     super.clearCheckpointData(time)
     EventHubDirectDStream.cleanupLock.synchronized {
       if (EventHubDirectDStream.lastCleanupTime < time.milliseconds) {
         logInfo(s"clean up progress file which is earlier than ${time.milliseconds}")
         progressTracker.cleanProgressFile(time.milliseconds)
         EventHubDirectDStream.lastCleanupTime = time.milliseconds
-      } else {
-        logInfo(s"do not clean up for ${EventHubDirectDStream.lastCleanupTime} at time" +
-          s" ${time.milliseconds}")
       }
     }
   }

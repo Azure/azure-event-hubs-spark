@@ -138,6 +138,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     // test cleanup of progress files
     var fs = progressRootPath.getFileSystem(new Configuration)
     for (i <- 0 until expectedOutputBeforeRestart.length - 1) {
+      println(i)
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
     }

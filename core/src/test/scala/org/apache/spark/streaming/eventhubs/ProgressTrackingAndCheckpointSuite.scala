@@ -327,7 +327,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       7000L)
   }
 
-  test("recover from progress after updating code (no checkpoint provided and roll back)") {
+  test("progress files are clean up correctly with a fragile rest endpoint") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),

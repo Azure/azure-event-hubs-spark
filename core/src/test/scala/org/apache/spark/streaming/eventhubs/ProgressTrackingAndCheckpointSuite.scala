@@ -354,9 +354,9 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
-          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
-          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),

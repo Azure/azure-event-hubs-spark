@@ -136,8 +136,20 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
 
     // test cleanup of progress files
+    // this test is tricky: because the offset committing and checkpoint data cleanup are performed
+    // in two different threads (listener and eventloop thread of job generator respectively), there
+    // are two possible cases:
+    // a. batch t finishes, commits and cleanup all progress files which is no later than t except
+    // the closest one
+    // b. batch t finishes, cleanup all progress files which is no later than t except the closest
+    // one and commits
+    // what is determined is that after batch t finishes, progress-t shall exist and all progress
+    // files earlier than batch t - 1 shall not exit,
+    // the existence of progress-(t-1) depends on the scheduling of threads
+
+
     var fs = progressRootPath.getFileSystem(new Configuration)
-    for (i <- 0 until expectedOutputBeforeRestart.length - 1) {
+    for (i <- 0 until expectedOutputBeforeRestart.length - 2) {
       println(i)
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))
@@ -160,7 +172,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     fs = progressRootPath.getFileSystem(new Configuration)
     // we need to minus 2 here, the reason is that we have a output which is recoverred from
     // checkpoint, i.e. when we have 6 output in total, we actually only run for 5000 milliseconds
-    for (i <- 0 until expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2) {
+    for (i <- 0 until expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3) {
       println(s"=======$i")
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
         s"${(i + 1) * 1000}")))

@@ -17,19 +17,14 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.nio.file.FileSystem
-import java.util.concurrent.ConcurrentLinkedQueue
-
 import scala.reflect.ClassTag
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
-import sun.dc.pr.PathFiller
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.utils.{FragileEventHubClient, SimulatedEventHubs, TestEventHubsReceiver}
 import org.apache.spark.util.ManualClock
 
 /**

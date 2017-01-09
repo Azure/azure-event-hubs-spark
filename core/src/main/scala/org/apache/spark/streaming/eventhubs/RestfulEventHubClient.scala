@@ -70,8 +70,7 @@ private[eventhubs] class RestfulEventHubClient(
 
   private def fromParametersToURLString(eventHubName: String, partitionId: Int): String = {
     s"https://$eventHubNamespace.servicebus.windows.net/$eventHubName" +
-      s"/consumergroups/${consumerGroups(eventHubName)}/partitions/" +
-      s"$partitionId?api-version=2015-01"
+      s"/consumergroups/${consumerGroups(eventHubName)}/?api-version=2015-01"
   }
 
   private def aggregateResults[T](undergoingRequests: List[Future[(EventHubNameAndPartition, T)]]):

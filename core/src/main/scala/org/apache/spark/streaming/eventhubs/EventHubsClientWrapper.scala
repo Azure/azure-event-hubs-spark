@@ -17,11 +17,13 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
 import scala.collection.Map
 
 import com.microsoft.azure.eventhubs._
+import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus._
 
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes._
@@ -128,7 +130,16 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
                              receiverEpoch: Long): Unit = {
 
     // Create Eventhubs client
-    val eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
+    val eventhubsClient = {
+      val nullOrExistingClient =
+        EventHubsClientWrapper.eventHubClients.putIfAbsent(connectionString,
+          EventHubClient.createFromConnectionStringSync(connectionString))
+      if (nullOrExistingClient == null) {
+        EventHubsClientWrapper.eventHubClients.get(connectionString)
+      } else {
+        nullOrExistingClient
+      }
+    }
 
     eventhubsReceiver = offsetType match {
       case EventhubsOffsetTypes.None | EventhubsOffsetTypes.PreviousCheckpoint
@@ -178,7 +189,9 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
 
 object EventHubsClientWrapper {
 
-  def getEventHubClient(
+  private[eventhubs] val eventHubClients = new ConcurrentHashMap[String, AzureEventHubClient]
+
+  def getEventHubReceiver(
       eventhubsParams: Map[String, String],
       partitionId: Int,
       startOffset: Long,

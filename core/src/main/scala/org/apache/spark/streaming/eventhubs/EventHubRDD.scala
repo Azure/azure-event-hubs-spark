@@ -18,6 +18,8 @@
 package org.apache.spark.streaming.eventhubs
 
 // scalastyle:off
+import java.util.concurrent.ConcurrentHashMap
+
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
@@ -98,10 +100,10 @@ class EventHubRDD(
         s" ${eventHubPartition.untilSeq} (inclusive) at $batchTime")
       val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
         eventHubName)
-      val eventHubClient = eventHubReceiverCreator(eventHubParameters,
+      val eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
         eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
-        eventHubClient, maxRate)
+        eventHubReceiver, maxRate)
       val lastEvent = receivedEvents.last
       val endOffset = lastEvent.getSystemProperties.getOffset.toLong
       progressWriter.write(batchTime.milliseconds, endOffset,
@@ -109,8 +111,9 @@ class EventHubRDD(
       logInfo(s"write offset $endOffset, sequence number" +
         s" ${lastEvent.getSystemProperties.getSequenceNumber} for EventHub" +
         s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      eventHubClient.close()
+      eventHubReceiver.close()
       receivedEvents.iterator
     }
   }
 }
+

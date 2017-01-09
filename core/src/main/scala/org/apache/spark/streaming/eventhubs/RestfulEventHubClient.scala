@@ -110,6 +110,7 @@ private[eventhubs] class RestfulEventHubClient(
           logError(errorInfoString)
           throw new Exception(errorInfoString)
         }
+        println(response.body)
         val endpointOffset = fromResponseBodyToResult(response.body)
         logInfo(s"latest offset of $ehNameAndPartition: $endpointOffset")
         (ehNameAndPartition, endpointOffset)

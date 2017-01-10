@@ -320,9 +320,8 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  // TODO: do we really need to synchronize this method?
   // called in EventHubDirectDStream's clearCheckpointData method
-  def cleanProgressFile(checkpointTime: Long): Unit = synchronized {
+  def cleanProgressFile(checkpointTime: Long): Unit = driverLock.synchronized {
     // because offset committing and checkpoint data cleanup are performed in two different threads,
     // we need to always keep the latest file instead of blindly delete all files earlier than
     // checkpointTime.

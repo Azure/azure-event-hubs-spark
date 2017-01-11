@@ -70,6 +70,38 @@ private[eventhubs] class TestRestEventHubClient(
   override def close(): Unit = {}
 }
 
+private[eventhubs] class FragileEventHubClient private extends EventHubClient {
+
+  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+    import FragileEventHubClient._
+
+    callIndex += 1
+    if (callIndex < numBatchesBeforeCrashedEndpoint) {
+      Some(latestRecords)
+    } else if (callIndex < lastBatchWhenEndpointCrashed) {
+      None
+    } else {
+      Some(latestRecords)
+    }
+  }
+
+  override def close(): Unit = {}
+}
+
+// ugly stuff to make things checkpointable in tests
+private[eventhubs] object FragileEventHubClient {
+
+  var callIndex = -1
+  var numBatchesBeforeCrashedEndpoint = 0
+  var lastBatchWhenEndpointCrashed = 0
+  var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()
+
+  def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
+    FragileEventHubClient = {
+    new FragileEventHubClient()
+  }
+}
+
 
 private[eventhubs] class FluctuatedEventHubClient(
     ssc: StreamingContext,
@@ -81,7 +113,6 @@ private[eventhubs] class FluctuatedEventHubClient(
 
   override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     callIndex += 1
-    println(s"callIndex $callIndex")
     if (callIndex < numBatchesBeforeNewData) {
       Some(latestRecords.map{
         case (ehNameAndPartition, _) =>

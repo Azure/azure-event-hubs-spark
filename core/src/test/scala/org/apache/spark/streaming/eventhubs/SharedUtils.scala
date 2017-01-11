@@ -56,7 +56,7 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     fs = progressRootPath.getFileSystem(new Configuration())
     val sparkContext = new SparkContext(new SparkConf().setAppName(appName).
       setMaster("local[*]").set("spark.streaming.clock", streamingClock))
-    sparkContext.setLogLevel("ERROR")
+    sparkContext.setLogLevel("INFO")
     ssc = new StreamingContext(sparkContext, batchDuration)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
     progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
@@ -67,6 +67,7 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     ProgressTracker.reset()
     progressTracker = null
     progressListener = null
+    EventHubDirectDStream.lastCleanupTime = -1
     ProgressTrackingListener.reset(ssc)
     ssc.stop()
   }

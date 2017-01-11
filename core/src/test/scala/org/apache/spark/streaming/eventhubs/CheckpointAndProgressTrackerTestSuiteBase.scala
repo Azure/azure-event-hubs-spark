@@ -17,17 +17,15 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.nio.file.Files
-
-import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
-import org.scalatest.concurrent.Eventually.{eventually, timeout}
-import org.scalatest.time.SpanSugar._
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{Path, PathFilter}
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
 import org.apache.spark.util.ManualClock
 
 /**
@@ -53,6 +51,49 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     }.head
   }
 
+  private def validateTempFileCleanup(
+      numNonExistBatch: Int,
+      numBatches: Int,
+      expectedFileNum: Int): Unit = {
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          ProgressTracker.getInstance.fromPathToTimestamp(path) < 1000 * numNonExistBatch
+        }
+      }).length == 0)
+    // we do not consider APIs like take() here
+    assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
+      new PathFilter {
+        override def accept(path: Path): Boolean = {
+          ProgressTracker.getInstance.fromPathToTimestamp(path) == 1000 * numBatches
+        }
+      }).length == expectedFileNum)
+  }
+
+  private def validateProgressFileCleanup(numNonExistBatch: Int, numBatches: Int): Unit = {
+    // test cleanup of progress files
+    // this test is tricky: because the offset committing and checkpoint data cleanup are performed
+    // in two different threads (listener and eventloop thread of job generator respectively), there
+    // are two possible cases:
+    // a. batch t finishes, commits and cleanup all progress files which is no later than t except
+    // the closest one
+    // b. batch t finishes, cleanup all progress files which is no later than t except the closest
+    // one and commits
+    // what is determined is that after batch t finishes, progress-t shall exist and all progress
+    // files earlier than batch t - 1 shall not exit,
+    // the existence of progress-(t-1) depends on the scheduling of threads
+
+    // check progress directory
+    val fs = progressRootPath.getFileSystem(new Configuration)
+    for (i <- 0 until numNonExistBatch) {
+      assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
+        s"${(i + 1) * 1000}")))
+    }
+    assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
+      s"progress-${numBatches * 1000}")))
+  }
+
+
   protected def testCheckpointedOperation[U: ClassTag, V: ClassTag, W: ClassTag](
        input1: Seq[Seq[U]],
        input2: Seq[Seq[V]],
@@ -77,11 +118,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       operation,
       expectedOutputBeforeRestart)
 
-    val currentCheckpointDir = ssc.checkpointDir
+    validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
+      expectedOutputBeforeRestart.length)
+    validateTempFileCleanup(expectedOutputBeforeRestart.length - 1,
+      expectedOutputBeforeRestart.length,
+      expectedStartingOffsetsAndSeqs1.values.flatten.size +
+        expectedStartingOffsetsAndSeqs2.values.flatten.size)
 
+    val currentCheckpointDir = ssc.checkpointDir
     // simulate down
     reset()
-
     // restart
     ssc = new StreamingContext(currentCheckpointDir)
 
@@ -95,6 +141,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     runStreamsWithEventHubInput(ssc,
       expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = true)
+
+    // test cleanup of progress files
+    validateProgressFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
+      expectedStartingOffsetsAndSeqs1.values.flatten.size +
+        expectedStartingOffsetsAndSeqs2.values.flatten.size)
   }
 
   protected def runStopAndRecover[U: ClassTag, V: ClassTag](
@@ -112,11 +168,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
 
-    val currentCheckpointDir = ssc.checkpointDir
+    validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
+      expectedOutputBeforeRestart.length)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length - 1,
+      expectedOutputBeforeRestart.length,
+      expectedOffsetsAndSeqs.size)
 
+    val currentCheckpointDir = ssc.checkpointDir
     // simulate down
     reset()
-
     // restart
     ssc = new StreamingContext(currentCheckpointDir)
   }
@@ -145,5 +206,13 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
     runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
       expectedOutputAfterRestart, useSet = false)
+
+    validateProgressFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1)
+    validateTempFileCleanup(
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
+      expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
+      expectedOffsetsAndSeqs.size)
   }
 }

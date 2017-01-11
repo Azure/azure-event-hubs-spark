@@ -87,7 +87,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
 
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names
-  private def fromPathToTimestamp(path: Path): Long = {
+  private[eventhubs] def fromPathToTimestamp(path: Path): Long = {
     path.getName.split("-").last.toLong
   }
 
@@ -316,6 +316,37 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     } finally {
       if (oos != null) {
         oos.close()
+      }
+    }
+  }
+
+  // called in EventHubDirectDStream's clearCheckpointData method
+  def cleanProgressFile(checkpointTime: Long): Unit = driverLock.synchronized {
+    // because offset committing and checkpoint data cleanup are performed in two different threads,
+    // we need to always keep the latest file instead of blindly delete all files earlier than
+    // checkpointTime.
+    val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
+    // clean progress directory
+    val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime
+    }).map(_.getPath)
+    val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
+      fromPathToTimestamp(p2))
+    if (sortedFileList.nonEmpty) {
+      sortedFileList.tail.foreach { filePath =>
+        logInfo(s"delete $filePath")
+        fs.delete(filePath, true)
+      }
+    }
+    // clean temp directory
+    val allUselessTempFiles = fs.listStatus(progressTempDirPath, new PathFilter {
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime
+    }).map(_.getPath)
+    if (allUselessTempFiles.nonEmpty) {
+      allUselessTempFiles.groupBy(fromPathToTimestamp).toList.sortWith((p1, p2) => p1._1 > p2._1).
+        tail.flatMap(_._2).foreach {
+        filePath => logInfo(s"delete $filePath")
+        fs.delete(filePath, true)
       }
     }
   }

@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.utils.FragileEventHubClient
 import org.apache.spark.util.ManualClock
 
 class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTestSuiteBase
@@ -361,16 +362,51 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L)),
       4000L)
 
-    val progressDir = ProgressTracker.getInstance.progressDirPath.toString
+    val currentCheckpointDirectory = ssc.checkpointDir
 
     ssc.stop()
     reset()
-    ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
-    val fs = FileSystem.get(ssc.sparkContext.hadoopConfiguration)
-    fs.delete(new Path(progressDir + "/progress-3000"), true)
 
-    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(3000)
-    testUnaryOperation(
+    ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
+      () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))
+
+    ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
+      _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =
+      Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L))
+
+    runStreamsWithEventHubInput(ssc,
+      expectedOutputAfterRestart.length - 1,
+      expectedOutputAfterRestart, useSet = true)
+
+    testProgressTracker(
+      eventhubNamespace,
+      expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
+        EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
+      7000L)
+  }
+
+  test("progress files are clean up correctly with a fragile rest endpoint") {
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(6, 7, 9, 10, 3, 4), Seq(), Seq(), Seq(), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+
+    // ugly stuff to make things serializable
+    FragileEventHubClient.numBatchesBeforeCrashedEndpoint = 3
+    FragileEventHubClient.lastBatchWhenEndpointCrashed = 6
+    FragileEventHubClient.latestRecords = Map(
+      EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+      EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
+      EventHubNameAndPartition("eh1", 2) -> (9L, 9L))
+
+    testFragileStream(
       input,
       eventhubsParams = Map[String, Map[String, String]](
         "eh1" -> Map(
@@ -379,19 +415,29 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
-          EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
-          EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
-      expectedOutputAfterRestart)
+      expectedOutput = expectedOutputBeforeRestart)
+
+    val currentCheckpointDirectory = ssc.checkpointDir
+    ssc.stop()
+    reset()
+
+    ssc = new StreamingContext(currentCheckpointDirectory)
+
+    runStreamsWithEventHubInput(ssc,
+      expectedOutputAfterRestart.length - 1,
+      expectedOutputAfterRestart, useSet = true)
 
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
         EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
         EventHubNameAndPartition("eh1", 2) -> (9L, 9L)),
-      7000L)
+      10000L)
   }
 }

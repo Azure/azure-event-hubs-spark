@@ -18,8 +18,6 @@
 package org.apache.spark.streaming.eventhubs
 
 // scalastyle:off
-import java.util.concurrent.ConcurrentHashMap
-
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData

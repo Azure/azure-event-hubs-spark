@@ -17,7 +17,6 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
 import scala.collection.Map
@@ -184,8 +183,6 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
 }
 
 object EventHubsClientWrapper {
-
-  private[eventhubs] val eventHubClients = new ConcurrentHashMap[String, AzureEventHubClient]
 
   def getEventHubReceiver(
       eventhubsParams: Map[String, String],

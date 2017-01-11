@@ -395,8 +395,10 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
     val expectedOutputBeforeRestart = Seq(
       Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    // the order of the output should looks like there is no issue, because we reuse the fetched
+    // highest offset
     val expectedOutputAfterRestart = Seq(
-      Seq(6, 7, 9, 10, 3, 4), Seq(), Seq(), Seq(), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq(), Seq(), Seq())
 
     // ugly stuff to make things serializable
     FragileEventHubClient.numBatchesBeforeCrashedEndpoint = 3

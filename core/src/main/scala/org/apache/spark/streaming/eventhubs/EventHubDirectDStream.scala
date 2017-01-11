@@ -101,6 +101,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = Map[EventHubNameAndPartition, (Long, Long)]()
+  private[eventhubs] var fetchedHighestOffsetsAndSeqNums =
+    Map[EventHubNameAndPartition, (Long, Long)]()
 
   override def start(): Unit = {
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
@@ -115,16 +117,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventHubClient.close()
   }
 
-  private def fetchLatestOffset(validTime: Time): Map[EventHubNameAndPartition, (Long, Long)] = {
-    // TODO: rate control
-    val latestOffsets = eventHubClient.endPointOfPartition()
-    if (latestOffsets.isDefined) {
-      latestOffsets.get
-    } else {
-      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
-        s" micro batch and process it later")
-      Map()
+  private def fetchLatestOffset(validTime: Time, retryIfFail: Boolean):
+      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+    val r = eventHubClient.endPointOfPartition(retryIfFail)
+    if (r.isDefined) {
+      fetchedHighestOffsetsAndSeqNums = r.get
     }
+    r
   }
 
   /**
@@ -272,34 +271,31 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
+  private def failIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums.isEmpty ||
+    currentOffsetsAndSeqNums.equals(fetchedHighestOffsetsAndSeqNums)
+
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
-    println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
-    if (latestOffsetOfAllPartitions.isEmpty) {
-      // we need to update currentOffsetsAndSeqNums in the case of dead rest endpoint
-      // considering the following case:
-      // assuming C is the commited offset, and H is the highest offset in EventHubs
-      // in Batch i, stream 1 commits with offset = 500, C = 400; in Batch i + 1, rest endpoint die,
-      // C = 400; in Batch i + 2, C will still be 400 and cause unnecessary reprocessing of the
-      // batch in Batch i
-      currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
-      // we have to take "dead rest endpoint" as consumed all messages, considering the following
-      // example case:
-      // assuming C is the commited offset, and H is the highest offset in EventHubs
-      // in Batch i, stream 1 has consumed all messages, and
-      // C = 500; in Batch i + 1, rest endpoint die, C = 500; in Batch i + 2, new data comes, C is
-      // equal to the highest available offset in HDFS and does not equal to H, the thread will be
-      // blocked infinitely
-      consumedAllMessages = true
-      Some(context.sparkContext.emptyRDD[EventData])
+    val highestOffsetOfPartitions = fetchLatestOffset(validTime,
+      retryIfFail = failIfRestEndpointFail).orElse(
+        if (failIfRestEndpointFail) {
+          None
+        } else {
+          Some(fetchedHighestOffsetsAndSeqNums)
+        }
+      )
+    println(s"latestOffsetOfAllPartitions: $highestOffsetOfPartitions")
+    if (highestOffsetOfPartitions.isEmpty) {
+      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
+        s" micro batch and process it later")
+      None
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
-        !startPointInNextBatch.equals(latestOffsetOfAllPartitions) &&
+        !startPointInNextBatch.equals(highestOffsetOfPartitions) &&
         !consumedAllMessages &&
         initialized) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
@@ -309,13 +305,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       }
       // keep this state to prevent dstream dying
-      if (startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
+      if (startPointInNextBatch.equals(highestOffsetOfPartitions)) {
         consumedAllMessages = true
       } else {
         consumedAllMessages = false
       }
       initialized = true
-      proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
+      proceedWithNonEmptyRDD(validTime, startPointInNextBatch, highestOffsetOfPartitions.get)
     }
   }
 

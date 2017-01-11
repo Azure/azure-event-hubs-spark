@@ -279,7 +279,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       ProgressTrackingListener.initInstance(ssc, progressDir)
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    val highestOffsetOfPartitions = fetchLatestOffset(validTime,
+    val highestOffsetOption = fetchLatestOffset(validTime,
       retryIfFail = failIfRestEndpointFail).orElse(
         if (failIfRestEndpointFail) {
           None
@@ -287,17 +287,17 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           Some(fetchedHighestOffsetsAndSeqNums)
         }
       )
-    println(s"latestOffsetOfAllPartitions: $highestOffsetOfPartitions")
-    if (highestOffsetOfPartitions.isEmpty) {
+    println(s"latestOffsetOfAllPartitions: $highestOffsetOption")
+    if (highestOffsetOption.isEmpty) {
       logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
         s" micro batch and process it later")
       None
     } else {
-      println(s"===highestOffsetOfPartitions: $highestOffsetOfPartitions")
+      println(s"===highestOffsetOfPartitions: $highestOffsetOption")
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       println(s"===startPointInNextBatch: $startPointInNextBatch")
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
-        !startPointInNextBatch.equals(highestOffsetOfPartitions.get) &&
+        !startPointInNextBatch.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
         initialized) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
@@ -307,13 +307,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       }
       // keep this state to prevent dstream dying
-      if (startPointInNextBatch.equals(highestOffsetOfPartitions)) {
+      if (startPointInNextBatch.equals(highestOffsetOption.get)) {
         consumedAllMessages = true
       } else {
         consumedAllMessages = false
       }
       initialized = true
-      proceedWithNonEmptyRDD(validTime, startPointInNextBatch, highestOffsetOfPartitions.get)
+      proceedWithNonEmptyRDD(validTime, startPointInNextBatch, highestOffsetOption.get)
     }
   }
 

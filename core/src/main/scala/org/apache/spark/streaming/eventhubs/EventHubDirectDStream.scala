@@ -295,6 +295,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     } else {
       println(s"===highestOffsetOfPartitions: $highestOffsetOfPartitions")
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
+      println(s"===startPointInNextBatch: $startPointInNextBatch")
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(highestOffsetOfPartitions) &&
         !consumedAllMessages &&

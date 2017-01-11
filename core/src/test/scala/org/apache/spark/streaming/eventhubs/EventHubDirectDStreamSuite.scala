@@ -51,7 +51,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
 
   test("skip the batch when failed to fetch the latest offset of partitions") {
     val eventHubClientMock = mock[EventHubClient]
-    Mockito.when(eventHubClientMock.endPointOfPartition()).thenReturn(None)
+    Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = false)).thenReturn(None)
     val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> eventhubParameters))
     ehDStream.setEventHubClient(eventHubClientMock)

@@ -293,6 +293,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         s" micro batch and process it later")
       None
     } else {
+      println(s"===highestOffsetOfPartitions: $highestOffsetOfPartitions")
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(highestOffsetOfPartitions) &&

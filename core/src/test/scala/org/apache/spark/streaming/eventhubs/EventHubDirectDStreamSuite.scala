@@ -56,7 +56,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       Map("eh1" -> eventhubParameters))
     ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()
-    assert(ehDStream.compute(Time(1000)).get.count() === 0)
+    assert(ehDStream.compute(Time(1000)).isEmpty)
   }
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {

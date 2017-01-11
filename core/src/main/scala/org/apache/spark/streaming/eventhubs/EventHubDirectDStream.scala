@@ -42,13 +42,13 @@ import org.apache.spark.util.Utils
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
-                                                                    _ssc: StreamingContext,
-                                                                    private[eventhubs] val eventHubNameSpace: String,
-                                                                    progressDir: String,
-                                                                    eventhubsParams: Map[String, Map[String, String]],
-                                                                    eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
+     _ssc: StreamingContext,
+     private[eventhubs] val eventHubNameSpace: String,
+     progressDir: String,
+     eventhubsParams: Map[String, Map[String, String]],
+     eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
                                               EventHubsClientWrapper.getEventHubReceiver,
-                                                                    eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
+     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
                                               RestfulEventHubClient.getInstance)
   extends InputDStream[EventData](_ssc) with Logging {
 

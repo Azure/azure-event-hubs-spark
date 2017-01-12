@@ -229,11 +229,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def currentOffsetEarlierThanCommittedOffsets(
+  private def currentOffsetEarlierThan(
       offsetsMap2: Map[EventHubNameAndPartition, (Long, Long)]): Boolean = {
     currentOffsetsAndSeqNums.map {
       case (eh, (offset, seq)) => (eh, (offset, seq), (offsetsMap2(eh)._1, offsetsMap2(eh)._2))
-    }.forall { case (_, (o1, s1), (o2, s2)) => o1 <= o2 && s1 <= s2 }
+    }.forall { case (_, (o1, s1), (o2, s2)) => o1 < o2 && s1 < s2 }
   }
 
   private def proceedWithNonEmptyRDD(
@@ -299,7 +299,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       None
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
-      while (!currentOffsetEarlierThanCommittedOffsets(startPointInNextBatch) &&
+      while (!currentOffsetEarlierThan(startPointInNextBatch) &&
         !startPointInNextBatch.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
         initialized) {

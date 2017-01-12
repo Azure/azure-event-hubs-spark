@@ -287,7 +287,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           Some(fetchedHighestOffsetsAndSeqNums)
         }
       )
-    println(s"latestOffsetOfAllPartitions: $highestOffsetOption")
+    logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
     if (highestOffsetOption.isEmpty) {
       logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
         s" micro batch and process it later")

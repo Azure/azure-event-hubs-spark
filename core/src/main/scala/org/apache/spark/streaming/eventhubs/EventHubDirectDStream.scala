@@ -309,6 +309,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         logInfo(s"wake up at Batch ${validTime.milliseconds}")
         startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
       }
+      println(s"$currentOffsetsAndSeqNums \n\n\n $startPointInNextBatch")
       // keep this state to prevent dstream dying
       if (startPointInNextBatch.equals(highestOffsetOption.get)) {
         consumedAllMessages = true

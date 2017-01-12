@@ -224,7 +224,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def currentOffsetEarlierThanCheckpoint(
+  private def currentOffsetEarlierThanCommittedOffsets(
       offsetsMap2: Map[EventHubNameAndPartition, (Long, Long)]): Boolean = {
     currentOffsetsAndSeqNums.map {
       case (eh, (offset, seq)) => (eh, (offset, seq), (offsetsMap2(eh)._1, offsetsMap2(eh)._2))
@@ -294,7 +294,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       None
     } else {
       var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
-      while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
+      while (!currentOffsetEarlierThanCommittedOffsets(startPointInNextBatch) &&
         !startPointInNextBatch.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
         initialized) {

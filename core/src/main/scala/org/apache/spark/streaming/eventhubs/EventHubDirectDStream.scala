@@ -333,7 +333,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
     override def update(time: Time): Unit = {
       batchForTime.clear()
-      generatedRDDs.filter(_._2.isInstanceOf[EventHubRDD]).foreach { kv =>
+      generatedRDDs.foreach { kv =>
         val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
         batchForTime += kv._1 -> offsetRangeOfRDD
       }
@@ -348,6 +348,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       ProgressTracker.initInstance(progressDir, context.sparkContext.appName,
         context.sparkContext.hadoopConfiguration)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
+        logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubRDD(
           context.sparkContext,
           eventhubsParams,

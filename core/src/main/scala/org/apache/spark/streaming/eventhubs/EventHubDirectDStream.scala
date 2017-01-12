@@ -100,7 +100,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _eventHubClient
   }
 
-  private[eventhubs] var currentOffsetsAndSeqNums = Map[EventHubNameAndPartition, (Long, Long)]()
+  private[eventhubs] var currentOffsetsAndSeqNums = {
+    for (eventHubName <- eventhubsParams.keys;
+         p <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
+      yield (EventHubNameAndPartition(eventHubName, p),
+        (PartitionReceiver.START_OF_STREAM.toLong, -1L))
+  }.toMap
   private[eventhubs] var fetchedHighestOffsetsAndSeqNums =
     Map[EventHubNameAndPartition, (Long, Long)]()
 

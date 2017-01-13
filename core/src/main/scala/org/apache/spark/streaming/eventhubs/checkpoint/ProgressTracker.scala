@@ -390,6 +390,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     try {
       val fs = progressTempDirPath.getFileSystem(new Configuration())
       val files = allProgressRecords(timestamp).iterator
+      logInfo(s"$files")
       while (files.hasNext) {
         val file = files.next()
         val progressRecords = readProgressRecordLines(file.getPath, fs)

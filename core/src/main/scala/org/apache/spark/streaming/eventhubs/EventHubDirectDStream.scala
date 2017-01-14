@@ -282,6 +282,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
+      initialized = true
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
     val highestOffsetOption = fetchLatestOffset(validTime,
@@ -302,7 +303,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
-        initialized) {
+        validTime.milliseconds == ssc.initialCheckpoint.checkpointTime.milliseconds) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
@@ -316,7 +317,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       } else {
         consumedAllMessages = false
       }
-      initialized = true
       proceedWithNonEmptyRDD(validTime, startPointInNextBatch, highestOffsetOption.get)
     }
   }

@@ -275,7 +275,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
     val expectedOutputBeforeRestart = Seq(
       Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
-    val expectedOutputAfterRestart = Seq(Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
+    val expectedOutputAfterRestart = Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6))
 
     testUnaryOperation(
       input,
@@ -315,7 +315,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L))
 
-    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(2000)
+    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(1000)
 
     runStreamsWithEventHubInput(ssc,
       expectedOutputAfterRestart.length - 1,

@@ -281,7 +281,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private def needingWorkaroundSparkCheckpointIssue(validTime: Time): Boolean = {
     if (ssc.initialCheckpoint == null) {
-      true
+      initialized
     } else {
       !ssc.initialCheckpoint.checkpointTime.equals(validTime)
     }
@@ -290,7 +290,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
-      initialized = true
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
     val highestOffsetOption = fetchLatestOffset(validTime,
@@ -325,6 +324,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       } else {
         consumedAllMessages = false
       }
+      initialized = true
       proceedWithNonEmptyRDD(validTime, startPointInNextBatch, highestOffsetOption.get)
     }
   }

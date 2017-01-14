@@ -280,7 +280,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     currentOffsetsAndSeqNums.equals(fetchedHighestOffsetsAndSeqNums)
 
   private def needingWorkaroundSparkCheckpointIssue(validTime: Time): Boolean = {
-    ssc.initialCheckpoint != null && ssc.initialCheckpoint.checkpointTime.equals(validTime)
+    if (ssc.initialCheckpoint == null) {
+      true
+    } else {
+      !ssc.initialCheckpoint.checkpointTime.equals(validTime)
+    }
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
@@ -307,7 +311,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
-        !needingWorkaroundSparkCheckpointIssue(validTime)) {
+        needingWorkaroundSparkCheckpointIssue(validTime)) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()

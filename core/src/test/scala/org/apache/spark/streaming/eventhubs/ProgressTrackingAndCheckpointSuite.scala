@@ -315,7 +315,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L))
 
-    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(4000L)
+    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(2000)
 
     runStreamsWithEventHubInput(ssc,
       expectedOutputAfterRestart.length - 1,

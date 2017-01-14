@@ -307,7 +307,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
         !startPointInNextBatch.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
-        needingWorkaroundSparkCheckpointIssue(validTime)) {
+        !needingWorkaroundSparkCheckpointIssue(validTime)) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()

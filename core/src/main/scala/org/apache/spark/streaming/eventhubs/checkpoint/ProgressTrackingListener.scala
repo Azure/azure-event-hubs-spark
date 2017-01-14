@@ -50,6 +50,8 @@ private[eventhubs] class ProgressTrackingListener private (
           }
           progressTracker.commit(contentToCommit, batchTime)
           logInfo(s"commit ending offset of Batch $batchTime $contentToCommit")
+        } else {
+          logInfo(s"read RDD data from Checkpoint at $batchTime, skip commits")
         }
         ssc.graph.notifyAll()
       }

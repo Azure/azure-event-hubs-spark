@@ -44,7 +44,8 @@ private[eventhubs] class ProgressTrackingListener private (
       ssc.graph.synchronized {
         if (progressInLastBatch.nonEmpty) {
           val contentToCommit = allEventDStreams.map {
-            dstream => ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums)
+            dstream =>
+              ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums.offsets)
           }.toMap.map { case (namespace, currentOffsets) =>
             (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
           }

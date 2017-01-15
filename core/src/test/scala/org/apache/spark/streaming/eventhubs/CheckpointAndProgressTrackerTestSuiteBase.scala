@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker}
 import org.apache.spark.util.ManualClock
 
 /**
@@ -99,8 +99,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
        input2: Seq[Seq[V]],
        eventhubsParams1: Map[String, Map[String, String]],
        eventhubsParams2: Map[String, Map[String, String]],
-       expectedStartingOffsetsAndSeqs1: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-       expectedStartingOffsetsAndSeqs2: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+       expectedStartingOffsetsAndSeqs1: Map[String, OffsetRecord],
+       expectedStartingOffsetsAndSeqs2: Map[String, OffsetRecord],
        operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
        expectedOutputBeforeRestart: Seq[Seq[W]],
        expectedOutputAfterRestart: Seq[Seq[W]]) {
@@ -122,8 +122,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart.length)
     validateTempFileCleanup(expectedOutputBeforeRestart.length - 1,
       expectedOutputBeforeRestart.length,
-      expectedStartingOffsetsAndSeqs1.values.flatten.size +
-        expectedStartingOffsetsAndSeqs2.values.flatten.size)
+      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsets).size +
+        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsets).size)
 
     val currentCheckpointDir = ssc.checkpointDir
     // simulate down
@@ -149,15 +149,15 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
-      expectedStartingOffsetsAndSeqs1.values.flatten.size +
-        expectedStartingOffsetsAndSeqs2.values.flatten.size)
+      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsets).size +
+        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsets).size)
   }
 
   protected def runStopAndRecover[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
+      expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
       expectedOutputBeforeRestart: Seq[Seq[V]]): Unit = {
     testUnaryOperation(
@@ -173,7 +173,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length - 1,
       expectedOutputBeforeRestart.length,
-      expectedOffsetsAndSeqs.size)
+      expectedOffsetsAndSeqs.offsets.size)
 
     val currentCheckpointDir = ssc.checkpointDir
     // simulate down
@@ -185,8 +185,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
   protected def testCheckpointedOperation[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
+      expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
       expectedOutputBeforeRestart: Seq[Seq[V]],
       expectedOutputAfterRestart: Seq[Seq[V]]) {
@@ -213,6 +213,6 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
-      expectedOffsetsAndSeqs.size)
+      expectedOffsetsAndSeqs.offsets.size)
   }
 }

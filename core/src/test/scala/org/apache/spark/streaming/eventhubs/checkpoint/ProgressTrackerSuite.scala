@@ -23,6 +23,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
+import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, SharedUtils}
 
 class ProgressTrackerSuite extends SharedUtils {
@@ -124,7 +125,7 @@ class ProgressTrackerSuite extends SharedUtils {
     val ehMap = progressTracker.read(namespace, timestamp)
     var expectedOffsetAndSeqIdx = 0
     for (partitionId <- partitionRange) {
-      assert(ehMap(EventHubNameAndPartition(ehName, partitionId)) ===
+      assert(ehMap.offsets(EventHubNameAndPartition(ehName, partitionId)) ===
         expectedOffsetAndSeq(expectedOffsetAndSeqIdx))
       expectedOffsetAndSeqIdx += 1
     }
@@ -272,13 +273,13 @@ class ProgressTrackerSuite extends SharedUtils {
         EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
     progressTracker.commit(offsetToCommit, 1000L)
     val namespace1Offsets = progressTracker.read("namespace1", 2000L)
-    assert(namespace1Offsets === Map(
+    assert(namespace1Offsets === OffsetRecord(Time(1000L), Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
-      EventHubNameAndPartition("eh2", 1) -> (1L, 1L)))
+      EventHubNameAndPartition("eh2", 1) -> (1L, 1L))))
     val namespace2Offsets = progressTracker.read("namespace2", 2000L)
-    assert(namespace2Offsets === Map(
+    assert(namespace2Offsets === OffsetRecord(Time(1000L), Map(
       EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
-      EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
+      EventHubNameAndPartition("eh2", 4) -> (3L, 3L))))
     // test temp directory cleanup
     assert(fs.exists(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString,
       appName))))

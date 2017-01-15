@@ -28,7 +28,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker, ProgressTrackingListener}
 import org.apache.spark.streaming.eventhubs.utils.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
 import org.apache.spark.util.Utils
 
@@ -72,16 +72,17 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutput)
-    testProgressTracker(eventhubNamespace, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+    testProgressTracker(eventhubNamespace,
+      OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-        EventHubNameAndPartition("eh1", 2) -> (5L, 5L)), 4000L)
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L))), 4000L)
   }
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream +" +
@@ -99,17 +100,18 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.window(Seconds(2), Seconds(1)).map(
           eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutput)
-    testProgressTracker(eventhubNamespace, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-      EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-      EventHubNameAndPartition("eh1", 2) -> (5L, 5L)), 4000L)
+    testProgressTracker(eventhubNamespace,
+      OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L))), 4000L)
   }
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (multi-streams join)") {
@@ -142,27 +144,29 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.name" -> "eh21")
       ),
       expectedOffsetsAndSeqs1 = Map("namespace1" ->
-        Map(EventHubNameAndPartition("eh11", 0) -> (2L, 2L),
+        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh11", 0) -> (2L, 2L),
           EventHubNameAndPartition("eh11", 1) -> (2L, 2L),
           EventHubNameAndPartition("eh11", 2) -> (2L, 2L))
-      ),
+      )),
       expectedOffsetsAndSeqs2 = Map("namespace2" ->
-        Map(EventHubNameAndPartition("eh21", 0) -> (2L, 2L),
+        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh21", 0) -> (2L, 2L),
           EventHubNameAndPartition("eh21", 1) -> (2L, 2L),
           EventHubNameAndPartition("eh21", 2) -> (2L, 2L))
-      ),
+      )),
       // join and sum up the value
       operation = (inputDStream1: EventHubDirectDStream, inputDStream2: EventHubDirectDStream) =>
         inputDStream1.flatMap(eventData => eventData.getProperties.asScala).
           join(inputDStream2.flatMap(eventData => eventData.getProperties.asScala)).
           map{case (key, (v1, v2)) => (key, v1.toInt + v2.toInt)},
       expectedOutput)
-    testProgressTracker("namespace1", Map(EventHubNameAndPartition("eh11", 0) -> (5L, 5L),
-      EventHubNameAndPartition("eh11", 1) -> (5L, 5L),
-      EventHubNameAndPartition("eh11", 2) -> (5L, 5L)), 3000L)
-    testProgressTracker("namespace2", Map(EventHubNameAndPartition("eh21", 0) -> (5L, 5L),
-      EventHubNameAndPartition("eh21", 1) -> (5L, 5L),
-      EventHubNameAndPartition("eh21", 2) -> (5L, 5L)), 3000L)
+    testProgressTracker("namespace1",
+      OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh11", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh11", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh11", 2) -> (5L, 5L))), 3000L)
+    testProgressTracker("namespace2",
+      OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh21", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh21", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh21", 2) -> (5L, 5L))), 3000L)
   }
 
   test("update offset correctly when RDD operation only involves some of the partitions") {
@@ -177,10 +181,10 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
           EventHubNameAndPartition("eh1", 2) -> (-1L, -1L))
-      ),
+      )),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutput,
@@ -189,10 +193,10 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       }))
 
     testProgressTracker(eventhubNamespace,
-      Map(
+      OffsetRecord(Time(3000L), Map(
         EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
-        EventHubNameAndPartition("eh1", 2) -> (-1L, -1L)),
+        EventHubNameAndPartition("eh1", 2) -> (-1L, -1L))),
       4000L)
   }
 
@@ -209,17 +213,18 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(Time(6000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
-      ),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
       expectedOutput,
       messagesBeforeEmpty = 4,
       numBatchesBeforeNewData = 5)
-    testProgressTracker(eventhubNamespace, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-      EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-      EventHubNameAndPartition("eh1", 2) -> (5L, 5L)), 7000L)
+    testProgressTracker(eventhubNamespace,
+      OffsetRecord(Time(6000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+      7000L)
   }
 }

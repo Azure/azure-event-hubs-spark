@@ -30,6 +30,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.{StreamingContext, Time}
 import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition}
 
+
+case class OffsetRecord(timestamp: Time, offsets: Map[EventHubNameAndPartition, (Long, Long)])
+
 /**
  * EventHub uses offset to indicates the startpoint of each receiver, and uses the number of
  * messages for rate control, which are described by offset and sequence number respesctively.
@@ -258,10 +261,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   /**
    * read the progress record for the specified namespace, streamId and timestamp
    */
-  def read(namespace: String, timestamp: Long):
-      Map[EventHubNameAndPartition, (Long, Long)] = driverLock.synchronized {
+  def read(namespace: String, timestamp: Long): OffsetRecord = driverLock.synchronized {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     var ret = Map[EventHubNameAndPartition, (Long, Long)]()
+    var readTimestamp: Long = 0
     var progressFileOption: Option[Path] = null
     try {
       progressFileOption = locateProgressFile(fs, timestamp)
@@ -271,6 +274,8 @@ private[eventhubs] class ProgressTracker private[checkpoint](
           case (ehNamespace, _) => ehNamespace == namespace}
         require(namespaceToEventHubs.isDefined, s"cannot find $namespace in" +
           s" $eventHubNameAndPartitions")
+        // it's hacky to mark it as the start of streams
+        readTimestamp = -1
         ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, -1L))).
           toMap
       } else {
@@ -279,6 +284,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         val recordLines = readProgressRecordLines(progressFilePath, fs)
         require(recordLines.count(_.timestamp != expectedTimestamp) == 0, "detected inconsistent" +
           s" progress record, expected timestamp $expectedTimestamp")
+        readTimestamp = expectedTimestamp
         ret = recordLines.filter(progressRecord => progressRecord.namespace == namespace).
           map(progressRecord => EventHubNameAndPartition(progressRecord.eventHubName,
             progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId)).toMap
@@ -289,7 +295,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         ias.printStackTrace()
         throw ias
     }
-    ret
+    OffsetRecord(Time(readTimestamp), ret)
   }
 
   def close(): Unit = {}

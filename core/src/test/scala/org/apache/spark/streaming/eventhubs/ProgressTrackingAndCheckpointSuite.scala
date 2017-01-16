@@ -115,6 +115,51 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       expectedOutputAfterRestart)
   }
 
+  test("test integration of spark checkpoint and progress tracking (reduceByKeyAndWindow)") {
+    val input = Seq(
+      Seq("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
+      Seq("4", "5", "6", "7", "8", "9", "10", "1", "2", "3"),
+      Seq("7", "8", "9", "1", "2", "3", "4", "5", "6", "7"))
+    val expectedOutputBeforeRestart = Seq(
+      Seq("1" -> 1, "2" -> 1, "4" -> 1, "5" -> 1, "7" -> 1, "8" -> 1),
+      Seq("1" -> 2, "2" -> 1, "4" -> 2, "5" -> 1, "7" -> 2, "8" -> 1, "3" -> 1, "6" -> 1,
+        "9" -> 1),
+      Seq("1" -> 1, "2" -> 1, "4" -> 1, "5" -> 1, "7" -> 1, "8" -> 1, "3" -> 2, "6" -> 2,
+        "9" -> 2))
+    val expectedOutputAfterRestart = Seq(
+      Seq("1" -> 1, "2" -> 1, "4" -> 1, "5" -> 1, "7" -> 1, "8" -> 1, "3" -> 2, "6" -> 2,
+        "9" -> 2),
+      Seq("5" -> 2, "6" -> 1, "9" -> 1, "2" -> 1, "3" -> 1, "7" -> 1, "8" -> 2,
+        "10" -> 1, "1" -> 1, "4" -> 1),
+      Seq("7" -> 2, "8" -> 1, "10" -> 2, "1" -> 1, "4" -> 1, "5" -> 1, "9" -> 1,
+        "2" -> 1, "3" -> 1, "6" -> 1))
+
+    testCheckpointedOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
+        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+        )),
+      expectedOffsetsAndSeqs = OffsetRecord(Time(3000L),
+        Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+          EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+          EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.flatMap(eventData => eventData.getProperties.asScala.
+          map{case (_, value) => (value, 1)}).
+          reduceByKeyAndWindow(_ + _, _ - _, Seconds(2), Seconds(1)),
+      expectedOutputBeforeRestart,
+      expectedOutputAfterRestart,
+      useSetFlag = true)
+  }
+
   test("test integration of spark checkpoint and progress tracking (single stream +" +
     " windowing function)") {
     val input = Seq(
@@ -389,7 +434,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
 
     ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
       _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =
-      OffsetRecord(Time(4000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+      OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L)))
 

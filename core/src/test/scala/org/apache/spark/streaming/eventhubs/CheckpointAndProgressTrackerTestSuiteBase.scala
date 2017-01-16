@@ -159,13 +159,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
       expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
-      expectedOutputBeforeRestart: Seq[Seq[V]]): Unit = {
+      expectedOutputBeforeRestart: Seq[Seq[V]],
+      useSetFlag: Boolean = false): Unit = {
+
     testUnaryOperation(
       input,
       eventhubsParams,
       expectedStartingOffsetsAndSeqs,
       operation,
-      expectedOutputBeforeRestart)
+      expectedOutputBeforeRestart,
+      useSet = useSetFlag)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
 
     validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
@@ -189,13 +192,14 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
       expectedOutputBeforeRestart: Seq[Seq[V]],
-      expectedOutputAfterRestart: Seq[Seq[V]]) {
+      expectedOutputAfterRestart: Seq[Seq[V]],
+      useSetFlag: Boolean = false) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
-      expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
+      expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart, useSetFlag = useSetFlag)
 
     // Restart and complete the computation from checkpoint file
     logInfo(
@@ -205,7 +209,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     )
 
     runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
-      expectedOutputAfterRestart, useSet = false)
+      expectedOutputAfterRestart, useSet = useSetFlag)
 
     validateProgressFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3,

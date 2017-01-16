@@ -274,7 +274,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       6000L)
   }
 
-  test("always start the first micro batch") {
+  test("recover correctly when checkpoint writing is delayed") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
@@ -282,7 +282,8 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val expectedOutputBeforeRestart = Seq(
       Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart = Seq(
-      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6))
+      Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6),
+      Seq(10, 11, 3, 4, 7, 8))
 
     testUnaryOperation(
       input,
@@ -315,8 +316,6 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val fs = FileSystem.get(new Configuration)
     fs.delete(new Path(currentCheckpointDirectory + "/checkpoint-3000"), true)
     fs.delete(new Path(currentCheckpointDirectory + "/checkpoint-3000.bk"), true)
-    fs.delete(new Path(currentCheckpointDirectory + "/checkpoint-2000"), true)
-    fs.delete(new Path(progressRootPath + s"/$appName/progress-3000"), true)
 
     ssc.stop()
     reset()
@@ -324,11 +323,13 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
       () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))
 
+
     ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
       _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =
-      OffsetRecord(Time(1000L), Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
-        EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
-        EventHubNameAndPartition("eh1", 2) -> (-1L, -1L)))
+      OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (1L, 1L),
+        EventHubNameAndPartition("eh1", 1) -> (1L, 1L),
+        EventHubNameAndPartition("eh1", 2) -> (1L, 1L)))
+
 
     runStreamsWithEventHubInput(ssc,
       expectedOutputAfterRestart.length - 1,
@@ -337,13 +338,13 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(6000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        OffsetRecord(Time(5000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
-      7000L)
+      6000L)
   }
 
-  test("recover from progress after updating code (no checkpoint provided and roll back)") {
+  test("workaround checkpoint written with generated but not evaluated RDD") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),

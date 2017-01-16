@@ -54,6 +54,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
+  private var latestCheckpointTime: Time = _
+
   private var initialized = false
 
   private var consumedAllMessages = false
@@ -267,20 +269,33 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def failIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
+  private def composeHighestOffset(validTime: Time) = {
+    fetchLatestOffset(validTime,
+      retryIfFail = failIfRestEndpointFail).orElse(
+      if (failIfRestEndpointFail) {
+        None
+      } else {
+        Some(fetchedHighestOffsetsAndSeqNums.offsets)
+      }
+    )
+  }
+
+  private def notPossibleForCheckpointBlocking(validTime: Time): Boolean = {
+    if (ssc.initialCheckpoint == null) {
+      // first time execution, we always return true to keep the results of other judge
+      true
+    } else {
+      ssc.initialCheckpoint.checkpointTime != validTime
+    }
+  }
+
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
       initialized = true
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    val highestOffsetOption = fetchLatestOffset(validTime,
-      retryIfFail = failIfRestEndpointFail).orElse(
-        if (failIfRestEndpointFail) {
-          None
-        } else {
-          Some(fetchedHighestOffsetsAndSeqNums.offsets)
-        }
-      )
+    val highestOffsetOption = composeHighestOffset(validTime)
     logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
     if (highestOffsetOption.isEmpty) {
       logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
@@ -290,7 +305,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       var startPointRecord = fetchStartOffsetForEachPartition(validTime)
       while (startPointRecord.timestamp < currentOffsetsAndSeqNums.timestamp &&
         !startPointRecord.offsets.equals(highestOffsetOption.get) &&
-        !consumedAllMessages) {
+        !consumedAllMessages &&
+        notPossibleForCheckpointBlocking(validTime)) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
@@ -323,9 +339,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
 
     override def update(time: Time): Unit = {
+      if (latestCheckpointTime == null || time > latestCheckpointTime) {
+        latestCheckpointTime = time
+      }
       batchForTime.clear()
-      generatedRDDs.foreach { kv =>
+      generatedRDDs.filter{case (t, _) => t <= latestCheckpointTime}.foreach { kv =>
         val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
+        logInfo(s"update RDD ${offsetRangeOfRDD.mkString("[", ", ", "]")} at ${kv._1}")
         batchForTime += kv._1 -> offsetRangeOfRDD
       }
     }

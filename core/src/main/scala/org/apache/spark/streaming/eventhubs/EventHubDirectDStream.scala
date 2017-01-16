@@ -102,7 +102,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _eventHubClient
   }
 
-  private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(Time(0), Map())
+  private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(Time(-1),
+    {eventhubNameAndPartitions.map{ehNameAndSpace => (ehNameAndSpace, (-1L, -1L))}.toMap})
   private[eventhubs] var fetchedHighestOffsetsAndSeqNums: OffsetRecord = _
 
   override def start(): Unit = {
@@ -228,19 +229,19 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private def proceedWithNonEmptyRDD(
       validTime: Time,
-      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)],
+      startOffsetInNextBatch: OffsetRecord,
       latestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
     Option[EventHubRDD] = {
     // normal processing
-    validatePartitions(validTime, startOffsetInNextBatch.keys.toList)
-    currentOffsetsAndSeqNums = OffsetRecord(validTime, startOffsetInNextBatch)
+    validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
+    currentOffsetsAndSeqNums = startOffsetInNextBatch
     val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
     logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
     val offsetRanges = latestOffsetOfAllPartitions.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
-          fromOffset = startOffsetInNextBatch(eventHubNameAndPartition)._1,
-          fromSeq = startOffsetInNextBatch(eventHubNameAndPartition)._2,
+          fromOffset = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._1,
+          fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
           untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
     }.toList
     val eventHubRDD = new EventHubRDD(
@@ -283,7 +284,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def notPossibleForCheckpointBlocking(validTime: Time): Boolean = {
     if (ssc.initialCheckpoint == null) {
       // first time execution, we always return true to keep the results of other judge
-      true
+      currentOffsetsAndSeqNums.timestamp.milliseconds != -1
     } else {
       ssc.initialCheckpoint.checkpointTime != validTime
     }
@@ -303,7 +304,16 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       None
     } else {
       var startPointRecord = fetchStartOffsetForEachPartition(validTime)
-      while (startPointRecord.timestamp < currentOffsetsAndSeqNums.timestamp &&
+      while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration &&
+        startPointRecord.timestamp.milliseconds != -1) {
+        logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
+          s" ${validTime.milliseconds}")
+        graph.wait()
+        logInfo(s"wake up at Batch ${validTime.milliseconds}")
+        startPointRecord = fetchStartOffsetForEachPartition(validTime)
+      }
+      /*
+      while (startPointRecord.timestamp <= currentOffsetsAndSeqNums.timestamp &&
         !startPointRecord.offsets.equals(highestOffsetOption.get) &&
         !consumedAllMessages &&
         notPossibleForCheckpointBlocking(validTime)) {
@@ -313,14 +323,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         logInfo(s"wake up at Batch ${validTime.milliseconds}")
         startPointRecord = fetchStartOffsetForEachPartition(validTime)
       }
-      logInfo(s"${currentOffsetsAndSeqNums.timestamp}\t ${startPointRecord.timestamp}")
+      */
       // keep this state to prevent dstream dying
       if (startPointRecord.offsets.equals(highestOffsetOption.get)) {
         consumedAllMessages = true
       } else {
         consumedAllMessages = false
       }
-      proceedWithNonEmptyRDD(validTime, startPointRecord.offsets, highestOffsetOption.get)
+      logInfo(s"${currentOffsetsAndSeqNums.timestamp}\t ${startPointRecord.timestamp}")
+      proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
     }
   }
 

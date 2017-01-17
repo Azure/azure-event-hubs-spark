@@ -142,7 +142,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def fetchStartOffsetForEachPartition(validTime: Time): OffsetRecord = {
     val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
-    logInfo(s"$offsetRecord")
     OffsetRecord(
       if (offsetRecord.timestamp.milliseconds == -1) {
         ssc.graph.startTime
@@ -271,12 +270,14 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
   private def composeHighestOffset(validTime: Time) = {
-    fetchLatestOffset(validTime,
-      retryIfFail = failIfRestEndpointFail).orElse(
-      if (failIfRestEndpointFail) {
-        None
-      } else {
-        Some(fetchedHighestOffsetsAndSeqNums.offsets)
+    fetchLatestOffset(validTime, retryIfFail = failIfRestEndpointFail).orElse(
+      {
+        logWarning(s"failed to fetch highest offset at $validTime")
+        if (failIfRestEndpointFail) {
+          None
+        } else {
+          Some(fetchedHighestOffsetsAndSeqNums.offsets)
+        }
       }
     )
   }
@@ -309,28 +310,17 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
-        logInfo(s"wake up at Batch ${validTime.milliseconds}")
+        logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
         startPointRecord = fetchStartOffsetForEachPartition(validTime)
       }
-      /*
-      while (startPointRecord.timestamp <= currentOffsetsAndSeqNums.timestamp &&
-        !startPointRecord.offsets.equals(highestOffsetOption.get) &&
-        !consumedAllMessages &&
-        notPossibleForCheckpointBlocking(validTime)) {
-        logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
-          s" ${validTime.milliseconds}")
-        graph.wait()
-        logInfo(s"wake up at Batch ${validTime.milliseconds}")
-        startPointRecord = fetchStartOffsetForEachPartition(validTime)
-      }
-      */
       // keep this state to prevent dstream dying
       if (startPointRecord.offsets.equals(highestOffsetOption.get)) {
         consumedAllMessages = true
       } else {
         consumedAllMessages = false
       }
-      logInfo(s"${currentOffsetsAndSeqNums.timestamp}\t ${startPointRecord.timestamp}")
+      logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
+        s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
       proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
     }
   }

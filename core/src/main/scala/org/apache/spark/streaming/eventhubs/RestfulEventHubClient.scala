@@ -99,7 +99,7 @@ private[eventhubs] class RestfulEventHubClient(
         var response: HttpResponse[String] = null
         val ehNameAndPartition = EventHubNameAndPartition(eventHubName, partitionId)
         while (!successfullyFetched) {
-          logInfo(s"start fetching latest offset of $ehNameAndPartition")
+          logDebug(s"start fetching latest offset of $ehNameAndPartition")
           val urlString = fromParametersToURLString(eventHubName, partitionId)
           response = Http(urlString).
             header("Authorization",
@@ -125,7 +125,7 @@ private[eventhubs] class RestfulEventHubClient(
           }
         }
         val endpointOffset = fromResponseBodyToResult(response.body)
-        logInfo(s"latest offset of $ehNameAndPartition: $endpointOffset")
+        logDebug(s"latest offset of $ehNameAndPartition: $endpointOffset")
         (ehNameAndPartition, endpointOffset)
       }
     }

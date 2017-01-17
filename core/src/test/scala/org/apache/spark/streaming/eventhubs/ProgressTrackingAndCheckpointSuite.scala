@@ -389,7 +389,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       6000L)
   }
 
-  test("workaround checkpoint written with generated but not evaluated RDD") {
+  test("continue processing when the application crash before the last commit finished") {
     val input = Seq(
       Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
       Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
@@ -429,14 +429,18 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     ssc.stop()
     reset()
 
+    // simulate commit fail
+    val fs = FileSystem.get(new Configuration())
+    fs.delete(new Path(progressRootPath.toString + s"/$appName/progress-3000"), true)
+
     ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
       () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))
 
-    ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
-      _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =
-      OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-        EventHubNameAndPartition("eh1", 2) -> (5L, 5L)))
+    assert(ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
+      _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums ===
+      OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+        EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
 
     runStreamsWithEventHubInput(ssc,
       expectedOutputAfterRestart.length - 1,

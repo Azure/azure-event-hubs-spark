@@ -47,7 +47,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
     eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
-                                              EventHubsClientWrapper.getEventHubClient,
+                                              EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
                                               RestfulEventHubClient.getInstance)
   extends InputDStream[EventData](_ssc) with Logging {

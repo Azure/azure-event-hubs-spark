@@ -22,6 +22,7 @@ import scala.collection.JavaConverters._
 import scala.collection.Map
 
 import com.microsoft.azure.eventhubs._
+import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus._
 
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes._
@@ -32,6 +33,8 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  */
 @SerialVersionUID(1L)
 class EventHubsClientWrapper extends Serializable with EventHubClient {
+
+  var eventhubsClient: AzureEventHubClient = _
 
   // TODO: the design of this class is not simple enough
   // ideally, we shall not require the user to explicitly call createReceiver first
@@ -120,15 +123,15 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
       currentOffset, receiverEpoch)
   }
 
-  private[eventhubs] def createReceiverInternal(connectionString: String,
+  private[eventhubs] def createReceiverInternal(
+                             connectionString: String,
                              consumerGroup: String,
                              partitionId: String,
                              offsetType: EventhubsOffsetType,
                              currentOffset: String,
                              receiverEpoch: Long): Unit = {
-
     // Create Eventhubs client
-    val eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
+    eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
     eventhubsReceiver = offsetType match {
       case EventhubsOffsetTypes.None | EventhubsOffsetTypes.PreviousCheckpoint
@@ -162,7 +165,10 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
     if (events == null) Iterable.empty else events.asScala
   }
 
-  override def close(): Unit = if (eventhubsReceiver != null) eventhubsReceiver.close()
+  override def close(): Unit = {
+    if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
+    if (eventhubsClient != null) eventhubsClient.closeSync()
+  }
 
   private var eventhubsReceiver: PartitionReceiver = _
   private val MINIMUM_PREFETCH_COUNT: Int = 10
@@ -178,7 +184,7 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
 
 object EventHubsClientWrapper {
 
-  def getEventHubClient(
+  def getEventHubReceiver(
       eventhubsParams: Map[String, String],
       partitionId: Int,
       startOffset: Long,

@@ -250,9 +250,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     Some(eventHubRDD)
   }
 
-  // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
-  // we have to disable cleanup thread
-  /*
   override private[streaming] def clearCheckpointData(time: Time): Unit = {
     super.clearCheckpointData(time)
     EventHubDirectDStream.cleanupLock.synchronized {
@@ -263,7 +260,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       }
     }
   }
-  */
 
   private def failIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)

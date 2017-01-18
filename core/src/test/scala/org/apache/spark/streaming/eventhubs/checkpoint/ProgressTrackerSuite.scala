@@ -290,7 +290,7 @@ class ProgressTrackerSuite extends SharedUtils {
   test("locate ProgressFile correctly") {
     progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
-    assert(progressTracker.locateProgressFile(fs, 1000L) === None)
+    assert(progressTracker.pinPointProgressFile(fs, 1000L) === None)
 
     val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
@@ -344,7 +344,5 @@ class ProgressTrackerSuite extends SharedUtils {
     verifyProgressFile("namespace2", "eh12", 0 to 1, 2000L, Seq((2, 3), (2, 3)))
     verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
 
-    assert(progressTracker.locateProgressFile(fs, 1000L) === None)
-    assert(progressTracker.locateProgressFile(fs, 500L) === None)
   }
 }

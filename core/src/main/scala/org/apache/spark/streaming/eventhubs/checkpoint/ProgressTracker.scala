@@ -77,20 +77,13 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  private def pinPointFile(directory: Path, fs: FileSystem, timestamp: Long): Option[Path] = {
-    require(fs.isDirectory(directory), s"$directory is not a directory")
-    val targetFilePath = new Path(directory.toString + s"/progress-$timestamp")
-    val targetFileExists = fs.exists(targetFilePath)
-    if (targetFileExists) Some(targetFilePath) else None
-  }
-
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names
   private[eventhubs] def fromPathToTimestamp(path: Path): Long = {
     path.getName.split("-").last.toLong
   }
 
-  private def getLatestFile(directory: Path, fs: FileSystem): Option[Path] = {
+  private[eventhubs] def getLatestFile(directory: Path, fs: FileSystem): Option[Path] = {
     require(fs.isDirectory(directory), s"$directory is not a directory")
     val allFiles = fs.listStatus(directory)
     if (allFiles.length < 1) {
@@ -194,7 +187,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    * the passed-in timestamp we return the latest file; otherwise we return the file which is
    * committed at batch (timestamp - batchDuratiuon)
    */
-  private[checkpoint] def locateProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
+  private[checkpoint] def pinPointProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {
       require(fs.isDirectory(progressDirPath), s"$progressDirPath is not a directory")
       val targetFilePath = new Path(progressDirPath.toString + s"/progress-$timestamp")
@@ -258,7 +251,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     var readTimestamp: Long = 0
     var progressFileOption: Option[Path] = null
     try {
-      progressFileOption = locateProgressFile(fs, timestamp - batchDuration)
+      progressFileOption = pinPointProgressFile(fs, timestamp - batchDuration)
       if (progressFileOption.isEmpty) {
         // if no progress file, then start from the beginning of the streams
         val namespaceToEventHubs = eventHubNameAndPartitions.find {
@@ -324,6 +317,9 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     // checkpointTime.
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     // clean progress directory
+    // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
+    // we have to disable cleanup thread
+    /*
     val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
       override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime
     }).map(_.getPath)
@@ -335,6 +331,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         fs.delete(filePath, true)
       }
     }
+    */
     // clean temp directory
     val allUselessTempFiles = fs.listStatus(progressTempDirPath, new PathFilter {
       override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime

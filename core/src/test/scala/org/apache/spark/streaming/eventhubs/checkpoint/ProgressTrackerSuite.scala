@@ -321,12 +321,12 @@ class ProgressTrackerSuite extends SharedUtils {
 
     // if latest timestamp is earlier than the specified timestamp, we shall return the latest
     // offsets
-    verifyProgressFile("namespace1", "eh1", 0 to 0, 5000L, Seq((2, 3)))
-    verifyProgressFile("namespace1", "eh2", 0 to 1, 5000L, Seq((2, 4), (2, 4)))
-    verifyProgressFile("namespace1", "eh3", 0 to 2, 5000L, Seq((2, 5), (2, 5), (2, 5)))
-    verifyProgressFile("namespace2", "eh11", 0 to 0, 5000L, Seq((3, 4)))
-    verifyProgressFile("namespace2", "eh12", 0 to 1, 5000L, Seq((4, 5), (4, 5)))
-    verifyProgressFile("namespace2", "eh13", 0 to 2, 5000L, Seq((5, 6), (5, 6), (5, 6)))
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 4000L, Seq((2, 3)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 4000L, Seq((2, 4), (2, 4)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 4000L, Seq((2, 5), (2, 5), (2, 5)))
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 4000L, Seq((3, 4)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 4000L, Seq((4, 5), (4, 5)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 4000L, Seq((5, 6), (5, 6), (5, 6)))
 
     // locate file correctly
     verifyProgressFile("namespace1", "eh1", 0 to 0, 3000L, Seq((1, 2)))

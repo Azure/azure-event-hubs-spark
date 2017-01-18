@@ -70,6 +70,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       }).length == expectedFileNum)
   }
 
+  // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
+  // we have to disable cleanup thread
   private def validateProgressFileCleanup(numNonExistBatch: Int, numBatches: Int): Unit = {
     // test cleanup of progress files
     // this test is tricky: because the offset committing and checkpoint data cleanup are performed
@@ -84,6 +86,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     // the existence of progress-(t-1) depends on the scheduling of threads
 
     // check progress directory
+    /*
     val fs = progressRootPath.getFileSystem(new Configuration)
     for (i <- 0 until numNonExistBatch) {
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
@@ -91,6 +94,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     }
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
       s"progress-${numBatches * 1000}")))
+    */
+
   }
 
 

@@ -344,7 +344,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         latestCheckpointTime = time
       }
       batchForTime.clear()
-      generatedRDDs.filter{case (t, _) => t <= latestCheckpointTime}.foreach { kv =>
+      generatedRDDs.foreach { kv =>
         val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
         logInfo(s"update RDD ${offsetRangeOfRDD.mkString("[", ", ", "]")} at ${kv._1}")
         batchForTime += kv._1 -> offsetRangeOfRDD

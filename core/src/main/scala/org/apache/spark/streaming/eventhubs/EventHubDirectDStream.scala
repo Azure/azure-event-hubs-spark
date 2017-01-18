@@ -58,8 +58,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
-  private var consumedAllMessages = false
-
   ProgressTracker.eventHubDirectDStreams += this
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
@@ -140,7 +138,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    * @return EventHubName-Partition -> (offset, seq)
    */
   private def fetchStartOffsetForEachPartition(validTime: Time): OffsetRecord = {
-    val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds)
+    val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds,
+      ssc.graph.batchDuration.milliseconds)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
     OffsetRecord(
       if (offsetRecord.timestamp.milliseconds == -1) {
@@ -222,10 +221,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def currentOffsetEarlierThan(newFetchedRecord: OffsetRecord): Boolean = {
-    currentOffsetsAndSeqNums.timestamp < newFetchedRecord.timestamp
-  }
-
   private def proceedWithNonEmptyRDD(
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
@@ -255,6 +250,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     Some(eventHubRDD)
   }
 
+  // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
+  // we have to disable cleanup thread
+  /*
   override private[streaming] def clearCheckpointData(time: Time): Unit = {
     super.clearCheckpointData(time)
     EventHubDirectDStream.cleanupLock.synchronized {
@@ -265,6 +263,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       }
     }
   }
+  */
 
   private def failIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
@@ -280,15 +279,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         }
       }
     )
-  }
-
-  private def notPossibleForCheckpointBlocking(validTime: Time): Boolean = {
-    if (ssc.initialCheckpoint == null) {
-      // first time execution, we always return true to keep the results of other judge
-      currentOffsetsAndSeqNums.timestamp.milliseconds != -1
-    } else {
-      ssc.initialCheckpoint.checkpointTime != validTime
-    }
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
@@ -312,12 +302,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         graph.wait()
         logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
         startPointRecord = fetchStartOffsetForEachPartition(validTime)
-      }
-      // keep this state to prevent dstream dying
-      if (startPointRecord.offsets.equals(highestOffsetOption.get)) {
-        consumedAllMessages = true
-      } else {
-        consumedAllMessages = false
       }
       logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
         s" startPointRecordTimestamp: ${startPointRecord.timestamp}")

@@ -122,7 +122,7 @@ class ProgressTrackerSuite extends SharedUtils {
   private def verifyProgressFile(
       namespace: String, ehName: String, partitionRange: Range,
       timestamp: Long, expectedOffsetAndSeq: Seq[(Long, Long)]): Unit = {
-    val ehMap = progressTracker.read(namespace, timestamp)
+    val ehMap = progressTracker.read(namespace, timestamp, 1000L)
     var expectedOffsetAndSeqIdx = 0
     for (partitionId <- partitionRange) {
       assert(ehMap.offsets(EventHubNameAndPartition(ehName, partitionId)) ===
@@ -199,7 +199,7 @@ class ProgressTrackerSuite extends SharedUtils {
     writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
 
     intercept[IllegalArgumentException] {
-      progressTracker.read("namespace2", 2000L)
+      progressTracker.read("namespace2", 2000L, 1000L)
     }
   }
 
@@ -272,11 +272,11 @@ class ProgressTrackerSuite extends SharedUtils {
         EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
         EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
     progressTracker.commit(offsetToCommit, 1000L)
-    val namespace1Offsets = progressTracker.read("namespace1", 2000L)
+    val namespace1Offsets = progressTracker.read("namespace1", 2000L, 1000L)
     assert(namespace1Offsets === OffsetRecord(Time(1000L), Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
       EventHubNameAndPartition("eh2", 1) -> (1L, 1L))))
-    val namespace2Offsets = progressTracker.read("namespace2", 2000L)
+    val namespace2Offsets = progressTracker.read("namespace2", 2000L, 1000L)
     assert(namespace2Offsets === OffsetRecord(Time(1000L), Map(
       EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
       EventHubNameAndPartition("eh2", 4) -> (3L, 3L))))

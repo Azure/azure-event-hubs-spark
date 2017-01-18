@@ -77,7 +77,20 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  private def getLastestFile(directory: Path, fs: FileSystem): Option[Path] = {
+  private def pinPointFile(directory: Path, fs: FileSystem, timestamp: Long): Option[Path] = {
+    require(fs.isDirectory(directory), s"$directory is not a directory")
+    val targetFilePath = new Path(directory.toString + s"/progress-$timestamp")
+    val targetFileExists = fs.exists(targetFilePath)
+    if (targetFileExists) Some(targetFilePath) else None
+  }
+
+  // getModificationTime is not reliable for unit test and some extreme case in distributed
+  // file system so that we have to derive timestamp from the file names
+  private[eventhubs] def fromPathToTimestamp(path: Path): Long = {
+    path.getName.split("-").last.toLong
+  }
+
+  private def getLatestFile(directory: Path, fs: FileSystem): Option[Path] = {
     require(fs.isDirectory(directory), s"$directory is not a directory")
     val allFiles = fs.listStatus(directory)
     if (allFiles.length < 1) {
@@ -86,12 +99,6 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       Some(allFiles.sortWith((f1, f2) =>
         fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))(0).getPath)
     }
-  }
-
-  // getModificationTime is not reliable for unit test and some extreme case in distributed
-  // file system so that we have to derive timestamp from the file names
-  private[eventhubs] def fromPathToTimestamp(path: Path): Long = {
-    path.getName.split("-").last.toLong
   }
 
   /**
@@ -103,7 +110,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    *          (false, Some(x)) does not exist
    */
   private def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
-    val latestFileOpt = getLastestFile(progressDirPath, fs)
+    val latestFileOpt = getLatestFile(progressDirPath, fs)
     val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
     var br: BufferedReader = null
     try {
@@ -189,27 +196,10 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    */
   private[checkpoint] def locateProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {
-      val latestFilePathOpt = getLastestFile(progressDirPath, fs)
-      if (latestFilePathOpt.isDefined) {
-        val latestFile = latestFilePathOpt.get
-        val latestTimestamp = fromPathToTimestamp(latestFile)
-        if (latestTimestamp < timestamp) {
-          latestFilePathOpt
-        } else {
-          val allFiles = fs.listStatus(progressDirPath)
-          val sortedFiles = allFiles.filter(fileStatus =>
-            fromPathToTimestamp(fileStatus.getPath) < timestamp).
-            sortWith((f1, f2) =>
-              fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))
-          if (sortedFiles.length < 1) {
-            None
-          } else {
-            Some(sortedFiles.head.getPath)
-          }
-        }
-      } else {
-        latestFilePathOpt
-      }
+      require(fs.isDirectory(progressDirPath), s"$progressDirPath is not a directory")
+      val targetFilePath = new Path(progressDirPath.toString + s"/progress-$timestamp")
+      val targetFileExists = fs.exists(targetFilePath)
+      if (targetFileExists) Some(targetFilePath) else None
     } catch {
       case ioe: IOException =>
         logError(ioe.getMessage)
@@ -261,20 +251,21 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   /**
    * read the progress record for the specified namespace, streamId and timestamp
    */
-  def read(namespace: String, timestamp: Long): OffsetRecord = driverLock.synchronized {
+  def read(namespace: String, timestamp: Long, batchDuration: Long):
+      OffsetRecord = driverLock.synchronized {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     var ret = Map[EventHubNameAndPartition, (Long, Long)]()
     var readTimestamp: Long = 0
     var progressFileOption: Option[Path] = null
     try {
-      progressFileOption = locateProgressFile(fs, timestamp)
+      progressFileOption = locateProgressFile(fs, timestamp - batchDuration)
       if (progressFileOption.isEmpty) {
         // if no progress file, then start from the beginning of the streams
         val namespaceToEventHubs = eventHubNameAndPartitions.find {
           case (ehNamespace, _) => ehNamespace == namespace}
         require(namespaceToEventHubs.isDefined, s"cannot find $namespace in" +
           s" $eventHubNameAndPartitions")
-        // it's hacky to mark it as the start of streams
+        // it's hacky to take timestamp -1 as the start of streams
         readTimestamp = -1
         ret = namespaceToEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, -1L))).
           toMap

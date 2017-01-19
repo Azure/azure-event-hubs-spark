@@ -280,7 +280,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
-      initialized = true
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
     val highestOffsetOption = composeHighestOffset(validTime)
@@ -300,6 +299,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       }
       logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
         s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
+      initialized = true
       proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
     }
   }

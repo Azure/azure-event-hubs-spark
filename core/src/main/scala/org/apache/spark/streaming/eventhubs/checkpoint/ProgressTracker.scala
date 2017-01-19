@@ -255,6 +255,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         if (!fallBack) {
           pinPointProgressFile(fs, timestamp - batchDuration)
         } else {
+          logInfo("falling back to read file")
           getLatestFile(progressDirPath, fs)
         }
       }

@@ -290,13 +290,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         s" stop the application")
       None
     } else {
-      var startPointRecord = fetchStartOffsetForEachPartition(validTime, initialized)
+      var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
       while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
         logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
-        startPointRecord = fetchStartOffsetForEachPartition(validTime, initialized)
+        startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
       }
       logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
         s" startPointRecordTimestamp: ${startPointRecord.timestamp}")

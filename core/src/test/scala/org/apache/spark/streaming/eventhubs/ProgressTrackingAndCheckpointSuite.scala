@@ -292,7 +292,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
 
     ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
 
-    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(3000)
+    ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(5000)
     testUnaryOperation(
       input,
       eventhubsParams = Map[String, Map[String, String]](
@@ -302,7 +302,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(4000), Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
+        OffsetRecord(Time(6000), Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
           EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
           EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
       )),
@@ -313,10 +313,10 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(5000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        OffsetRecord(Time(7000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
-      6000L)
+      8000L)
   }
 
   test("recover correctly when checkpoint writing is delayed") {

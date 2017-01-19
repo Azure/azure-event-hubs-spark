@@ -137,9 +137,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    *
    * @return EventHubName-Partition -> (offset, seq)
    */
-  private def fetchStartOffsetForEachPartition(validTime: Time): OffsetRecord = {
+  private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
     val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds,
-      ssc.graph.batchDuration.milliseconds)
+      ssc.graph.batchDuration.milliseconds, fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
     OffsetRecord(
       if (offsetRecord.timestamp.milliseconds == -1) {
@@ -286,18 +286,17 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val highestOffsetOption = composeHighestOffset(validTime)
     logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
     if (highestOffsetOption.isEmpty) {
-      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
-        s" micro batch and process it later")
+      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +
+        s" stop the application")
       None
     } else {
-      var startPointRecord = fetchStartOffsetForEachPartition(validTime)
-      while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration &&
-        startPointRecord.timestamp.milliseconds != -1) {
+      var startPointRecord = fetchStartOffsetForEachPartition(validTime, initialized)
+      while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
         logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
-        startPointRecord = fetchStartOffsetForEachPartition(validTime)
+        startPointRecord = fetchStartOffsetForEachPartition(validTime, initialized)
       }
       logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
         s" startPointRecordTimestamp: ${startPointRecord.timestamp}")

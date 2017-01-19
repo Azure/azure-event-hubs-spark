@@ -83,17 +83,6 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     path.getName.split("-").last.toLong
   }
 
-  private[eventhubs] def getLatestFile(directory: Path, fs: FileSystem): Option[Path] = {
-    require(fs.isDirectory(directory), s"$directory is not a directory")
-    val allFiles = fs.listStatus(directory)
-    if (allFiles.length < 1) {
-      None
-    } else {
-      Some(allFiles.sortWith((f1, f2) =>
-        fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))(0).getPath)
-    }
-  }
-
   /**
    * this method is called when ProgressTracker is started for the first time (including recovering
    * from checkpoint). This method validate the latest progress file by checking whether it
@@ -182,10 +171,21 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   }
 
   /**
-   * locate the progress file according to the timestamp
-   * when the timestamp of the latest file in the progress tracking directory is earlier than
-   * the passed-in timestamp we return the latest file; otherwise we return the file which is
-   * committed at batch (timestamp - batchDuratiuon)
+   * get the latest progress file saved under directory
+   */
+  private[eventhubs] def getLatestFile(directory: Path, fs: FileSystem): Option[Path] = {
+    require(fs.isDirectory(directory), s"$directory is not a directory")
+    val allFiles = fs.listStatus(directory)
+    if (allFiles.length < 1) {
+      None
+    } else {
+      Some(allFiles.sortWith((f1, f2) =>
+        fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))(0).getPath)
+    }
+  }
+
+  /**
+   * pinpoint the progress file named "progress-timestamp"
    */
   private[checkpoint] def pinPointProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {
@@ -244,14 +244,20 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   /**
    * read the progress record for the specified namespace, streamId and timestamp
    */
-  def read(namespace: String, timestamp: Long, batchDuration: Long):
+  def read(namespace: String, timestamp: Long, batchDuration: Long, fallBack: Boolean):
       OffsetRecord = driverLock.synchronized {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     var ret = Map[EventHubNameAndPartition, (Long, Long)]()
     var readTimestamp: Long = 0
     var progressFileOption: Option[Path] = null
     try {
-      progressFileOption = pinPointProgressFile(fs, timestamp - batchDuration)
+      progressFileOption = {
+        if (!fallBack) {
+          pinPointProgressFile(fs, timestamp - batchDuration)
+        } else {
+          getLatestFile(progressDirPath, fs)
+        }
+      }
       if (progressFileOption.isEmpty) {
         // if no progress file, then start from the beginning of the streams
         val namespaceToEventHubs = eventHubNameAndPartitions.find {

@@ -173,14 +173,17 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   /**
    * get the latest progress file saved under directory
    */
-  private[eventhubs] def getLatestFile(directory: Path, fs: FileSystem): Option[Path] = {
+  private[eventhubs] def getLatestFile(
+      directory: Path, fs: FileSystem,
+      timestamp: Long = Long.MaxValue): Option[Path] = {
     require(fs.isDirectory(directory), s"$directory is not a directory")
     val allFiles = fs.listStatus(directory)
     if (allFiles.length < 1) {
       None
     } else {
-      Some(allFiles.sortWith((f1, f2) =>
-        fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))(0).getPath)
+      Some(allFiles.filter(fsStatus => fromPathToTimestamp(fsStatus.getPath) < timestamp).
+        sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))
+        (0).getPath)
     }
   }
 
@@ -255,8 +258,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
         if (!fallBack) {
           pinPointProgressFile(fs, timestamp - batchDuration)
         } else {
-          logInfo("falling back to read file")
-          getLatestFile(progressDirPath, fs)
+          getLatestFile(progressDirPath, fs, timestamp)
         }
       }
       if (progressFileOption.isEmpty) {

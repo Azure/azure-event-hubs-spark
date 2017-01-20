@@ -107,7 +107,7 @@ private[eventhubs] class RestfulEventHubClient(
                 policyName = policyKeys(eventHubName)._1,
                 policyKey = policyKeys(eventHubName)._2)).
             header("Content-Type", "application/atom+xml;type=entry;charset=utf-8").
-            timeout(connTimeoutMs = 3000, readTimeoutMs = 15000).asString
+            timeout(connTimeoutMs = 3000, readTimeoutMs = 30000).asString
           if (response.code != 200) {
             if (!retryIfFail || retryTime > RETRY_INTERVAL_SECONDS.length) {
               val errorInfoString = s"cannot get latest offset of" +

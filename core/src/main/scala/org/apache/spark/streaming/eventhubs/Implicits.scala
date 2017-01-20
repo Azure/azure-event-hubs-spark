@@ -36,7 +36,7 @@ object Implicits {
 
   // will be used to execute requests to EventHub
   private[eventhubs] implicit val exec = ExecutionContext.
-    fromExecutor(Executors.newFixedThreadPool(15))
+    fromExecutor(Executors.newCachedThreadPool)
 
   /**
    * Converts the StreamingContext into an EventHub enabled streaming context

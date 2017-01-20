@@ -23,6 +23,7 @@ import scala.collection.mutable
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 
+import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
@@ -280,9 +281,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val highestOffsetOption = composeHighestOffset(validTime)
     logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
     if (highestOffsetOption.isEmpty) {
-      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +
-        s" stop the application")
-      None
+      val errorMsg = s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +
+        s" stop the application"
+      logError(errorMsg)
+      throw new SparkException(errorMsg)
     } else {
       var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
       while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration) {

@@ -24,7 +24,7 @@ import scala.reflect.ClassTag
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{SparkConf, SparkContext, SparkException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
@@ -56,7 +56,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       Map("eh1" -> eventhubParameters))
     ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()
-    assert(ehDStream.compute(Time(1000)).isEmpty)
+    intercept[IllegalStateException] {
+      ehDStream.compute(Time(1000))
+    }
   }
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {

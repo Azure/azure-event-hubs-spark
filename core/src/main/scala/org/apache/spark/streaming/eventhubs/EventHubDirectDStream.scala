@@ -284,7 +284,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       val errorMsg = s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +
         s" stop the application"
       logError(errorMsg)
-      throw new SparkException(errorMsg)
+      throw new IllegalStateException(errorMsg)
     } else {
       var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
       while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration) {

@@ -70,12 +70,16 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override protected[streaming] val rateController: Option[RateController] = {
+    None
+    // TODO: performance evaluation of rate controller
+    /*
     if (RateController.isBackPressureEnabled(ssc.sparkContext.conf)) {
       Some(new EventHubDirectDStreamRateController(id, RateEstimator.create(ssc.sparkContext.conf,
         graph.batchDuration)))
     } else {
       None
     }
+    */
   }
 
   private def maxRateLimitPerPartition(eventHubName: String): Int = {

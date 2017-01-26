@@ -52,8 +52,10 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     progressListener.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
-    val record = progressTracker.read(eventhubNamespace, 2000L)
-    assert(record === Map(EventHubNameAndPartition("eh1", 1) -> (1L, 2L)))
+    val record = progressTracker.read(eventhubNamespace, 2000L, 1000L, fallBack = false)
+    assert(record === OffsetRecord(Time(1000L),
+      Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
+        EventHubNameAndPartition("eh1", 1) -> (1L, 2L))))
   }
 
   test("do not commit offsets when there is a failure in microbatch") {

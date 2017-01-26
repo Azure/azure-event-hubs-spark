@@ -114,7 +114,8 @@ object EventHubsUtils {
       eventHubNamespace: String,
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    require(progressDir.startsWith("hdfs://"), "we only support HDFS based checkpoint storage")
+    require(progressDir.startsWith("hdfs://") || progressDir.startsWith("adl://"),
+      "we only support HDFS/ADLS based progress file storage")
     val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
     newStream
   }

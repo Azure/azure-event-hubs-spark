@@ -32,7 +32,7 @@ import org.powermock.reflect.Whitebox
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
-import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker}
 import org.apache.spark.streaming.eventhubs.utils._
 import org.apache.spark.util.{ManualClock, Utils}
 
@@ -134,7 +134,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   def testFragileStream[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      expectedOffsetsAndSeqs: Map[String, OffsetRecord],
       operation: EventHubDirectDStream => DStream[V],
       expectedOutput: Seq[Seq[V]]) {
     val numBatches_ = expectedOutput.size
@@ -291,7 +291,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   protected def verifyOffsetsAndSeqs(
       ssc: StreamingContext,
       namespace: String,
-      expectedOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]]): Unit = {
+      expectedOffsetsAndSeqs: Map[String, OffsetRecord]): Unit = {
     val producedOffsetsAndSeqs = ssc.graph.getInputStreams().filter(
       _.isInstanceOf[EventHubDirectDStream]).map(_.asInstanceOf[EventHubDirectDStream]).
       filter(_.eventHubNameSpace == namespace).
@@ -302,9 +302,10 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
   def testProgressTracker(
       namespace: String,
-      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      expectedOffsetsAndSeqs: OffsetRecord,
       timestamp: Long): Unit = {
-    val producedOffsetsAndSeqs = ProgressTracker.getInstance.read(namespace, timestamp)
+    val producedOffsetsAndSeqs = ProgressTracker.getInstance.read(namespace, timestamp,
+      batchDuration.milliseconds, fallBack = false)
     assert(producedOffsetsAndSeqs === expectedOffsetsAndSeqs)
   }
 
@@ -313,8 +314,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       input2: Seq[Seq[V]],
       eventhubsParams1: Map[String, Map[String, String]],
       eventhubsParams2: Map[String, Map[String, String]],
-      expectedOffsetsAndSeqs1: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      expectedOffsetsAndSeqs2: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      expectedOffsetsAndSeqs1: Map[String, OffsetRecord],
+      expectedOffsetsAndSeqs2: Map[String, OffsetRecord],
       operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
       expectedOutput: Seq[Seq[W]],
       numBatches: Int = -1) {
@@ -382,7 +383,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   def testFluctuatedStream[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      expectedOffsetsAndSeqs: Map[String, OffsetRecord],
       operation: EventHubDirectDStream => DStream[V],
       expectedOutput: Seq[Seq[V]],
       messagesBeforeEmpty: Long,
@@ -403,7 +404,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   def testUnaryOperation[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      expectedOffsetsAndSeqs: Map[String, OffsetRecord],
       operation: EventHubDirectDStream => DStream[V],
       expectedOutput: Seq[Seq[V]],
       numBatches: Int = -1,

@@ -63,7 +63,8 @@ private[eventhubs] class TestEventHubsReceiver(
 private[eventhubs] class TestRestEventHubClient(
     latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
 
-  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(retryIfFail: Boolean):
+      Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     Some(latestRecords)
   }
 
@@ -72,7 +73,8 @@ private[eventhubs] class TestRestEventHubClient(
 
 private[eventhubs] class FragileEventHubClient private extends EventHubClient {
 
-  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(retryIfFail: Boolean):
+      Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     import FragileEventHubClient._
 
     callIndex += 1
@@ -111,7 +113,8 @@ private[eventhubs] class FluctuatedEventHubClient(
 
   private var callIndex = -1
 
-  override def endPointOfPartition(): Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(retryIfFail: Boolean):
+      Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
       Some(latestRecords.map{

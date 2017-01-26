@@ -23,6 +23,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
+import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, SharedUtils}
 
 class ProgressTrackerSuite extends SharedUtils {
@@ -121,10 +122,10 @@ class ProgressTrackerSuite extends SharedUtils {
   private def verifyProgressFile(
       namespace: String, ehName: String, partitionRange: Range,
       timestamp: Long, expectedOffsetAndSeq: Seq[(Long, Long)]): Unit = {
-    val ehMap = progressTracker.read(namespace, timestamp)
+    val ehMap = progressTracker.read(namespace, timestamp, 1000L, fallBack = false)
     var expectedOffsetAndSeqIdx = 0
     for (partitionId <- partitionRange) {
-      assert(ehMap(EventHubNameAndPartition(ehName, partitionId)) ===
+      assert(ehMap.offsets(EventHubNameAndPartition(ehName, partitionId)) ===
         expectedOffsetAndSeq(expectedOffsetAndSeqIdx))
       expectedOffsetAndSeqIdx += 1
     }
@@ -198,7 +199,7 @@ class ProgressTrackerSuite extends SharedUtils {
     writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
 
     intercept[IllegalArgumentException] {
-      progressTracker.read("namespace2", 2000L)
+      progressTracker.read("namespace2", 2000L, 1000L, fallBack = false)
     }
   }
 
@@ -271,14 +272,14 @@ class ProgressTrackerSuite extends SharedUtils {
         EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
         EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
     progressTracker.commit(offsetToCommit, 1000L)
-    val namespace1Offsets = progressTracker.read("namespace1", 2000L)
-    assert(namespace1Offsets === Map(
+    val namespace1Offsets = progressTracker.read("namespace1", 2000L, 1000L, fallBack = false)
+    assert(namespace1Offsets === OffsetRecord(Time(1000L), Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
-      EventHubNameAndPartition("eh2", 1) -> (1L, 1L)))
-    val namespace2Offsets = progressTracker.read("namespace2", 2000L)
-    assert(namespace2Offsets === Map(
+      EventHubNameAndPartition("eh2", 1) -> (1L, 1L))))
+    val namespace2Offsets = progressTracker.read("namespace2", 2000L, 1000L, fallBack = false)
+    assert(namespace2Offsets === OffsetRecord(Time(1000L), Map(
       EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
-      EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
+      EventHubNameAndPartition("eh2", 4) -> (3L, 3L))))
     // test temp directory cleanup
     assert(fs.exists(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString,
       appName))))
@@ -289,7 +290,7 @@ class ProgressTrackerSuite extends SharedUtils {
   test("locate ProgressFile correctly") {
     progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
-    assert(progressTracker.locateProgressFile(fs, 1000L) === None)
+    assert(progressTracker.pinPointProgressFile(fs, 1000L) === None)
 
     val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
@@ -320,12 +321,12 @@ class ProgressTrackerSuite extends SharedUtils {
 
     // if latest timestamp is earlier than the specified timestamp, we shall return the latest
     // offsets
-    verifyProgressFile("namespace1", "eh1", 0 to 0, 5000L, Seq((2, 3)))
-    verifyProgressFile("namespace1", "eh2", 0 to 1, 5000L, Seq((2, 4), (2, 4)))
-    verifyProgressFile("namespace1", "eh3", 0 to 2, 5000L, Seq((2, 5), (2, 5), (2, 5)))
-    verifyProgressFile("namespace2", "eh11", 0 to 0, 5000L, Seq((3, 4)))
-    verifyProgressFile("namespace2", "eh12", 0 to 1, 5000L, Seq((4, 5), (4, 5)))
-    verifyProgressFile("namespace2", "eh13", 0 to 2, 5000L, Seq((5, 6), (5, 6), (5, 6)))
+    verifyProgressFile("namespace1", "eh1", 0 to 0, 4000L, Seq((2, 3)))
+    verifyProgressFile("namespace1", "eh2", 0 to 1, 4000L, Seq((2, 4), (2, 4)))
+    verifyProgressFile("namespace1", "eh3", 0 to 2, 4000L, Seq((2, 5), (2, 5), (2, 5)))
+    verifyProgressFile("namespace2", "eh11", 0 to 0, 4000L, Seq((3, 4)))
+    verifyProgressFile("namespace2", "eh12", 0 to 1, 4000L, Seq((4, 5), (4, 5)))
+    verifyProgressFile("namespace2", "eh13", 0 to 2, 4000L, Seq((5, 6), (5, 6), (5, 6)))
 
     // locate file correctly
     verifyProgressFile("namespace1", "eh1", 0 to 0, 3000L, Seq((1, 2)))
@@ -343,7 +344,5 @@ class ProgressTrackerSuite extends SharedUtils {
     verifyProgressFile("namespace2", "eh12", 0 to 1, 2000L, Seq((2, 3), (2, 3)))
     verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
 
-    assert(progressTracker.locateProgressFile(fs, 1000L) === None)
-    assert(progressTracker.locateProgressFile(fs, 500L) === None)
   }
 }

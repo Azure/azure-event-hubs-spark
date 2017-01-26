@@ -23,6 +23,7 @@ import scala.collection.mutable
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 
+import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
@@ -54,9 +55,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
-  private var initialized = false
+  private var latestCheckpointTime: Time = _
 
-  private var consumedAllMessages = false
+  private var initialized = false
 
   ProgressTracker.eventHubDirectDStreams += this
 
@@ -69,12 +70,16 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override protected[streaming] val rateController: Option[RateController] = {
+    None
+    // TODO: performance evaluation of rate controller
+    /*
     if (RateController.isBackPressureEnabled(ssc.sparkContext.conf)) {
       Some(new EventHubDirectDStreamRateController(id, RateEstimator.create(ssc.sparkContext.conf,
         graph.batchDuration)))
     } else {
       None
     }
+    */
   }
 
   private def maxRateLimitPerPartition(eventHubName: String): Int = {
@@ -100,7 +105,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _eventHubClient
   }
 
-  private[eventhubs] var currentOffsetsAndSeqNums = Map[EventHubNameAndPartition, (Long, Long)]()
+  private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(Time(-1),
+    {eventhubNameAndPartitions.map{ehNameAndSpace => (ehNameAndSpace, (-1L, -1L))}.toMap})
+  private[eventhubs] var fetchedHighestOffsetsAndSeqNums: OffsetRecord = _
 
   override def start(): Unit = {
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
@@ -115,16 +122,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventHubClient.close()
   }
 
-  private def fetchLatestOffset(validTime: Time): Map[EventHubNameAndPartition, (Long, Long)] = {
-    // TODO: rate control
-    val latestOffsets = eventHubClient.endPointOfPartition()
-    if (latestOffsets.isDefined) {
-      latestOffsets.get
-    } else {
-      logError(s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will skip this" +
-        s" micro batch and process it later")
-      Map()
+  private def fetchLatestOffset(validTime: Time, retryIfFail: Boolean):
+      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+    val r = eventHubClient.endPointOfPartition(retryIfFail)
+    if (r.isDefined) {
+      fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, r.get)
     }
+    r
   }
 
   /**
@@ -138,21 +142,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    *
    * @return EventHubName-Partition -> (offset, seq)
    */
-  private def fetchStartOffsetForEachPartition(validTime: Time):
-    Map[EventHubNameAndPartition, (Long, Long)] = {
-    val checkpoints = progressTracker.read(eventHubNameSpace, validTime.milliseconds)
-    if (checkpoints.nonEmpty) {
-      logInfo(s"get checkpoint at $validTime: $checkpoints")
-      checkpoints
-    } else {
-      // start from the beginning of each eventHubPartition
-      {
-        for (eventHubName <- eventhubsParams.keys;
-             p <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
-          yield (EventHubNameAndPartition(eventHubName, p),
-            (PartitionReceiver.START_OF_STREAM.toLong, -1L))
-      }.toMap
-    }
+  private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
+    val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds,
+      ssc.graph.batchDuration.milliseconds, fallBack)
+    require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
+    OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
+      offsetRecord.timestamp.milliseconds)), offsetRecord.offsets)
   }
 
   private def reportInputInto(validTime: Time,
@@ -174,8 +169,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def validatePartitions(
       validTime: Time,
       calculatedPartitions: List[EventHubNameAndPartition]): Unit = {
-    if (currentOffsetsAndSeqNums.nonEmpty) {
-      val currentPartitions = currentOffsetsAndSeqNums.keys.toList
+    if (currentOffsetsAndSeqNums != null) {
+      val currentPartitions = currentOffsetsAndSeqNums.offsets.keys.toList
       val diff = currentPartitions.diff(calculatedPartitions)
       if (diff.nonEmpty) {
         logError(s"detected lost partitions $diff")
@@ -194,7 +189,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       case (eventHubNameAndPar, (_, latestSeq)) =>
         val maximumAllowedMessageCnt = maxRateLimitPerPartition(eventHubNameAndPar.eventHubName)
         val endSeq = math.min(latestSeq,
-          maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2)
+          maximumAllowedMessageCnt + currentOffsetsAndSeqNums.offsets(eventHubNameAndPar)._2)
         (eventHubNameAndPar, endSeq)
     }
   }
@@ -212,41 +207,35 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           val lagPerPartition = latestEndpoints.map {
             case (eventHubNameAndPartition, (_, latestSeq)) =>
               eventHubNameAndPartition ->
-                math.max(latestSeq - currentOffsetsAndSeqNums(eventHubNameAndPartition)._2, 0)
+                math.max(latestSeq - currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
+                  0)
           }
           val totalLag = lagPerPartition.values.sum
           lagPerPartition.map {
             case (eventHubNameAndPartition, lag) =>
               val backpressureRate = math.round(lag / totalLag.toFloat * allowedRate)
               eventHubNameAndPartition ->
-                (backpressureRate + currentOffsetsAndSeqNums(eventHubNameAndPartition)._2)
+                (backpressureRate + currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2)
           }
       }
     }
   }
 
-  private def currentOffsetEarlierThanCheckpoint(
-      offsetsMap2: Map[EventHubNameAndPartition, (Long, Long)]): Boolean = {
-    currentOffsetsAndSeqNums.map {
-      case (eh, (offset, seq)) => (eh, (offset, seq), (offsetsMap2(eh)._1, offsetsMap2(eh)._2))
-    }.forall { case (_, (o1, s1), (o2, s2)) => o1 <= o2 && s1 <= s2 }
-  }
-
   private def proceedWithNonEmptyRDD(
       validTime: Time,
-      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)],
+      startOffsetInNextBatch: OffsetRecord,
       latestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
     Option[EventHubRDD] = {
     // normal processing
-    validatePartitions(validTime, startOffsetInNextBatch.keys.toList)
+    validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch
     val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
     logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
     val offsetRanges = latestOffsetOfAllPartitions.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
-          fromOffset = startOffsetInNextBatch(eventHubNameAndPartition)._1,
-          fromSeq = startOffsetInNextBatch(eventHubNameAndPartition)._2,
+          fromOffset = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._1,
+          fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
           untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
     }.toList
     val eventHubRDD = new EventHubRDD(
@@ -272,50 +261,47 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
+  private def failIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
+    currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
+
+  private def composeHighestOffset(validTime: Time) = {
+    fetchLatestOffset(validTime, retryIfFail = failIfRestEndpointFail).orElse(
+      {
+        logWarning(s"failed to fetch highest offset at $validTime")
+        if (failIfRestEndpointFail) {
+          None
+        } else {
+          Some(fetchedHighestOffsetsAndSeqNums.offsets)
+        }
+      }
+    )
+  }
+
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    val latestOffsetOfAllPartitions = fetchLatestOffset(validTime)
-    println(s"latestOffsetOfAllPartitions: $latestOffsetOfAllPartitions")
-    if (latestOffsetOfAllPartitions.isEmpty) {
-      // we need to update currentOffsetsAndSeqNums in the case of dead rest endpoint
-      // considering the following case:
-      // assuming C is the commited offset, and H is the highest offset in EventHubs
-      // in Batch i, stream 1 commits with offset = 500, C = 400; in Batch i + 1, rest endpoint die,
-      // C = 400; in Batch i + 2, C will still be 400 and cause unnecessary reprocessing of the
-      // batch in Batch i
-      currentOffsetsAndSeqNums = fetchStartOffsetForEachPartition(validTime)
-      // we have to take "dead rest endpoint" as consumed all messages, considering the following
-      // example case:
-      // assuming C is the commited offset, and H is the highest offset in EventHubs
-      // in Batch i, stream 1 has consumed all messages, and
-      // C = 500; in Batch i + 1, rest endpoint die, C = 500; in Batch i + 2, new data comes, C is
-      // equal to the highest available offset in HDFS and does not equal to H, the thread will be
-      // blocked infinitely
-      consumedAllMessages = true
-      Some(context.sparkContext.emptyRDD[EventData])
+    val highestOffsetOption = composeHighestOffset(validTime)
+    logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
+    if (highestOffsetOption.isEmpty) {
+      val errorMsg = s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +
+        s" stop the application"
+      logError(errorMsg)
+      throw new IllegalStateException(errorMsg)
     } else {
-      var startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
-      while (startPointInNextBatch.equals(currentOffsetsAndSeqNums) &&
-        !startPointInNextBatch.equals(latestOffsetOfAllPartitions) &&
-        !consumedAllMessages &&
-        initialized) {
+      var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
+      while (startPointRecord.timestamp < validTime - ssc.graph.batchDuration) {
         logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
         graph.wait()
-        logInfo(s"wake up at Batch ${validTime.milliseconds}")
-        startPointInNextBatch = fetchStartOffsetForEachPartition(validTime)
+        logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
+        startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
       }
-      // keep this state to prevent dstream dying
-      if (startPointInNextBatch.equals(latestOffsetOfAllPartitions)) {
-        consumedAllMessages = true
-      } else {
-        consumedAllMessages = false
-      }
+      logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
+        s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
       initialized = true
-      proceedWithNonEmptyRDD(validTime, startPointInNextBatch, latestOffsetOfAllPartitions)
+      proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
     }
   }
 
@@ -329,16 +315,18 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private[eventhubs] class EventHubDirectDStreamCheckpointData(
       eventHubDirectDStream: EventHubDirectDStream) extends DStreamCheckpointData(this) {
 
-    def batchForTime: mutable.HashMap[Time,
-      Array[(EventHubNameAndPartition, Long, Long, Long)]] = {
-      data.asInstanceOf[mutable.HashMap[Time,
-        Array[(EventHubNameAndPartition, Long, Long, Long)]]]
+    def batchForTime: mutable.HashMap[Time, Array[(EventHubNameAndPartition, Long, Long, Long)]] = {
+      data.asInstanceOf[mutable.HashMap[Time, Array[(EventHubNameAndPartition, Long, Long, Long)]]]
     }
 
     override def update(time: Time): Unit = {
+      if (latestCheckpointTime == null || time > latestCheckpointTime) {
+        latestCheckpointTime = time
+      }
       batchForTime.clear()
-      generatedRDDs.filter(_._2.isInstanceOf[EventHubRDD]).foreach { kv =>
+      generatedRDDs.foreach { kv =>
         val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
+        logInfo(s"update RDD ${offsetRangeOfRDD.mkString("[", ", ", "]")} at ${kv._1}")
         batchForTime += kv._1 -> offsetRangeOfRDD
       }
     }
@@ -352,6 +340,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       ProgressTracker.initInstance(progressDir, context.sparkContext.appName,
         context.sparkContext.hadoopConfiguration)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
+        logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubRDD(
           context.sparkContext,
           eventhubsParams,

@@ -25,7 +25,7 @@ import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTracker
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker}
 import org.apache.spark.util.ManualClock
 
 /**
@@ -70,6 +70,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       }).length == expectedFileNum)
   }
 
+  // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
+  // we have to disable cleanup thread
   private def validateProgressFileCleanup(numNonExistBatch: Int, numBatches: Int): Unit = {
     // test cleanup of progress files
     // this test is tricky: because the offset committing and checkpoint data cleanup are performed
@@ -84,6 +86,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     // the existence of progress-(t-1) depends on the scheduling of threads
 
     // check progress directory
+    /*
     val fs = progressRootPath.getFileSystem(new Configuration)
     for (i <- 0 until numNonExistBatch) {
       assert(!fs.exists(new Path(progressRootPath.toString + s"/$appName/progress-" +
@@ -91,6 +94,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     }
     assert(fs.exists(new Path(progressRootPath.toString + s"/$appName/" +
       s"progress-${numBatches * 1000}")))
+    */
+
   }
 
 
@@ -99,8 +104,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
        input2: Seq[Seq[V]],
        eventhubsParams1: Map[String, Map[String, String]],
        eventhubsParams2: Map[String, Map[String, String]],
-       expectedStartingOffsetsAndSeqs1: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-       expectedStartingOffsetsAndSeqs2: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+       expectedStartingOffsetsAndSeqs1: Map[String, OffsetRecord],
+       expectedStartingOffsetsAndSeqs2: Map[String, OffsetRecord],
        operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
        expectedOutputBeforeRestart: Seq[Seq[W]],
        expectedOutputAfterRestart: Seq[Seq[W]]) {
@@ -122,8 +127,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart.length)
     validateTempFileCleanup(expectedOutputBeforeRestart.length - 1,
       expectedOutputBeforeRestart.length,
-      expectedStartingOffsetsAndSeqs1.values.flatten.size +
-        expectedStartingOffsetsAndSeqs2.values.flatten.size)
+      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsets).size +
+        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsets).size)
 
     val currentCheckpointDir = ssc.checkpointDir
     // simulate down
@@ -149,23 +154,26 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
-      expectedStartingOffsetsAndSeqs1.values.flatten.size +
-        expectedStartingOffsetsAndSeqs2.values.flatten.size)
+      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsets).size +
+        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsets).size)
   }
 
   protected def runStopAndRecover[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
+      expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
-      expectedOutputBeforeRestart: Seq[Seq[V]]): Unit = {
+      expectedOutputBeforeRestart: Seq[Seq[V]],
+      useSetFlag: Boolean = false): Unit = {
+
     testUnaryOperation(
       input,
       eventhubsParams,
       expectedStartingOffsetsAndSeqs,
       operation,
-      expectedOutputBeforeRestart)
+      expectedOutputBeforeRestart,
+      useSet = useSetFlag)
     testProgressTracker(eventhubNamespace, expectedOffsetsAndSeqs, 4000L)
 
     validateProgressFileCleanup(expectedOutputBeforeRestart.length - 2,
@@ -173,7 +181,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length - 1,
       expectedOutputBeforeRestart.length,
-      expectedOffsetsAndSeqs.size)
+      expectedOffsetsAndSeqs.offsets.size)
 
     val currentCheckpointDir = ssc.checkpointDir
     // simulate down
@@ -185,17 +193,18 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
   protected def testCheckpointedOperation[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]],
-      expectedStartingOffsetsAndSeqs: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      expectedOffsetsAndSeqs: Map[EventHubNameAndPartition, (Long, Long)],
+      expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
+      expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
       expectedOutputBeforeRestart: Seq[Seq[V]],
-      expectedOutputAfterRestart: Seq[Seq[V]]) {
+      expectedOutputAfterRestart: Seq[Seq[V]],
+      useSetFlag: Boolean = false) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
-      expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart)
+      expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart, useSetFlag = useSetFlag)
 
     // Restart and complete the computation from checkpoint file
     logInfo(
@@ -205,7 +214,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     )
 
     runStreamsWithEventHubInput(ssc, expectedOutputAfterRestart.length - 1,
-      expectedOutputAfterRestart, useSet = false)
+      expectedOutputAfterRestart, useSet = useSetFlag)
 
     validateProgressFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 3,
@@ -213,6 +222,6 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
-      expectedOffsetsAndSeqs.size)
+      expectedOffsetsAndSeqs.offsets.size)
   }
 }

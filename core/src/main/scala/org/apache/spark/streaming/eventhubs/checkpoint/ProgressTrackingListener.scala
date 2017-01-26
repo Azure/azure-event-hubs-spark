@@ -41,15 +41,19 @@ private[eventhubs] class ProgressTrackingListener private (
       // merge with the temp directory
       val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
       logInfo(s"progressInLastBatch $progressInLastBatch")
-      val contentToCommit = allEventDStreams.map {
-        dstream => ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums)
-      }.toMap.map { case (namespace, currentOffsets) =>
-        (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
-      }
       ssc.graph.synchronized {
-        progressTracker.commit(contentToCommit, batchTime)
-        logInfo(s"commit ending offset of Batch $batchTime $contentToCommit")
-        // NOTE: we need to notifyAll here to handle multiple EventHubDirectStreams in application
+        if (progressInLastBatch.nonEmpty) {
+          val contentToCommit = allEventDStreams.map {
+            dstream =>
+              ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums.offsets)
+          }.toMap.map { case (namespace, currentOffsets) =>
+            (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
+          }
+          progressTracker.commit(contentToCommit, batchTime)
+          logInfo(s"commit ending offset of Batch $batchTime $contentToCommit")
+        } else {
+          logInfo(s"read RDD data from Checkpoint at $batchTime, skip commits")
+        }
         ssc.graph.notifyAll()
       }
     }

@@ -16,16 +16,16 @@ We will have the official release in the maven central repo, you can add the fol
     <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>spark-streaming-eventhubs_2.11</artifactId>
-        <version>2.0.2</version>
+        <version>2.0.3</version>
     </dependency>
 
 #### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.2"
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.3"
 
 #### Maven Central for other dependency co-ordinates
 
-https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.2
+https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.3
 
 ### Getting Staging Version
 

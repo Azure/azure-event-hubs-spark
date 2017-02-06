@@ -20,16 +20,23 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.SparkContext
+
 
 /**
  * A DFS based OffsetStore implementation
  */
 @SerialVersionUID(1L)
 class DfsBasedOffsetStore(
-                           directory: String,
-                           namespace: String,
-                           name: String,
-                           partition: String) extends OffsetStore with Logging {
+                         directory: String,
+                         namespace: String,
+                         name: String,
+                         partition: String) extends OffsetStore with Logging {
+
+  if (!SparkContext.getOrCreate().isLocal) {
+    require(directory.startsWith("hdfs://") || directory.startsWith("adl://"),
+      "we only support to store offset in HDFS/ADLS when running Spark in non-local mode ")
+  }
 
   var path: Path = _
   var backupPath: Path = _
@@ -185,3 +192,4 @@ class DfsBasedOffsetStore(
     }
   }
 }
+

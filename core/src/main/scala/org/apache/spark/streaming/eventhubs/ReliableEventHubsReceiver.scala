@@ -23,6 +23,7 @@ import scala.collection.{mutable, Map}
 import com.microsoft.azure.eventhubs._
 
 import org.apache.spark.SparkEnv
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.storage.{StorageLevel, StreamBlockId}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener}

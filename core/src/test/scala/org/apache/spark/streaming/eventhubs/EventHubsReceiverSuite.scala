@@ -25,6 +25,7 @@ import org.mockito.Mockito._
 import org.mockito.internal.util.reflection.Whitebox
 import org.scalatest.mock.MockitoSugar
 
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore

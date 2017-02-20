@@ -22,7 +22,9 @@ import org.mockito.Mockito._
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.eventhubscommon.EventhubsOffsetTypes
+import org.apache.spark.eventhubscommon.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**

@@ -22,9 +22,10 @@ import java.io.{IOException, ObjectInputStream}
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
+import com.microsoft.azure.eventhubs.EventData
 
-import org.apache.spark.SparkException
+import org.apache.spark.eventhubscommon._
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
@@ -122,42 +123,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override def stop(): Unit = {
     eventHubClient.close()
   }
-
-  private def collectPartitionsNeedingLargerProcessingRange(): List[EventHubNameAndPartition] = {
-    val partitionList = new ListBuffer[EventHubNameAndPartition]
-    if (fetchedHighestOffsetsAndSeqNums != null) {
-      for ((ehNameAndPartition, (offset, seqId)) <- fetchedHighestOffsetsAndSeqNums.offsets) {
-        if (currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2 >=
-          fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2) {
-          partitionList += ehNameAndPartition
-        }
-      }
-    } else {
-      partitionList ++= eventhubNameAndPartitions
-    }
-    partitionList.toList
-  }
-
-  private def fetchLatestOffset(validTime: Time, retryIfFail: Boolean):
-      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
-    // check if there is any eventhubs partition which potentially has newly arrived message (
-    // the fetched highest message id is within the next batch's processing engine)
-    val demandingEhNameAndPartitions = collectPartitionsNeedingLargerProcessingRange()
-    val r = eventHubClient.endPointOfPartition(retryIfFail, demandingEhNameAndPartitions)
-    if (r.isDefined) {
-      // merge results
-      val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {
-        fetchedHighestOffsetsAndSeqNums.offsets ++ r.get
-      } else {
-        r.get
-      }
-      fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, mergedOffsets)
-      Some(fetchedHighestOffsetsAndSeqNums.offsets)
-    } else {
-      r
-    }
-  }
-
+  
   /**
    * EventHub uses *Number Of Messages* for rate control, but uses *offset* to setup of the start
    * point of the receivers. As a result, we need to translate the sequence number to offset to
@@ -288,20 +254,27 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def failIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
+  /**
+   * when we have reached the end of the message queue in the remote end or we haven't get any
+   * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
+   * to prevent we die too much, we shall retry with 2-power interval in this case
+   */
+  private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
-  private def composeHighestOffset(validTime: Time) = {
-    fetchLatestOffset(validTime, retryIfFail = failIfRestEndpointFail).orElse(
-      {
+  private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
+    CommonUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
+      case Some(highestOffsets) =>
+        fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, highestOffsets)
+        Some(fetchedHighestOffsetsAndSeqNums.offsets)
+      case _ =>
         logWarning(s"failed to fetch highest offset at $validTime")
-        if (failIfRestEndpointFail) {
+        if (retryIfFail) {
           None
         } else {
           Some(fetchedHighestOffsetsAndSeqNums.offsets)
         }
-      }
-    )
+    }
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
@@ -309,7 +282,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       ProgressTrackingListener.initInstance(ssc, progressDir)
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    val highestOffsetOption = composeHighestOffset(validTime)
+    val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
     logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
     if (highestOffsetOption.isEmpty) {
       val errorMsg = s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +

@@ -21,6 +21,7 @@ import scala.collection.Map
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.SparkConf
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}

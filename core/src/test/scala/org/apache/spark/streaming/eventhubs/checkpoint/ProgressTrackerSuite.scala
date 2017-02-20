@@ -23,8 +23,9 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.streaming.Time
-import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition, SharedUtils}
+import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, SharedUtils}
 
 class ProgressTrackerSuite extends SharedUtils {
 

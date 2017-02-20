@@ -15,21 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.client
 
 import java.net.SocketTimeoutException
 import java.time.Duration
-import java.util.concurrent.Executors
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 import scala.xml.XML
 
 import com.microsoft.azure.servicebus.SharedAccessSignatureTokenProvider
 import scalaj.http.{Http, HttpResponse}
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 /**
@@ -41,7 +41,7 @@ import org.apache.spark.internal.Logging
  * @param policyKeys a map from eventHub name to (policyName, policyKey) pair
  * @param threadNum the number of threads used to communicate with remote EventHub
  */
-private[eventhubs] class RestfulEventHubClient(
+private[spark] class RestfulEventHubClient(
     eventHubNamespace: String,
     numPartitionsEventHubs: Map[String, Int],
     consumerGroups: Map[String, String],
@@ -51,7 +51,7 @@ private[eventhubs] class RestfulEventHubClient(
   private val RETRY_INTERVAL_SECONDS = Array(8, 16, 32, 64, 128)
 
   // will be used to execute requests to EventHub
-  import Implicits.exec
+  import org.apache.spark.eventhubscommon.Implicits.exec
 
   private def createSasToken(eventHubName: String, policyName: String, policyKey: String):
       String = {
@@ -174,7 +174,7 @@ private[eventhubs] class RestfulEventHubClient(
   }
 }
 
-private[eventhubs] object RestfulEventHubClient {
+private[spark] object RestfulEventHubClient {
   def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
   RestfulEventHubClient = {
     new RestfulEventHubClient(eventHubNameSpace,

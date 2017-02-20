@@ -15,16 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.client
 
-private[eventhubs] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
-  override def toString: String = s"$eventHubName-partition-$partitionId"
-}
+private[spark] trait EventHubClient extends Serializable {
 
-private[eventhubs] object EventHubNameAndPartition {
-  def fromString(str: String): EventHubNameAndPartition = {
-    val Array(name, partition) = str.split("-partition-")
-    EventHubNameAndPartition(name, partition.toInt)
-  }
+  /**
+   * return the end point of each partition
+   * @return a map from eventhubName-partition to (offset, seq)
+   */
+  def endPointOfPartition(retryIfFail: Boolean): Option[Map[EventHubNameAndPartition, (Long, Long)]]
+
+  /**
+   * close this client
+   */
+  def close(): Unit
 }

@@ -24,6 +24,8 @@ import scala.reflect.ClassTag
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubClient
 import org.apache.spark.{SparkConf, SparkContext, SparkException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._

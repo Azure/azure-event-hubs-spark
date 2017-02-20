@@ -20,6 +20,7 @@ import scala.collection.Map
 
 import com.microsoft.azure.eventhubs._
 
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.internal.Logging
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.eventhubs.checkpoint.{DfsBasedOffsetStore, OffsetStore}

@@ -18,7 +18,6 @@
 package org.apache.spark.streaming.eventhubs.utils
 
 import scala.collection.mutable.ListBuffer
-import scala.reflect.ClassTag
 
 import com.microsoft.azure.eventhubs.EventData
 

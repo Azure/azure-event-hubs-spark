@@ -20,7 +20,6 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.progress.ProgressWriter

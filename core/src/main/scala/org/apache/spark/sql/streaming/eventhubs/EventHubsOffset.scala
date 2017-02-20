@@ -20,4 +20,9 @@ package org.apache.spark.sql.streaming.eventhubs
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.sql.execution.streaming.Offset
 
-case class EventHubsOffset(offsets: Map[EventHubNameAndPartition, (Long, Long)]) extends Offset
+case class EventHubsOffset(
+    batchId: Long,
+    offsets: Map[EventHubNameAndPartition, (Long, Long)]) extends Offset
+
+case class EventHubsBatchRecord(batchId: Long,
+                                targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset

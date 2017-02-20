@@ -20,7 +20,7 @@ package org.apache.spark.sql.streaming.eventhubs
 import org.apache.spark.eventhubscommon.{CommonUtils, EventHubNameAndPartition}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql.{DataFrame, SparkSession, SQLContext}
 import org.apache.spark.sql.execution.streaming.{Offset, Source}
 import org.apache.spark.sql.types._
 
@@ -64,7 +64,8 @@ private[eventhubs] class EventHubsSource(
   }
 
   private var currentOffsetsAndSeqNums: EventHubsOffset =
-    EventHubsOffset(ehNameAndPartitions.map{ehNameAndSpace => (ehNameAndSpace, (-1L, -1L))}.toMap)
+    EventHubsOffset(0L,
+      ehNameAndPartitions.map{ehNameAndSpace => (ehNameAndSpace, (-1L, -1L))}.toMap)
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {
@@ -80,7 +81,7 @@ private[eventhubs] class EventHubsSource(
   private[spark] def composeHighestOffset(retryIfFail: Boolean) = {
     CommonUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
       case Some(highestOffsets) =>
-        fetchedHighestOffsetsAndSeqNums = EventHubsOffset(highestOffsets)
+        fetchedHighestOffsetsAndSeqNums = EventHubsOffset(Long.MaxValue, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)
       case _ =>
         logWarning(s"failed to fetch highest offset")
@@ -105,13 +106,26 @@ private[eventhubs] class EventHubsSource(
    */
   override def getOffset: Option[Offset] = {
     // 1. get the highest offset
-    val highestOffsets = composeHighestOffset(failAppIfRestEndpointFail)
+    val highestOffsetsOpt = composeHighestOffset(failAppIfRestEndpointFail)
+    require(highestOffsetsOpt.isDefined, "cannot get highest offset from rest endpoint of" +
+      " eventhubs")
     // 2. rate limit
-    null
+    val targetOffsets = CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
+      highestOffsetsOpt.get, parameters)
+    Some(EventHubsBatchRecord(currentOffsetsAndSeqNums.batchId + 1, targetOffsets))
   }
 
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
-    null
+    val spark = SparkSession.builder().getOrCreate()
+    import spark.implicits._
+    if (start.isEmpty) {
+      // read from progress tracking directory to get the start offset of the undergoing batch
+
+    } else {
+      // start from the beginning of the stream
+    }
+    // TODO: create EventHubsRDD
+    Seq(1, 2, 3).toDF()
   }
 
   override def stop(): Unit = {

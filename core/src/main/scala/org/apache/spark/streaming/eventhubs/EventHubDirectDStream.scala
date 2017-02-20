@@ -20,13 +20,11 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{IOException, ObjectInputStream}
 
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD

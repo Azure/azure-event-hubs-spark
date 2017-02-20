@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+<<<<<<< HEAD
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.microsoft.azure.eventhubs.EventData
@@ -282,4 +283,42 @@ private[spark] class EventHubsSource(
 
 private object EventHubsSource {
   val streamIdGenerator = new AtomicInteger(0)
+=======
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.execution.streaming.{Offset, Source}
+import org.apache.spark.sql.types._
+
+class EventHubsSource(userDefinedKeys: Seq[String]) extends Source {
+
+  override def schema: StructType = {
+    // in this phase, we shall include the system properties as well as the ones defined in the
+    // application properties
+    // TODO: do we need to add body length?
+    StructType(Seq(
+      StructField("body", BinaryType),
+      StructField("offset", LongType),
+      StructField("seqNumber", LongType),
+      StructField("enqueuedTime", LongType),
+      StructField("publisher", StringType),
+      StructField("partitionKey", StringType)
+    ) ++ userDefinedKeys.map(udkey =>
+      StructField(udkey, ObjectType(classOf[Any]))))
+  }
+
+  /**
+   * @return return the target offset in the next batch
+   */
+  override def getOffset: Option[Offset] = {
+    // 1. get the highest offset
+    None
+  }
+
+  override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
+    null
+  }
+
+  override def stop(): Unit = {
+
+  }
+>>>>>>> refactor client part
 }

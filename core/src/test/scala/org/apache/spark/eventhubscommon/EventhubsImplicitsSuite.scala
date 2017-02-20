@@ -19,9 +19,6 @@ package org.apache.spark.eventhubscommon
 
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
-import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
-import org.apache.spark.streaming.receiver.ReceiverSupervisor
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 
 class EventhubsImplicitsSuite

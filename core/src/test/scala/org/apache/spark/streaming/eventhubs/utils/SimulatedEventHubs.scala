@@ -22,8 +22,9 @@ import scala.reflect.ClassTag
 
 import com.microsoft.azure.eventhubs.EventData
 
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper, TestEventHubOutputStream}
 
 private[eventhubs] class SimulatedEventHubs(
     namespace: String,

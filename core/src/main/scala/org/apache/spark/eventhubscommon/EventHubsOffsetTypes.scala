@@ -15,18 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon
 
-private[eventhubs] trait EventHubClient extends Serializable {
+object EventhubsOffsetTypes extends Enumeration {
 
-  /**
-   * return the end point of each partition
-   * @return a map from eventhubName-partition to (offset, seq)
-   */
-  def endPointOfPartition(retryIfFail: Boolean): Option[Map[EventHubNameAndPartition, (Long, Long)]]
+  type EventhubsOffsetType = Value
 
-  /**
-   * close this client
-   */
-  def close(): Unit
+  val None, PreviousCheckpoint, InputByteOffset, InputTimeOffset = Value
 }

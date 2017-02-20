@@ -15,11 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon
 
-object EventhubsOffsetTypes extends Enumeration {
+import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.internal.Logging
 
-  type EventhubsOffsetType = Value
+object CommonUtils extends Logging {
 
-  val None, PreviousCheckpoint, InputByteOffset, InputTimeOffset = Value
+  private[spark] def fetchLatestOffset(
+      eventHubClient: EventHubClient, retryIfFail: Boolean):
+      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+    eventHubClient.endPointOfPartition(retryIfFail)
+  }
 }

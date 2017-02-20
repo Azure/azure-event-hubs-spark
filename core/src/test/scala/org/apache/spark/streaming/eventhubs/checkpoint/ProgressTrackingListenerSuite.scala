@@ -20,9 +20,10 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.{EventHubNameAndPartition, SharedUtils}
+import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
 
 // scalastyle:off

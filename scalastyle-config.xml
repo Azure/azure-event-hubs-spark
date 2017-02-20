@@ -181,7 +181,7 @@ This file is divided into 3 sections:
     ]]></customMessage>
   </check>
 
-  <check customId="classforname" level="error" class="org.scalastyle.file.RegexChecker" enabled="true">
+  <check customId="classforname" level="error" class="org.scalastyle.file.RegexChecker" enabled="false">
     <parameters><parameter name="regex">Class\.forName</parameter></parameters>
     <customMessage><![CDATA[
       Are you sure that you want to use Class.forName? In most cases, you should use Utils.classForName instead.

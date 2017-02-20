@@ -84,12 +84,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     */
   }
 
-  private def maxRateLimitPerPartition(eventHubName: String): Int = {
-    val x = eventhubsParams(eventHubName).getOrElse("eventhubs.maxRate", "10000").toInt
-    require(x > 0, s"eventhubs.maxRate has to be larger than zero, violated by $eventHubName ($x)")
-    x
-  }
-
   private var _eventHubClient: EventHubClient = _
 
   private def progressTracker = ProgressTracker.getInstance
@@ -172,32 +166,20 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  /**
-   * return the last sequence number of each partition, which are to be received in this micro batch
-   * @param latestEndpoints the latest offset/seq of each partition
-   */
-  private def defaultRateControl(latestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
-      Map[EventHubNameAndPartition, Long] = {
-    latestEndpoints.map{
-      case (eventHubNameAndPar, (_, latestSeq)) =>
-        val maximumAllowedMessageCnt = maxRateLimitPerPartition(eventHubNameAndPar.eventHubName)
-        val endSeq = math.min(latestSeq,
-          maximumAllowedMessageCnt + currentOffsetsAndSeqNums.offsets(eventHubNameAndPar)._2)
-        (eventHubNameAndPar, endSeq)
-    }
-  }
-
-  private def clamp(latestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
+  private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
       Map[EventHubNameAndPartition, Long] = {
     if (rateController.isEmpty) {
-      defaultRateControl(latestEndpoints)
+      CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
+        fetchedHighestOffsetsAndSeqNums.offsets, eventhubsParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
       estimateRateLimit.filter(_ > 0) match {
         case None =>
-          defaultRateControl(latestEndpoints)
+          highestEndpoints.map{case (ehNameAndPartition, _) =>
+            (ehNameAndPartition, currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2)
+          }
         case Some(allowedRate) =>
-          val lagPerPartition = latestEndpoints.map {
+          val lagPerPartition = highestEndpoints.map {
             case (eventHubNameAndPartition, (_, latestSeq)) =>
               eventHubNameAndPartition ->
                 math.max(latestSeq - currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
@@ -217,14 +199,14 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def proceedWithNonEmptyRDD(
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
-      latestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
+      highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
     Option[EventHubRDD] = {
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch
-    val clampedSeqIDs = clamp(latestOffsetOfAllPartitions)
+    val clampedSeqIDs = clamp(highestOffsetOfAllPartitions)
     logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
-    val offsetRanges = latestOffsetOfAllPartitions.map {
+    val offsetRanges = highestOffsetOfAllPartitions.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
           fromOffset = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._1,

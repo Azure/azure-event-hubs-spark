@@ -22,6 +22,47 @@ import org.apache.spark.internal.Logging
 
 object CommonUtils extends Logging {
 
+  private def maxRateLimitPerPartition(
+      eventHubName: String,
+      eventhubsParams: Map[String, _]): Int = {
+    val maxRate = eventhubsParams.get(eventHubName) match {
+      case Some(eventHubsConfigEntries) =>
+        eventHubsConfigEntries.asInstanceOf[Map[String, String]].
+          getOrElse("eventhubs.maxRate", "10000").toInt
+      case None =>
+        eventhubsParams.asInstanceOf[Map[String, String]].
+          getOrElse("eventhubs.maxRate", "10000").toInt
+    }
+    require(maxRate > 0,
+      s"eventhubs.maxRate has to be larger than zero, violated by $eventHubName ($maxRate)")
+    maxRate
+  }
+
+  /**
+   * return the last sequence number of each partition, which are to be received in this micro batch
+   * @param highestEndpoints the latest offset/seq of each partition
+   */
+  private def defaultRateControl(
+      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
+      eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+    highestEndpoints.map{
+      case (eventHubNameAndPar, (_, latestSeq)) =>
+        val maximumAllowedMessageCnt = maxRateLimitPerPartition(
+          eventHubNameAndPar.eventHubName, eventhubsParams)
+        val endSeq = math.min(latestSeq,
+          maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2)
+        (eventHubNameAndPar, endSeq)
+    }
+  }
+
+  private[spark] def clamp(
+      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
+      eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+    defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, eventhubsParams)
+  }
+
   private[spark] def fetchLatestOffset(
       eventHubClient: EventHubClient, retryIfFail: Boolean):
       Option[Map[EventHubNameAndPartition, (Long, Long)]] = {

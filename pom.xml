@@ -214,8 +214,11 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_2.11</artifactId>
       <version>${spark.version}</version>
+<<<<<<< HEAD
       <type>test-jar</type>
       <scope>test</scope>
+=======
+>>>>>>> refactor client part
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>

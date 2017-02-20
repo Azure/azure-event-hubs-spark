@@ -22,7 +22,13 @@ import org.mockito.Mockito._
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
+<<<<<<< HEAD:core/src/test/scala/org/apache/spark/eventhubscommon/client/EventHubsClientWrapperSuite.scala
 import org.apache.spark.eventhubscommon.client.EventhubsOffsetTypes.EventhubsOffsetType
+=======
+import org.apache.spark.eventhubscommon.EventhubsOffsetTypes
+import org.apache.spark.eventhubscommon.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+>>>>>>> refactor client part:core/src/test/scala/org/apache/spark/streaming/eventhubs/EventHubsClientWrapperSuite.scala
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**

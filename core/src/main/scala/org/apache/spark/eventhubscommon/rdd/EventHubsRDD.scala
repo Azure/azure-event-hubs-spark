@@ -58,8 +58,10 @@ private[spark] class EventHubsRDD(
     }.toArray
   }
 
-  private def wrappingReceive(eventHubNameAndPartition: EventHubNameAndPartition,
-                              eventHubClient: EventHubsClientWrapper, expectedEventNumber: Int):
+  private def wrappingReceive(
+      eventHubNameAndPartition: EventHubNameAndPartition,
+      eventHubClient: EventHubsClientWrapper,
+      expectedEventNumber: Int):
     List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
     val receivingTrace = new ListBuffer[Long]

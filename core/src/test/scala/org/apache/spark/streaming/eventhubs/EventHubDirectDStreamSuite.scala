@@ -20,8 +20,14 @@ package org.apache.spark.streaming.eventhubs
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
+<<<<<<< HEAD
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.client.EventHubClient
+=======
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.{SparkConf, SparkContext, SparkException}
+>>>>>>> refactor client part
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 

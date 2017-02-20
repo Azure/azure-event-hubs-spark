@@ -61,5 +61,4 @@ private object JsonUtils {
       convertedStringIndexedMap += eventHubNameAndPartition.toString -> offsetAndSeqNum}
     Serialization.write((batchId, convertedStringIndexedMap))
   }
-
 }

@@ -176,7 +176,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
       Map[EventHubNameAndPartition, Long] = {
     if (rateController.isEmpty) {
+<<<<<<< HEAD
       RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
+=======
+      CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
+>>>>>>> refactor rate control
         fetchedHighestOffsetsAndSeqNums.offsets, eventhubsParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
@@ -207,7 +211,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
       highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
+<<<<<<< HEAD
     Option[EventHubsRDD] = {
+=======
+    Option[EventHubRDD] = {
+>>>>>>> refactor rate control
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch

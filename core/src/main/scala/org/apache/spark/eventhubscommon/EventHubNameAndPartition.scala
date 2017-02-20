@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+private[spark] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
 
-private[eventhubs] case class OffsetRange(
-    eventHubNameAndPartition: EventHubNameAndPartition,
-    fromOffset: Long,
-    fromSeq: Long,
-    untilSeq: Long) {
+  override def toString: String = s"$eventHubName-partition-$partitionId"
+}
 
-  private[eventhubs] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
+private[spark] object EventHubNameAndPartition {
+  def fromString(str: String): EventHubNameAndPartition = {
+    val Array(name, partition) = str.split("-partition-")
+    EventHubNameAndPartition(name, partition.toInt)
+  }
 }

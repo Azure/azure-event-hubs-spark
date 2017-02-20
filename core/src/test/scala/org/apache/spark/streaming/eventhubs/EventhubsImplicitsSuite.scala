@@ -19,6 +19,7 @@ package org.apache.spark.streaming.eventhubs
 
 import org.scalatest.mock.MockitoSugar
 
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 import org.apache.spark.streaming.receiver.ReceiverSupervisor
@@ -42,7 +43,7 @@ class EventhubsImplicitsSuite
   test("StreamingContext can be implicitly converted to eventhub streaming context") {
     val ssc = new StreamingContext(master, framework, batchDuration)
 
-    import org.apache.spark.streaming.eventhubs.Implicits._
+    import org.apache.spark.eventhubscommon.Implicits._
 
     val stream = ssc.unionedEventHubStream(ehParams)
     val stream2 = ssc.eventHubStream(ehParams, "0")

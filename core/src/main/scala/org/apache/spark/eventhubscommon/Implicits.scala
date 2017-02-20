@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon
 
 import java.util.concurrent.Executors
 
@@ -24,9 +24,11 @@ import scala.language.implicitConversions
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.streaming.eventhubs.EventHubsUtils
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 
@@ -34,7 +36,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Import the members of this object to enable the use of the unionedEventhubStream and
  * eventhubStream methods on the StreamingContext instead of the EventHubsUtils class.
  */
-object Implicits {
+private[spark] object Implicits {
 
   // will be used to execute requests to EventHub
   private[eventhubs] implicit val exec = {

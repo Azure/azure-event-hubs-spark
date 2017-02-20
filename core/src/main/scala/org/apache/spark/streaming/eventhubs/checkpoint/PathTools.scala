@@ -17,8 +17,8 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.streaming.Time
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
 private[checkpoint] object PathTools extends Serializable {
 

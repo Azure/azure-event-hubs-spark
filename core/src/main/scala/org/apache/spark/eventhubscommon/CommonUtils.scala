@@ -15,21 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon
 
-private[eventhubs] trait EventHubClient extends Serializable {
+import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.internal.Logging
 
-  /**
-   * return the end point of each partition
-   * @return a map from eventhubName-partition to (offset, seq)
-   */
-  def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-    Option[Map[EventHubNameAndPartition, (Long, Long)]]
+object CommonUtils extends Logging {
 
-  /**
-   * close this client
-   */
-  def close(): Unit
+  private[spark] def fetchLatestOffset(
+      eventHubClient: EventHubClient, retryIfFail: Boolean):
+      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+    eventHubClient.endPointOfPartition(retryIfFail)
+  }
 }

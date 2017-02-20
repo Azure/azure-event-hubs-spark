@@ -34,13 +34,10 @@ import org.apache.spark.eventhubscommon.client.{EventHubsClientWrapper, Eventhub
 import org.apache.spark.eventhubscommon.client.EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
-<<<<<<< HEAD
-=======
-import org.apache.spark.eventhubscommon.EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.SparkConf
 import org.apache.spark.eventhubscommon.EventhubsOffsetTypes
+import org.apache.spark.eventhubscommon.EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
->>>>>>> refactor client part
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 import org.apache.spark.util.Utils
 
@@ -169,7 +166,6 @@ class MyMockedEventHubsClientWrapper(
     logInfo(s"calling createReceiverInternal with $currentOffset and $offsetType")
 
     if (offsetType != EventhubsOffsetTypes.None) {
-
       offset = currentOffset.toInt
       partition = partitionId
     }

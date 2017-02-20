@@ -22,7 +22,10 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source
 import org.apache.spark.sql.sources.{DataSourceRegister, StreamSourceProvider}
 import org.apache.spark.sql.types._
+<<<<<<< HEAD
 import org.apache.spark.unsafe.types.UTF8String
+=======
+>>>>>>> refactor rate control
 
 private[sql] class EventHubsSourceProvider extends DataSourceRegister
   with StreamSourceProvider with Logging {
@@ -34,7 +37,17 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
       schema: Option[StructType],
       providerName: String,
       parameters: Map[String, String]): (String, StructType) = {
+<<<<<<< HEAD
     (shortName(), EventHubsSourceProvider.sourceSchema(parameters))
+=======
+    val userDefinedKeys = parameters.get("eventhubs.sql.userDefinedKeys") match {
+      case Some(keys) =>
+        keys.split(",").toSeq
+      case None =>
+        Seq()
+    }
+    (shortName(), EventHubsSourceProvider.sourceSchema(userDefinedKeys))
+>>>>>>> refactor rate control
   }
 
   override def createSource(
@@ -49,6 +62,7 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
   }
 }
 
+<<<<<<< HEAD
 private[sql] object EventHubsSourceProvider extends Serializable {
 
   private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(parameters: Map[String, String]):
@@ -67,6 +81,14 @@ private[sql] object EventHubsSourceProvider extends Serializable {
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
     val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
+=======
+private[sql] object EventHubsSourceProvider {
+
+  def sourceSchema(userDefinedKeys: Seq[String]): StructType = {
+    // in this phase, we shall include the system properties as well as the ones defined in the
+    // application properties
+    // TODO: do we need to add body length?
+>>>>>>> refactor rate control
     StructType(Seq(
       StructField("body", BinaryType),
       StructField("offset", LongType),
@@ -74,6 +96,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
       StructField("enqueuedTime", LongType),
       StructField("publisher", StringType),
       StructField("partitionKey", StringType)
+<<<<<<< HEAD
     ) ++ {if (containsProperties) {
       if (userDefinedKeys.nonEmpty) {
         userDefinedKeys.map(key => StructField(key, StringType))
@@ -85,3 +108,9 @@ private[sql] object EventHubsSourceProvider extends Serializable {
     }})
   }
 }
+=======
+    ) ++ userDefinedKeys.map(udkey =>
+      StructField(udkey, ObjectType(classOf[Any]))))
+  }
+}
+>>>>>>> refactor rate control

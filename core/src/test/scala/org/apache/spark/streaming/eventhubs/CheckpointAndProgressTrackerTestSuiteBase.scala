@@ -19,13 +19,13 @@ package org.apache.spark.streaming.eventhubs
 
 import scala.reflect.ClassTag
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
 
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.eventhubscommon.ProgressTrackerBase
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker}
+import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, OffsetRecord}
 import org.apache.spark.util.ManualClock
 
 /**
@@ -58,14 +58,16 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
       new PathFilter {
         override def accept(path: Path): Boolean = {
-          ProgressTracker.getInstance.fromPathToTimestamp(path) < 1000 * numNonExistBatch
+          ProgressTrackerBase.getInstance.asInstanceOf[DirectDStreamProgressTracker].
+            fromPathToTimestamp(path) < 1000 * numNonExistBatch
         }
       }).length == 0)
     // we do not consider APIs like take() here
     assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
       new PathFilter {
         override def accept(path: Path): Boolean = {
-          ProgressTracker.getInstance.fromPathToTimestamp(path) == 1000 * numBatches
+          ProgressTrackerBase.getInstance.asInstanceOf[DirectDStreamProgressTracker].
+            fromPathToTimestamp(path) == 1000 * numBatches
         }
       }).length == expectedFileNum)
   }

@@ -17,4 +17,12 @@
 
 package org.apache.spark.eventhubscommon
 
-private[spark] trait EventHubsConnector
+private[spark] trait EventHubsConnector {
+
+  // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
+  // eventhubs instance
+  def uid: String
+
+  // the list of eventhubs partitions connecting with this connector
+  def connectedInstances: List[EventHubNameAndPartition]
+}

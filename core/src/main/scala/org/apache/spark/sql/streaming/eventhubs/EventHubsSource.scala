@@ -70,7 +70,7 @@ private[spark] class EventHubsSource(
     _eventHubsReceiver
   }
 
-  private val ehNameAndPartitions = {
+  private[spark] val ehNameAndPartitions = {
     val partitionCount = parameters("eventhubs.partition.count").toInt
     (for (partitionId <- 0 until partitionCount)
       yield EventHubNameAndPartition(eventHubsName, partitionId)).toList

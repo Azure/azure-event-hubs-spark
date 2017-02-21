@@ -26,8 +26,9 @@ import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.streaming.eventhubs.EventHubsSource
 import org.apache.spark.streaming.{StreamingContext, Time}
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 
@@ -62,10 +63,14 @@ private[eventhubs] class ProgressTracker private[checkpoint](
   private val driverLock = new Object
 
   def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
-    ProgressTracker.eventHubDirectDStreams.map { directStream =>
-      val namespace = directStream.eventHubNameSpace
-      val ehSpace = directStream.eventhubNameAndPartitions
-      (namespace, ehSpace.toList)
+    ProgressTracker.registeredConnectors.map {
+      case directDStream: EventHubDirectDStream =>
+        val namespace = directDStream.eventHubNameSpace
+        val ehSpace = directDStream.eventhubNameAndPartitions
+        (namespace, ehSpace.toList)
+      case structuredStreamSource: EventHubsSource =>
+        (structuredStreamSource.eventhubsName,
+          structuredStreamSource.ehNameAndPartitions.toList)
     }.toMap
   }
 
@@ -429,12 +434,12 @@ private[eventhubs] class ProgressTracker private[checkpoint](
 
 private[eventhubs] object ProgressTracker {
 
-  private[eventhubs] val eventHubDirectDStreams = new ListBuffer[EventHubDirectDStream]
+  private[eventhubs] val registeredConnectors = new ListBuffer[EventHubsConnector]
 
   private var _progressTracker: ProgressTracker = _
 
   private[eventhubs] def reset(): Unit = {
-    eventHubDirectDStreams.clear()
+    registeredConnectors.clear()
     _progressTracker = null
   }
 

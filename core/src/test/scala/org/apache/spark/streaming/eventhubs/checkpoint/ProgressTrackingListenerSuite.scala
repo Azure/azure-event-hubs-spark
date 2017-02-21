@@ -21,12 +21,8 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.{SparkConf, SparkContext}
-<<<<<<< HEAD
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
-=======
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, ProgressTrackerBase}
->>>>>>> add ProgressTrackerBase
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
@@ -57,15 +53,12 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListener.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-<<<<<<< HEAD
     assert(fs.exists(new Path(progressTracker.progressDirectoryPath + "/progress-1000")))
     val record = progressTracker.asInstanceOf[DirectDStreamProgressTracker].read(eventhubNamespace,
       1000L, fallBack = false)
-=======
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
     val record = progressTracker.asInstanceOf[DirectDStreamProgressTracker].read(eventhubNamespace,
-      2000L, 1000L, fallBack = false)
->>>>>>> add ProgressTrackerBase
+      1000L, fallBack = false)
     assert(record === OffsetRecord(Time(1000L),
       Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
         EventHubNameAndPartition("eh1", 1) -> (1L, 2L))))
@@ -113,11 +106,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
-<<<<<<< HEAD
     assert(DirectDStreamProgressTracker.registeredConnectors.length === 2)
-=======
-    assert(ProgressTrackerBase.registeredConnectors.length === 2)
->>>>>>> add ProgressTrackerBase
     ssc.stop()
   }
 }

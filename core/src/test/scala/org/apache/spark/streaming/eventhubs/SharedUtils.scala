@@ -24,10 +24,16 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.{BeforeAndAfterEach, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
+<<<<<<< HEAD
 import org.apache.spark.eventhubscommon.EventHubsConnector
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
+=======
+import org.apache.spark.eventhubscommon.{EventHubsConnector, ProgressTrackerBase}
+import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
+>>>>>>> add ProgressTrackerBase
 
 private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 

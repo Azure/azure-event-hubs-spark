@@ -58,7 +58,11 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
       new PathFilter {
         override def accept(path: Path): Boolean = {
+<<<<<<< HEAD
           DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker].
+=======
+          ProgressTrackerBase.getInstance.asInstanceOf[DirectDStreamProgressTracker].
+>>>>>>> add ProgressTrackerBase
             fromPathToTimestamp(path) < 1000 * numNonExistBatch
         }
       }).length == 0)
@@ -66,7 +70,11 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     assert(fs.listStatus(new Path(progressRootPath.toString + s"/${appName}_temp"),
       new PathFilter {
         override def accept(path: Path): Boolean = {
+<<<<<<< HEAD
           DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker].
+=======
+          ProgressTrackerBase.getInstance.asInstanceOf[DirectDStreamProgressTracker].
+>>>>>>> add ProgressTrackerBase
             fromPathToTimestamp(path) == 1000 * numBatches
         }
       }).length == expectedFileNum)

@@ -15,13 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon
 
 /**
  * this class represent the record written by ProgressWriter and read by ProgressTracker
  * this class is supposed to only be used by the classes within checkpoint package
+ *
+ * timestamp in DirectDStream refers to the batch time, and in Structured Streaming refers to
+ * BatchID
+ *
  */
-private[checkpoint] case class ProgressRecord(
+private[spark] case class ProgressRecord(
     timestamp: Long, namespace: String, streamId: Int,
     eventHubName: String, partitionId: Int, offset: Long,
     seqId: Long) {
@@ -30,7 +34,7 @@ private[checkpoint] case class ProgressRecord(
   }
 }
 
-private[checkpoint] object ProgressRecord {
+private[spark] object ProgressRecord {
 
   def parse(line: String): Option[ProgressRecord] = {
     try {

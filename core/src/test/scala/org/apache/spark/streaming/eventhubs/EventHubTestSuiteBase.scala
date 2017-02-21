@@ -306,8 +306,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       expectedOffsetsAndSeqs: OffsetRecord,
       timestamp: Long): Unit = {
     val producedOffsetsAndSeqs = ProgressTrackerBase.getInstance.
-      asInstanceOf[DirectDStreamProgressTracker].read(namespace, timestamp,
-      batchDuration.milliseconds, fallBack = false)
+      asInstanceOf[DirectDStreamProgressTracker].read(namespace,
+      timestamp - batchDuration.milliseconds, fallBack = false)
     assert(producedOffsetsAndSeqs === expectedOffsetsAndSeqs)
   }
 

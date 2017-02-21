@@ -38,14 +38,14 @@ private[eventhubs] class ProgressTrackingListener private (
       if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
         val progressTracker = ProgressTracker.getInstance
         // build current offsets
-        val allEventDStreams = ProgressTracker.eventHubDirectDStreams
+        val allEventDStreams = ProgressTracker.registeredConnectors
         // merge with the temp directory
         val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
         logInfo(s"progressInLastBatch $progressInLastBatch")
         ssc.graph.synchronized {
           if (progressInLastBatch.nonEmpty) {
             val contentToCommit = allEventDStreams.map {
-              dstream =>
+              case dstream: EventHubDirectDStream =>
                 ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums.offsets)
             }.toMap.map { case (namespace, currentOffsets) =>
               (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))

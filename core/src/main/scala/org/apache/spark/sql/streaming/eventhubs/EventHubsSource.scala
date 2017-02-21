@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubscommon.{CommonUtils, EventHubNameAndPartition}
+import org.apache.spark.eventhubscommon.{CommonUtils, EventHubNameAndPartition, EventHubsConnector}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession, SQLContext}
@@ -27,19 +27,19 @@ import org.apache.spark.sql.types._
 /**
  * each source is mapped to an eventhubs instance
  */
-private[eventhubs] class EventHubsSource(
+private[spark] class EventHubsSource(
     sqlContext: SQLContext,
     parameters: Map[String, String],
     eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
       EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
-      RestfulEventHubClient.getInstance) extends Source with Logging {
+      RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
 
   private val eventhubsNamespace: String = parameters("eventhubs.namespace")
 
   require(eventhubsNamespace != null, "eventhubs.namespace is not defined")
 
-  private val eventhubsName: String = parameters("eventhubs.name")
+  private[spark] val eventhubsName: String = parameters("eventhubs.name")
 
   require(eventhubsName != null, "eventhubs.name is not defined")
 
@@ -57,7 +57,7 @@ private[eventhubs] class EventHubsSource(
     this
   }
 
-  private val ehNameAndPartitions = {
+  private[spark] val ehNameAndPartitions = {
     val partitionCount = parameters("eventhubs.partition.count").toInt
     for (partitionId <- 0 until partitionCount)
       yield EventHubNameAndPartition(eventhubsName, partitionId)

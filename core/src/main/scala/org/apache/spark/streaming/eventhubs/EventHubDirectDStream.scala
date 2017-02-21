@@ -52,7 +52,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                                               EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
                                               RestfulEventHubClient.getInstance)
-  extends InputDStream[EventData](_ssc) with Logging {
+  extends InputDStream[EventData](_ssc) with EventHubsConnector with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
@@ -60,7 +60,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
-  ProgressTracker.eventHubDirectDStreams += this
+  ProgressTracker.registeredConnectors += this
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
@@ -289,7 +289,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   @throws(classOf[IOException])
   private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
     ois.defaultReadObject()
-    ProgressTracker.eventHubDirectDStreams += this
+    ProgressTracker.registeredConnectors += this
     initialized = false
   }
 

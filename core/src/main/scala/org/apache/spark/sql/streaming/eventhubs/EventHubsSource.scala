@@ -39,7 +39,7 @@ private[spark] class EventHubsSource(
 
   require(eventhubsNamespace != null, "eventhubs.namespace is not defined")
 
-  private[spark] val eventhubsName: String = parameters("eventhubs.name")
+  private val eventhubsName: String = parameters("eventhubs.name")
 
   require(eventhubsName != null, "eventhubs.name is not defined")
 
@@ -57,10 +57,10 @@ private[spark] class EventHubsSource(
     this
   }
 
-  private[spark] val ehNameAndPartitions = {
+  private val ehNameAndPartitions = {
     val partitionCount = parameters("eventhubs.partition.count").toInt
-    for (partitionId <- 0 until partitionCount)
-      yield EventHubNameAndPartition(eventhubsName, partitionId)
+    (for (partitionId <- 0 until partitionCount)
+      yield EventHubNameAndPartition(eventhubsName, partitionId)).toList
   }
 
   private var currentOffsetsAndSeqNums: EventHubsOffset =
@@ -105,11 +105,9 @@ private[spark] class EventHubsSource(
    * @return return the target offset in the next batch
    */
   override def getOffset: Option[Offset] = {
-    // 1. get the highest offset
     val highestOffsetsOpt = composeHighestOffset(failAppIfRestEndpointFail)
     require(highestOffsetsOpt.isDefined, "cannot get highest offset from rest endpoint of" +
       " eventhubs")
-    // 2. rate limit
     val targetOffsets = CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
       highestOffsetsOpt.get, parameters)
     Some(EventHubsBatchRecord(currentOffsetsAndSeqNums.batchId + 1, targetOffsets))
@@ -131,4 +129,10 @@ private[spark] class EventHubsSource(
   override def stop(): Unit = {
 
   }
+
+  // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
+  override def uid: String = eventhubsName
+
+  // the list of eventhubs partitions connecting with this connector
+  override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
 }

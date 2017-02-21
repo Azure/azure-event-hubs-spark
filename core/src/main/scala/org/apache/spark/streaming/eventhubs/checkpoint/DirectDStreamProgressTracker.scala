@@ -26,11 +26,9 @@ import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, PathTools, ProgressTrackerBase}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.streaming.eventhubs.EventHubsSource
 import org.apache.spark.streaming.{StreamingContext, Time}
-import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 
 
 case class OffsetRecord(timestamp: Time, offsets: Map[EventHubNameAndPartition, (Long, Long)])
@@ -46,33 +44,15 @@ case class OffsetRecord(timestamp: Time, offsets: Map[EventHubNameAndPartition, 
  * @param appName the name of Spark application
  * @param hadoopConfiguration the hadoop configuration instance
  */
-private[eventhubs] class ProgressTracker private[checkpoint](
+private[spark] class DirectDStreamProgressTracker private[spark](
     progressDir: String,
     appName: String,
-    private val hadoopConfiguration: Configuration) extends Logging {
-
-  private val progressDirStr = PathTools.progressDirPathStr(progressDir, appName)
-  private val progressTempDirStr = PathTools.progressTempDirPathStr(progressDir,
-    appName)
-
-  private[eventhubs] val progressDirPath = new Path(progressDirStr)
-  private[eventhubs] val progressTempDirPath = new Path(progressTempDirStr)
+    hadoopConfiguration: Configuration)
+  extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) with Logging {
 
   // the lock synchronizing the read and committing operations, since they are executed in driver
   // and listener thread respectively.
   private val driverLock = new Object
-
-  def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
-    ProgressTracker.registeredConnectors.map {
-      case directDStream: EventHubDirectDStream =>
-        val namespace = directDStream.eventHubNameSpace
-        val ehSpace = directDStream.eventhubNameAndPartitions
-        (namespace, ehSpace.toList)
-      case structuredStreamSource: EventHubsSource =>
-        (structuredStreamSource.eventhubsName,
-          structuredStreamSource.ehNameAndPartitions.toList)
-    }.toMap
-  }
 
   private def allEventNameAndPartitionExist(
     candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
@@ -145,7 +125,7 @@ private[eventhubs] class ProgressTracker private[checkpoint](
    * called when ProgressTracker is called for the first time, including recovering from the
    * checkpoint
    */
-  private def init(): Unit = {
+  override def init(): Unit = {
     // recover from partially executed checkpoint commit
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     try {
@@ -429,32 +409,5 @@ private[eventhubs] class ProgressTracker private[checkpoint](
       ret(progressRecord.namespace) = newMap
     }
     ret.toMap
-  }
-}
-
-private[eventhubs] object ProgressTracker {
-
-  private[eventhubs] val registeredConnectors = new ListBuffer[EventHubsConnector]
-
-  private var _progressTracker: ProgressTracker = _
-
-  private[eventhubs] def reset(): Unit = {
-    registeredConnectors.clear()
-    _progressTracker = null
-  }
-
-  def getInstance: ProgressTracker = _progressTracker
-
-  private[eventhubs] def initInstance(
-      progressDirStr: String,
-      appName: String,
-      hadoopConfiguration: Configuration): ProgressTracker = this.synchronized {
-    if (_progressTracker == null) {
-      _progressTracker = new ProgressTracker(progressDirStr,
-        appName,
-        hadoopConfiguration)
-      _progressTracker.init()
-    }
-    _progressTracker
   }
 }

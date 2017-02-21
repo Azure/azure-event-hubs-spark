@@ -21,7 +21,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, ProgressTrackerBase}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
@@ -53,7 +53,8 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     progressListener.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
-    val record = progressTracker.read(eventhubNamespace, 2000L, 1000L, fallBack = false)
+    val record = progressTracker.asInstanceOf[DirectDStreamProgressTracker].read(eventhubNamespace,
+      2000L, 1000L, fallBack = false)
     assert(record === OffsetRecord(Time(1000L),
       Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
         EventHubNameAndPartition("eh1", 1) -> (1L, 2L))))
@@ -100,7 +101,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
-    assert(ProgressTracker.registeredConnectors.length === 2)
+    assert(ProgressTrackerBase.registeredConnectors.length === 2)
     ssc.stop()
   }
 }

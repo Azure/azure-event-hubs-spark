@@ -19,6 +19,7 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 
 import scala.collection.mutable.ListBuffer
 
+import org.apache.spark.eventhubscommon.ProgressTrackerBase
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
@@ -36,9 +37,10 @@ private[eventhubs] class ProgressTrackingListener private (
     val batchTime = batchCompleted.batchInfo.batchTime.milliseconds
     try {
       if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-        val progressTracker = ProgressTracker.getInstance
+        val progressTracker = ProgressTrackerBase.getInstance.
+          asInstanceOf[DirectDStreamProgressTracker]
         // build current offsets
-        val allEventDStreams = ProgressTracker.registeredConnectors
+        val allEventDStreams = ProgressTrackerBase.registeredConnectors
         // merge with the temp directory
         val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
         logInfo(s"progressInLastBatch $progressInLastBatch")

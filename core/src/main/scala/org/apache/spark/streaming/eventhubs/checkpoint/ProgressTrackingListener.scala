@@ -40,7 +40,11 @@ private[eventhubs] class ProgressTrackingListener private (
         val progressTracker = DirectDStreamProgressTracker.getInstance.
           asInstanceOf[DirectDStreamProgressTracker]
         // build current offsets
+<<<<<<< HEAD
         val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
+=======
+        val allEventDStreams = ProgressTracker.registeredConnectors
+>>>>>>> sync
         // merge with the temp directory
         val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
         logInfo(s"progressInLastBatch $progressInLastBatch")
@@ -48,7 +52,11 @@ private[eventhubs] class ProgressTrackingListener private (
           if (progressInLastBatch.nonEmpty) {
             val contentToCommit = allEventDStreams.map {
               case dstream: EventHubDirectDStream =>
+<<<<<<< HEAD
                 (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
+=======
+                ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums.offsets)
+>>>>>>> sync
             }.toMap.map { case (namespace, currentOffsets) =>
               (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
             }

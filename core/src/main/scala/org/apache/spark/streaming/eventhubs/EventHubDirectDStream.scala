@@ -61,7 +61,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
+<<<<<<< HEAD
   DirectDStreamProgressTracker.registeredConnectors += this
+=======
+  ProgressTracker.registeredConnectors += this
+>>>>>>> sync
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
@@ -306,7 +310,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   @throws(classOf[IOException])
   private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
     ois.defaultReadObject()
+<<<<<<< HEAD
     DirectDStreamProgressTracker.registeredConnectors += this
+=======
+    ProgressTracker.registeredConnectors += this
+>>>>>>> sync
     initialized = false
   }
 

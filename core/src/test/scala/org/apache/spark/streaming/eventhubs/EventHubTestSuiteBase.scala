@@ -29,11 +29,11 @@ import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.powermock.reflect.Whitebox
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, ProgressTrackerBase}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker}
+import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, OffsetRecord}
 import org.apache.spark.streaming.eventhubs.utils._
 import org.apache.spark.util.{ManualClock, Utils}
 
@@ -305,7 +305,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace: String,
       expectedOffsetsAndSeqs: OffsetRecord,
       timestamp: Long): Unit = {
-    val producedOffsetsAndSeqs = ProgressTracker.getInstance.read(namespace, timestamp,
+    val producedOffsetsAndSeqs = ProgressTrackerBase.getInstance.
+      asInstanceOf[DirectDStreamProgressTracker].read(namespace, timestamp,
       batchDuration.milliseconds, fallBack = false)
     assert(producedOffsetsAndSeqs === expectedOffsetsAndSeqs)
   }

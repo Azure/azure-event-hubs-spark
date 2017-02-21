@@ -21,11 +21,12 @@ import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterEach, FunSuite}
+import org.scalatest.{BeforeAndAfterEach, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.eventhubscommon.{EventHubsConnector, ProgressTrackerBase}
 import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
 
 private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
@@ -37,7 +38,7 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
   var progressRootPath: Path = _
   var progressListener: ProgressTrackingListener = _
   var ssc: StreamingContext = _
-  var progressTracker: ProgressTracker = _
+  var progressTracker: ProgressTrackerBase[_ <: EventHubsConnector] = _
 
   protected val streamingClock = "org.apache.spark.util.SystemClock"
 
@@ -59,12 +60,12 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     sparkContext.setLogLevel("INFO")
     ssc = new StreamingContext(sparkContext, batchDuration)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
-      new Configuration())
+    progressTracker = ProgressTrackerBase.initInstance(progressRootPath.toString, appName,
+      new Configuration(), "directDStream")
   }
 
   protected def reset(): Unit = {
-    ProgressTracker.reset()
+    ProgressTrackerBase.reset()
     progressTracker = null
     progressListener = null
     EventHubDirectDStream.lastCleanupTime = -1

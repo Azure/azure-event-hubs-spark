@@ -24,9 +24,9 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, ProgressTrackerBase}
 import org.apache.spark.streaming._
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTrackingListener}
 import org.apache.spark.streaming.eventhubs.utils.FragileEventHubClient
 import org.apache.spark.util.ManualClock
 
@@ -38,8 +38,8 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
-      new Configuration())
+    progressTracker = ProgressTrackerBase.initInstance(progressRootPath.toString,
+      appName, new Configuration(), "directDStream")
   }
 
   override def batchDuration: Duration = Seconds(1)
@@ -79,7 +79,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
-    assert(ProgressTracker.getInstance != null)
+    assert(ProgressTrackerBase.getInstance != null)
     assert(eventHubDirectDStream.eventHubClient != null)
   }
 

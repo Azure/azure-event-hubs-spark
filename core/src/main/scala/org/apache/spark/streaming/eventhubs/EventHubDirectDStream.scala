@@ -137,8 +137,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    * @return EventHubName-Partition -> (offset, seq)
    */
   private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
-    val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds,
-      ssc.graph.batchDuration.milliseconds, fallBack)
+    val offsetRecord = progressTracker.read(eventHubNameSpace,
+      validTime.milliseconds - ssc.graph.batchDuration.milliseconds, fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
     OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
       offsetRecord.timestamp.milliseconds)), offsetRecord.offsets)

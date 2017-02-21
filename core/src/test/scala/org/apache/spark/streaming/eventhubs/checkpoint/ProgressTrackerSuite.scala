@@ -22,16 +22,11 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-<<<<<<< HEAD
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressTrackerBase, ProgressWriter}
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.SharedUtils
-=======
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.streaming.Time
-import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, SharedUtils}
->>>>>>> refactor client part
+
 
 class ProgressTrackerSuite extends SharedUtils {
 
@@ -262,7 +257,6 @@ class ProgressTrackerSuite extends SharedUtils {
   test("latest offsets can be committed correctly and temp directory is not cleaned") {
     progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
-
     var progressWriter = new ProgressWriter(0, "namespace1", EventHubNameAndPartition("eh1", 0),
       1000L, new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 0)

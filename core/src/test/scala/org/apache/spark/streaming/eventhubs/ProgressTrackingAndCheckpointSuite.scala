@@ -24,12 +24,8 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-<<<<<<< HEAD
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.utils.FragileEventHubClient
-=======
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
->>>>>>> refactor client part
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
 import org.apache.spark.util.ManualClock

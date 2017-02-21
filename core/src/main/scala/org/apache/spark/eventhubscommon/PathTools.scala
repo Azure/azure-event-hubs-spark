@@ -17,19 +17,21 @@
 
 package org.apache.spark.eventhubscommon
 
-/**
- * interface representing the bridge between EventHubs and Spark-side processing engine
- * (Direct DStream or Structured Streaming)
- */
-private[spark] trait EventHubsConnector {
+private[spark] object PathTools extends Serializable {
 
-  // the id of the stream which is mapped from eventhubs instance
-  def streamId: Int
+  def progressDirPathStr(checkpointDir: String, appName: String): String = {
+    s"$checkpointDir/$appName"
+  }
 
-  // uniquely identify the entities in eventhubs side, it can be the EventHubs namespace or the
-  // combination of namespace and eventhubs name and streamId
-  def uid: String
+  def progressTempDirPathStr(checkpointDir: String, appName: String): String = {
+    s"$checkpointDir/${appName}_temp"
+  }
 
-  // the list of eventhubs partitions connecting with this connector
-  def connectedInstances: List[EventHubNameAndPartition]
+  def progressTempFileStr(basePath: String,
+                          streamId: Int,
+                          namespace: String,
+                          eventHubNameAndPartition: EventHubNameAndPartition,
+                          timestamp: Long): String = {
+    basePath + s"/$streamId-$namespace-$eventHubNameAndPartition-$timestamp"
+  }
 }

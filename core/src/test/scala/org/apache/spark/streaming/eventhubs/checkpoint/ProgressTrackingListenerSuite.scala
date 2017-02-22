@@ -22,7 +22,7 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubscommon.progress.{ProgressTrackerBase, ProgressWriter}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo

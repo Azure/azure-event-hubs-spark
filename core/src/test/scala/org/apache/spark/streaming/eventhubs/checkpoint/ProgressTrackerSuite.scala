@@ -23,7 +23,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressTrackerBase}
+import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressTrackerBase, ProgressWriter}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, SharedUtils}

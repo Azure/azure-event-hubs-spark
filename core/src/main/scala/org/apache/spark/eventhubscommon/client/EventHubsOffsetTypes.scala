@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubscommon.client
 
 object EventhubsOffsetTypes extends Enumeration {
 

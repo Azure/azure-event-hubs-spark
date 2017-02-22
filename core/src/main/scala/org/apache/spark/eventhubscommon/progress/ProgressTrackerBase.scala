@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubscommon.progress
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
 
@@ -26,6 +26,7 @@ import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, OffsetRecord}

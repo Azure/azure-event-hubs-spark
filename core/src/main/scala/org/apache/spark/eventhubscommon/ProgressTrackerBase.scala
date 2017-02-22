@@ -17,13 +17,13 @@
 
 package org.apache.spark.eventhubscommon
 
-import java.io.{BufferedReader, InputStreamReader, IOException}
+import java.io.{BufferedReader, IOException, InputStreamReader}
 
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, FSDataInputStream, Path}
+import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream, FileSystem, Path}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.Time
@@ -181,6 +181,51 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         throw ias
     }
     OffsetRecord(Time(readTimestamp), recordToReturn)
+  }
+
+  // write offsetToCommit to a progress tracking file
+  private def transaction(
+     offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+     fs: FileSystem,
+     commitTime: Long): Unit = {
+    var oos: FSDataOutputStream = null
+    try {
+      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"))
+      offsetToCommit.foreach {
+        case ((namespace, streamId), ehNameAndPartitionToOffsetAndSeq) =>
+          ehNameAndPartitionToOffsetAndSeq.foreach {
+            case (nameAndPartitionId, (offset, seq)) =>
+              oos.writeBytes(
+                ProgressRecord(commitTime, namespace, streamId,
+                  nameAndPartitionId.eventHubName, nameAndPartitionId.partitionId, offset,
+                  seq).toString + "\n"
+              )
+          }
+      }
+    } finally {
+      if (oos != null) {
+        oos.close()
+      }
+    }
+  }
+
+  /**
+   * commit offsetToCommit to a new progress tracking file
+   */
+  protected def commit(
+      offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+      commitTime: Long): Unit = {
+    val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
+    try {
+      transaction(offsetToCommit, fs, commitTime)
+    } catch {
+      case ioe: IOException =>
+        ioe.printStackTrace()
+        throw ioe
+    } finally {
+      // EMPTY, we leave the cleanup of partially executed transaction to the moment when recovering
+      // from failure
+    }
   }
 
   def init()

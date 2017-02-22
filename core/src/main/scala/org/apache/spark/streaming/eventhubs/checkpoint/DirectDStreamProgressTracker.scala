@@ -196,56 +196,5 @@ private[spark] class DirectDStreamProgressTracker private[spark](
     super.commit(offsetToCommit, commitTime)
   }
 
-  private def allProgressRecords(timestamp: Long): List[FileStatus] = {
-    val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-    val r = fs.listStatus(progressTempDirPath, new PathFilter {
-      override def accept(path: Path) = {
-        path.getName.split("-").last == timestamp.toString
-      }
-    }).toList
-    r
-  }
 
-  /**
-   * read progress records from temp directories
-   * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
-   */
-  def collectProgressRecordsForBatch(timestamp: Long):
-      Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
-    val records = new ListBuffer[ProgressRecord]
-    val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
-    try {
-      val fs = progressTempDirPath.getFileSystem(new Configuration())
-      val files = allProgressRecords(timestamp).iterator
-      while (files.hasNext) {
-        val file = files.next()
-        val progressRecords = readProgressRecordLines(file.getPath, fs)
-        records ++= progressRecords
-      }
-      // check timestamp consistency
-      records.foreach(progressRecord =>
-        if (timestamp != progressRecord.timestamp) {
-            throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
-              s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
-              s" implementation of underlying file system")
-        })
-    } catch {
-      case ioe: IOException =>
-        logError(s"error: ${ioe.getMessage}")
-        ioe.printStackTrace()
-        throw ioe
-      case t: Throwable =>
-        logError(s"unknown error ${t.getMessage}")
-        t.printStackTrace()
-        throw t
-    }
-    // produce the return value
-    records.foreach { progressRecord =>
-      val newMap = ret.getOrElseUpdate(progressRecord.namespace, Map()) +
-        (EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) ->
-          (progressRecord.offset, progressRecord.seqId))
-      ret(progressRecord.namespace) = newMap
-    }
-    ret.toMap
-  }
 }

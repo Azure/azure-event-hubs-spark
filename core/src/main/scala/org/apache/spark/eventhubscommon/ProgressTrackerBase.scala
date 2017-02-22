@@ -19,11 +19,12 @@ package org.apache.spark.eventhubscommon
 
 import java.io.{BufferedReader, IOException, InputStreamReader}
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataInputStream, FSDataOutputStream, FileSystem, Path}
+import org.apache.hadoop.fs._
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.Time
@@ -138,7 +139,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   /**
    * read the progress record for the specified progressEntityID and timestamp
    */
-  protected def read(targetConnectorID: String, timestamp: Long, fallBack: Boolean,
+  def read(targetConnectorID: String, timestamp: Long, fallBack: Boolean,
            predicateWithinProgressFile: (ProgressRecord, String) => Boolean): OffsetRecord = {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     var recordToReturn = Map[EventHubNameAndPartition, (Long, Long)]()
@@ -212,7 +213,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   /**
    * commit offsetToCommit to a new progress tracking file
    */
-  protected def commit(
+  def commit(
       offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = {
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
@@ -226,6 +227,59 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       // EMPTY, we leave the cleanup of partially executed transaction to the moment when recovering
       // from failure
     }
+  }
+
+  private def allProgressRecords(timestamp: Long): List[FileStatus] = {
+    val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
+    val r = fs.listStatus(progressTempDirPath, new PathFilter {
+      override def accept(path: Path) = {
+        path.getName.split("-").last == timestamp.toString
+      }
+    }).toList
+    r
+  }
+
+  /**
+   * read progress records from temp directories
+   * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
+   */
+  def collectProgressRecordsForBatch(timestamp: Long):
+  Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
+    val records = new ListBuffer[ProgressRecord]
+    val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
+    try {
+      val fs = progressTempDirPath.getFileSystem(new Configuration())
+      val files = allProgressRecords(timestamp).iterator
+      while (files.hasNext) {
+        val file = files.next()
+        val progressRecords = readProgressRecordLines(file.getPath, fs)
+        records ++= progressRecords
+      }
+      // check timestamp consistency
+      records.foreach(progressRecord =>
+        if (timestamp != progressRecord.timestamp) {
+          throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
+            s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
+            s" implementation of underlying file system")
+        })
+    } catch {
+      case ioe: IOException =>
+        logError(s"error: ${ioe.getMessage}")
+        ioe.printStackTrace()
+        throw ioe
+      case t: Throwable =>
+        logError(s"unknown error ${t.getMessage}")
+        t.printStackTrace()
+        throw t
+    }
+    // produce the return value
+    records.foreach { progressRecord =>
+      val newMap = ret.getOrElseUpdate(progressRecord.namespace, Map()) +
+        (EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) ->
+          (progressRecord.offset, progressRecord.seqId))
+      ret(progressRecord.namespace) = newMap
+    }
+    ret.toMap
   }
 
   def init()

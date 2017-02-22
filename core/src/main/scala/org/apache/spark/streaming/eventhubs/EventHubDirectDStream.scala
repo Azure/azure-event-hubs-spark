@@ -27,6 +27,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubscommon._
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubscommon.rdd.{EventHubRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}

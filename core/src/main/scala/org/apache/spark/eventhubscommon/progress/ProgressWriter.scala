@@ -15,18 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.progress
 
 import java.io.IOException
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
-import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
-private[eventhubs] class ProgressWriter(
+private[spark] class ProgressWriter(
      progressDir: String,
      appName: String,
      streamId: Int,
@@ -39,7 +38,7 @@ private[eventhubs] class ProgressWriter(
     PathTools.progressTempDirPathStr(progressDir, appName),
     streamId, namespace, eventHubNameAndPartition, timestamp)
 
-  private[eventhubs] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
+  private[spark] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
 
   def write(recordTime: Long, cpOffset: Long, cpSeq: Long): Unit = {
     val fs = tempProgressTrackingPointPath.getFileSystem(hadoopConfiguration)

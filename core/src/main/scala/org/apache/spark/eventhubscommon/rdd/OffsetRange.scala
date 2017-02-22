@@ -15,8 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.rdd
 
-// a bridging object to avoid serialzing offsetstore instances
-private[eventhubs] case class OffsetStoreParams(checkpointDir: String, appName: String,
-                                                streamId: Int, eventHubNamespace: String)
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+
+private[spark] case class OffsetRange(
+    eventHubNameAndPartition: EventHubNameAndPartition,
+    fromOffset: Long,
+    fromSeq: Long,
+    untilSeq: Long) {
+
+  private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
+}

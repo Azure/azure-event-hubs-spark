@@ -20,7 +20,7 @@ package org.apache.spark.eventhubscommon
 import org.apache.spark.eventhubscommon.client.EventHubClient
 import org.apache.spark.internal.Logging
 
-object CommonUtils extends Logging {
+object RateControlUtils extends Logging {
 
   private def maxRateLimitPerPartition(
       eventHubName: String,

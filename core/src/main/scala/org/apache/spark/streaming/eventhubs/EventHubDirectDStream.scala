@@ -25,6 +25,7 @@ import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
@@ -175,7 +176,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
       Map[EventHubNameAndPartition, Long] = {
     if (rateController.isEmpty) {
-      CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
+      RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
         fetchedHighestOffsetsAndSeqNums.offsets, eventhubsParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
@@ -251,7 +252,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
   private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
-    CommonUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
+    RateControlUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)

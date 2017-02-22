@@ -22,7 +22,8 @@ import java.io.IOException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, PathTools, ProgressRecord}
+import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord}
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 private[eventhubs] class ProgressWriter(

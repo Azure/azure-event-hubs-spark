@@ -23,7 +23,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressTrackerBase, ProgressWriter}
+import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressWriter}
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.SharedUtils
 

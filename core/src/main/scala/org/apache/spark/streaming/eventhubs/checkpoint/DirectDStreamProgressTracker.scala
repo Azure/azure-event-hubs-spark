@@ -152,32 +152,6 @@ private[spark] class DirectDStreamProgressTracker private[spark](
 
   def close(): Unit = {}
 
-  // write offsetToCommit to a progress tracking file
-  private def transaction(
-      offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
-      fs: FileSystem,
-      commitTime: Long): Unit = {
-    var oos: FSDataOutputStream = null
-    try {
-      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"))
-      offsetToCommit.foreach {
-        case ((namespace, streamId), ehNameAndPartitionToOffsetAndSeq) =>
-          ehNameAndPartitionToOffsetAndSeq.foreach {
-            case (nameAndPartitionId, (offset, seq)) =>
-              oos.writeBytes(
-                ProgressRecord(commitTime, namespace, streamId,
-                  nameAndPartitionId.eventHubName, nameAndPartitionId.partitionId, offset,
-                  seq).toString + "\n"
-              )
-          }
-      }
-    } finally {
-      if (oos != null) {
-        oos.close()
-      }
-    }
-  }
-
   // called in EventHubDirectDStream's clearCheckpointData method
   def cleanProgressFile(checkpointTime: Long): Unit = driverLock.synchronized {
     // because offset committing and checkpoint data cleanup are performed in two different threads,
@@ -216,19 +190,10 @@ private[spark] class DirectDStreamProgressTracker private[spark](
   /**
    * commit offsetToCommit to a new progress tracking file
    */
-  def commit(offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+  override def commit(
+      offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = driverLock.synchronized {
-    val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
-    try {
-      transaction(offsetToCommit, fs, commitTime)
-    } catch {
-      case ioe: IOException =>
-        ioe.printStackTrace()
-        throw ioe
-    } finally {
-      // EMPTY, we leave the cleanup of partially executed transaction to the moment when recovering
-      // from failure
-    }
+    super.commit(offsetToCommit, commitTime)
   }
 
   private def allProgressRecords(timestamp: Long): List[FileStatus] = {

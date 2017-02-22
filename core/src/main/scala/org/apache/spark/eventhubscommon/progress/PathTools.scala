@@ -34,11 +34,11 @@ private[spark] object PathTools extends Serializable {
   }
 
   def progressTempFileStr(
-      basePath: String,
-      streamId: Int,
-      uid: String,
-      eventHubNameAndPartition: EventHubNameAndPartition,
-      timestamp: Long): String = {
+                           basePath: String,
+                           streamId: Int,
+                           uid: String,
+                           eventHubNameAndPartition: EventHubNameAndPartition,
+                           timestamp: Long): String = {
     basePath + s"/$streamId-$uid-$eventHubNameAndPartition-$timestamp"
   }
 }

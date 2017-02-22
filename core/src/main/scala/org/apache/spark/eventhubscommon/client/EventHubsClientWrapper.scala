@@ -24,8 +24,8 @@ import scala.collection.Map
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import com.microsoft.azure.servicebus._
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventhubsOffsetTypes}
-import org.apache.spark.eventhubscommon.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**

@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubscommon.{CommonUtils, EventHubNameAndPartition, EventHubsConnector}
+import org.apache.spark.eventhubscommon.{RateControlUtils, EventHubNameAndPartition, EventHubsConnector}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession, SQLContext}
@@ -79,7 +79,7 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def composeHighestOffset(retryIfFail: Boolean) = {
-    CommonUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
+    RateControlUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = EventHubsOffset(Long.MaxValue, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)
@@ -108,7 +108,7 @@ private[spark] class EventHubsSource(
     val highestOffsetsOpt = composeHighestOffset(failAppIfRestEndpointFail)
     require(highestOffsetsOpt.isDefined, "cannot get highest offset from rest endpoint of" +
       " eventhubs")
-    val targetOffsets = CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
+    val targetOffsets = RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
       highestOffsetsOpt.get, parameters)
     Some(EventHubsBatchRecord(currentOffsetsAndSeqNums.batchId + 1, targetOffsets))
   }

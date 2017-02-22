@@ -19,11 +19,7 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 
 import scala.collection.mutable.ListBuffer
 
-<<<<<<< HEAD
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
-=======
-import org.apache.spark.eventhubscommon.ProgressTrackerBase
->>>>>>> add ProgressTrackerBase
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
@@ -41,21 +37,10 @@ private[eventhubs] class ProgressTrackingListener private (
     val batchTime = batchCompleted.batchInfo.batchTime.milliseconds
     try {
       if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-<<<<<<< HEAD
         val progressTracker = DirectDStreamProgressTracker.getInstance.
           asInstanceOf[DirectDStreamProgressTracker]
         // build current offsets
-<<<<<<< HEAD
         val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
-=======
-        val allEventDStreams = ProgressTracker.registeredConnectors
->>>>>>> sync
-=======
-        val progressTracker = ProgressTrackerBase.getInstance.
-          asInstanceOf[DirectDStreamProgressTracker]
-        // build current offsets
-        val allEventDStreams = ProgressTrackerBase.registeredConnectors
->>>>>>> add ProgressTrackerBase
         // merge with the temp directory
         val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
         logInfo(s"progressInLastBatch $progressInLastBatch")
@@ -63,11 +48,7 @@ private[eventhubs] class ProgressTrackingListener private (
           if (progressInLastBatch.nonEmpty) {
             val contentToCommit = allEventDStreams.map {
               case dstream: EventHubDirectDStream =>
-<<<<<<< HEAD
                 (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
-=======
-                ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums.offsets)
->>>>>>> sync
             }.toMap.map { case (namespace, currentOffsets) =>
               (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
             }

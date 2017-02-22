@@ -61,15 +61,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   DirectDStreamProgressTracker.registeredConnectors += this
-=======
-  ProgressTracker.registeredConnectors += this
->>>>>>> sync
-=======
-  ProgressTrackerBase.registeredConnectors += this
->>>>>>> add ProgressTrackerBase
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
@@ -100,11 +92,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var _eventHubClient: EventHubClient = _
 
-<<<<<<< HEAD
   private def progressTracker = DirectDStreamProgressTracker.getInstance.
-=======
-  private def progressTracker = ProgressTrackerBase.getInstance.
->>>>>>> add ProgressTrackerBase
     asInstanceOf[DirectDStreamProgressTracker]
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
@@ -128,13 +116,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
     require(concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
-<<<<<<< HEAD
     DirectDStreamProgressTracker.initInstance(progressDir,
       context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
-=======
-    ProgressTrackerBase.initInstance(progressDir,
-      context.sparkContext.appName, context.sparkContext.hadoopConfiguration, "directDStream")
->>>>>>> add ProgressTrackerBase
     ProgressTrackingListener.initInstance(ssc, progressDir)
   }
 
@@ -193,11 +176,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
       Map[EventHubNameAndPartition, Long] = {
     if (rateController.isEmpty) {
-<<<<<<< HEAD
       RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
-=======
-      CommonUtils.clamp(currentOffsetsAndSeqNums.offsets,
->>>>>>> refactor rate control
         fetchedHighestOffsetsAndSeqNums.offsets, eventhubsParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
@@ -228,11 +207,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
       highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
-<<<<<<< HEAD
     Option[EventHubsRDD] = {
-=======
-    Option[EventHubRDD] = {
->>>>>>> refactor rate control
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch
@@ -323,15 +298,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   @throws(classOf[IOException])
   private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
     ois.defaultReadObject()
-<<<<<<< HEAD
-<<<<<<< HEAD
     DirectDStreamProgressTracker.registeredConnectors += this
-=======
-    ProgressTracker.registeredConnectors += this
->>>>>>> sync
-=======
-    ProgressTrackerBase.registeredConnectors += this
->>>>>>> add ProgressTrackerBase
     initialized = false
   }
 
@@ -360,14 +327,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // we have to initialize here, otherwise there is a race condition when recovering from spark
       // checkpoint
       logInfo("initialized ProgressTracker")
-<<<<<<< HEAD
       val appName = context.sparkContext.appName
       DirectDStreamProgressTracker.initInstance(progressDir, appName,
         context.sparkContext.hadoopConfiguration)
-=======
-      ProgressTrackerBase.initInstance(progressDir, context.sparkContext.appName,
-        context.sparkContext.hadoopConfiguration, "directDStream")
->>>>>>> add ProgressTrackerBase
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
         logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubsRDD(

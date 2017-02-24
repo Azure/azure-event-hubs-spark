@@ -21,11 +21,12 @@ import scala.reflect.ClassTag
 
 import org.apache.hadoop.fs.{Path, PathFilter}
 
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.eventhubscommon.OffsetRecord
+import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, OffsetRecord}
+import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 import org.apache.spark.util.ManualClock
 
 /**

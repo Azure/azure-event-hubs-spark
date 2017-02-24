@@ -21,7 +21,6 @@ import scala.reflect.ClassTag
 
 import org.apache.hadoop.fs.{Path, PathFilter}
 
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.eventhubscommon.OffsetRecord
 import org.apache.spark.streaming._

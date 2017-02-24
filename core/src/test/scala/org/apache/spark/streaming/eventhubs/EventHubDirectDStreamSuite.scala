@@ -20,11 +20,11 @@ package org.apache.spark.streaming.eventhubs
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.client.EventHubClient
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
-import org.apache.spark.streaming.eventhubs.checkpoint.OffsetRecord
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
 
 class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar with SharedUtils {
 

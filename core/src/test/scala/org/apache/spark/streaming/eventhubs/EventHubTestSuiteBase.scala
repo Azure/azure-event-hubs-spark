@@ -29,12 +29,12 @@ import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.powermock.reflect.Whitebox
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
-import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, OffsetRecord}
+import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 import org.apache.spark.streaming.eventhubs.utils._
 import org.apache.spark.util.{ManualClock, Utils}
 

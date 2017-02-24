@@ -24,10 +24,10 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.streaming._
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
 import org.apache.spark.streaming.eventhubs.utils.FragileEventHubClient
 import org.apache.spark.util.ManualClock
 

@@ -27,7 +27,6 @@ import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, Pro
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.SharedUtils
 
-
 class ProgressTrackerSuite extends SharedUtils {
 
   override def beforeEach(): Unit = {

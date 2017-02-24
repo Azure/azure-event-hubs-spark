@@ -29,7 +29,7 @@ import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
 
-private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
+private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   val appName = "dummyapp"
   val streamId = 0
@@ -37,8 +37,8 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   var fs: FileSystem = _
   var progressRootPath: Path = _
-  var progressListener: ProgressTrackingListener = _
   var ssc: StreamingContext = _
+  var progressListener: ProgressTrackingListener = _
   var progressTracker: ProgressTrackerBase[_ <: EventHubsConnector] = _
 
   protected val streamingClock = "org.apache.spark.util.SystemClock"

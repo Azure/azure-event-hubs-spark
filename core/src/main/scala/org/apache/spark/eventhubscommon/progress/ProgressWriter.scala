@@ -47,7 +47,7 @@ private[spark] class ProgressWriter(
       // it would be safe to overwrite checkpoint, since we will not start a new job when
       // checkpoint hasn't been committed
       cpFileStream = fs.create(tempProgressTrackingPointPath, true)
-      val record = ProgressRecord(recordTime, namespace, streamId,
+      val record = ProgressRecord(recordTime, namespace,
         eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
         cpSeq)
       cpFileStream.writeBytes(s"$record")

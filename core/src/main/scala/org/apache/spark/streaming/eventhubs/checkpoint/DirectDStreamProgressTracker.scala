@@ -44,63 +44,12 @@ private[spark] class DirectDStreamProgressTracker private[spark](
     progressDir: String,
     appName: String,
     hadoopConfiguration: Configuration)
-  extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) with Logging {
+  extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
 
   // the lock synchronizing the read and committing operations, since they are executed in driver
   // and listener thread respectively.
   private val driverLock = new Object
 
-  /**
-   * this method is called when ProgressTracker is started for the first time (including recovering
-   * from checkpoint). This method validate the latest progress file by checking whether it
-   * contains progress of all partitions we subscribe to. If not, we will delete the corrupt
-   * progress file
-   * @return (whether the latest file pass the validation, whether the latest file exists)
-   *          (false, Some(x)) does not exist
-   */
-  private def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
-    val latestFileOpt = getLatestFile(progressDirPath, fs)
-    val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
-    var br: BufferedReader = null
-    try {
-      if (latestFileOpt.isEmpty) {
-        return (false, None)
-      }
-      val cpFile = fs.open(latestFileOpt.get)
-      br = new BufferedReader(new InputStreamReader(cpFile, "UTF-8"))
-      var cpRecord: String = br.readLine()
-      var timestamp = -1L
-      while (cpRecord != null) {
-        val progressRecordOpt = ProgressRecord.parse(cpRecord)
-        if (progressRecordOpt.isEmpty) {
-          return (false, latestFileOpt)
-        }
-        val progressRecord = progressRecordOpt.get
-        val newList = allProgressFiles.getOrElseUpdate(progressRecord.namespace,
-          List[EventHubNameAndPartition]()) :+
-          EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
-        allProgressFiles(progressRecord.namespace) = newList
-        if (timestamp == -1L) {
-          timestamp = progressRecord.timestamp
-        } else if (progressRecord.timestamp != timestamp) {
-          return (false, latestFileOpt)
-        }
-        cpRecord = br.readLine()
-      }
-      br.close()
-    } catch {
-      case ios: IOException =>
-        throw ios
-      case t: Throwable =>
-        t.printStackTrace()
-        return (false, latestFileOpt)
-    } finally {
-      if (br != null) {
-        br.close()
-      }
-    }
-    (allEventNameAndPartitionExist(allProgressFiles.toMap), latestFileOpt)
-  }
 
   /**
    * called when ProgressTracker is called for the first time, including recovering from the
@@ -187,7 +136,7 @@ private[spark] class DirectDStreamProgressTracker private[spark](
    * commit offsetToCommit to a new progress tracking file
    */
   override def commit(
-      offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = driverLock.synchronized {
     super.commit(offsetToCommit, commitTime)
   }

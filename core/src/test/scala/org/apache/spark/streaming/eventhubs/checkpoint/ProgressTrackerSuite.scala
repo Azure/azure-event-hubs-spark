@@ -79,7 +79,7 @@ class ProgressTrackerSuite extends SharedUtils {
     for (partitionId <- partitionRange) {
       Files.write(
         Paths.get(progressPath + s"/progress-$timestamp"),
-        (ProgressRecord(timestamp, namespace, streamId, ehName, partitionId, offset,
+        (ProgressRecord(timestamp, namespace, ehName, partitionId, offset,
           seq).toString + "\n").getBytes, {
           if (Files.exists(Paths.get(progressPath + s"/progress-$timestamp"))) {
             StandardOpenOption.APPEND
@@ -195,7 +195,7 @@ class ProgressTrackerSuite extends SharedUtils {
     // write wrong record
     Files.write(
       Paths.get(progressPath + s"/progress-1000"),
-      (ProgressRecord(2000L, "namespace2", 1, "eh12", 0, 2, 3).toString + "\n").getBytes,
+      (ProgressRecord(2000L, "namespace2", "eh12", 0, 2, 3).toString + "\n").getBytes,
       StandardOpenOption.APPEND)
     writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh12", 1 to 1, 2, 3)
     writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
@@ -270,10 +270,10 @@ class ProgressTrackerSuite extends SharedUtils {
     progressWriter.write(1000L, 3, 3)
 
     val offsetToCommit = Map(
-      ("namespace1", 1) -> Map(
+      "namespace1" -> Map(
         EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
         EventHubNameAndPartition("eh2", 1) -> (1L, 1L)),
-      ("namespace2", 2) -> Map(
+      "namespace2" -> Map(
         EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
         EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
     progressTracker.asInstanceOf[DirectDStreamProgressTracker].commit(offsetToCommit, 1000L)

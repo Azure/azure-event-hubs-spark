@@ -26,11 +26,11 @@ package org.apache.spark.eventhubscommon.progress
  *
  */
 private[spark] case class ProgressRecord(
-    timestamp: Long, namespace: String, streamId: Int,
+    timestamp: Long, namespace: String,
     eventHubName: String, partitionId: Int, offset: Long,
     seqId: Long) {
   override def toString: String = {
-    s"$timestamp $namespace $streamId $eventHubName $partitionId $offset $seqId"
+    s"$timestamp $namespace $eventHubName $partitionId $offset $seqId"
   }
 }
 
@@ -38,9 +38,9 @@ private[spark] object ProgressRecord {
 
   def parse(line: String): Option[ProgressRecord] = {
     try {
-      val Array(timestampStr, namespace, streamId, eventHubName, partitionIdStr, offsetStr,
+      val Array(timestampStr, namespace, eventHubName, partitionIdStr, offsetStr,
         seqStr) = line.split(" ")
-      Some(ProgressRecord(timestampStr.toLong, namespace, streamId.toInt, eventHubName,
+      Some(ProgressRecord(timestampStr.toLong, namespace, eventHubName,
         partitionIdStr.toInt, offsetStr.toLong, seqStr.toLong))
     } catch {
       case m: RuntimeException =>

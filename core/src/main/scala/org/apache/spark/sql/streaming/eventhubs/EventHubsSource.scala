@@ -21,7 +21,7 @@ import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConn
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, SQLContext, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession, SQLContext}
 import org.apache.spark.sql.execution.streaming.{Offset, Source}
 import org.apache.spark.sql.types._
 
@@ -124,11 +124,12 @@ private[spark] class EventHubsSource(
     import spark.implicits._
     if (start.isEmpty) {
       // read from progress tracking directory to get the start offset of the undergoing batch
-      // val startOffsetOfUndergoingBatch =
-      /*
+      val startOffsetOfUndergoingBatch = progressTracker.collectProgressRecordsForBatch(
+        currentOffsetsAndSeqNums.batchId)
       currentOffsetsAndSeqNums = EventHubsOffset(currentOffsetsAndSeqNums.batchId + 1,
-        )
-      */
+        startOffsetOfUndergoingBatch.filter { case (namespace, ehNameAndPartitions) =>
+          namespace == parameters("eventhubs.namespace")
+        }.values.head.filter(_._1.eventHubName == parameters("")))
     } else {
       // start from the beginning of the stream
     }

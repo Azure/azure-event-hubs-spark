@@ -48,9 +48,9 @@ private[eventhubs] class ProgressTrackingListener private (
           if (progressInLastBatch.nonEmpty) {
             val contentToCommit = allEventDStreams.map {
               case dstream: EventHubDirectDStream =>
-                ((dstream.eventHubNameSpace, dstream.id), dstream.currentOffsetsAndSeqNums.offsets)
+                (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
             }.toMap.map { case (namespace, currentOffsets) =>
-              (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace._1, Map()))
+              (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
             }
             progressTracker.commit(contentToCommit, batchTime)
             logInfo(s"commit ending offset of Batch $batchTime $contentToCommit")

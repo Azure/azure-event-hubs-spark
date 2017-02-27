@@ -80,6 +80,59 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
+  /**
+   * this method is called when ProgressTracker is started for the first time (including recovering
+   * from checkpoint). This method validate the latest progress file by checking whether it
+   * contains progress of all partitions we subscribe to. If not, we will delete the corrupt
+   * progress file
+   * @return (whether the latest file pass the validation, option to the file path,
+   *         the latest timestamp)
+   */
+  protected def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
+    val latestFileOpt = getLatestFile(progressDirPath, fs)
+    val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
+    var br: BufferedReader = null
+    try {
+      if (latestFileOpt.isEmpty) {
+        return (false, None)
+      }
+      val cpFile = fs.open(latestFileOpt.get)
+      br = new BufferedReader(new InputStreamReader(cpFile, "UTF-8"))
+      var cpRecord: String = br.readLine()
+      var timestamp = -1L
+      while (cpRecord != null) {
+        val progressRecordOpt = ProgressRecord.parse(cpRecord)
+        if (progressRecordOpt.isEmpty) {
+          return (false, latestFileOpt)
+        }
+        val progressRecord = progressRecordOpt.get
+        val newList = allProgressFiles.getOrElseUpdate(progressRecord.namespace,
+          List[EventHubNameAndPartition]()) :+
+          EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
+        allProgressFiles(progressRecord.namespace) = newList
+        if (timestamp == -1L) {
+          timestamp = progressRecord.timestamp
+        } else if (progressRecord.timestamp != timestamp) {
+          return (false, latestFileOpt)
+        }
+        cpRecord = br.readLine()
+      }
+      br.close()
+    } catch {
+      case ios: IOException =>
+        throw ios
+      case t: Throwable =>
+        t.printStackTrace()
+        return (false, latestFileOpt)
+    } finally {
+      if (br != null) {
+        br.close()
+      }
+    }
+    (allEventNameAndPartitionExist(allProgressFiles.toMap), latestFileOpt)
+  }
+
+
   protected def readProgressRecordLines(
       progressFilePath: Path,
       fs: FileSystem): List[ProgressRecord] = {
@@ -187,18 +240,18 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   // write offsetToCommit to a progress tracking file
   private def transaction(
-     offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+     offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
      fs: FileSystem,
      commitTime: Long): Unit = {
     var oos: FSDataOutputStream = null
     try {
       oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"))
       offsetToCommit.foreach {
-        case ((namespace, streamId), ehNameAndPartitionToOffsetAndSeq) =>
+        case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
             case (nameAndPartitionId, (offset, seq)) =>
               oos.writeBytes(
-                ProgressRecord(commitTime, namespace, streamId,
+                ProgressRecord(commitTime, namespace,
                   nameAndPartitionId.eventHubName, nameAndPartitionId.partitionId, offset,
                   seq).toString + "\n"
               )
@@ -215,7 +268,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
    * commit offsetToCommit to a new progress tracking file
    */
   def commit(
-      offsetToCommit: Map[(String, Int), Map[EventHubNameAndPartition, (Long, Long)]],
+      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
       commitTime: Long): Unit = {
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     try {
@@ -283,7 +336,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     ret.toMap
   }
 
-  def init()
+  def init(): Unit
 }
 
 

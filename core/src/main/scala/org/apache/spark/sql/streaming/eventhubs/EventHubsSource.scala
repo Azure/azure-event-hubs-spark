@@ -36,9 +36,9 @@ private[spark] class EventHubsSource(
     sqlContext: SQLContext,
     parameters: Map[String, String],
     eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
-      EventHubsClientWrapper.getEventHubReceiver,
+    EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
-      RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
+    RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
@@ -113,7 +113,7 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def composeHighestOffset(retryIfFail: Boolean):
-      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+  Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     RateControlUtils.fetchLatestOffset(eventHubClient,
       retryIfFail = retryIfFail,
       if (fetchedHighestOffsetsAndSeqNums == null) {
@@ -143,6 +143,7 @@ private[spark] class EventHubsSource(
    */
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
+
 
   private def cleanupFiles(batchIdToClean: Long): Unit = {
     Future {

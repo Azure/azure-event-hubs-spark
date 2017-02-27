@@ -245,7 +245,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
      commitTime: Long): Unit = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"))
+      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"), true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {

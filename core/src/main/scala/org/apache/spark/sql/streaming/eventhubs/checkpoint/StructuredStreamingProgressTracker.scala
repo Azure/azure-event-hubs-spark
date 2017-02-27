@@ -17,15 +17,9 @@
 
 package org.apache.spark.sql.streaming.eventhubs.checkpoint
 
-import java.io.{BufferedReader, IOException, InputStreamReader}
-
-import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.progress.{ProgressRecord, ProgressTrackerBase}
+import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 
 class StructuredStreamingProgressTracker(
     progressDir: String,
@@ -45,7 +39,7 @@ class StructuredStreamingProgressTracker(
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
             val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp)
-            // commit()
+            commit(progressRecords, latestFileTimestamp)
           }
         }
       } else {

@@ -17,37 +17,20 @@
 
 package org.apache.spark.sql.streaming.eventhubs.checkpoint
 
-<<<<<<< HEAD
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressTrackerBase}
 
 class StructuredStreamingProgressTracker(
-    uid: String,
-=======
-import java.io.{BufferedReader, IOException, InputStreamReader}
-
-import scala.collection.mutable
-
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.progress.{ProgressRecord, ProgressTrackerBase}
-
-class StructuredStreamingProgressTracker(
->>>>>>> get rid of stream id and partial progress tracker in eventhubssource
-    progressDir: String,
-    appName: String,
-    hadoopConfiguration: Configuration)
+                                          uid: String,
+                                          progressDir: String,
+                                          appName: String,
+                                          hadoopConfiguration: Configuration)
   extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
 
-<<<<<<< HEAD
   protected override lazy val progressDirStr: String = PathTools.progressDirPathStr(
     progressDir, appName, uid)
   protected override lazy val progressTempDirStr: String = PathTools.progressTempDirPathStr(
@@ -58,8 +41,6 @@ class StructuredStreamingProgressTracker(
     Map(connector.uid -> connector.connectedInstances)
   }
 
-=======
->>>>>>> get rid of stream id and partial progress tracker in eventhubssource
   override def init(): Unit = {
     // recover from partially executed checkpoint commit
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
@@ -72,25 +53,12 @@ class StructuredStreamingProgressTracker(
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
             val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp)
-<<<<<<< HEAD
             commit(progressRecords, latestFileTimestamp)
-=======
-            // commit()
->>>>>>> get rid of stream id and partial progress tracker in eventhubssource
           }
         }
       } else {
         fs.mkdirs(progressDirPath)
       }
-<<<<<<< HEAD
-=======
-      val checkpointTempDirExisted = fs.exists(progressTempDirPath)
-      if (checkpointTempDirExisted) {
-        fs.delete(progressTempDirPath, true)
-        logInfo(s"cleanup temp checkpoint $progressTempDirPath")
-      }
-      fs.mkdirs(progressTempDirPath)
->>>>>>> get rid of stream id and partial progress tracker in eventhubssource
     } catch {
       case ex: Exception =>
         ex.printStackTrace()
@@ -100,7 +68,6 @@ class StructuredStreamingProgressTracker(
     }
   }
 }
-<<<<<<< HEAD
 
 object StructuredStreamingProgressTracker {
 
@@ -133,5 +100,3 @@ object StructuredStreamingProgressTracker {
     _progressTrackers(uid)
   }
 }
-=======
->>>>>>> get rid of stream id and partial progress tracker in eventhubssource

@@ -302,7 +302,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
     try {
-      val fs = progressTempDirPath.getFileSystem(new Configuration())
+      val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
       val files = allProgressRecords(timestamp).iterator
       while (files.hasNext) {
         val file = files.next()

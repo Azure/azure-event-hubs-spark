@@ -26,7 +26,6 @@ import org.json4s.jackson.Serialization
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.sql.execution.streaming.Offset
 
-<<<<<<< HEAD
 // the descriptor of EventHubsBatchRecord to communicate with StreamExecution
 private[streaming] case class EventHubsBatchRecord(
     batchId: Long, targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset {
@@ -63,11 +62,3 @@ private object JsonUtils {
     Serialization.write((batchId, convertedStringIndexedMap))
   }
 }
-=======
-case class EventHubsOffset(
-    batchId: Long,
-    offsets: Map[EventHubNameAndPartition, (Long, Long)]) extends Offset
-
-case class EventHubsBatchRecord(batchId: Long,
-                                targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset
->>>>>>> sketch

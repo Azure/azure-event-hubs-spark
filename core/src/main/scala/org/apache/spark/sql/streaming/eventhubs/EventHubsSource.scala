@@ -106,6 +106,7 @@ private[spark] class EventHubsSource(
   private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
   // the highest offsets in EventHubs side
+
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {

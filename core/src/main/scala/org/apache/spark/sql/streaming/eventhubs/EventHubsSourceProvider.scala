@@ -68,6 +68,6 @@ private[sql] object EventHubsSourceProvider {
       StructField("publisher", StringType),
       StructField("partitionKey", StringType)
     ) ++ userDefinedKeys.map(udkey =>
-      StructField(udkey, ObjectType(classOf[Any]))))
+      StructField(udkey, ObjectType(classOf[AnyRef]))))
   }
 }

@@ -19,6 +19,9 @@ package org.apache.spark.eventhubscommon
 
 private[spark] trait EventHubsConnector {
 
+  // the id of the stream which is mapped from eventhubs instance
+  def streamId: Int
+
   // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
   // eventhubs instance
   def uid: String

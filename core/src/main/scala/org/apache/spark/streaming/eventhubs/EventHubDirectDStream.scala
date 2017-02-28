@@ -27,7 +27,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubscommon._
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
-import org.apache.spark.eventhubscommon.rdd.{EventHubRDD, OffsetRange, OffsetStoreParams}
+import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
@@ -209,7 +209,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
       highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
-    Option[EventHubRDD] = {
+    Option[EventHubsRDD] = {
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch
@@ -222,12 +222,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
           untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
     }.toList
-    val eventHubRDD = new EventHubRDD(
+    val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
       eventhubsParams,
       offsetRanges,
-      validTime,
-      OffsetStoreParams(progressDir, ssc.sparkContext.appName, this.id, eventHubNameSpace),
+      validTime.milliseconds,
+      OffsetStoreParams(progressDir, ssc.sparkContext.appName, streamId, eventHubNameSpace),
       eventhubReceiverCreator)
     reportInputInto(validTime, offsetRanges,
       offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
@@ -316,7 +316,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       }
       batchForTime.clear()
       generatedRDDs.foreach { kv =>
-        val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubRDD].offsetRanges.map(_.toTuple).toArray
+        val offsetRangeOfRDD = kv._2.asInstanceOf[EventHubsRDD].offsetRanges.map(_.toTuple).toArray
         logInfo(s"update RDD ${offsetRangeOfRDD.mkString("[", ", ", "]")} at ${kv._1}")
         batchForTime += kv._1 -> offsetRangeOfRDD
       }
@@ -332,13 +332,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         context.sparkContext.hadoopConfiguration, "directDStream")
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
         logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
-        generatedRDDs += t -> new EventHubRDD(
+        generatedRDDs += t -> new EventHubsRDD(
           context.sparkContext,
           eventhubsParams,
           b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq) =>
             OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq)}.toList,
-          t,
-          OffsetStoreParams(progressDir, ssc.sparkContext.appName, id, eventHubNameSpace),
+          t.milliseconds,
+          OffsetStoreParams(progressDir, ssc.sparkContext.appName, streamId, eventHubNameSpace),
           eventhubReceiverCreator)
       }
     }
@@ -350,6 +350,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // publish nothing as there is no receiver
     }
   }
+
+  // the id of the stream which is mapped from eventhubs instance
+  override val streamId: Int = this.id
 }
 
 private[eventhubs] object EventHubDirectDStream {

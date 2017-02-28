@@ -17,11 +17,15 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SparkSession, SQLContext}
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.streaming.{Offset, Source}
 import org.apache.spark.sql.types._
 
@@ -116,25 +120,66 @@ private[spark] class EventHubsSource(
       " eventhubs")
     val targetOffsets = RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
       highestOffsetsOpt.get, parameters)
-    Some(EventHubsBatchRecord(currentOffsetsAndSeqNums.batchId + 1, targetOffsets))
+    Some(EventHubsBatchRecord(currentOffsetsAndSeqNums.batchId + 1,
+      targetOffsets.map{case (ehNameAndPartition, seqNum) =>
+        (ehNameAndPartition, math.min(seqNum,
+          fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2))}))
+  }
+
+  private def fetchStartingOffsetOfCurrentBatch(committedBatchId: Long) = {
+    val startOffsetOfUndergoingBatch = progressTracker.collectProgressRecordsForBatch(
+      committedBatchId)
+    // we need to update the batch id of currentOffsetsAndSeqNums if we are recovered from the Spark
+    // HDFSBatchupLog
+    EventHubsOffset(committedBatchId + 1,
+      startOffsetOfUndergoingBatch.filter { case (namespace, _) =>
+        namespace == parameters("eventhubs.namespace")
+      }.values.head.filter(_._1.eventHubName == parameters("eventhubs.name")))
+  }
+
+  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
+    val offsetRanges = fetchedHighestOffsetsAndSeqNums.offsets.map {
+      case (eventHubNameAndPartition, (_, endSeqNum)) =>
+        OffsetRange(eventHubNameAndPartition,
+          fromOffset = currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._1,
+          fromSeq = currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
+          untilSeq = endOffset.targetSeqNums(eventHubNameAndPartition))
+    }.toList
+    new EventHubsRDD(
+      sqlContext.sparkContext,
+      Map(parameters("eventhubs.name") -> parameters),
+      offsetRanges,
+      currentOffsetsAndSeqNums.batchId,
+      OffsetStoreParams(progressTracker.progressDirPath.toString, sqlContext.sparkContext.appName,
+        streamId, s"${parameters("eventhubs.namespace")}-${parameters("eventhubs.name")}}"),
+      eventhubReceiverCreator
+    )
+  }
+
+  private def convertEventHubsRDDToDataFrame(eventHubsRDD: EventHubsRDD): DataFrame = {
+    import scala.collection.JavaConverters._
+    val dfSchema = schema
+    val internalRowRDD = eventHubsRDD.map(eventData =>
+      InternalRow.fromSeq(Seq(eventData.getBody, eventData.getSystemProperties.getOffset.toLong,
+        eventData.getSystemProperties.getSequenceNumber,
+        eventData.getSystemProperties.getEnqueuedTime,
+        eventData.getSystemProperties.getPublisher,
+        eventData.getSystemProperties.getPartitionKey
+      ) ++ eventData.getProperties.asScala.values)
+    )
+    sqlContext.internalCreateDataFrame(internalRowRDD, schema)
   }
 
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
-    val spark = SparkSession.builder().getOrCreate()
-    import spark.implicits._
-    if (start.isEmpty) {
-      // read from progress tracking directory to get the start offset of the undergoing batch
-      val startOffsetOfUndergoingBatch = progressTracker.collectProgressRecordsForBatch(
-        currentOffsetsAndSeqNums.batchId)
-      currentOffsetsAndSeqNums = EventHubsOffset(currentOffsetsAndSeqNums.batchId + 1,
-        startOffsetOfUndergoingBatch.filter { case (namespace, ehNameAndPartitions) =>
-          namespace == parameters("eventhubs.namespace")
-        }.values.head.filter(_._1.eventHubName == parameters("")))
-    } else {
-      // start from the beginning of the stream
-    }
-    // TODO: create EventHubsRDD
-    Seq(1, 2, 3).toDF()
+    currentOffsetsAndSeqNums = fetchStartingOffsetOfCurrentBatch({
+      if (start.isDefined) {
+        start.get.asInstanceOf[EventHubsBatchRecord].batchId
+      } else {
+        0
+      }
+    })
+    val eventhubsRDD = buildEventHubsRDD(end.asInstanceOf[EventHubsBatchRecord])
+    convertEventHubsRDDToDataFrame(eventhubsRDD)
   }
 
   override def stop(): Unit = {
@@ -146,4 +191,11 @@ private[spark] class EventHubsSource(
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
+
+  // the id of the stream which is mapped from eventhubs instance
+  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
+}
+
+private object EventHubsSource {
+  val streamIdGenerator = new AtomicInteger(0)
 }

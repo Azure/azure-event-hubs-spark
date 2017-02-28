@@ -72,7 +72,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput)
     testProgressTracker(eventhubNamespace,
       OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
@@ -101,7 +101,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.window(Seconds(2), Seconds(1)).map(
-          eventData => eventData.getProperties.get("output").toInt + 1),
+          eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput)
     testProgressTracker(eventhubNamespace,
       OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
@@ -152,7 +152,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       operation = (inputDStream1: EventHubDirectDStream, inputDStream2: EventHubDirectDStream) =>
         inputDStream1.flatMap(eventData => eventData.getProperties.asScala).
           join(inputDStream2.flatMap(eventData => eventData.getProperties.asScala)).
-          map{case (key, (v1, v2)) => (key, v1.toInt + v2.toInt)},
+          map{case (key, (v1, v2)) => (key, v1.asInstanceOf[Int] + v2.asInstanceOf[Int])},
       expectedOutput)
     testProgressTracker("namespace1",
       OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh11", 0) -> (5L, 5L),
@@ -181,7 +181,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           EventHubNameAndPartition("eh1", 2) -> (-1L, -1L))
       )),
       operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
       rddOperation = Some((rdd: RDD[Int], t: Time) => {
         Array(rdd.take(1).toSeq)
@@ -212,7 +212,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
             EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
             EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
       messagesBeforeEmpty = 4,
       numBatchesBeforeNewData = 5)

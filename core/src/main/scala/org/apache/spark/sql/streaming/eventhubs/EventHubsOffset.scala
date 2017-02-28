@@ -17,12 +17,41 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+import scala.collection.mutable
+
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
+
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.sql.execution.streaming.Offset
 
-case class EventHubsOffset(
+private[eventhubs] case class EventHubsOffset(
     batchId: Long,
-    offsets: Map[EventHubNameAndPartition, (Long, Long)]) extends Offset
+    offsets: Map[EventHubNameAndPartition, (Long, Long)]) extends Offset {
+  override def json: String = JsonUtils.partitionOffsetAndSeqNums(batchId, offsets)
+}
 
-case class EventHubsBatchRecord(batchId: Long,
-                                targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset
+private[eventhubs] case class EventHubsBatchRecord(batchId: Long,
+                                targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset {
+  override def json: String = JsonUtils.partitionAndSeqNum(batchId, targetSeqNums)
+}
+
+private object JsonUtils {
+  private implicit val formats = Serialization.formats(NoTypeHints)
+
+  def partitionAndSeqNum(batchId: Long, seqNums: Map[EventHubNameAndPartition, Long]): String = {
+    val convertedStringIndexedMap = new mutable.HashMap[String, Long]
+    seqNums.foreach{case (eventHubNameAndPartition, offsetAndSeqNum) =>
+      convertedStringIndexedMap += eventHubNameAndPartition.toString -> offsetAndSeqNum}
+    Serialization.write((batchId, convertedStringIndexedMap))
+  }
+
+  def partitionOffsetAndSeqNums(
+      batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)]): String = {
+    val convertedStringIndexedMap = new mutable.HashMap[String, (Long, Long)]
+    offsets.foreach{case (eventHubNameAndPartition, offsetAndSeqNum) =>
+      convertedStringIndexedMap += eventHubNameAndPartition.toString -> offsetAndSeqNum}
+    Serialization.write((batchId, convertedStringIndexedMap))
+  }
+
+}

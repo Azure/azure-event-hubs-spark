@@ -282,7 +282,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         case p @ Tuple2(_, _) =>
           msg.getProperties.put(p._1.toString, p._2.toString)
         case _ =>
-          msg.getProperties.put("output", property.toString)
+          msg.getProperties.put("output", property.asInstanceOf[AnyRef])
       }
       eventDataArray(offsetSetInQueue) = msg
       offsetSetInQueue += 1

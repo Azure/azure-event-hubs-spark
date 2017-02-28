@@ -132,12 +132,15 @@ private[spark] class EventHubsSource(
   private def fetchStartingOffsetOfCurrentBatch(committedBatchId: Long) = {
     val startOffsetOfUndergoingBatch = progressTracker.collectProgressRecordsForBatch(
       committedBatchId)
-    // we need to update the batch id of currentOffsetsAndSeqNums if we are recovered from the Spark
-    // HDFSBatchupLog
-    EventHubsOffset(committedBatchId + 1,
-      startOffsetOfUndergoingBatch.filter { case (namespace, _) =>
-        namespace == parameters("eventhubs.namespace")
-      }.values.head.filter(_._1.eventHubName == parameters("eventhubs.name")))
+    if (startOffsetOfUndergoingBatch.isEmpty) {
+      // first batch, take the initial value of the offset, -1
+      EventHubsOffset(committedBatchId, currentOffsetsAndSeqNums.offsets)
+    } else {
+      EventHubsOffset(committedBatchId,
+        startOffsetOfUndergoingBatch.filter { case (namespace, _) =>
+          namespace == parameters("eventhubs.namespace")
+        }.values.head.filter(_._1.eventHubName == parameters("eventhubs.name")))
+    }
   }
 
   private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
@@ -174,13 +177,8 @@ private[spark] class EventHubsSource(
   }
 
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
-    currentOffsetsAndSeqNums = fetchStartingOffsetOfCurrentBatch({
-      if (start.isDefined) {
-        start.get.asInstanceOf[EventHubsBatchRecord].batchId
-      } else {
-        0
-      }
-    })
+    currentOffsetsAndSeqNums = fetchStartingOffsetOfCurrentBatch(
+      start.map(offset => offset.asInstanceOf[EventHubsBatchRecord].batchId).getOrElse(0L))
     val eventhubsRDD = buildEventHubsRDD(end.asInstanceOf[EventHubsBatchRecord])
     convertEventHubsRDDToDataFrame(eventhubsRDD)
   }

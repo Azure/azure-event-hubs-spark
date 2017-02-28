@@ -332,9 +332,6 @@ private[spark] class EventHubsSource(
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
-
-  // the id of the stream which is mapped from eventhubs instance
-  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
 }
 
 private object EventHubsSource {

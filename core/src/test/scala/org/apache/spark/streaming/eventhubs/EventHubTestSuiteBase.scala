@@ -280,7 +280,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       Whitebox.setInternalState(msg, "systemProperties", systemProperties.asInstanceOf[Any])
       property match {
         case p @ Tuple2(_, _) =>
-          msg.getProperties.put(p._1.toString, p._2.toString)
+          msg.getProperties.put(p._1.toString, p._2.asInstanceOf[AnyRef])
         case _ =>
           msg.getProperties.put("output", property.asInstanceOf[AnyRef])
       }

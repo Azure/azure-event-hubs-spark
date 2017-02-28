@@ -24,7 +24,7 @@ import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientW
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, SparkSession, SQLContext}
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.streaming.{Offset, Source}
 import org.apache.spark.sql.types._
@@ -39,6 +39,10 @@ private[spark] class EventHubsSource(
       EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
       RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
+
+  case class EventHubsOffset(
+                              batchId: Long,
+                              offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
   private val eventhubsNamespace: String = parameters("eventhubs.namespace")
 
@@ -74,8 +78,7 @@ private[spark] class EventHubsSource(
   }
 
   private var currentOffsetsAndSeqNums: EventHubsOffset =
-    EventHubsOffset(0L,
-      ehNameAndPartitions.map{ehNameAndSpace => (ehNameAndSpace, (-1L, -1L))}.toMap)
+    EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {

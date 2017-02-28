@@ -86,5 +86,6 @@ private[sql] object EventHubsSourceProvider extends Serializable {
     } else {
       Seq()
     }})
+
   }
 }

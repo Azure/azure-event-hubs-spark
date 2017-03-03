@@ -22,9 +22,9 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.progress.{ProgressTrackerBase, ProgressWriter}
-import org.apache.spark.streaming.eventhubs.SharedUtils
+import org.apache.spark.eventhubscommon.progress.ProgressWriter
 import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
 
 // scalastyle:off
@@ -46,14 +46,14 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     val dstream = createDirectStreams(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
     dstream.start()
-    val progressWriter = new ProgressWriter(progressRootPath.toString,
-      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), 1000L,
-      new Configuration())
+    val progressWriter = new ProgressWriter(streamId, eventhubNamespace,
+      EventHubNameAndPartition("eh1", 1), 1000L,
+      new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 1L, 2L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListener.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-    assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
+    assert(fs.exists(new Path(progressTracker.progressDirectoryPath + "/progress-1000")))
     val record = progressTracker.asInstanceOf[DirectDStreamProgressTracker].read(eventhubNamespace,
       1000L, fallBack = false)
     assert(record === OffsetRecord(Time(1000L),
@@ -74,14 +74,15 @@ class ProgressTrackingListenerSuite extends SharedUtils {
         2 -> OutputOperationInfo(Time(1000L), 2, "correct output", "", None, None, None)))
     )
     // build temp directories
-    val progressWriter = new ProgressWriter(progressTracker.progressTempDirPath.toString,
-      appName, streamId, eventhubNamespace, EventHubNameAndPartition("eh1", 1), 1000L,
-      new Configuration())
+    val progressWriter = new ProgressWriter(streamId, eventhubNamespace,
+      EventHubNameAndPartition("eh1", 1), 1000L,
+      new Configuration(), progressTracker.progressTempDirectoryPath.toString,
+      appName)
     progressWriter.write(1000L, 0L, 0L)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
     progressListener.onBatchCompleted(batchCompletedEvent)
     assert(fs.exists(progressWriter.tempProgressTrackingPointPath))
-    assert(!fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
+    assert(!fs.exists(new Path(progressTracker.progressDirectoryPath + "/progress-1000")))
   }
 
   test("ProgressTrackingListener is registered correctly") {
@@ -102,7 +103,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     import scala.collection.JavaConverters._
     assert(ssc.scheduler.listenerBus.listeners.asScala.count(
       _.isInstanceOf[ProgressTrackingListener]) === 1)
-    assert(ProgressTrackerBase.registeredConnectors.length === 2)
+    assert(DirectDStreamProgressTracker.registeredConnectors.length === 2)
     ssc.stop()
   }
 }

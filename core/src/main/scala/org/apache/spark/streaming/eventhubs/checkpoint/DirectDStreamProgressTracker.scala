@@ -17,17 +17,13 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-import java.io.{BufferedReader, InputStreamReader, IOException}
-
-import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.progress.{ProgressRecord, ProgressTrackerBase}
-import org.apache.spark.internal.Logging
-
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
+import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 
 /**
  * EventHub uses offset to indicates the startpoint of each receiver, and uses the number of
@@ -50,6 +46,12 @@ private[spark] class DirectDStreamProgressTracker private[spark](
   // and listener thread respectively.
   private val driverLock = new Object
 
+
+  override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
+    DirectDStreamProgressTracker.registeredConnectors.map {
+      connector => (connector.uid, connector.connectedInstances)
+    }.toMap
+  }
 
   /**
    * called when ProgressTracker is called for the first time, including recovering from the
@@ -89,10 +91,9 @@ private[spark] class DirectDStreamProgressTracker private[spark](
   /**
    * read the progress record for the specified namespace, streamId and timestamp
    */
-  def read(namespace: String, timestamp: Long, fallBack: Boolean):
+  override def read(namespace: String, timestamp: Long, fallBack: Boolean):
       OffsetRecord = driverLock.synchronized {
-    read(namespace, timestamp, fallBack,
-      (pr: ProgressRecord, expectedNamespace: String) => pr.namespace == expectedNamespace)
+    super.read(namespace, timestamp, fallBack)
   }
 
   def close(): Unit = {}
@@ -140,6 +141,34 @@ private[spark] class DirectDStreamProgressTracker private[spark](
       commitTime: Long): Unit = driverLock.synchronized {
     super.commit(offsetToCommit, commitTime)
   }
+}
 
+object DirectDStreamProgressTracker {
 
+  val registeredConnectors = new ListBuffer[EventHubsConnector]
+
+  private var _progressTracker: DirectDStreamProgressTracker = _
+
+  private[spark] def reset(): Unit = {
+    registeredConnectors.clear()
+    _progressTracker = null
+  }
+
+  def getInstance: ProgressTrackerBase[_ <: EventHubsConnector] = _progressTracker
+
+  private[spark] def initInstance(
+      progressDirStr: String,
+      appName: String,
+      hadoopConfiguration: Configuration): ProgressTrackerBase[_ <: EventHubsConnector] = {
+    this.synchronized {
+      // DirectDStream shall have singleton progress tracker
+      if (_progressTracker == null) {
+        _progressTracker = new DirectDStreamProgressTracker(progressDirStr,
+          appName,
+          hadoopConfiguration)
+      }
+      _progressTracker.init()
+    }
+    _progressTracker
+  }
 }

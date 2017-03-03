@@ -7,3 +7,4 @@ target/
 *.iml
 scalastyle-output.xml
 dependency-reduced-pom.xml
+metastore_db/

@@ -42,9 +42,6 @@ private[spark] class EventHubsSource(
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
-  // the id of the stream which is mapped from eventhubs instance
-  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
-
   private val eventHubsNamespace: String = parameters("eventhubs.namespace")
   private val eventHubsName: String = parameters("eventhubs.name")
 
@@ -105,8 +102,8 @@ private[spark] class EventHubsSource(
   // the offsets which have been to the self-managed offset store
   private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
-  // the highest offsets in EventHubs side
 
+  // the highest offsets in EventHubs side
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {
@@ -144,7 +141,6 @@ private[spark] class EventHubsSource(
    */
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
-
 
   private def cleanupFiles(batchIdToClean: Long): Unit = {
     Future {

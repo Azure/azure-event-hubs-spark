@@ -144,7 +144,6 @@ private[spark] class EventHubsSource(
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
-
   private def cleanupFiles(batchIdToClean: Long): Unit = {
     Future {
       progressTracker.cleanProgressFile(batchIdToClean)

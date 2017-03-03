@@ -52,6 +52,12 @@ private[spark] class DirectDStreamProgressTracker private[spark](
     }.toMap
   }
 
+  override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
+    DirectDStreamProgressTracker.registeredConnectors.map {
+      connector => (connector.uid, connector.connectedInstances)
+    }.toMap
+  }
+
   /**
    * called when ProgressTracker is called for the first time, including recovering from the
    * checkpoint

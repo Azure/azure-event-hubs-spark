@@ -55,6 +55,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   protected def allEventNameAndPartitionExist(
       candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
+    println("======" + eventHubNameAndPartitions + "======")
     eventHubNameAndPartitions.forall{
       case (uid, ehNameAndPartitions) =>
         candidateEhNameAndPartitions.contains(uid) &&

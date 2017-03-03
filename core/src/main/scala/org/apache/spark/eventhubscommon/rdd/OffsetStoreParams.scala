@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubscommon.rdd
 
 // a bridging object to avoid serialzing offsetstore instances
+<<<<<<< HEAD
 <<<<<<< HEAD:core/src/main/scala/org/apache/spark/eventhubscommon/rdd/OffsetStoreParams.scala
 private[spark] case class OffsetStoreParams(
     checkpointDir: String, streamId: Int, uid: String, subDirs: String*)
@@ -25,3 +26,7 @@ private[spark] case class OffsetStoreParams(
 private[spark] case class OffsetStoreParams(checkpointDir: String, appName: String,
                                                 streamId: Int, eventHubNamespace: String)
 >>>>>>> refactor RDD classes:core/src/main/scala/org/apache/spark/eventhubscommon/rdd/OffsetStoreParams.scala
+=======
+private[spark] case class OffsetStoreParams(
+    checkpointDir: String, streamId: Int, uid: String, subDirs: String*)
+>>>>>>> Integration test (#16)

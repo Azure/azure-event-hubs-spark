@@ -20,15 +20,16 @@ package org.apache.spark.sql.streaming.eventhubs.checkpoint
 import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
 import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressTrackerBase}
 
 class StructuredStreamingProgressTracker(
-                                          uid: String,
-                                          progressDir: String,
-                                          appName: String,
-                                          hadoopConfiguration: Configuration)
+    uid: String,
+    progressDir: String,
+    appName: String,
+    hadoopConfiguration: Configuration)
   extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
 
   protected override lazy val progressDirStr: String = PathTools.progressDirPathStr(

@@ -29,24 +29,22 @@ import org.apache.hadoop.fs._
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.Time
-import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String, appName: String, hadoopConfiguration: Configuration) extends Logging {
 
 
-  protected val progressDirStr: String = PathTools.progressDirPathStr(progressDir, appName)
-  protected val progressTempDirStr: String = PathTools.progressTempDirPathStr(progressDir,
+  protected lazy val progressDirStr: String = PathTools.progressDirPathStr(progressDir, appName)
+  protected lazy val progressTempDirStr: String = PathTools.progressTempDirPathStr(progressDir,
     appName)
 
-  private[spark] val progressDirPath = new Path(progressDirStr)
-  private[spark] val progressTempDirPath = new Path(progressTempDirStr)
+  protected lazy val progressDirPath = new Path(progressDirStr)
+  protected lazy val progressTempDirPath = new Path(progressTempDirStr)
 
-  def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
-    ProgressTrackerBase.registeredConnectors.map {
-      connector => (connector.uid, connector.connectedInstances)
-    }.toMap
-  }
+  def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]]
+
+  private[spark] def progressDirectoryPath = progressDirPath
+  private[spark] def progressTempDirectoryPath = progressTempDirPath
 
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names. The timestamp can be the
@@ -57,10 +55,12 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   protected def allEventNameAndPartitionExist(
       candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
+    println("======" + eventHubNameAndPartitions + "======")
     eventHubNameAndPartitions.forall{
-      case (ehNameSpace, ehNameAndPartitions) =>
-        candidateEhNameAndPartitions.contains(ehNameSpace) &&
-          ehNameAndPartitions.forall(candidateEhNameAndPartitions(ehNameSpace).contains)
+      case (uid, ehNameAndPartitions) =>
+        println(s"${ehNameAndPartitions == null} $candidateEhNameAndPartitions")
+        candidateEhNameAndPartitions.contains(uid) &&
+          ehNameAndPartitions.forall(candidateEhNameAndPartitions(uid).contains)
     }
   }
 
@@ -106,10 +106,10 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
           return (false, latestFileOpt)
         }
         val progressRecord = progressRecordOpt.get
-        val newList = allProgressFiles.getOrElseUpdate(progressRecord.namespace,
+        val newList = allProgressFiles.getOrElseUpdate(progressRecord.uid,
           List[EventHubNameAndPartition]()) :+
           EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
-        allProgressFiles(progressRecord.namespace) = newList
+        allProgressFiles(progressRecord.uid) = newList
         if (timestamp == -1L) {
           timestamp = progressRecord.timestamp
         } else if (progressRecord.timestamp != timestamp) {
@@ -193,8 +193,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   /**
    * read the progress record for the specified progressEntityID and timestamp
    */
-  def read(targetConnectorID: String, timestamp: Long, fallBack: Boolean,
-           predicateWithinProgressFile: (ProgressRecord, String) => Boolean): OffsetRecord = {
+  def read(targetConnectorUID: String, timestamp: Long, fallBack: Boolean): OffsetRecord = {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     var recordToReturn = Map[EventHubNameAndPartition, (Long, Long)]()
     var readTimestamp: Long = 0
@@ -210,8 +209,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       if (progressFileOption.isEmpty) {
         // if no progress file, then start from the beginning of the streams
         val connectedEventHubs = eventHubNameAndPartitions.find {
-          case (connectorUID, _) => connectorUID == targetConnectorID}
-        require(connectedEventHubs.isDefined, s"cannot find $targetConnectorID in" +
+          case (connectorUID, _) => connectorUID == targetConnectorUID}
+        require(connectedEventHubs.isDefined, s"cannot find $targetConnectorUID in" +
           s" $eventHubNameAndPartitions")
         // it's hacky to take timestamp -1 as the start of streams
         readTimestamp = -1
@@ -225,7 +224,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
           s" progress record, expected timestamp $expectedTimestamp")
         readTimestamp = expectedTimestamp
         recordToReturn = recordLines.filter(
-          progressRecord => predicateWithinProgressFile(progressRecord, targetConnectorID)).map(
+          progressRecord => progressRecord.uid == targetConnectorUID).map(
           progressRecord => EventHubNameAndPartition(progressRecord.eventHubName,
             progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId)).toMap
       }
@@ -328,45 +327,13 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
     // produce the return value
     records.foreach { progressRecord =>
-      val newMap = ret.getOrElseUpdate(progressRecord.namespace, Map()) +
+      val newMap = ret.getOrElseUpdate(progressRecord.uid, Map()) +
         (EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) ->
           (progressRecord.offset, progressRecord.seqId))
-      ret(progressRecord.namespace) = newMap
+      ret(progressRecord.uid) = newMap
     }
     ret.toMap
   }
 
   def init(): Unit
-}
-
-
-private[spark] object ProgressTrackerBase {
-  val registeredConnectors = new ListBuffer[EventHubsConnector]
-
-  private var _progressTracker: ProgressTrackerBase[_ <: EventHubsConnector] = _
-
-  private[spark] def reset(): Unit = {
-    registeredConnectors.clear()
-    _progressTracker = null
-  }
-
-  def getInstance: ProgressTrackerBase[_ <: EventHubsConnector] = _progressTracker
-
-  private[spark] def initInstance(
-      progressDirStr: String,
-      appName: String,
-      hadoopConfiguration: Configuration,
-      ProgressTrackerType: String): ProgressTrackerBase[_ <: EventHubsConnector] =
-    this.synchronized {
-      if (_progressTracker == null) {
-        ProgressTrackerType match {
-          case "directDStream" =>
-            _progressTracker = new DirectDStreamProgressTracker(progressDirStr,
-              appName,
-              hadoopConfiguration)
-        }
-        _progressTracker.init()
-      }
-    _progressTracker
-  }
 }

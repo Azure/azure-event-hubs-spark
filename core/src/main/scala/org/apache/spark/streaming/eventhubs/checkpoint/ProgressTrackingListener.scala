@@ -37,10 +37,10 @@ private[eventhubs] class ProgressTrackingListener private (
     val batchTime = batchCompleted.batchInfo.batchTime.milliseconds
     try {
       if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-        val progressTracker = ProgressTrackerBase.getInstance.
+        val progressTracker = DirectDStreamProgressTracker.getInstance.
           asInstanceOf[DirectDStreamProgressTracker]
         // build current offsets
-        val allEventDStreams = ProgressTrackerBase.registeredConnectors
+        val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
         // merge with the temp directory
         val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
         logInfo(s"progressInLastBatch $progressInLastBatch")

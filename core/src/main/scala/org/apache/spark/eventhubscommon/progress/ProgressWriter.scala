@@ -26,17 +26,17 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 private[spark] class ProgressWriter(
-     progressDir: String,
-     appName: String,
      streamId: Int,
-     namespace: String,
+     uid: String,
      eventHubNameAndPartition: EventHubNameAndPartition,
      timestamp: Long,
-     hadoopConfiguration: Configuration) extends Logging {
+     hadoopConfiguration: Configuration,
+     progressDir: String,
+     subDirIdentifiers: String*) extends Logging {
 
   private val tempProgressTrackingPointStr = PathTools.progressTempFileStr(
-    PathTools.progressTempDirPathStr(progressDir, appName),
-    streamId, namespace, eventHubNameAndPartition, timestamp)
+    PathTools.progressTempDirPathStr(progressDir, subDirIdentifiers: _*),
+    streamId, uid, eventHubNameAndPartition, timestamp)
 
   private[spark] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
 
@@ -47,7 +47,7 @@ private[spark] class ProgressWriter(
       // it would be safe to overwrite checkpoint, since we will not start a new job when
       // checkpoint hasn't been committed
       cpFileStream = fs.create(tempProgressTrackingPointPath, true)
-      val record = ProgressRecord(recordTime, namespace,
+      val record = ProgressRecord(recordTime, uid,
         eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
         cpSeq)
       cpFileStream.writeBytes(s"$record")

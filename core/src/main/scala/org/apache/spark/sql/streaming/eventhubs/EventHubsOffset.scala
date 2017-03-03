@@ -18,6 +18,7 @@
 package org.apache.spark.sql.streaming.eventhubs
 
 import scala.collection.mutable
+import scala.util.control.NonFatal
 
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -38,7 +39,19 @@ private object JsonUtils {
     val convertedStringIndexedMap = new mutable.HashMap[String, Long]
     seqNums.foreach{case (eventHubNameAndPartition, offsetAndSeqNum) =>
       convertedStringIndexedMap += eventHubNameAndPartition.toString -> offsetAndSeqNum}
-    Serialization.write((batchId, convertedStringIndexedMap))
+    Serialization.write((batchId, convertedStringIndexedMap.toMap))
+  }
+
+  def partitionAndSeqNum(jsonStr: String): EventHubsBatchRecord = {
+    try {
+      val deserializedTuple = Serialization.read[(Int, Map[String, Long])](jsonStr)
+      val batchId = deserializedTuple._1
+      EventHubsBatchRecord(batchId, deserializedTuple._2.map{case (ehNameAndPartitionStr, seqNum) =>
+        (EventHubNameAndPartition.fromString(ehNameAndPartitionStr), seqNum)})
+    } catch {
+      case NonFatal(x) =>
+        throw new IllegalArgumentException(s"failed to parse $jsonStr")
+    }
   }
 
   def partitionOffsetAndSeqNums(

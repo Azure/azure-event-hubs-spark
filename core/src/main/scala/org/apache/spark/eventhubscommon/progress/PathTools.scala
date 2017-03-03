@@ -21,19 +21,23 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
 private[spark] object PathTools extends Serializable {
 
-  def progressDirPathStr(checkpointDir: String, appName: String): String = {
-    s"$checkpointDir/$appName"
+  private def fromSubDirNamesToString(subDirs: Seq[String]): String = {
+    subDirs.mkString("/")
   }
 
-  def progressTempDirPathStr(checkpointDir: String, appName: String): String = {
-    s"$checkpointDir/${appName}_temp"
+  def progressDirPathStr(checkpointDir: String, subDirNames: String*): String = {
+    s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}"
+  }
+
+  def progressTempDirPathStr(checkpointDir: String, subDirNames: String*): String = {
+    s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}_temp"
   }
 
   def progressTempFileStr(basePath: String,
                           streamId: Int,
-                          namespace: String,
+                          uid: String,
                           eventHubNameAndPartition: EventHubNameAndPartition,
                           timestamp: Long): String = {
-    basePath + s"/$streamId-$namespace-$eventHubNameAndPartition-$timestamp"
+    basePath + s"/$streamId-$uid-$eventHubNameAndPartition-$timestamp"
   }
 }

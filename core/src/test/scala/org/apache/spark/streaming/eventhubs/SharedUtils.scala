@@ -27,7 +27,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.eventhubscommon.EventHubsConnector
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
+import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
 
 private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
@@ -61,12 +61,12 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     sparkContext.setLogLevel("INFO")
     ssc = new StreamingContext(sparkContext, batchDuration)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTrackerBase.initInstance(progressRootPath.toString, appName,
-      new Configuration(), "directDStream")
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
   }
 
   protected def reset(): Unit = {
-    ProgressTrackerBase.reset()
+    DirectDStreamProgressTracker.reset()
     progressTracker = null
     progressListener = null
     EventHubDirectDStream.lastCleanupTime = -1

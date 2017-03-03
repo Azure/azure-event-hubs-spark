@@ -63,7 +63,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var initialized = false
 
-  ProgressTrackerBase.registeredConnectors += this
+  DirectDStreamProgressTracker.registeredConnectors += this
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
@@ -94,7 +94,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private var _eventHubClient: EventHubClient = _
 
-  private def progressTracker = ProgressTrackerBase.getInstance.
+  private def progressTracker = DirectDStreamProgressTracker.getInstance.
     asInstanceOf[DirectDStreamProgressTracker]
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
@@ -118,8 +118,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
     require(concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
-    ProgressTrackerBase.initInstance(progressDir,
-      context.sparkContext.appName, context.sparkContext.hadoopConfiguration, "directDStream")
+    DirectDStreamProgressTracker.initInstance(progressDir,
+      context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
     ProgressTrackingListener.initInstance(ssc, progressDir)
   }
 
@@ -227,7 +227,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       eventhubsParams,
       offsetRanges,
       validTime.milliseconds,
-      OffsetStoreParams(progressDir, ssc.sparkContext.appName, streamId, eventHubNameSpace),
+      OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
+        subDirs = ssc.sparkContext.appName),
       eventhubReceiverCreator)
     reportInputInto(validTime, offsetRanges,
       offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
@@ -299,7 +300,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   @throws(classOf[IOException])
   private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
     ois.defaultReadObject()
-    ProgressTrackerBase.registeredConnectors += this
+    DirectDStreamProgressTracker.registeredConnectors += this
     initialized = false
   }
 
@@ -328,8 +329,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // we have to initialize here, otherwise there is a race condition when recovering from spark
       // checkpoint
       logInfo("initialized ProgressTracker")
-      ProgressTrackerBase.initInstance(progressDir, context.sparkContext.appName,
-        context.sparkContext.hadoopConfiguration, "directDStream")
+      val appName = context.sparkContext.appName
+      DirectDStreamProgressTracker.initInstance(progressDir, appName,
+        context.sparkContext.hadoopConfiguration)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
         logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
         generatedRDDs += t -> new EventHubsRDD(
@@ -338,7 +340,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq) =>
             OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq)}.toList,
           t.milliseconds,
-          OffsetStoreParams(progressDir, ssc.sparkContext.appName, streamId, eventHubNameSpace),
+          OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
+            subDirs = appName),
           eventhubReceiverCreator)
       }
     }

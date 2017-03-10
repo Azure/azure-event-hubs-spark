@@ -183,6 +183,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_2.11</artifactId>
+      <version>${spark.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
       <version>0.11.0</version>
@@ -203,6 +208,8 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_2.11</artifactId>
       <version>${spark.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>

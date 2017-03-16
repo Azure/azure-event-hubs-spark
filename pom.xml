@@ -126,6 +126,12 @@
           <value>true</value>
         </property>
       </activation>
+      <distributionManagement>
+        <snapshotRepository>
+          <id>ossrh</id>
+          <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+      </distributionManagement>
       <build>
         <plugins>
           <plugin>
@@ -182,11 +188,11 @@
       <version>${spark.version}</version>
       <scope>provided</scope>
     </dependency>
-    <dependency>
+    <!--<dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
-      <version>0.9.0</version>
-    </dependency>
+      <version>0.12.0</version>
+    </dependency>-->
     <dependency>
       <groupId>org.scalaj</groupId>
       <artifactId>scalaj-http_2.11</artifactId>
@@ -284,12 +290,6 @@
       <version>1.0.6</version>
     </dependency>
   </dependencies>
-  <distributionManagement>
-      <snapshotRepository>
-        <id>ossrh</id>
-        <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-      </snapshotRepository>
-  </distributionManagement>
   <build>
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>

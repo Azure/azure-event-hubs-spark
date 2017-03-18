@@ -32,7 +32,7 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
 
   test("progress directory is created properly when it does not exist") {
     progressTracker = StructuredStreamingProgressTracker
-      .initInstance(uid, progressRootPath.toString, appName, new Configuration())
+      .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
     assert(fileSystem.exists(progressTracker.progressDirectoryPath))
   }
 
@@ -40,7 +40,7 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
     fileSystem.mkdirs(new Path(PathTools.progressTempDirPathStr(progressRootPath.toString,
       appName)))
     progressTracker = StructuredStreamingProgressTracker
-      .initInstance(uid, progressRootPath.toString, appName, new Configuration())
+      .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
     assert(fileSystem.exists(progressTracker.progressDirectoryPath))
   }
 
@@ -52,18 +52,18 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
     val streamId = EventHubsSource.streamIdGenerator.get()
 
     var tempFilePath = new Path(PathTools.progressTempFileStr(tempPath.toString,
-      streamId, uid, eventhubsNamedPartitions("ns1").head, unixTimestamp))
+      streamId, eventhubsSource1.uid, eventhubsNamedPartitions("ns1").head, unixTimestamp))
     fileSystem.create(tempFilePath)
 
     tempFilePath = new Path(PathTools.progressTempFileStr(tempPath.toString,
-      streamId, uid, eventhubsNamedPartitions("ns1").tail.head, unixTimestamp))
+      streamId, eventhubsSource1.uid, eventhubsNamedPartitions("ns1").tail.head, unixTimestamp))
     fileSystem.create(tempFilePath)
 
     val filesBefore = fileSystem.listStatus(tempPath)
     assert(filesBefore.size === 2)
 
     progressTracker = StructuredStreamingProgressTracker
-      .initInstance(uid, progressRootPath.toString, appName, new Configuration())
+      .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
 
     val filesAfter = fileSystem.listStatus(tempPath)
     assert(filesAfter.size === 2)
@@ -463,12 +463,9 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
     progressTracker = null
   }
 
-  val appName = "StrutcuredStreamingApp"
-  val eventhubsNamespace = "ns"
-  val eventhubsName = "eh"
-  val uid = s"${eventhubsNamespace}_${eventhubsName}"
+  private val appName = "StrutcuredStreamingApp"
 
-  val eventhubsNamedPartitions = Map("ns1" -> Seq(EventHubNameAndPartition("eh1", 0),
+  private val eventhubsNamedPartitions = Map("ns1" -> Seq(EventHubNameAndPartition("eh1", 0),
     EventHubNameAndPartition("eh1", 1)),
     "ns2" -> Seq(EventHubNameAndPartition("eh2", 0), EventHubNameAndPartition("eh2", 1),
       EventHubNameAndPartition("eh", 2)),
@@ -476,38 +473,36 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
       EventHubNameAndPartition("eh3", 2), EventHubNameAndPartition("eh3", 3),
       EventHubNameAndPartition("eh2", 0), EventHubNameAndPartition("eh2", 1)))
 
-  val eventhubsSource1: EventHubsConnector = new EventHubsConnector {
+  private val eventhubsSource1: EventHubsConnector = new EventHubsConnector {
     override def streamId = 0
     override def uid = "ns1_eh1"
     override def connectedInstances : List[EventHubNameAndPartition] =
       eventhubsNamedPartitions("ns1").toList
   }
 
-  val eventhubsSource2: EventHubsConnector = new EventHubsConnector {
+  private val eventhubsSource2: EventHubsConnector = new EventHubsConnector {
     override def streamId = 0
     override def uid = "ns2_eh2"
     override def connectedInstances  : List[EventHubNameAndPartition] =
       eventhubsNamedPartitions("ns2").toList
   }
 
-  val eventhubsSource3: EventHubsConnector = new EventHubsConnector {
+  private val eventhubsSource3: EventHubsConnector = new EventHubsConnector {
     override def streamId = 0
     override def uid = "ns3_eh3"
     override def connectedInstances  : List[EventHubNameAndPartition] =
       eventhubsNamedPartitions("ns3").filter(x => x.eventHubName.equals("eh3")).toList
   }
 
-  val eventhubsSource4: EventHubsConnector = new EventHubsConnector {
+  private val eventhubsSource4: EventHubsConnector = new EventHubsConnector {
     override def streamId = 0
     override def uid = "ns3_eh2"
     override def connectedInstances  : List[EventHubNameAndPartition] =
       eventhubsNamedPartitions("ns3").filter(x => x.eventHubName.equals("eh2")).toList
   }
 
-  var fileSystem: FileSystem = _
-  var progressRootPath: Path = _
-  var progressTracker: ProgressTrackerBase[_ <: EventHubsConnector] = _
-  var unixTimestamp: Long = _
-
-
+  private var fileSystem: FileSystem = _
+  private var progressRootPath: Path = _
+  private var progressTracker: ProgressTrackerBase[_ <: EventHubsConnector] = _
+  private var unixTimestamp: Long = _
 }

@@ -146,7 +146,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val r = eventHubClient.endPointOfPartition(retryIfFail, demandingEhNameAndPartitions)
     if (r.isDefined) {
       // merge results
-      val mergedOffsets = fetchedHighestOffsetsAndSeqNums.offsets ++ r.get
+      val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {
+        fetchedHighestOffsetsAndSeqNums.offsets ++ r.get
+      } else {
+        r.get
+      }
       fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, mergedOffsets)
       Some(fetchedHighestOffsetsAndSeqNums.offsets)
     } else {

@@ -176,8 +176,10 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
   private var MAXIMUM_EVENT_RATE: Int = 0
   private val DEFAULT_RECEIVER_EPOCH = -1L
 
-  override def endPointOfPartition(retryIfFail: Boolean):
-      Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
       " yet, please use RestfulEventHubClient")
   }

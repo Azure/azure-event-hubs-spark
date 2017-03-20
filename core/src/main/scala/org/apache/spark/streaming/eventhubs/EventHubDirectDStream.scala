@@ -20,6 +20,7 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{IOException, ObjectInputStream}
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 
@@ -122,13 +123,31 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventHubClient.close()
   }
 
+  private def collectPartitionsNeedingLargerProcessingRange(): List[EventHubNameAndPartition] = {
+    val partitionList = new ListBuffer[EventHubNameAndPartition]
+    for ((ehNameAndPartition, (offset, seqId)) <- fetchedHighestOffsetsAndSeqNums.offsets) {
+      if (currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2 >=
+        fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2) {
+        partitionList += ehNameAndPartition
+      }
+    }
+    partitionList.toList
+  }
+
   private def fetchLatestOffset(validTime: Time, retryIfFail: Boolean):
       Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
-    val r = eventHubClient.endPointOfPartition(retryIfFail)
+    // check if there is any eventhubs partition which potentially has newly arrived message (
+    // the fetched highest message id is within the next batch's processing engine)
+    val demandingEhNameAndPartitions = collectPartitionsNeedingLargerProcessingRange()
+    val r = eventHubClient.endPointOfPartition(retryIfFail, demandingEhNameAndPartitions)
     if (r.isDefined) {
-      fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, r.get)
+      // merge results
+      val mergedOffsets = fetchedHighestOffsetsAndSeqNums.offsets ++ r.get
+      fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, mergedOffsets)
+      Some(fetchedHighestOffsetsAndSeqNums.offsets)
+    } else {
+      r
     }
-    r
   }
 
   /**

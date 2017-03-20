@@ -395,6 +395,7 @@
               <artifactSet>
                 <includes>
                   <include>com.microsoft.azure</include>
+                  <include>org.scalaj</include>
                   <include>org.apache.qpid</include>
                   <include>org.bouncycastle</include>
                 </includes>

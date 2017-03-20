@@ -125,11 +125,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private def collectPartitionsNeedingLargerProcessingRange(): List[EventHubNameAndPartition] = {
     val partitionList = new ListBuffer[EventHubNameAndPartition]
-    for ((ehNameAndPartition, (offset, seqId)) <- fetchedHighestOffsetsAndSeqNums.offsets) {
-      if (currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2 >=
-        fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2) {
-        partitionList += ehNameAndPartition
+    if (fetchedHighestOffsetsAndSeqNums != null) {
+      for ((ehNameAndPartition, (offset, seqId)) <- fetchedHighestOffsetsAndSeqNums.offsets) {
+        if (currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2 >=
+          fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2) {
+          partitionList += ehNameAndPartition
+        }
       }
+    } else {
+      partitionList ++= eventhubNameAndPartitions
     }
     partitionList.toList
   }

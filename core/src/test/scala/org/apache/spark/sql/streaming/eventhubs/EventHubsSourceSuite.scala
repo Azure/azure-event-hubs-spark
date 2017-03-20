@@ -118,7 +118,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, eventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerEventHubs)
+        new TestRestEventHubClient(highestOffsetPerEventHubs))
 
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
 

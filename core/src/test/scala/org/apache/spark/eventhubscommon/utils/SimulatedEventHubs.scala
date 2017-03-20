@@ -48,9 +48,16 @@ class SimulatedEventHubs(
   }
 
   def send(newData: Map[EventHubNameAndPartition, Array[EventData]]): Unit = {
+<<<<<<< HEAD
     val combinedData: Map[EventHubNameAndPartition, Array[EventData]] =
       (messageStore.toSeq ++ newData.toSeq).groupBy(_._1)
         .map{case (k, v) => (k, v.flatMap(_._2).toArray)}
+=======
+
+    val combinedData: Map[EventHubNameAndPartition, Array[EventData]]
+    = (messageStore.toSeq ++ newData.toSeq).groupBy(_._1).mapValues(_.flatMap(_._2).toArray)
+
+>>>>>>> Refactoring simulated eventhubs setup
     messageStore = combinedData
   }
 }

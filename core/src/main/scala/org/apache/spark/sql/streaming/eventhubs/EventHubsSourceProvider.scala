@@ -22,6 +22,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source
 import org.apache.spark.sql.sources.{DataSourceRegister, StreamSourceProvider}
 import org.apache.spark.sql.types._
+import org.apache.spark.unsafe.types.UTF8String
 
 private[sql] class EventHubsSourceProvider extends DataSourceRegister
   with StreamSourceProvider with Logging {
@@ -82,6 +83,5 @@ private[sql] object EventHubsSourceProvider extends Serializable {
     } else {
       Seq()
     }})
-
   }
 }

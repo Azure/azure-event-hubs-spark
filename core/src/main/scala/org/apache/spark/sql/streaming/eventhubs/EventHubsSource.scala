@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, SQLContext}
@@ -44,25 +43,25 @@ private[spark] class EventHubsSource(
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
-  private val eventhubsNamespace: String = parameters("eventhubs.namespace")
-  private val eventhubsName: String = parameters("eventhubs.name")
+  private val eventHubsNamespace: String = parameters("eventhubs.namespace")
+  private val eventHubsName: String = parameters("eventhubs.name")
 
-  require(eventhubsNamespace != null, "eventhubs.namespace is not defined")
-  require(eventhubsName != null, "eventhubs.name is not defined")
+  require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
+  require(eventHubsName != null, "eventhubs.name is not defined")
 
-  private var _eventHubClient: EventHubClient = _
+  private var _eventHubsClient: EventHubClient = _
 
   private[eventhubs] def eventHubClient = {
-    if (_eventHubClient == null) {
-      _eventHubClient = eventhubClientCreator(eventhubsNamespace, Map(eventhubsName -> parameters))
+    if (_eventHubsClient == null) {
+      _eventHubsClient = eventhubClientCreator(eventHubsNamespace, Map(eventHubsName -> parameters))
     }
-    _eventHubClient
+    _eventHubsClient
   }
 
   private val ehNameAndPartitions = {
     val partitionCount = parameters("eventhubs.partition.count").toInt
     (for (partitionId <- 0 until partitionCount)
-      yield EventHubNameAndPartition(eventhubsName, partitionId)).toList
+      yield EventHubNameAndPartition(eventHubsName, partitionId)).toList
   }
 
   // EventHubsSource is created for each instance of program, that means it is different with
@@ -75,7 +74,7 @@ private[spark] class EventHubsSource(
     sqlContext.sparkContext.hadoopConfiguration)
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): EventHubsSource = {
-    _eventHubClient = eventHubClient
+    _eventHubsClient = eventHubClient
     this
   }
 
@@ -262,7 +261,7 @@ private[spark] class EventHubsSource(
   override def stop(): Unit = {}
 
   // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
-  override def uid: String = s"${eventhubsNamespace}_$eventhubsName"
+  override def uid: String = s"${eventHubsNamespace}_$eventHubsName"
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions

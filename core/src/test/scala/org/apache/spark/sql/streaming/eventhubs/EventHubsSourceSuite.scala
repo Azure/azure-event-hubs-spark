@@ -17,11 +17,15 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.scalatest.time.SpanSugar._
+import java.util.Calendar
 
-import org.apache.spark.eventhubscommon.utils.{EventHubsTestUtilities, TestEventHubsReceiver, TestRestEventHubClient}
+import org.scalatest.time.SpanSugar._
+import org.apache.spark.eventhubscommon.utils._
+import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming.StreamTest
 import org.apache.spark.sql.test.SharedSQLContext
+
+import scala.reflect.ClassTag
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
@@ -33,12 +37,13 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
       super.afterAll()
   }
 
-  override val streamingTimeout = 30.seconds
+  override val streamingTimeout: org.scalatest.time.Span = 30.seconds
 }
 
 class EventHubsSourceSuite extends EventHubsSourceTest {
 
-  testWithUninterruptibleThread("Verify offsets are correct") {
+
+  testWithUninterruptibleThread("Verify expected offsets are correct") {
 
     val eventHubsParameters = Map[String, String](
       "eventhubs.policyname" -> "policyName",
@@ -62,19 +67,16 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       7 -> Seq("propertyV" -> "v")
     )
 
-    val eventHubs = EventHubsTestUtilities.simulateEventHubs("ns1",
-      Map("eh1" -> eventHubsParameters), eventPayloadsAndProperties)
+    val eventHubs = EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
+      eventPayloadsAndProperties)
 
-    val highestOffsetPerEventHubs = eventHubs.messageStore.map {
-      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
-        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
-    }
+    val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
 
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerEventHubs))
+        new TestRestEventHubClient(highestOffsetPerPartition))
 
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
 
@@ -82,13 +84,14 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     offset.targetSeqNums.values.foreach(x => assert(x == 2))
   }
 
-  testWithUninterruptibleThread("Verify dataframe schema and data is correct") {
+  testWithUninterruptibleThread("Verify dataframe schema is correct") {
 
     val eventHubsParameters = Map[String, String](
       "eventhubs.policyname" -> "policyName",
       "eventhubs.policykey" -> "policyKey",
       "eventhubs.namespace" -> "ns1",
       "eventhubs.name" -> "eh1",
+      // "eventhubs.sql.userDefinedKeys" -> "creationTime",
       "eventhubs.partition.count" -> "2",
       "eventhubs.consumergroup" -> "$Default",
       "eventhubs.progressTrackingDir" -> "/tmp",
@@ -96,40 +99,33 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
 
     val eventPayloadsAndProperties = Seq(
-      1 -> Seq("propertyA" -> "a", "propertyB" -> "b", "propertyC" -> "c", "propertyD" -> "d",
-        "propertyE" -> "e", "propertyF" -> "f"),
-      0 -> Seq("propertyG" -> "g", "propertyH" -> "h", "propertyI" -> "i", "propertyJ" -> "j",
-        "propertyK" -> "k"),
-      3 -> Seq("propertyM" -> "m", "propertyN" -> "n", "propertyO" -> "o", "propertyP" -> "p"),
-      9 -> Seq("propertyQ" -> "q", "propertyR" -> "r", "propertyS" -> "s"),
-      5 -> Seq("propertyT" -> "t", "propertyU" -> "u"),
-      7 -> Seq("propertyV" -> "v")
+      1 -> Seq("creationTime" -> Calendar.getInstance().getTime),
+      3 -> Seq("creationTime" -> Calendar.getInstance().getTime),
+      5 -> Seq("creationTime" -> Calendar.getInstance().getTime),
+      7 -> Seq("creationTime" -> Calendar.getInstance().getTime),
+      9 -> Seq("creationTime" -> Calendar.getInstance().getTime),
+      11 -> Seq("creationTime" -> Calendar.getInstance().getTime)
     )
 
-    val eventHubs = EventHubsTestUtilities.simulateEventHubs("ns1",
-      Map("eh1" -> eventHubsParameters), eventPayloadsAndProperties)
+    val eventHubs = EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
+      eventPayloadsAndProperties)
 
-    val highestOffsetPerEventHubs = eventHubs.messageStore.map {
-      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
-        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
-    }
+    val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
 
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerEventHubs))
+        new TestRestEventHubClient(highestOffsetPerPartition))
 
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
 
-    val dataFrame = eventHubsSource.getBatch(null, offset)
-
-    eventHubsSource.commit(offset)
+    val dataFrame = eventHubsSource.getBatch(None, offset)
 
     assert(dataFrame.schema == eventHubsSource.schema)
 
-    import testImplicits._
+    eventHubsSource.commit(offset)
 
-    CheckAnswer(1, 0, 3, 9, 5, 7)
+    assert(dataFrame.select("body").count == 6)
   }
 }

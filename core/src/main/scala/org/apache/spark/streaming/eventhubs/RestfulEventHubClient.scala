@@ -47,7 +47,7 @@ private[eventhubs] class RestfulEventHubClient(
     policyKeys: Map[String, Tuple2[String, String]],
     threadNum: Int) extends EventHubClient with Logging {
 
-  private val RETRY_INTERVAL_SECONDS = Array(2, 4, 8, 16)
+  private val RETRY_INTERVAL_SECONDS = Array(8, 16, 32, 64, 128)
 
   // will be used to execute requests to EventHub
   import Implicits.exec
@@ -113,12 +113,14 @@ private[eventhubs] class RestfulEventHubClient(
           if (!retryIfFail || retryTime > RETRY_INTERVAL_SECONDS.length - 1) {
             val errorInfoString = s"cannot get latest offset of" +
               s" $ehNameAndPartition, status code: ${response.code}, ${response.headers}" +
-              s" returned error:" +
-              s" ${response.body}"
+              s" returned error: ${response.body}"
             logError(errorInfoString)
             throw new Exception(errorInfoString)
           } else {
-            Thread.sleep(1000 * RETRY_INTERVAL_SECONDS(retryTime))
+            val retryInterval = 1000 * RETRY_INTERVAL_SECONDS(retryTime)
+            logError(s"cannot get connect with Event Hubs Rest Endpoint for partition" +
+              s" $ehNameAndPartition, retry after $retryInterval seconds")
+            Thread.sleep(retryInterval)
             retryTime += 1
           }
         } else {

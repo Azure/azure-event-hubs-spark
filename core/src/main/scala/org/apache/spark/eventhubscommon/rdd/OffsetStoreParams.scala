@@ -15,16 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.rdd
 
-private[eventhubs] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
-
-  override def toString: String = s"$eventHubName-partition-$partitionId"
-}
-
-private[eventhubs] object EventHubNameAndPartition {
-  def fromString(str: String): EventHubNameAndPartition = {
-    val Array(name, partition) = str.split("-partition-")
-    EventHubNameAndPartition(name, partition.toInt)
-  }
-}
+// a bridging object to avoid serialzing offsetstore instances
+private[spark] case class OffsetStoreParams(
+    checkpointDir: String, streamId: Int, uid: String, subDirs: String*)

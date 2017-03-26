@@ -15,26 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.progress
 
-import org.apache.spark.streaming.Time
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
-private[checkpoint] object PathTools extends Serializable {
+private[spark] object PathTools extends Serializable {
 
-  def progressDirPathStr(checkpointDir: String, appName: String): String = {
-    s"$checkpointDir/$appName"
+  private def fromSubDirNamesToString(subDirs: Seq[String]): String = {
+    subDirs.mkString("/")
   }
 
-  def progressTempDirPathStr(checkpointDir: String, appName: String): String = {
-    s"$checkpointDir/${appName}_temp"
+  def progressDirPathStr(checkpointDir: String, subDirNames: String*): String = {
+    s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}"
+  }
+
+  def progressTempDirPathStr(checkpointDir: String, subDirNames: String*): String = {
+    s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}_temp"
   }
 
   def progressTempFileStr(basePath: String,
                           streamId: Int,
-                          namespace: String,
+                          uid: String,
                           eventHubNameAndPartition: EventHubNameAndPartition,
                           timestamp: Long): String = {
-    basePath + s"/$streamId-$namespace-$eventHubNameAndPartition-$timestamp"
+    basePath + s"/$streamId-$uid-$eventHubNameAndPartition-$timestamp"
   }
 }

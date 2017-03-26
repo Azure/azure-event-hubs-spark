@@ -15,9 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.client
 
-private[eventhubs] trait EventHubClient extends Serializable {
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+
+private[spark] trait EventHubClient extends Serializable {
 
   /**
    * return the end point of each partition

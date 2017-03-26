@@ -15,15 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.client
 
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
+object EventhubsOffsetTypes extends Enumeration {
 
-private[eventhubs] case class OffsetRange(
-    eventHubNameAndPartition: EventHubNameAndPartition,
-    fromOffset: Long,
-    fromSeq: Long,
-    untilSeq: Long) {
+  type EventhubsOffsetType = Value
 
-  private[eventhubs] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
+  val None, PreviousCheckpoint, InputByteOffset, InputTimeOffset = Value
 }

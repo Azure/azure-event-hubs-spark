@@ -17,21 +17,14 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.util.concurrent.ConcurrentLinkedQueue
-
-import scala.reflect.ClassTag
-
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.{SparkConf, SparkContext, SparkException}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.client.EventHubClient
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
-import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker, ProgressTrackingListener}
-import org.apache.spark.streaming.eventhubs.utils.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
-import org.apache.spark.util.Utils
-
+import org.apache.spark.streaming.eventhubs.checkpoint.ProgressTrackingListener
 
 class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar with SharedUtils {
 
@@ -79,7 +72,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput)
     testProgressTracker(eventhubNamespace,
       OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
@@ -108,7 +101,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.window(Seconds(2), Seconds(1)).map(
-          eventData => eventData.getProperties.get("output").toInt + 1),
+          eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput)
     testProgressTracker(eventhubNamespace,
       OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
@@ -159,7 +152,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       operation = (inputDStream1: EventHubDirectDStream, inputDStream2: EventHubDirectDStream) =>
         inputDStream1.flatMap(eventData => eventData.getProperties.asScala).
           join(inputDStream2.flatMap(eventData => eventData.getProperties.asScala)).
-          map{case (key, (v1, v2)) => (key, v1.toInt + v2.toInt)},
+          map{case (key, (v1, v2)) => (key, v1.asInstanceOf[Int] + v2.asInstanceOf[Int])},
       expectedOutput)
     testProgressTracker("namespace1",
       OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh11", 0) -> (5L, 5L),
@@ -188,7 +181,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           EventHubNameAndPartition("eh1", 2) -> (-1L, -1L))
       )),
       operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
       rddOperation = Some((rdd: RDD[Int], t: Time) => {
         Array(rdd.take(1).toSeq)
@@ -219,7 +212,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
             EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
             EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
-        inputDStream.map(eventData => eventData.getProperties.get("output").toInt + 1),
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
       messagesBeforeEmpty = 4,
       numBatchesBeforeNewData = 5)

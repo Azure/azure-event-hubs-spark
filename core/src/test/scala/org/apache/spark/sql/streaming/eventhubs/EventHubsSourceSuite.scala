@@ -287,8 +287,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   private def generateInputQuery(
-      eventHubsParams: Map[String, String],
-      sparkSession: SparkSession): Dataset[_] = {
+                                  eventHubsParams: Map[String, String],
+                                  sparkSession: SparkSession): Dataset[_] = {
     import sparkSession.implicits._
     val dataSource = spark
       .readStream
@@ -555,7 +555,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
         additionalConfs = Map("eventhubs.test.checkpointLocation" ->
           s"${Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath}",
-        "eventhubs.test.newSink" -> "true")),
+          "eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters),
       CheckAnswer(1, 2, 3, 4, 5, 6),
       AddEventHubsData(eventHubsParameters, highestBatchId.incrementAndGet().toLong,
@@ -585,8 +585,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     import org.apache.spark.sql.functions._
     val windowedStream = sourceQuery.groupBy(
       window($"creationTime".cast(TimestampType),
-      "3 second",
-      "1 second")).count().sort("window").select("count")
+        "3 second",
+        "1 second")).count().sort("window").select("count")
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(1000), triggerClock = manualClock))
     val clockMove = Array.fill(13)(AdvanceManualClock(1000)).toSeq

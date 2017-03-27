@@ -234,6 +234,19 @@ private[spark] class EventHubsSource(
     )
   }
 
+  private def fromUserDefinedKeysToProperties(userDefinedKeys: Seq[String], eventData: EventData):
+      Seq[String] = {
+    import scala.collection.JavaConverters._
+    userDefinedKeys.map(k => {
+      val properties = eventData.getProperties.asScala
+      if (properties.contains(k)) {
+        properties(k).toString
+      } else {
+        null
+      }
+    })
+  }
+
   private def convertEventHubsRDDToDataFrame(eventHubsRDD: EventHubsRDD): DataFrame = {
     import scala.collection.JavaConverters._
     val (containsProperties, userDefinedKeys) =

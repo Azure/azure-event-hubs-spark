@@ -20,12 +20,10 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 
 import org.scalatest.time.SpanSugar._
+
 import org.apache.spark.eventhubscommon.utils._
-import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming.StreamTest
 import org.apache.spark.sql.test.SharedSQLContext
-
-import scala.reflect.ClassTag
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 

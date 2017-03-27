@@ -104,10 +104,9 @@ object EventHubsTestUtilities extends Logging {
     }.toMap
   }
 
-  private def generateEventData
-  [T: ClassTag, U: ClassTag](
-                              payloadPropertyBag: Seq[(T, Seq[U])],
-                              partitionId: Int): Array[EventData] = {
+  private def generateEventData[T: ClassTag, U: ClassTag](
+      payloadPropertyBag: Seq[(T, Seq[U])],
+      partitionId: Int): Array[EventData] = {
 
     var offsetSetInQueue = 0
 
@@ -116,7 +115,6 @@ object EventHubsTestUtilities extends Logging {
     val publisherName = "Microsoft Corporation"
 
     for((payload, properties) <- payloadPropertyBag) {
-
       val eventData = new EventData(payload.toString.getBytes)
 
       val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()

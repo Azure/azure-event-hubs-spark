@@ -29,12 +29,12 @@ import org.apache.spark.util.Utils
 class EventHubsSourceSuite extends EventHubsStreamTest {
 
   private def buildEventHubsParamters(
-                                       namespace: String,
-                                       name: String,
-                                       partitionCount: Int,
-                                       maxRate: Int,
-                                       containsProperties: Boolean = false,
-                                       userDefinedKeys: Option[String] = None): Map[String, String] = {
+      namespace: String,
+      name: String,
+      partitionCount: Int,
+      maxRate: Int,
+      containsProperties: Boolean = false,
+      userDefinedKeys: Option[String] = None): Map[String, String] = {
     Map[String, String](
       "eventhubs.policyname" -> "policyName",
       "eventhubs.policykey" -> "policyKey",

@@ -87,13 +87,9 @@ private[spark] class EventHubsSource(
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {
-    val userDefinedKeys = parameters.get("eventhubs.sql.userDefinedKeys") match {
-      case Some(keys) =>
-        keys.split(",").toSeq
-      case None =>
-        Seq()
-    }
-    EventHubsSourceProvider.sourceSchema(userDefinedKeys)
+    val containsProperties = parameters.getOrElse("eventhubs.sql.containsProperties",
+      "false").toBoolean
+    EventHubsSourceProvider.sourceSchema(containsProperties)
   }
 
   private[spark] def composeHighestOffset(retryIfFail: Boolean) = {
@@ -200,8 +196,8 @@ private[spark] class EventHubsSource(
         eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,
         eventData.getSystemProperties.getPublisher,
         eventData.getSystemProperties.getPartitionKey
-      ) ++ eventData.getProperties.asScala.values)
-    )
+      ) ++ Seq(eventData.getProperties.asScala.map { case (k, v) => k -> v.toString })
+    ))
     sqlContext.createDataFrame(rowRDD, schema)
   }
 

@@ -34,13 +34,9 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
       schema: Option[StructType],
       providerName: String,
       parameters: Map[String, String]): (String, StructType) = {
-    val userDefinedKeys = parameters.get("eventhubs.sql.userDefinedKeys") match {
-      case Some(keys) =>
-        keys.split(",").toSeq
-      case None =>
-        Seq()
-    }
-    (shortName(), EventHubsSourceProvider.sourceSchema(userDefinedKeys))
+    val containsProperties = parameters.getOrElse("eventhubs.sql.containsProperties",
+      "false").toBoolean
+    (shortName(), EventHubsSourceProvider.sourceSchema(containsProperties))
   }
 
   override def createSource(
@@ -57,7 +53,7 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
 
 private[sql] object EventHubsSourceProvider {
 
-  def sourceSchema(userDefinedKeys: Seq[String]): StructType = {
+  def sourceSchema(containsProperties: Boolean): StructType = {
     // in this phase, we shall include the system properties as well as the ones defined in the
     // application properties
     // TODO: do we need to add body length?
@@ -68,7 +64,10 @@ private[sql] object EventHubsSourceProvider {
       StructField("enqueuedTime", LongType),
       StructField("publisher", StringType),
       StructField("partitionKey", StringType)
-    ) ++ userDefinedKeys.map(udkey =>
-      StructField(udkey, ObjectType(classOf[AnyRef]))))
+    ) ++ {if (containsProperties) {
+      Seq(StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
+    } else {
+      Seq()
+    }})
   }
 }

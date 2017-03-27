@@ -136,6 +136,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       "eventhubs.policykey" -> "policyKey",
       "eventhubs.namespace" -> "ns1",
       "eventhubs.sql.containsProperties" -> "true",
+      "eventhubs.sql.userDefinedKeys" -> "creationTime",
       "eventhubs.name" -> "eh1",
       "eventhubs.partition.count" -> "2",
       "eventhubs.consumergroup" -> "$Default",

@@ -65,9 +65,9 @@ private[sql] object EventHubsSourceProvider {
       StructField("body", BinaryType),
       StructField("offset", LongType),
       StructField("seqNumber", LongType),
-      StructField("enqueuedTime", LongType)
-      // StructField("publisher", StringType),
-      // StructField("partitionKey", StringType)
+      StructField("enqueuedTime", LongType),
+      StructField("publisher", StringType),
+      StructField("partitionKey", StringType)
     ) ++ userDefinedKeys.map(udkey =>
       StructField(udkey, ObjectType(classOf[AnyRef]))))
   }

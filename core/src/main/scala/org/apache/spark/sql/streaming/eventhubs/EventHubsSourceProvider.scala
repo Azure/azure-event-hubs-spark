@@ -49,7 +49,7 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
   }
 }
 
-private[sql] object EventHubsSourceProvider {
+private[sql] object EventHubsSourceProvider extends Serializable {
 
   private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(parameters: Map[String, String]):
       (Boolean, Seq[String]) = {

@@ -17,6 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.net.SocketTimeoutException
 import java.time.Duration
 import java.util.concurrent.Executors
 
@@ -102,29 +103,37 @@ private[eventhubs] class RestfulEventHubClient(
       while (!successfullyFetched) {
         logDebug(s"start fetching latest offset of $ehNameAndPartition")
         val urlString = fromParametersToURLString(eventHubName, partitionId)
-        response = Http(urlString).
-          header("Authorization",
+        try {
+          response = Http(urlString).header("Authorization",
             createSasToken(eventHubName,
               policyName = policyKeys(eventHubName)._1,
               policyKey = policyKeys(eventHubName)._2)).
-          header("Content-Type", "application/atom+xml;type=entry;charset=utf-8").
-          timeout(connTimeoutMs = 3000, readTimeoutMs = 30000).asString
-        if (response.code != 200) {
-          if (!retryIfFail || retryTime > RETRY_INTERVAL_SECONDS.length - 1) {
-            val errorInfoString = s"cannot get latest offset of" +
-              s" $ehNameAndPartition, status code: ${response.code}, ${response.headers}" +
-              s" returned error: ${response.body}"
-            logError(errorInfoString)
-            throw new Exception(errorInfoString)
+            header("Content-Type", "application/atom+xml;type=entry;charset=utf-8").
+            timeout(connTimeoutMs = 3000, readTimeoutMs = 30000).asString
+          if (response.code != 200) {
+            if (!retryIfFail || retryTime > RETRY_INTERVAL_SECONDS.length - 1) {
+              val errorInfoString = s"cannot get latest offset of" +
+                s" $ehNameAndPartition, status code: ${response.code}, ${response.headers}" +
+                s" returned error: ${response.body}"
+              logError(errorInfoString)
+              throw new Exception(errorInfoString)
+            } else {
+              val retryInterval = 1000 * RETRY_INTERVAL_SECONDS(retryTime)
+              logError(s"cannot get connect with Event Hubs Rest Endpoint for partition" +
+                s" $ehNameAndPartition, retry after $retryInterval seconds")
+              Thread.sleep(retryInterval)
+              retryTime += 1
+            }
           } else {
-            val retryInterval = 1000 * RETRY_INTERVAL_SECONDS(retryTime)
-            logError(s"cannot get connect with Event Hubs Rest Endpoint for partition" +
-              s" $ehNameAndPartition, retry after $retryInterval seconds")
-            Thread.sleep(retryInterval)
-            retryTime += 1
+            successfullyFetched = true
           }
-        } else {
-          successfullyFetched = true
+        } catch {
+          case e: SocketTimeoutException =>
+            e.printStackTrace()
+            logError("Event Hubs return ReadTimeout with 30s as threshold, retrying...")
+          case e: Exception =>
+            e.printStackTrace()
+            throw e
         }
       }
       val endpointOffset = fromResponseBodyToResult(response.body)

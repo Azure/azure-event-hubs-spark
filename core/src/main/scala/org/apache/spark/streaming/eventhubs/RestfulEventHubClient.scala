@@ -17,6 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.net.SocketTimeoutException
 import java.time.Duration
 import java.util.concurrent.Executors
 
@@ -47,7 +48,7 @@ private[eventhubs] class RestfulEventHubClient(
     policyKeys: Map[String, Tuple2[String, String]],
     threadNum: Int) extends EventHubClient with Logging {
 
-  private val RETRY_INTERVAL_SECONDS = Array(2, 4, 8, 16)
+  private val RETRY_INTERVAL_SECONDS = Array(8, 16, 32, 64, 128)
 
   // will be used to execute requests to EventHub
   import Implicits.exec
@@ -87,46 +88,74 @@ private[eventhubs] class RestfulEventHubClient(
     }
   }
 
-  private def queryPartitionRuntimeInfo[T](
-      fromResponseBodyToResult: String => T, retryIfFail: Boolean):
-      Option[Map[EventHubNameAndPartition, T]] = {
-    val futures = new ListBuffer[Future[(EventHubNameAndPartition, T)]]
-    for ((eventHubName, numPartitions) <- numPartitionsEventHubs;
-         partitionId <- 0 until numPartitions) {
-      futures += Future {
-        var retryTime = 0
-        var successfullyFetched = false
-        var response: HttpResponse[String] = null
-        val ehNameAndPartition = EventHubNameAndPartition(eventHubName, partitionId)
-        while (!successfullyFetched) {
-          logDebug(s"start fetching latest offset of $ehNameAndPartition")
-          val urlString = fromParametersToURLString(eventHubName, partitionId)
-          response = Http(urlString).
-            header("Authorization",
-              createSasToken(eventHubName,
-                policyName = policyKeys(eventHubName)._1,
-                policyKey = policyKeys(eventHubName)._2)).
+  private def composeQuery[T](
+      retryIfFail: Boolean,
+      fromResponseBodyToResult: String => T,
+      nameAndPartition: EventHubNameAndPartition):
+      Future[(EventHubNameAndPartition, T)] = {
+    Future {
+      var retryTime = 0
+      var successfullyFetched = false
+      var response: HttpResponse[String] = null
+      val ehNameAndPartition = nameAndPartition
+      val eventHubName = nameAndPartition.eventHubName
+      val partitionId = nameAndPartition.partitionId
+      while (!successfullyFetched) {
+        logDebug(s"start fetching latest offset of $ehNameAndPartition")
+        val urlString = fromParametersToURLString(eventHubName, partitionId)
+        try {
+          response = Http(urlString).header("Authorization",
+            createSasToken(eventHubName,
+              policyName = policyKeys(eventHubName)._1,
+              policyKey = policyKeys(eventHubName)._2)).
             header("Content-Type", "application/atom+xml;type=entry;charset=utf-8").
             timeout(connTimeoutMs = 3000, readTimeoutMs = 30000).asString
           if (response.code != 200) {
             if (!retryIfFail || retryTime > RETRY_INTERVAL_SECONDS.length - 1) {
               val errorInfoString = s"cannot get latest offset of" +
                 s" $ehNameAndPartition, status code: ${response.code}, ${response.headers}" +
-                s" returned error:" +
-                s" ${response.body}"
+                s" returned error: ${response.body}"
               logError(errorInfoString)
               throw new Exception(errorInfoString)
             } else {
-              Thread.sleep(1000 * RETRY_INTERVAL_SECONDS(retryTime))
+              val retryInterval = 1000 * RETRY_INTERVAL_SECONDS(retryTime)
+              logError(s"cannot get connect with Event Hubs Rest Endpoint for partition" +
+                s" $ehNameAndPartition, retry after $retryInterval seconds")
+              Thread.sleep(retryInterval)
               retryTime += 1
             }
           } else {
             successfullyFetched = true
           }
+        } catch {
+          case e: SocketTimeoutException =>
+            e.printStackTrace()
+            logError("Event Hubs return ReadTimeout with 30s as threshold, retrying...")
+          case e: Exception =>
+            e.printStackTrace()
+            throw e
         }
-        val endpointOffset = fromResponseBodyToResult(response.body)
-        logDebug(s"latest offset of $ehNameAndPartition: $endpointOffset")
-        (ehNameAndPartition, endpointOffset)
+      }
+      val endpointOffset = fromResponseBodyToResult(response.body)
+      logDebug(s"latest offset of $ehNameAndPartition: $endpointOffset")
+      (ehNameAndPartition, endpointOffset)
+    }
+  }
+
+  private def queryPartitionRuntimeInfo[T](
+      targetEventHubsNameAndPartitions: List[EventHubNameAndPartition],
+      fromResponseBodyToResult: String => T, retryIfFail: Boolean):
+      Option[Map[EventHubNameAndPartition, T]] = {
+    val futures = new ListBuffer[Future[(EventHubNameAndPartition, T)]]
+    if (targetEventHubsNameAndPartitions.isEmpty) {
+      for ((eventHubName, numPartitions) <- numPartitionsEventHubs;
+           partitionId <- 0 until numPartitions) {
+        futures += composeQuery(retryIfFail, fromResponseBodyToResult,
+          EventHubNameAndPartition(eventHubName, partitionId))
+      }
+    } else {
+      for (targetNameAndPartition <- targetEventHubsNameAndPartitions) {
+        futures += composeQuery(retryIfFail, fromResponseBodyToResult, targetNameAndPartition)
       }
     }
     aggregateResults(futures.toList)
@@ -136,9 +165,12 @@ private[eventhubs] class RestfulEventHubClient(
     // empty
   }
 
-  override def endPointOfPartition(retryIfFail: Boolean):
-      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
-    queryPartitionRuntimeInfo(fromResponseBodyToEndpoint, retryIfFail)
+  override def endPointOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+    queryPartitionRuntimeInfo(targetEventHubsNameAndPartitions,
+      fromResponseBodyToEndpoint, retryIfFail)
   }
 }
 

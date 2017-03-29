@@ -90,7 +90,12 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def composeHighestOffset(retryIfFail: Boolean) = {
-    RateControlUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
+    RateControlUtils.fetchLatestOffset(eventHubClient, retryIfFail,
+      if (fetchedHighestOffsetsAndSeqNums == null) {
+        null
+      } else {
+        fetchedHighestOffsetsAndSeqNums.offsets
+      }, committedOffsetsAndSeqNums.offsets) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = EventHubsOffset(committedOffsetsAndSeqNums.batchId,
           highestOffsets)

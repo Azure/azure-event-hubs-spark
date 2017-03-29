@@ -253,7 +253,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
   private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
-    RateControlUtils.fetchLatestOffset(eventHubClient, retryIfFail = retryIfFail) match {
+    RateControlUtils.fetchLatestOffset(
+      eventHubClient,
+      retryIfFail,
+      if (fetchedHighestOffsetsAndSeqNums == null) {
+        null
+      } else {
+        fetchedHighestOffsetsAndSeqNums.offsets
+      },
+      currentOffsetsAndSeqNums.offsets) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)

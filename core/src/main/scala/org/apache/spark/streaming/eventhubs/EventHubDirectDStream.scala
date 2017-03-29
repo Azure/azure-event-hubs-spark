@@ -67,7 +67,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
-  private val eventhubNameAndPartitions = {
+  private[eventhubs] val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;
          partitionId <- 0 until eventhubsParams(eventHubName)(
       "eventhubs.partition.count").toInt) yield EventHubNameAndPartition(eventHubName, partitionId)
@@ -126,7 +126,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override def stop(): Unit = {
     eventHubClient.close()
   }
-  
+
   /**
    * EventHub uses *Number Of Messages* for rate control, but uses *offset* to setup of the start
    * point of the receivers. As a result, we need to translate the sequence number to offset to

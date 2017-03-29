@@ -19,12 +19,13 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.microsoft.azure.eventhubs.EventData
+
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.streaming.{Offset, SerializedOffset, Source}
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
@@ -44,25 +45,25 @@ private[spark] class EventHubsSource(
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
-  private val eventhubsNamespace: String = parameters("eventhubs.namespace")
-  private val eventhubsName: String = parameters("eventhubs.name")
+  private val eventHubsNamespace: String = parameters("eventhubs.namespace")
+  private val eventHubsName: String = parameters("eventhubs.name")
 
-  require(eventhubsNamespace != null, "eventhubs.namespace is not defined")
-  require(eventhubsName != null, "eventhubs.name is not defined")
+  require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
+  require(eventHubsName != null, "eventhubs.name is not defined")
 
-  private var _eventHubClient: EventHubClient = _
+  private var _eventHubsClient: EventHubClient = _
 
   private[eventhubs] def eventHubClient = {
-    if (_eventHubClient == null) {
-      _eventHubClient = eventhubClientCreator(eventhubsNamespace, Map(eventhubsName -> parameters))
+    if (_eventHubsClient == null) {
+      _eventHubsClient = eventhubClientCreator(eventHubsNamespace, Map(eventHubsName -> parameters))
     }
-    _eventHubClient
+    _eventHubsClient
   }
 
   private val ehNameAndPartitions = {
     val partitionCount = parameters("eventhubs.partition.count").toInt
     (for (partitionId <- 0 until partitionCount)
-      yield EventHubNameAndPartition(eventhubsName, partitionId)).toList
+      yield EventHubNameAndPartition(eventHubsName, partitionId)).toList
   }
 
   // EventHubsSource is created for each instance of program, that means it is different with
@@ -75,7 +76,7 @@ private[spark] class EventHubsSource(
     sqlContext.sparkContext.hadoopConfiguration)
 
   private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient): EventHubsSource = {
-    _eventHubClient = eventHubClient
+    _eventHubsClient = eventHubClient
     this
   }
 
@@ -88,17 +89,12 @@ private[spark] class EventHubsSource(
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {
-    val userDefinedKeys = parameters.get("eventhubs.sql.userDefinedKeys") match {
-      case Some(keys) =>
-        keys.split(",").toSeq
-      case None =>
-        Seq()
-    }
-    EventHubsSourceProvider.sourceSchema(userDefinedKeys)
+    EventHubsSourceProvider.sourceSchema(parameters)
   }
 
   private[spark] def composeHighestOffset(retryIfFail: Boolean) = {
-    RateControlUtils.fetchLatestOffset(eventHubClient, retryIfFail,
+    RateControlUtils.fetchLatestOffset(eventHubClient,
+      retryIfFail = retryIfFail,
       if (fetchedHighestOffsetsAndSeqNums == null) {
         null
       } else {
@@ -200,15 +196,29 @@ private[spark] class EventHubsSource(
 
   private def convertEventHubsRDDToDataFrame(eventHubsRDD: EventHubsRDD): DataFrame = {
     import scala.collection.JavaConverters._
-    val internalRowRDD = eventHubsRDD.map(eventData =>
-      InternalRow.fromSeq(Seq(eventData.getBody, eventData.getSystemProperties.getOffset.toLong,
+    val (containsProperties, userDefinedKeys) =
+      EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(parameters)
+    val rowRDD = eventHubsRDD.map(eventData =>
+      Row.fromSeq(Seq(eventData.getBody, eventData.getSystemProperties.getOffset.toLong,
         eventData.getSystemProperties.getSequenceNumber,
         eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,
         eventData.getSystemProperties.getPublisher,
         eventData.getSystemProperties.getPartitionKey
-      ) ++ eventData.getProperties.asScala.values)
-    )
-    sqlContext.internalCreateDataFrame(internalRowRDD, schema)
+      ) ++ {
+        if (containsProperties) {
+          if (userDefinedKeys.nonEmpty) {
+            userDefinedKeys.map(k => {
+              eventData.getProperties.asScala.getOrElse(k, "").toString
+            })
+          } else {
+            Seq(eventData.getProperties.asScala.map { case (k, v) => k -> v.toString })
+          }
+        } else {
+          Seq()
+        }
+      }
+    ))
+    sqlContext.createDataFrame(rowRDD, schema)
   }
 
   private def readProgress(batchId: Long): EventHubsOffset = {
@@ -267,7 +277,7 @@ private[spark] class EventHubsSource(
   override def stop(): Unit = {}
 
   // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
-  override def uid: String = s"${eventhubsNamespace}_$eventhubsName"
+  override def uid: String = s"${eventHubsNamespace}_$eventHubsName"
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions

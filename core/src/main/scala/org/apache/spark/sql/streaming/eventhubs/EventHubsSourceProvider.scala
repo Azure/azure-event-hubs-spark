@@ -33,13 +33,7 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
       schema: Option[StructType],
       providerName: String,
       parameters: Map[String, String]): (String, StructType) = {
-    val userDefinedKeys = parameters.get("eventhubs.sql.userDefinedKeys") match {
-      case Some(keys) =>
-        keys.split(",").toSeq
-      case None =>
-        Seq()
-    }
-    (shortName(), EventHubsSourceProvider.sourceSchema(userDefinedKeys))
+    (shortName(), EventHubsSourceProvider.sourceSchema(parameters))
   }
 
   override def createSource(
@@ -54,9 +48,24 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
   }
 }
 
-private[sql] object EventHubsSourceProvider {
+private[sql] object EventHubsSourceProvider extends Serializable {
 
-  def sourceSchema(userDefinedKeys: Seq[String]): StructType = {
+  private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(parameters: Map[String, String]):
+      (Boolean, Seq[String]) = {
+    val containsProperties = parameters.getOrElse("eventhubs.sql.containsProperties",
+      "false").toBoolean
+    val userDefinedKeys = {
+      if (parameters.contains("eventhubs.sql.userDefinedKeys")) {
+        parameters("eventhubs.sql.userDefinedKeys").split(",").toSeq
+      } else {
+        Seq()
+      }
+    }
+    (containsProperties, userDefinedKeys)
+  }
+
+  def sourceSchema(parameters: Map[String, String]): StructType = {
+    val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
     // in this phase, we shall include the system properties as well as the ones defined in the
     // application properties
     // TODO: do we need to add body length?
@@ -67,7 +76,14 @@ private[sql] object EventHubsSourceProvider {
       StructField("enqueuedTime", LongType),
       StructField("publisher", StringType),
       StructField("partitionKey", StringType)
-    ) ++ userDefinedKeys.map(udkey =>
-      StructField(udkey, ObjectType(classOf[AnyRef]))))
+    ) ++ {if (containsProperties) {
+      if (userDefinedKeys.nonEmpty) {
+        userDefinedKeys.map(key => StructField(key, StringType))
+      } else {
+        Seq(StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
+      }
+    } else {
+      Seq()
+    }})
   }
 }

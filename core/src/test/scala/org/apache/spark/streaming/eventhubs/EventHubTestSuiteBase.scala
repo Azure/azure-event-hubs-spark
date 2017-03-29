@@ -30,12 +30,11 @@ import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.powermock.reflect.Whitebox
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
-import org.apache.spark.streaming.eventhubs.utils._
 import org.apache.spark.util.{ManualClock, Utils}
 
 
@@ -104,8 +103,6 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     ssc
   }
 
-
-
   private def setupFragileInputStream(
       namespace: String,
       simulatedEventHubs: SimulatedEventHubs,
@@ -154,7 +151,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
-    val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
+    val maxOffsetForEachEventHub = simulatedEventHubs.messageStore.map {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
         (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
     }
@@ -352,7 +349,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       numBatchesBeforeNewData: Int,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
-    val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
+    val maxOffsetForEachEventHub = simulatedEventHubs.messageStore.map {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
         (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
     }

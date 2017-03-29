@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.utils
+package org.apache.spark.eventhubscommon.utils
 
 import scala.collection.mutable.ListBuffer
 
@@ -25,26 +25,40 @@ import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientW
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.streaming.StreamingContext
 
-private[eventhubs] class SimulatedEventHubs(
-    namespace: String,
-    val messagesStore: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
+class SimulatedEventHubs(
+    eventHubsNamespace: String,
+    initialData: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
 
-  def search(ehPartition: EventHubNameAndPartition, offset: Int, eventNum: Int):
+  var messageStore: Map[EventHubNameAndPartition, Array[EventData]] = initialData
+  val eventHubsNamedPartitions: Seq[EventHubNameAndPartition] = initialData.keys.toSeq
+
+  def search(eventHubsNamedPartition: EventHubNameAndPartition, eventOffset: Int, eventCount: Int):
       List[EventData] = {
-    val ret = new ListBuffer[EventData]
-    for (i <- 0 until eventNum) {
+
+    val resultData = new ListBuffer[EventData]
+
+    for (i <- 0 until eventCount) {
+
       // as in eventhub, offset is exclusive
-      val index = offset + i + 1
-      if (index < messagesStore(ehPartition).length) {
-        ret += messagesStore(ehPartition)(index)
+      val messageIndex = eventOffset + i + 1
+      if (messageIndex < messageStore(eventHubsNamedPartition).length) {
+        resultData += messageStore(eventHubsNamedPartition)(messageIndex)
       }
     }
-    ret.toList
+
+    resultData.toList
+  }
+
+  def send(newData: Map[EventHubNameAndPartition, Array[EventData]]): Unit = {
+
+    val combinedData: Map[EventHubNameAndPartition, Array[EventData]]
+    = (messageStore.toSeq ++ newData.toSeq).groupBy(_._1).mapValues(_.flatMap(_._2).toArray)
+
+    messageStore = combinedData
   }
 }
 
-
-private[eventhubs] class TestEventHubsReceiver(
+class TestEventHubsReceiver(
     eventHubParameters: Map[String, String],
     eventHubs: SimulatedEventHubs,
     partitionId: Int,
@@ -60,7 +74,7 @@ private[eventhubs] class TestEventHubsReceiver(
   }
 }
 
-private[eventhubs] class TestRestEventHubClient(
+class TestRestEventHubClient(
     latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
 
   override def endPointOfPartition(
@@ -73,7 +87,7 @@ private[eventhubs] class TestRestEventHubClient(
   override def close(): Unit = {}
 }
 
-private[eventhubs] class FragileEventHubClient private extends EventHubClient {
+class FragileEventHubClient private extends EventHubClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -95,7 +109,7 @@ private[eventhubs] class FragileEventHubClient private extends EventHubClient {
 }
 
 // ugly stuff to make things checkpointable in tests
-private[eventhubs] object FragileEventHubClient {
+object FragileEventHubClient {
 
   var callIndex = -1
   var numBatchesBeforeCrashedEndpoint = 0
@@ -109,7 +123,7 @@ private[eventhubs] object FragileEventHubClient {
 }
 
 
-private[eventhubs] class FluctuatedEventHubClient(
+class FluctuatedEventHubClient(
     ssc: StreamingContext,
     messagesBeforeEmpty: Long,
     numBatchesBeforeNewData: Int,

@@ -1,0 +1,151 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.spark.eventhubscommon.utils
+
+import java.time.Instant
+import java.util.Calendar
+
+import com.microsoft.azure.eventhubs.EventData
+import com.microsoft.azure.eventhubs.EventData.SystemProperties
+import com.microsoft.azure.servicebus.amqp.AmqpConstants
+
+import scala.reflect.ClassTag
+import org.powermock.reflect.Whitebox
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.internal.Logging
+
+object EventHubsTestUtilities extends Logging {
+
+  def simulateEventHubs
+  [T: ClassTag, U: ClassTag](eventHubsParameters: Map[String, String],
+                             eventPayloadsAndProperties: Seq[(T, Seq[U])]):
+  SimulatedEventHubs = {
+
+    // Round-robin allocation of payloads to partitions
+
+    val eventHubsNamespace = eventHubsParameters("eventhubs.namespace")
+    val eventHubsName = eventHubsParameters("eventhubs.name")
+
+    val eventHubsPartitionList = {
+      for (i <- 0 until eventHubsParameters("eventhubs.partition.count").toInt)
+        yield EventHubNameAndPartition(eventHubsName, i)
+    }
+
+    val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList,
+      eventPayloadsAndProperties)
+
+    new SimulatedEventHubs(eventHubsNamespace, payloadPropertyStore)
+  }
+
+  def getHighestOffsetPerPartition(eventHubs: SimulatedEventHubs):
+  Map[EventHubNameAndPartition, (Long, Long)] = {
+
+    eventHubs.messageStore.map {
+      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
+        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
+    }
+  }
+
+  def addEventsToEventHubs
+  [T: ClassTag, U: ClassTag](
+                              eventHubs: SimulatedEventHubs,
+                              eventPayloadsAndProperties: Seq[(T, Seq[U])]) : SimulatedEventHubs = {
+
+    val eventHubsPartitionList = eventHubs.eventHubsNamedPartitions
+
+    // Round-robin allocation of payloads to partitions
+
+    val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList,
+      eventPayloadsAndProperties)
+
+    eventHubs.send(payloadPropertyStore)
+
+    eventHubs
+  }
+
+  private def roundRobinAllocation
+  [T: ClassTag, U: ClassTag](
+                              eventHubsPartitionList: Seq[EventHubNameAndPartition],
+                              eventPayloadsAndProperties: Seq[(T, Seq[U])]):
+  Map[EventHubNameAndPartition, Array[EventData]] = {
+
+    val eventAllocation: Seq[(EventHubNameAndPartition, Seq[(T, Seq[U])])]
+    = if (eventHubsPartitionList.length >= eventPayloadsAndProperties.length) {
+
+      eventHubsPartitionList.zip(eventPayloadsAndProperties.map(x => Seq(x)))
+
+    } else {
+
+      eventPayloadsAndProperties.zipWithIndex
+        .map(x => (x._1, eventHubsPartitionList(x._2 % eventHubsPartitionList.length)))
+        .map(x => (x._2, x._1)).groupBy(_._1).mapValues(z => z.map(_._2))
+
+    }.toSeq
+
+    eventAllocation.map {
+      case (eventHubNameAndPartition, payloadPropertyBag) =>
+        (eventHubNameAndPartition,
+          generateEventData(payloadPropertyBag, eventHubNameAndPartition.partitionId))
+    }.toMap
+  }
+
+  private def generateEventData[T: ClassTag, U: ClassTag](
+      payloadPropertyBag: Seq[(T, Seq[U])],
+      partitionId: Int): Array[EventData] = {
+
+    var offsetSetInQueue = 0
+
+    val eventDataArray = new Array[EventData](payloadPropertyBag.length)
+
+    val publisherName = "Microsoft Corporation"
+
+    for((payload, properties) <- payloadPropertyBag) {
+      val eventData = new EventData(payload.toString.getBytes)
+
+      val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()
+      systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME,
+        offsetSetInQueue.toString)
+      systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME,
+        Long.box(offsetSetInQueue))
+      systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME,
+        partitionId.toString)
+      systemPropertiesMap.put(AmqpConstants.PUBLISHER_ANNOTATION_NAME,
+        publisherName.toString)
+      systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
+        Calendar.getInstance().getTime)
+
+      val systemProperties = new SystemProperties(systemPropertiesMap)
+      Whitebox.setInternalState(eventData, "systemProperties", systemProperties.asInstanceOf[Any])
+
+      for (property <- properties) {
+        property match {
+          case p@Tuple2(_, _) =>
+            eventData.getProperties.put(p._1.toString, p._2.asInstanceOf[AnyRef])
+          case _ =>
+            eventData.getProperties.put("output", property.asInstanceOf[AnyRef])
+        }
+      }
+
+      eventDataArray(offsetSetInQueue) = eventData
+
+      offsetSetInQueue += 1
+    }
+
+    eventDataArray
+  }
+}

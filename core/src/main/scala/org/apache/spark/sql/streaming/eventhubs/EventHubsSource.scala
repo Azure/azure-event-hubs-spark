@@ -25,6 +25,7 @@ import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
@@ -35,10 +36,11 @@ import org.apache.spark.sql.types._
 private[spark] class EventHubsSource(
     sqlContext: SQLContext,
     parameters: Map[String, String],
-    eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
-    EventHubsClientWrapper.getEventHubReceiver,
-    eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
-    RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
+    eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+      EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+    eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
+      EventHubClient = RestfulEventHubClient.getInstance)
+  extends Source with EventHubsConnector with Logging {
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
@@ -50,7 +52,7 @@ private[spark] class EventHubsSource(
 
   private var _eventHubsClient: EventHubClient = _
 
-  private var _eventHubsReceiver: (Map[String, String], Int, Long, Int)
+  private var _eventHubsReceiver: (Map[String, String], Int, Long, EventHubsOffsetType, Int)
     => EventHubsClientWrapper = _
 
   private[eventhubs] def eventHubClient = {
@@ -91,7 +93,7 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def setEventHubsReceiver(
-      eventhubReceiverCreator: (Map[String, String], Int, Long, Int) =>
+      eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
         EventHubsClientWrapper): EventHubsSource = {
     _eventHubsReceiver = eventhubReceiverCreator
     this
@@ -213,14 +215,29 @@ private[spark] class EventHubsSource(
     }
   }
 
-  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
-    val offsetRanges = fetchedHighestOffsetsAndSeqNums.offsets.map {
-      case (eventHubNameAndPartition, (_, endSeqNum)) =>
-        OffsetRange(eventHubNameAndPartition,
-          fromOffset = committedOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._1,
-          fromSeq = committedOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
-          untilSeq = endOffset.targetSeqNums(eventHubNameAndPartition))
+  private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
+    val filterOffsetAndType = {
+      if (committedOffsetsAndSeqNums.batchId == -1) {
+        RateControlUtils.composeFromOffsetWithFilteringParams(parameters,
+          committedOffsetsAndSeqNums.offsets)
+      } else {
+        Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
+      }
+    }
+    endOffset.targetSeqNums.map {
+      case (ehNameAndPartition, seqNum) =>
+        val (offsetType, offset) = RateControlUtils.calculateStartOffset(ehNameAndPartition,
+          filterOffsetAndType, committedOffsetsAndSeqNums.offsets)
+        OffsetRange(ehNameAndPartition,
+          fromOffset = offset,
+          fromSeq = committedOffsetsAndSeqNums.offsets(ehNameAndPartition)._2,
+          untilSeq = seqNum,
+          offsetType = offsetType)
     }.toList
+  }
+
+  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
+    val offsetRanges = composeOffsetRange(endOffset)
     new EventHubsRDD(
       sqlContext.sparkContext,
       Map(parameters("eventhubs.name") -> parameters),
@@ -266,7 +283,7 @@ private[spark] class EventHubsSource(
   private def readProgress(batchId: Long): EventHubsOffset = {
     val nextBatchId = batchId + 1
     val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
-    if (progress.timestamp.milliseconds == -1 || !validateReadResults(progress)) {
+    if (progress.timestamp == -1 || !validateReadResults(progress)) {
       // next batch hasn't been committed
       val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
       EventHubsOffset(batchId, lastCommittedOffset.offsets)

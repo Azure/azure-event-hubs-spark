@@ -23,5 +23,5 @@ import org.apache.spark.streaming.Time
  * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
  */
 private[spark] case class OffsetRecord(
-    timestamp: Time,
+    timestamp: Long,
     offsets: Map[EventHubNameAndPartition, (Long, Long)])

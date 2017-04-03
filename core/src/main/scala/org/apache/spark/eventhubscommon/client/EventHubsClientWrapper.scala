@@ -93,11 +93,14 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     MAXIMUM_EVENT_RATE
   }
 
-  def createReceiver(eventhubsParams: Map[String, String],
-                     partitionId: String, startOffset: String, maximumEventRate: Int): Unit = {
+  def createReceiver(
+      eventhubsParams: Map[String, String],
+      partitionId: String,
+      startOffset: String,
+      offsetType: EventHubsOffsetType,
+      maximumEventRate: Int): Unit = {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
       eventhubsParams)
-    val offsetType = EventHubsOffsetTypes.PreviousCheckpoint
     val currentOffset = startOffset
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
     createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
@@ -186,8 +189,9 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
 
 private[spark] object EventHubsClientWrapper {
 
-  def configureStartOffset(previousOffset: String, eventhubsParams: Map[String, String]):
-      (EventHubsOffsetType, String) = {
+  private[eventhubscommon] def configureStartOffset(
+      previousOffset: String,
+      eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
     if (previousOffset != "-1" && previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
     } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
@@ -203,12 +207,13 @@ private[spark] object EventHubsClientWrapper {
       eventhubsParams: Map[String, String],
       partitionId: Int,
       startOffset: Long,
+      offsetType: EventHubsOffsetType,
       maximumEventRate: Int): EventHubsClientWrapper = {
 
     // TODO: reuse client
     val eventHubClientWrapperInstance = new EventHubsClientWrapper()
     eventHubClientWrapperInstance.createReceiver(eventhubsParams, partitionId.toString,
-      startOffset.toString, maximumEventRate)
+      startOffset.toString, offsetType, maximumEventRate)
     eventHubClientWrapperInstance
   }
 }

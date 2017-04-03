@@ -61,12 +61,12 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        OffsetRecord(3000L, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
       operation = (inputDStream: EventHubDirectDStream) =>
@@ -75,7 +75,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     val eventHubDirectDStream = ssc.graph.getInputStreams().filter(
       _.isInstanceOf[EventHubDirectDStream]).head.asInstanceOf[EventHubDirectDStream]
     assert(eventHubDirectDStream.currentOffsetsAndSeqNums ===
-      OffsetRecord(Time(2000L), Map(
+      OffsetRecord(2000L, Map(
         EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
@@ -102,11 +102,11 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
-      expectedOffsetsAndSeqs = OffsetRecord(Time(3000L),
+      expectedOffsetsAndSeqs = OffsetRecord(3000L,
         Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
@@ -144,11 +144,11 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
         )),
-      expectedOffsetsAndSeqs = OffsetRecord(Time(3000L),
+      expectedOffsetsAndSeqs = OffsetRecord(3000L,
         Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
@@ -184,11 +184,11 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
-      expectedOffsetsAndSeqs = OffsetRecord(Time(3000L),
+      expectedOffsetsAndSeqs = OffsetRecord(3000L,
         Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
@@ -235,12 +235,12 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedStartingOffsetsAndSeqs1 = Map("namespace1" ->
-        OffsetRecord(Time(1000L), Map(EventHubNameAndPartition("eh1", 0) -> (2L, 2L),
+        OffsetRecord(1000L, Map(EventHubNameAndPartition("eh1", 0) -> (2L, 2L),
           EventHubNameAndPartition("eh1", 1) -> (2L, 2L),
           EventHubNameAndPartition("eh1", 2) -> (2L, 2L))
       )),
       expectedStartingOffsetsAndSeqs2 = Map("namespace2" ->
-        OffsetRecord(Time(1000L), Map(EventHubNameAndPartition("eh1", 0) -> (2L, 2L),
+        OffsetRecord(1000L, Map(EventHubNameAndPartition("eh1", 0) -> (2L, 2L),
           EventHubNameAndPartition("eh1", 1) -> (2L, 2L),
           EventHubNameAndPartition("eh1", 2) -> (2L, 2L))
       )),
@@ -272,7 +272,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
@@ -283,7 +283,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        OffsetRecord(3000L, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L)
@@ -303,7 +303,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(6000), Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
+        OffsetRecord(6000, Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
           EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
           EventHubNameAndPartition("eh1", 2) -> (7L, 7L))
       )),
@@ -314,7 +314,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(7000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        OffsetRecord(7000L, Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
       8000L)
@@ -340,7 +340,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
@@ -351,7 +351,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        OffsetRecord(3000L, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L)
@@ -371,7 +371,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
 
     ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
       _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =
-      OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (1L, 1L),
+      OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (1L, 1L),
         EventHubNameAndPartition("eh1", 1) -> (1L, 1L),
         EventHubNameAndPartition("eh1", 2) -> (1L, 1L)))
 
@@ -383,7 +383,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(5000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        OffsetRecord(5000L, Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
       6000L)
@@ -408,7 +408,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
@@ -419,7 +419,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(3000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        OffsetRecord(3000L, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
           EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L)
@@ -438,7 +438,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
 
     assert(ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
       _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums ===
-      OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+      OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
 
@@ -449,7 +449,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(5000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        OffsetRecord(5000L, Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
       6000L)
@@ -484,7 +484,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.name" -> "eh1")
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
           EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
       )),
@@ -505,7 +505,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs =
-        OffsetRecord(Time(8000L), Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
+        OffsetRecord(8000L, Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
           EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
       9000L)

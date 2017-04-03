@@ -30,6 +30,7 @@ import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.powermock.reflect.Whitebox
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
@@ -110,7 +111,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
     new EventHubDirectDStream(ssc, namespace,
       progressRootPath.toString, eventhubsParams,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) => FragileEventHubClient.getInstance("",
         Map()))
@@ -158,7 +160,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
     new EventHubDirectDStream(ssc, namespace,
       progressRootPath.toString, eventhubsParams,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(maxOffsetForEachEventHub))
@@ -356,7 +359,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
     new EventHubDirectDStream(ssc, namespace,
       progressRootPath.toString, eventhubsParams,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
         new FluctuatedEventHubClient(ssc, messagesBeforeEmpty, numBatchesBeforeNewData,

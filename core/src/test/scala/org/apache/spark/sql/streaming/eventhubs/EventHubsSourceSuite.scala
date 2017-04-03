@@ -20,6 +20,7 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
@@ -66,7 +67,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
@@ -99,7 +101,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
@@ -226,7 +229,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       ehOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))

@@ -280,12 +280,12 @@ class ProgressTrackerSuite extends SharedUtils {
     progressTracker.asInstanceOf[DirectDStreamProgressTracker].commit(offsetToCommit, 1000L)
     val namespace1Offsets = progressTracker.asInstanceOf[DirectDStreamProgressTracker].
       read("namespace1", 1000L, fallBack = false)
-    assert(namespace1Offsets === OffsetRecord(Time(1000L), Map(
+    assert(namespace1Offsets === OffsetRecord(1000L, Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
       EventHubNameAndPartition("eh2", 1) -> (1L, 1L))))
     val namespace2Offsets = progressTracker.asInstanceOf[DirectDStreamProgressTracker].
       read("namespace2", 1000L, fallBack = false)
-    assert(namespace2Offsets === OffsetRecord(Time(1000L), Map(
+    assert(namespace2Offsets === OffsetRecord(1000L, Map(
       EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
       EventHubNameAndPartition("eh2", 4) -> (3L, 3L))))
     // test temp directory cleanup

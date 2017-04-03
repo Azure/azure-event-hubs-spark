@@ -26,6 +26,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, SparkContext, TaskContext}
@@ -36,7 +37,8 @@ private class EventHubRDDPartition(
     val eventHubNameAndPartitionID: EventHubNameAndPartition,
     val fromOffset: Long,
     val fromSeq: Long,
-    val untilSeq: Long) extends Partition {
+    val untilSeq: Long,
+    val offsetType: EventHubsOffsetType) extends Partition {
 
   override def index: Int = sparkPartitionId
 }
@@ -47,13 +49,14 @@ private[spark] class EventHubsRDD(
     val offsetRanges: List[OffsetRange],
     batchTime: Long,
     offsetParams: OffsetStoreParams,
-    eventHubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
+    eventHubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+      EventHubsClientWrapper)
   extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
     offsetRanges.zipWithIndex.map { case (offsetRange, index) =>
       new EventHubRDDPartition(index, offsetRange.eventHubNameAndPartition, offsetRange.fromOffset,
-        offsetRange.fromSeq, offsetRange.untilSeq)
+        offsetRange.fromSeq, offsetRange.untilSeq, offsetRange.offsetType)
     }.toArray
   }
 
@@ -102,7 +105,8 @@ private[spark] class EventHubsRDD(
       val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
         eventHubName)
       val eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
-        eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset, maxRate)
+        eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
+        eventHubPartition.offsetType, maxRate)
       val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
         eventHubReceiver, maxRate)
       val lastEvent = receivedEvents.last

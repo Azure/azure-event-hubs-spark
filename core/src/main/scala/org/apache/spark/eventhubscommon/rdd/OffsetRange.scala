@@ -27,5 +27,5 @@ private[spark] case class OffsetRange(
     untilSeq: Long,
     offsetType: EventHubsOffsetType) {
 
-  private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
+  private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq, offsetType)
 }

@@ -19,7 +19,8 @@ package org.apache.spark.eventhubscommon
 
 import scala.collection.mutable.ListBuffer
 
-import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
 private[spark] object RateControlUtils extends Logging {
@@ -111,5 +112,36 @@ private[spark] object RateControlUtils extends Logging {
     } else {
       r
     }
+  }
+
+  private[spark] def composeFromOffsetWithFilteringParams(
+      eventhubsParams: Map[String, _],
+      fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)]):
+    Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
+
+    fetchedStartOffsetsInNextBatch.map {
+      case (ehNameAndPartition, (offset, seq)) =>
+        val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
+          offset.toString,
+          eventhubsParams.get(ehNameAndPartition.toString) match {
+            case Some(ehConfig) =>
+              ehConfig.asInstanceOf[Map[String, String]]
+            case None =>
+              ehNameAndPartition.asInstanceOf[Map[String, String]]
+          })
+        (ehNameAndPartition, (offsetType, offsetStr.toLong))
+    }
+  }
+
+  private[spark] def calculateStartOffset(
+      ehNameAndPartition: EventHubNameAndPartition,
+      filteringOffsetAndType: Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)],
+      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)]):
+    (EventHubsOffsetType, Long) = {
+    filteringOffsetAndType.getOrElse(
+      ehNameAndPartition,
+      (EventHubsOffsetTypes.PreviousCheckpoint,
+        startOffsetInNextBatch(ehNameAndPartition)._1)
+    )
   }
 }

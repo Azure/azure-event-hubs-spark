@@ -127,7 +127,7 @@ private[spark] object RateControlUtils extends Logging {
             case Some(ehConfig) =>
               ehConfig.asInstanceOf[Map[String, String]]
             case None =>
-              ehNameAndPartition.asInstanceOf[Map[String, String]]
+              eventhubsParams.asInstanceOf[Map[String, String]]
           })
         (ehNameAndPartition, (offsetType, offsetStr.toLong))
     }

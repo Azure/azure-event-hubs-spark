@@ -22,5 +22,6 @@ import org.apache.spark.streaming.Time
 /**
  * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
  */
-// TODO: timestamp shall be typed as Long, epoch branch has fixed that
-case class OffsetRecord(timestamp: Time, offsets: Map[EventHubNameAndPartition, (Long, Long)])
+private[spark] case class OffsetRecord(
+    timestamp: Time,
+    offsets: Map[EventHubNameAndPartition, (Long, Long)])

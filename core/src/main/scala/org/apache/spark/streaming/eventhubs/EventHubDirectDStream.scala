@@ -208,15 +208,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   // application; this "first time" shall not include the restart from checkpoint
   private def shouldCareEnqueueTimeOrOffset = !initialized && !ssc.isCheckpointPresent
 
-  private def composeOffsetType(ehNameAndPartition: EventHubNameAndPartition):
-      EventHubsOffsetType = {
-    if (shouldCareEnqueueTimeOrOffset) {
-      val ehNameAndPartitionParams = eventhubsParams(ehNameAndPartition.toString)
-      if (ehNameAndPartitionParams.contains("eventhubs.filter.offset")) {
-
-      }
-    } else {
-      EventHubsOffsetTypes.PreviousCheckpoint
+  private def composeFromOffsetFromParams(fetchedStartOffsetsInNextBatch: OffsetRecord) = {
+    fetchedStartOffsetsInNextBatch.offsets.map {
+      case (ehNameAndPartition, (offset, seq)) =>
+        (ehNameAndPartition, EventHubsClientWrapper.configureStartOffset(offset.toString,
+          eventhubsParams(ehNameAndPartition)))
     }
   }
 
@@ -230,11 +226,23 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     currentOffsetsAndSeqNums = startOffsetInNextBatch
     val clampedSeqIDs = clamp(highestOffsetOfAllPartitions)
     logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
+    // to handle filter.enqueueTime and filter.offset
+    val startOffsetTypeAndValue = {
+      if (shouldCareEnqueueTimeOrOffset) {
+        startOffsetInNextBatch.offsets.map {
+          case (ehNameAndPartition, (offset, seq)) =>
+            (ehNameAndPartition, EventHubsClientWrapper.configureStartOffset(offset.toString,
+              eventhubsParams(ehNameAndPartition)))
+        }
+      } else {
+        Map()
+      }
+    }
     val offsetRanges = highestOffsetOfAllPartitions.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
-          fromOffset = currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._1,
-          fromSeq = currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
+          fromOffset = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._1,
+          fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
           untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum),
           offsetType = if (shouldCareEnqueueTimeOrOffset) )
     }.toList
@@ -383,30 +391,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 }
 
 private[eventhubs] object EventHubDirectDStream {
-
-  def composeStartOffset(
-      fetchedStartOffset: OffsetRecord,
-      eventhubsParams: Map[String, Map[String, String]]): OffsetRecord = {
-    OffsetRecord(fetchedStartOffset.timestamp,
-      fetchedStartOffset.offsets.map {
-        case (ehNameAndPartition, (offset, seqNum)) =>
-          if (offset != -1) {
-            (ehNameAndPartition, (offset, seqNum))
-          } else if (eventhubsParams(ehNameAndPartition.toString).
-            contains("eventhubs.filter.offset")) {
-            (ehNameAndPartition, (eventhubsParams(ehNameAndPartition.toString)(
-              "eventhubs.filter.offset").toLong, -1L))
-          } else if (eventhubsParams(ehNameAndPartition.toString).
-            contains("eventhubs.filter.enqueuetime")) {
-            (ehNameAndPartition, (eventhubsParams(ehNameAndPartition.toString)(
-              "eventhubs.filter.enqueuetime").toLong, -1L))
-          } else {
-            (ehNameAndPartition, (offset, seqNum))
-          }
-      }
-    )
-  }
-
   val cleanupLock = new Object
   var lastCleanupTime = -1L
 }

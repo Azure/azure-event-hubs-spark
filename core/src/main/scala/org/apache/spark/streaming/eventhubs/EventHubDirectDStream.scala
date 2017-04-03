@@ -24,7 +24,8 @@ import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -203,6 +204,22 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
+  // we should only care about the passing offset types when we start for the first time of the
+  // application; this "first time" shall not include the restart from checkpoint
+  private def shouldCareEnqueueTimeOrOffset = !initialized && !ssc.isCheckpointPresent
+
+  private def composeOffsetType(ehNameAndPartition: EventHubNameAndPartition):
+      EventHubsOffsetType = {
+    if (shouldCareEnqueueTimeOrOffset) {
+      val ehNameAndPartitionParams = eventhubsParams(ehNameAndPartition.toString)
+      if (ehNameAndPartitionParams.contains("eventhubs.filter.offset")) {
+
+      }
+    } else {
+      EventHubsOffsetTypes.PreviousCheckpoint
+    }
+  }
+
   private def proceedWithNonEmptyRDD(
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
@@ -216,9 +233,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val offsetRanges = highestOffsetOfAllPartitions.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
-          fromOffset = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._1,
-          fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
-          untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum))
+          fromOffset = currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._1,
+          fromSeq = currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
+          untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum),
+          offsetType = if (shouldCareEnqueueTimeOrOffset) )
     }.toList
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
@@ -365,6 +383,30 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 }
 
 private[eventhubs] object EventHubDirectDStream {
+
+  def composeStartOffset(
+      fetchedStartOffset: OffsetRecord,
+      eventhubsParams: Map[String, Map[String, String]]): OffsetRecord = {
+    OffsetRecord(fetchedStartOffset.timestamp,
+      fetchedStartOffset.offsets.map {
+        case (ehNameAndPartition, (offset, seqNum)) =>
+          if (offset != -1) {
+            (ehNameAndPartition, (offset, seqNum))
+          } else if (eventhubsParams(ehNameAndPartition.toString).
+            contains("eventhubs.filter.offset")) {
+            (ehNameAndPartition, (eventhubsParams(ehNameAndPartition.toString)(
+              "eventhubs.filter.offset").toLong, -1L))
+          } else if (eventhubsParams(ehNameAndPartition.toString).
+            contains("eventhubs.filter.enqueuetime")) {
+            (ehNameAndPartition, (eventhubsParams(ehNameAndPartition.toString)(
+              "eventhubs.filter.enqueuetime").toLong, -1L))
+          } else {
+            (ehNameAndPartition, (offset, seqNum))
+          }
+      }
+    )
+  }
+
   val cleanupLock = new Object
   var lastCleanupTime = -1L
 }

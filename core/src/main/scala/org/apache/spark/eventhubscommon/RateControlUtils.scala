@@ -118,7 +118,6 @@ private[spark] object RateControlUtils extends Logging {
       eventhubsParams: Map[String, _],
       fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)]):
     Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
-    println(s"===============EVENTHUBSPARAMS: $eventhubsParams===============")
     fetchedStartOffsetsInNextBatch.map {
       case (ehNameAndPartition, (offset, seq)) =>
         val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
@@ -129,7 +128,6 @@ private[spark] object RateControlUtils extends Logging {
             case None =>
               eventhubsParams.asInstanceOf[Map[String, String]]
           })
-        println(s"=====GET OFFSET TYPE: $offsetType and VALUE: $offsetStr=========")
         (ehNameAndPartition, (offsetType, offsetStr.toLong))
     }
   }

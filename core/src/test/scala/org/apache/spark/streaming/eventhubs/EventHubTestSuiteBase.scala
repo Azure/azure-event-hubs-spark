@@ -245,7 +245,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace: String,
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]]): SimulatedEventHubs = {
-    val propertyStore = eventhubsParams.keys.flatMap {
+    val ehAndRawInputMap = eventhubsParams.keys.flatMap {
       eventHubName =>
         val ehList = {
           for (i <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
@@ -253,7 +253,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         }.toArray
         ehList.zip(input)
     }.toMap
-    new SimulatedEventHubs(namespace, propertyStore.map {
+    new SimulatedEventHubs(namespace, ehAndRawInputMap.map {
       case (eventHubNameAndPartition, propertyQueue) =>
         (eventHubNameAndPartition,
           fromPayloadToEventData(propertyQueue, eventHubNameAndPartition.partitionId))
@@ -261,10 +261,12 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   }
 
   private def fromPayloadToEventData[U: ClassTag](
-      propertySequence: Seq[U], partitionId: Int): Array[EventData] = {
+      rawInputSeq: Seq[U], partitionId: Int): Array[EventData] = {
     var offsetSetInQueue = 0
-    val eventDataArray = new Array[EventData](propertySequence.length)
-    for (property <- propertySequence) {
+    val eventDataArray = new Array[EventData](rawInputSeq.length)
+    var enqueueTime = 0L
+    // take input as a kv pair in payload
+    for (input <- rawInputSeq) {
       // dummy payload
       val payLoad = Array.fill[Byte](1)('e')
       val msg = new EventData(payLoad)
@@ -275,17 +277,19 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         Long.box(offsetSetInQueue))
       systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME,
         Int.box(partitionId))
-      systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME, Instant.now())
+      systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
+        Instant.ofEpochMilli(enqueueTime))
       val systemProperties = new SystemProperties(systemPropertiesMap)
       Whitebox.setInternalState(msg, "systemProperties", systemProperties.asInstanceOf[Any])
-      property match {
+      input match {
         case p @ Tuple2(_, _) =>
           msg.getProperties.put(p._1.toString, p._2.asInstanceOf[AnyRef])
         case _ =>
-          msg.getProperties.put("output", property.asInstanceOf[AnyRef])
+          msg.getProperties.put("output", input.asInstanceOf[AnyRef])
       }
       eventDataArray(offsetSetInQueue) = msg
       offsetSetInQueue += 1
+      enqueueTime += 1000
     }
     eventDataArray
   }

@@ -223,4 +223,32 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
       7000L)
   }
+
+  test("filter messages for enqueueTime correctly") {
+    val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
+    val expectedOutput = Seq(
+      Seq(5, 6, 8, 9), Seq(7, 8, 10, 2), Seq(9, 10, 3, 4))
+    testUnaryOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1",
+          "eventhubs.filter.enqueuetime" -> "3000"
+        )
+      ),
+      expectedOffsetsAndSeqs = Map(eventhubNamespace ->
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))
+      ),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
+      expectedOutput)
+    testProgressTracker(eventhubNamespace,
+      OffsetRecord(3000L, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+        EventHubNameAndPartition("eh1", 2) -> (5L, 5L))), 4000L)
+  }
 }

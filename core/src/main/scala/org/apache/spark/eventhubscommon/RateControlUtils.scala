@@ -129,6 +129,7 @@ private[spark] object RateControlUtils extends Logging {
             case None =>
               eventhubsParams.asInstanceOf[Map[String, String]]
           })
+        println(s"=====GET OFFSET TYPE: $offsetType and VALUE: $offsetStr=========")
         (ehNameAndPartition, (offsetType, offsetStr.toLong))
     }
   }

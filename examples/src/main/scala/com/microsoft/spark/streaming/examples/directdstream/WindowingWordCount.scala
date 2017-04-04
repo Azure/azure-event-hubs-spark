@@ -61,6 +61,7 @@ object WindowingWordCount {
     val batchDuration = args(5).toInt
     val sparkCheckpointDir = args(6)
     val maxRate = args(7)
+    val enqueueTime = args(8)
 
     val eventhubParameters = Map[String, String] (
       "eventhubs.policyname" -> policyName,
@@ -70,7 +71,7 @@ object WindowingWordCount {
       "eventhubs.partition.count" -> "32",
       "eventhubs.consumergroup" -> "$Default",
       "eventhubs.maxRate" -> s"$maxRate",
-      "eventhubs.filter.enqueuetime" -> "1491327524000"
+      "eventhubs.filter.enqueuetime" -> enqueueTime
     )
 
     val ssc = StreamingContext.getOrCreate(sparkCheckpointDir,

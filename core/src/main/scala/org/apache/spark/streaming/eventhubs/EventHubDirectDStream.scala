@@ -208,6 +208,23 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   // application; this "first time" shall not include the restart from checkpoint
   private def shouldCareEnqueueTimeOrOffset = !initialized && !ssc.isCheckpointPresent
 
+  private def validateFilteringParams(): Unit = {
+    // first check if the parameters are valid
+    val latestEnqueueTimeOfPartitions = eventHubClient.lastEnqueueTimeOfPartitions(
+      retryIfFail = true, eventhubNameAndPartitions.toList)
+    require(latestEnqueueTimeOfPartitions.isDefined, "cannot get latest enqueue time from Event" +
+      " Hubs Rest Endpoint")
+    latestEnqueueTimeOfPartitions.get.foreach {
+      case (ehNameAndPartition, latestEnqueueTime) =>
+        require(latestEnqueueTime <=
+          eventhubsParams(ehNameAndPartition.eventHubName)("eventhubs.filter.enqueuetime").toLong,
+        "you cannot pass in an enqueue time which is later than the highest enqueue time in" +
+          s" event hubs, ($ehNameAndPartition, pass-in-enqueuetime" +
+          s" ${eventhubsParams(ehNameAndPartition.eventHubName)("eventhubs.filter.enqueuetime").
+            toLong}, latest-enqueuetime $latestEnqueueTime)")
+    }
+  }
+
   private def composeOffsetRange(
       startOffsetInNextBatch: OffsetRecord,
       highestOffsets: Map[EventHubNameAndPartition, (Long, Long)]): List[OffsetRange] = {
@@ -215,6 +232,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     // to handle filter.enqueueTime and filter.offset
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
+        // first check if the parameters are valid
+        validateFilteringParams()
         RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
           startOffsetInNextBatch.offsets)
       } else {
@@ -284,7 +303,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
       },
-      currentOffsetsAndSeqNums.offsets) match {
+      currentOffsetsAndSeqNums.offsets)
+    match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime.milliseconds, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)

@@ -19,7 +19,6 @@ package org.apache.spark.eventhubscommon.client
 import java.time.Instant
 
 import scala.collection.JavaConverters._
-import scala.collection.Map
 
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import com.microsoft.azure.servicebus._
@@ -42,7 +41,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
   // and then call receive
   // we shall let the user pass parameters in the constructor directly
 
-  private def configureGeneralParameters(eventhubsParams: Map[String, String]) = {
+  private def configureGeneralParameters(eventhubsParams: Predef.Map[String, String]) = {
     if (eventhubsParams.contains("eventhubs.uri") &&
       eventhubsParams.contains("eventhubs.namespace")) {
       throw new IllegalArgumentException(s"Eventhubs URI and namespace cannot both be specified" +
@@ -64,7 +63,6 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     val evhPolicyKey = eventhubsParams("eventhubs.policykey")
     val connectionString = new ConnectionStringBuilder(namespaceName.get, evhName, evhPolicyName,
       evhPolicyKey)
-    println(connectionString)
     // Set the consumer group if specified.
     val consumerGroup = eventhubsParams.getOrElse("eventhubs.consumergroup",
       AzureEventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
@@ -75,7 +73,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
   }
 
   private def configureStartOffset(
-      eventhubsParams: Map[String, String], offsetStore: OffsetStore):
+      eventhubsParams: Predef.Map[String, String], offsetStore: OffsetStore):
       (EventHubsOffsetType, String) = {
     // Determine the offset to start receiving data
     val previousOffset = offsetStore.read()
@@ -95,7 +93,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
   }
 
   def createReceiver(
-      eventhubsParams: Map[String, String],
+      eventhubsParams: Predef.Map[String, String],
       partitionId: String,
       startOffset: String,
       offsetType: EventHubsOffsetType,
@@ -186,13 +184,26 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
       " yet, please use RestfulEventHubClient")
   }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
+      " client yet, please use RestfulEventHubClient")
+  }
 }
 
 private[spark] object EventHubsClientWrapper {
 
   private[eventhubscommon] def configureStartOffset(
       previousOffset: String,
-      eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
+      eventhubsParams: Predef.Map[String, String]): (EventHubsOffsetType, String) = {
     if (previousOffset != "-1" && previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
     } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
@@ -205,7 +216,7 @@ private[spark] object EventHubsClientWrapper {
   }
 
   def getEventHubReceiver(
-      eventhubsParams: Map[String, String],
+      eventhubsParams: Predef.Map[String, String],
       partitionId: Int,
       startOffset: Long,
       offsetType: EventHubsOffsetType,

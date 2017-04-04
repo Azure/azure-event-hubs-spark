@@ -70,8 +70,8 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
   }
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {
-    val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
-    ehParams2("eventhubs.consumergroup") = "$consumergroup"
+    var ehParams2 = ehParams
+    ehParams2 += "eventhubs.consumergroup" -> "$consumergroup"
     when(offsetStoreMock.read()).thenReturn("-1")
     doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString,
       Matchers.anyString,
@@ -92,8 +92,8 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
   }
 
   test("EventHubsClientWrapper converts parameters for enqueuetime filter") {
-    val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
-    ehParams2("eventhubs.filter.enqueuetime") = "1433887583"
+    var ehParams2 = ehParams
+    ehParams2 += "eventhubs.filter.enqueuetime" -> "1433887583"
     when(offsetStoreMock.read()).thenReturn("-1")
     doNothing().when(ehClientWrapperMock).createReceiverInternal(
       Matchers.anyString,

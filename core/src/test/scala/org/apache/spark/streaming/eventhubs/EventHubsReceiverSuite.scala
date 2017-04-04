@@ -16,7 +16,7 @@
  */
 package org.apache.spark.streaming.eventhubs
 
-import scala.collection.mutable._
+import scala.collection.mutable.ArrayBuffer
 
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
@@ -42,7 +42,7 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
   var offsetStoreMock: OffsetStore = _
   var executorMock: ReceiverSupervisor = _
 
-  val eventhubParameters = Map[String, String] (
+  val eventhubParameters = Map(
     "eventhubs.policyname" -> "policyname",
     "eventhubs.policykey" -> "policykey",
     "eventhubs.namespace" -> "namespace",
@@ -80,8 +80,8 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     val eventSequenceNumber: Long = 1
     val maximumEventRate: Int = 999
 
-    val updatedEventhubsParams = collection.mutable.Map[String, String]() ++= eventhubParameters
-    updatedEventhubsParams("eventhubs.checkpoint.interval") =
+    var updatedEventhubsParams = eventhubParameters
+    updatedEventhubsParams += "eventhubs.checkpoint.interval" ->
       eventCheckpointIntervalInSeconds.toString
 
     var eventData = new EventData(Array.fill(8)((scala.util.Random.nextInt(256) - 128).toByte))

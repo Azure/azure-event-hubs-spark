@@ -65,6 +65,9 @@ private[spark] class RestfulEventHubClient(
   }
 
   private def fromResponseBodyToEndpoint(responseBody: String): (Long, Long) = {
+    /**
+     *(partitionDescription \ "LastEnqueuedTimeUtc").text.toLong
+     */
     val partitionDescription = XML.loadString(responseBody) \\ "entry" \
       "content" \ "PartitionDescription"
     ((partitionDescription \ "LastEnqueuedOffset").text.toLong,
@@ -165,12 +168,33 @@ private[spark] class RestfulEventHubClient(
     // empty
   }
 
+  /**
+   * return highest offset/seq and latest enqueueTime of each partition
+   */
   override def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     queryPartitionRuntimeInfo(targetEventHubsNameAndPartitions,
       fromResponseBodyToEndpoint, retryIfFail)
+  }
+
+  private def fromResponseBodyToEnqueueTime(responseBody: String): Long = {
+    val partitionDescription = XML.loadString(responseBody) \\ "entry" \
+      "content" \ "PartitionDescription"
+    (partitionDescription \ "LastEnqueuedTimeUtc").text.toLong
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    queryPartitionRuntimeInfo(targetEventHubNameAndPartitions,
+      fromResponseBodyToEnqueueTime, retryIfFail)
   }
 }
 

@@ -117,6 +117,19 @@ class TestRestEventHubClient(
     Some(latestRecords)
   }
 
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
+      " client yet, please use RestfulEventHubClient")
+  }
+
   override def close(): Unit = {}
 }
 
@@ -136,6 +149,19 @@ class FragileEventHubClient private extends EventHubClient {
     } else {
       Some(latestRecords)
     }
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
+      " client yet, please use RestfulEventHubClient")
   }
 
   override def close(): Unit = {}
@@ -180,5 +206,18 @@ class FluctuatedEventHubClient(
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
+      " client yet, please use RestfulEventHubClient")
+  }
 }
 

@@ -23,12 +23,21 @@ private[spark] trait EventHubClient extends Serializable {
 
   /**
    * return the end point of each partition
-   * @return a map from eventhubName-partition to (offset, seq)
+   * @return a map from eventhubName-partition to (offset, seq, latestEnqueueTime)
    */
   def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
     Option[Map[EventHubNameAndPartition, (Long, Long)]]
+
+  /**
+   * return the last enqueueTime of each partition
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]]
 
   /**
    * close this client

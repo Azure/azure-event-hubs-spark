@@ -139,9 +139,9 @@ private[spark] class RestfulEventHubClient(
             throw e
         }
       }
-      val endpointOffset = fromResponseBodyToResult(response.body)
-      logDebug(s"latest offset of $ehNameAndPartition: $endpointOffset")
-      (ehNameAndPartition, endpointOffset)
+      val results = fromResponseBodyToResult(response.body)
+      logDebug(s"results of $ehNameAndPartition: $results")
+      (ehNameAndPartition, results)
     }
   }
 

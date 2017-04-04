@@ -216,6 +216,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       " Hubs Rest Endpoint")
     latestEnqueueTimeOfPartitions.get.foreach {
       case (ehNameAndPartition, latestEnqueueTime) =>
+        println(s"$latestEnqueueTime" +
+          s" ${eventhubsParams(ehNameAndPartition.eventHubName)("eventhubs.filter.enqueuetime").
+          toLong}")
         require(latestEnqueueTime >
           eventhubsParams(ehNameAndPartition.eventHubName)("eventhubs.filter.enqueuetime").toLong,
         "you cannot pass in an enqueue time which is later than the highest enqueue time in" +

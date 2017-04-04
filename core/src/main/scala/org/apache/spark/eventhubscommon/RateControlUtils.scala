@@ -123,7 +123,7 @@ private[spark] object RateControlUtils extends Logging {
       case (ehNameAndPartition, (offset, seq)) =>
         val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
           offset.toString,
-          eventhubsParams.get(ehNameAndPartition.toString) match {
+          eventhubsParams.get(ehNameAndPartition.eventHubName) match {
             case Some(ehConfig) =>
               ehConfig.asInstanceOf[Map[String, String]]
             case None =>

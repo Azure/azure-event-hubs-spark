@@ -64,6 +64,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     val evhPolicyKey = eventhubsParams("eventhubs.policykey")
     val connectionString = new ConnectionStringBuilder(namespaceName.get, evhName, evhPolicyName,
       evhPolicyKey)
+    println(connectionString)
     // Set the consumer group if specified.
     val consumerGroup = eventhubsParams.getOrElse("eventhubs.consumergroup",
       AzureEventHubClient.DEFAULT_CONSUMER_GROUP_NAME)

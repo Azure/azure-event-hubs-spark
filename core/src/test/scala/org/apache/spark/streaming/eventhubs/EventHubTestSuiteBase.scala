@@ -109,11 +109,15 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
-    new EventHubDirectDStream(ssc, namespace,
-      progressRootPath.toString, eventhubsParams,
+    new EventHubDirectDStream(
+      ssc,
+      namespace,
+      progressRootPath.toString,
+      eventhubsParams,
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
        eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
+        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId,
+          startOffset, eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) => FragileEventHubClient.getInstance("",
         Map()))
   }
@@ -162,7 +166,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       progressRootPath.toString, eventhubsParams,
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
        eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
+        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(maxOffsetForEachEventHub))
   }
@@ -360,17 +365,18 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
         (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
     }
-
-    new EventHubDirectDStream(ssc, namespace,
-      progressRootPath.toString, eventhubsParams,
+    new EventHubDirectDStream(ssc,
+      namespace,
+      progressRootPath.toString,
+      eventhubsParams,
       (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
        eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
+        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new FluctuatedEventHubClient(ssc, messagesBeforeEmpty, numBatchesBeforeNewData,
           maxOffsetForEachEventHub))
   }
-
 
   private def setupFluctuatedEventHubStream[V: ClassTag](
       simulatedEventHubs: SimulatedEventHubs,

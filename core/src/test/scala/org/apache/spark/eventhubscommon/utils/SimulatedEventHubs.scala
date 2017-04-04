@@ -21,8 +21,9 @@ import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
 
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
 class SimulatedEventHubs(
@@ -33,6 +34,22 @@ class SimulatedEventHubs(
 
   var messageStore: Map[EventHubNameAndPartition, Array[EventData]] = initialData
   val eventHubsNamedPartitions: Seq[EventHubNameAndPartition] = initialData.keys.toSeq
+
+  def searchWithTime(
+      eventHubsNamedPartition: EventHubNameAndPartition,
+      enqueueTime: Long,
+      eventCount: Int): List[EventData] = {
+    val resultData = new ListBuffer[EventData]
+    for (msg <- messageStore(eventHubsNamedPartition)) {
+      if (resultData.length > eventCount) {
+        return resultData.toList
+      }
+      if (msg.getSystemProperties.getEnqueuedTime.toEpochMilli >= enqueueTime) {
+        resultData += msg
+      }
+    }
+    resultData.toList
+  }
 
   def search(eventHubsNamedPartition: EventHubNameAndPartition, eventOffset: Int, eventCount: Int):
       List[EventData] = {
@@ -59,15 +76,21 @@ class TestEventHubsReceiver(
     eventHubParameters: Map[String, String],
     eventHubs: SimulatedEventHubs,
     partitionId: Int,
-    startOffset: Long)
+    startOffset: Long,
+    offsetType: EventHubsOffsetType)
   extends EventHubsClientWrapper {
 
   val eventHubName = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")
-    eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
-      expectedEventNum)
+    if (offsetType != EventHubsOffsetTypes.InputTimeOffset) {
+      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
+        expectedEventNum)
+    } else {
+      eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
+        eventHubParameters("eventhubs.filter.enqueuetime").toLong, expectedEventNum)
+    }
   }
 }
 

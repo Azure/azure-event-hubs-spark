@@ -227,7 +227,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
   test("filter messages for enqueueTime correctly") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(
-      Seq(5, 6, 8, 9), Seq(7, 8, 10, 2), Seq(9, 10, 3, 4))
+      Seq(5, 6, 8, 9, 2, 3), Seq(7, 10, 4), Seq())
     testUnaryOperation(
       input,
       eventhubsParams = Map[String, Map[String, String]](

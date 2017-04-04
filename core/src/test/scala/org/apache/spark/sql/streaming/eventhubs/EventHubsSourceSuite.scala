@@ -69,7 +69,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
       (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
        eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -103,7 +104,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
       (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
        eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     // First batch
@@ -231,7 +233,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
       (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
        ehOffsetType: EventHubsOffsetType, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          ehOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]

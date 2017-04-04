@@ -273,6 +273,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
         subDirs = ssc.sparkContext.appName),
       eventhubReceiverCreator)
+    logInfo(s"OFFSET RANGES in batch $validTime: $offsetRanges")
     reportInputInto(validTime, offsetRanges,
       offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
     Some(eventHubRDD)

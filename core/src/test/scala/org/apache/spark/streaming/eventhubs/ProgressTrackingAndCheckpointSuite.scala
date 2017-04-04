@@ -532,14 +532,14 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
           "eventhubs.filter.enqueuetime" -> "2000")
       ),
       expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+        OffsetRecord(0L, Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
+          EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
+          EventHubNameAndPartition("eh1", 2) -> (-1L, -1L))
         )),
-      expectedOffsetsAndSeqs = OffsetRecord(3000L,
-        Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-          EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-          EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+      expectedOffsetsAndSeqs = OffsetRecord(1000L,
+        Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart,

@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubscommon.client
 
 import java.net.SocketTimeoutException
-import java.time.Duration
+import java.time.{Duration, Instant}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{Await, Future}
@@ -182,7 +182,7 @@ private[spark] class RestfulEventHubClient(
   private def fromResponseBodyToEnqueueTime(responseBody: String): Long = {
     val partitionDescription = XML.loadString(responseBody) \\ "entry" \
       "content" \ "PartitionDescription"
-    (partitionDescription \ "LastEnqueuedTimeUtc").text.toLong
+    Instant.parse((partitionDescription \ "LastEnqueuedTimeUtc").text).getEpochSecond
   }
 
   /**

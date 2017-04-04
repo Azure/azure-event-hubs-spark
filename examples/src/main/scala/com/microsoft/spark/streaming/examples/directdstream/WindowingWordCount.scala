@@ -47,9 +47,9 @@ object WindowingWordCount {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length != 8) {
+    if (args.length != 9) {
       println("Usage: program progressDir PolicyName PolicyKey EventHubNamespace EventHubName" +
-        " BatchDuration(seconds) Spark_Checkpoint_Directory maxRate")
+        " BatchDuration(seconds) Spark_Checkpoint_Directory maxRate enqueueTime")
       sys.exit(1)
     }
 

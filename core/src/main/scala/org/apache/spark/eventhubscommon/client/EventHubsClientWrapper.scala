@@ -156,10 +156,14 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     if (events == null) Iterable.empty else events.asScala
   }
 
+  /**
+   * starting from EventHubs client 0.13.1, returning a null from receiver means that there is
+   * no message in server end
+   */
   def receive(expectedEventNum: Int): Iterable[EventData] = {
     val events = eventhubsReceiver.receive(
       math.min(expectedEventNum, eventhubsReceiver.getPrefetchCount)).get()
-    if (events == null) Iterable.empty else events.asScala
+    if (events != null) events.asScala else null
   }
 
   override def close(): Unit = {

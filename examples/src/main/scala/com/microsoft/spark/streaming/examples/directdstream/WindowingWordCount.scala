@@ -69,7 +69,8 @@ object WindowingWordCount {
       "eventhubs.name" -> name,
       "eventhubs.partition.count" -> "32",
       "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.maxRate" -> s"$maxRate"
+      "eventhubs.maxRate" -> s"$maxRate",
+      "eventhubs.filter.enqueuetime" -> "1491327524000"
     )
 
     val ssc = StreamingContext.getOrCreate(sparkCheckpointDir,

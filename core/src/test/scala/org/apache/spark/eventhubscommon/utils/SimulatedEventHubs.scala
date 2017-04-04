@@ -84,6 +84,7 @@ class TestEventHubsReceiver(
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")
+    println(s"====SEARCH WITH $offsetType in $eventHubName-partition-$partitionId")
     if (offsetType != EventHubsOffsetTypes.InputTimeOffset) {
       eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
         expectedEventNum)

@@ -17,7 +17,8 @@
 
 package org.apache.spark.eventhubscommon.utils
 
-import java.util.Calendar
+import java.time.Instant
+import java.util.{Calendar, Date}
 
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
@@ -101,28 +102,27 @@ private[spark] object EventHubsTestUtilities extends Logging {
       }.toMap
     }
   }
-
-  private def generateEventData[T, U](
+  private[spark] def generateEventData[T, U](
       payloadPropertyBag: Seq[(T, Seq[U])],
-      partitionId: Int, startingOffset: Int): Array[EventData] = {
-    var queueOffset = startingOffset
-    var eventIndex = 0
+      partitionId: Int,
+      startOffset: Int): Array[EventData] = {
+    var offsetSetInQueue = startOffset
     val eventDataArray = new Array[EventData](payloadPropertyBag.length)
     val publisherName = "Microsoft Corporation"
-
+    var enqueueTime = 0L
     for((payload, properties) <- payloadPropertyBag) {
       val eventData = new EventData(payload.toString.getBytes)
       val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()
       systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME,
-        queueOffset.toString)
+        offsetSetInQueue.toString)
       systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME,
-        Long.box(queueOffset))
+        Long.box(offsetSetInQueue))
       systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME,
         partitionId.toString)
       systemPropertiesMap.put(AmqpConstants.PUBLISHER_ANNOTATION_NAME,
         publisherName.toString)
       systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
-        Calendar.getInstance().getTime)
+        Date.from(Instant.ofEpochMilli(enqueueTime)))
       val systemProperties = new SystemProperties(systemPropertiesMap)
       Whitebox.setInternalState(eventData, "systemProperties", systemProperties.asInstanceOf[Any])
       for (property <- properties) {
@@ -133,11 +133,10 @@ private[spark] object EventHubsTestUtilities extends Logging {
             eventData.getProperties.put("output", property.asInstanceOf[AnyRef])
         }
       }
-      eventDataArray(eventIndex) = eventData
-      queueOffset += 1
-      eventIndex += 1
+      eventDataArray(offsetSetInQueue) = eventData
+      offsetSetInQueue += 1
+      enqueueTime += 1000
     }
-
     eventDataArray
   }
 

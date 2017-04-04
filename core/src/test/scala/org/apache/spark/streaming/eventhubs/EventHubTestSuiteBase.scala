@@ -262,10 +262,20 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     new SimulatedEventHubs(namespace, ehAndRawInputMap.map {
       case (eventHubNameAndPartition, propertyQueue) =>
         (eventHubNameAndPartition,
+          EventHubsTestUtilities.generateEventData(
+            propertyQueue.map(property => ('e', Seq(property))),
+            eventHubNameAndPartition.partitionId))
+    })
+    /*
+    new SimulatedEventHubs(namespace, ehAndRawInputMap.map {
+      case (eventHubNameAndPartition, propertyQueue) =>
+        (eventHubNameAndPartition,
           fromPayloadToEventData(propertyQueue, eventHubNameAndPartition.partitionId))
     })
+    */
   }
 
+  /*
   private def fromPayloadToEventData[U: ClassTag](
       rawInputSeq: Seq[U], partitionId: Int): Array[EventData] = {
     var offsetSetInQueue = 0
@@ -299,6 +309,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     }
     eventDataArray
   }
+  */
 
   protected def verifyOffsetsAndSeqs(
       ssc: StreamingContext,

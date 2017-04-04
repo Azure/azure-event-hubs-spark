@@ -53,6 +53,8 @@ object WindowingWordCount {
       sys.exit(1)
     }
 
+    Thread.currentThread().setName("WINDOWING_MAIN_THREAD")
+
     val progressDir = args(0)
     val policyName = args(1)
     val policykey = args(2)

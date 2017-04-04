@@ -239,9 +239,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         )
       ),
       expectedOffsetsAndSeqs = Map(eventhubNamespace ->
-        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-          EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+          EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+          EventHubNameAndPartition("eh1", 2) -> (5L, 5L)))
       ),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),

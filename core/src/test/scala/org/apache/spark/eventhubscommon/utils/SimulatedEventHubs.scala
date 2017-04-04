@@ -41,7 +41,7 @@ class SimulatedEventHubs(
       eventCount: Int): List[EventData] = {
     val resultData = new ListBuffer[EventData]
     for (msg <- messageStore(eventHubsNamedPartition)) {
-      if (resultData.length > eventCount) {
+      if (resultData.length >= eventCount) {
         return resultData.toList
       }
       if (msg.getSystemProperties.getEnqueuedTime.toEpochMilli >= enqueueTime) {

@@ -19,6 +19,7 @@ package org.apache.spark.streaming.eventhubs
 
 import java.io.{IOException, ObjectInputStream}
 import java.time.Instant
+import java.util.Date
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import scala.collection.mutable
@@ -283,7 +284,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME,
         Int.box(partitionId))
       systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
-        Instant.ofEpochMilli(enqueueTime))
+        Date.from(Instant.ofEpochMilli(enqueueTime)))
       val systemProperties = new SystemProperties(systemPropertiesMap)
       Whitebox.setInternalState(msg, "systemProperties", systemProperties.asInstanceOf[Any])
       input match {

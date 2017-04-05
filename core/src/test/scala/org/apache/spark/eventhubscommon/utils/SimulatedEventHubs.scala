@@ -44,7 +44,7 @@ class SimulatedEventHubs(
       if (resultData.length >= eventCount) {
         return resultData.toList
       }
-      if (msg.getSystemProperties.getEnqueuedTime.toEpochMilli >= enqueueTime) {
+      if (msg.getSystemProperties.getEnqueuedTime.getEpochSecond >= enqueueTime) {
         resultData += msg
       }
     }

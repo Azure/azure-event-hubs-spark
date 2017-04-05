@@ -60,10 +60,11 @@ private[spark] object EventHubsTestUtilities extends Logging {
   }
 
   def getHighestOffsetPerPartition(eventHubs: SimulatedEventHubs):
-      Map[EventHubNameAndPartition, (Long, Long)] = {
+      Map[EventHubNameAndPartition, (Long, Long, Long)] = {
     eventHubs.messageStore.map {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
-        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
+        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1,
+          messageQueue.last.getSystemProperties.getEnqueuedTime.getEpochSecond))
     }
   }
 
@@ -122,7 +123,7 @@ private[spark] object EventHubsTestUtilities extends Logging {
       systemPropertiesMap.put(AmqpConstants.PUBLISHER_ANNOTATION_NAME,
         publisherName.toString)
       systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
-        Date.from(Instant.ofEpochMilli(enqueueTime)))
+        Date.from(Instant.ofEpochSecond(enqueueTime)))
       val systemProperties = new SystemProperties(systemPropertiesMap)
       Whitebox.setInternalState(eventData, "systemProperties", systemProperties.asInstanceOf[Any])
       for (property <- properties) {

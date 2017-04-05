@@ -158,10 +158,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
-    val maxOffsetForEachEventHub = simulatedEventHubs.messageStore.map {
-      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
-        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
-    }
+    val maxOffsetForEachEventHub = EventHubsTestUtilities.getHighestOffsetPerPartition(
+      simulatedEventHubs)
 
     new EventHubDirectDStream(ssc, namespace,
       progressRootPath.toString, eventhubsParams,

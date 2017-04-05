@@ -108,13 +108,14 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends EventH
 }
 
 class TestRestEventHubClient(
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)]) extends EventHubClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
     Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    Some(latestRecords)
+    Some(latestRecords.map{case (ehNameAndPartition, (offset, seq, _)) =>
+      (ehNameAndPartition, (offset, seq))})
   }
 
   /**
@@ -126,8 +127,10 @@ class TestRestEventHubClient(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
-    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
-      " client yet, please use RestfulEventHubClient")
+    Some(targetEventHubNameAndPartitions.map{
+      ehNameAndPartition =>
+        (ehNameAndPartition, latestRecords(ehNameAndPartition)._3)
+    }.toMap)
   }
 
   override def close(): Unit = {}
@@ -160,8 +163,7 @@ class FragileEventHubClient private extends EventHubClient {
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
-    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
-      " client yet, please use RestfulEventHubClient")
+    Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 
   override def close(): Unit = {}
@@ -216,8 +218,7 @@ class FluctuatedEventHubClient(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
-    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
-      " client yet, please use RestfulEventHubClient")
+    Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 }
 

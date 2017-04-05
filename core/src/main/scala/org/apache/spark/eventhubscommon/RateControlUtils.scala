@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubscommon
 
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
@@ -111,6 +112,30 @@ private[spark] object RateControlUtils extends Logging {
       Some(mergedOffsets)
     } else {
       r
+    }
+  }
+
+  private[spark] def validateFilteringParams(
+      eventHubsClient: EventHubClient,
+      eventhubsParams: Map[String, _],
+      ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
+    // first check if the parameters are valid
+    val latestEnqueueTimeOfPartitions = eventHubsClient.lastEnqueueTimeOfPartitions(
+      retryIfFail = true, ehNameAndPartitions)
+    require(latestEnqueueTimeOfPartitions.isDefined, "cannot get latest enqueue time from Event" +
+      " Hubs Rest Endpoint")
+    latestEnqueueTimeOfPartitions.get.foreach {
+      case (ehNameAndPartition, latestEnqueueTime) =>
+        val passInEnqueueTime = eventhubsParams.get(ehNameAndPartition.eventHubName) match {
+          case Some(ehParams) =>
+            ehParams.asInstanceOf[Map[String, String]]("eventhubs.filter.enqueuetime").toLong
+          case None =>
+            eventhubsParams.asInstanceOf[Map[String, String]]("eventhubs.filter.enqueuetime").toLong
+        }
+        require(latestEnqueueTime >= passInEnqueueTime,
+          "you cannot pass in an enqueue time which is later than the highest enqueue time in" +
+            s" event hubs, ($ehNameAndPartition, pass-in-enqueuetime $passInEnqueueTime," +
+            s" latest-enqueuetime $latestEnqueueTime)")
     }
   }
 

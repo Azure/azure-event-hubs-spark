@@ -128,9 +128,11 @@ private[spark] object RateControlUtils extends Logging {
       case (ehNameAndPartition, latestEnqueueTime) =>
         val passInEnqueueTime = eventhubsParams.get(ehNameAndPartition.eventHubName) match {
           case Some(ehParams) =>
-            ehParams.asInstanceOf[Map[String, String]]("eventhubs.filter.enqueuetime").toLong
+            ehParams.asInstanceOf[Map[String, String]].getOrElse(
+              "eventhubs.filter.enqueuetime", Long.MinValue.toString).toLong
           case None =>
-            eventhubsParams.asInstanceOf[Map[String, String]]("eventhubs.filter.enqueuetime").toLong
+            eventhubsParams.asInstanceOf[Map[String, String]].getOrElse(
+              "eventhubs.filter.enqueuetime", Long.MinValue.toString).toLong
         }
         require(latestEnqueueTime >= passInEnqueueTime,
           "you cannot pass in an enqueue time which is later than the highest enqueue time in" +

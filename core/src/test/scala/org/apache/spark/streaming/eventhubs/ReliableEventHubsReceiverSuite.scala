@@ -167,6 +167,10 @@ class MyMockedEventHubsClientWrapper(
     }
   }
 
+  override def closeReceiver(): Unit = {
+    // no ops
+  }
+
   override def receive(): Iterable[EventData] = {
 
     if (count == myExceptionCount) {

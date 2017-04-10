@@ -91,11 +91,11 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
       Long.box(eventSequenceNumber))
     systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME, eventhubPartitionId)
 
-    val systemProperties : SystemProperties = new SystemProperties(systemPropertiesMap)
+    val systemProperties = new SystemProperties(systemPropertiesMap)
 
     Whitebox.setInternalState(eventData, "systemProperties", systemProperties)
 
-    val eventDataCollection: ArrayBuffer[EventData] = new ArrayBuffer[EventData]()
+    val eventDataCollection = new ArrayBuffer[EventData]
     eventDataCollection += eventData
 
     when(offsetStoreMock.read()).thenReturn("-1")

@@ -111,54 +111,53 @@ private[eventhubs] class EventHubsReceiver(
 
     def run() {
       logInfo("Begin EventHubsMessageHandler for partition " + partitionId)
-      try {
-        myOffsetStore.open()
-        // Create an EventHubs client receiver
-        receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore, maximumEventRate)
-        var lastMaximumSequence = 0L
-        while (!stopMessageHandler) {
-          try {
-            val receivedEvents = receiverClient.receive()
-            if (receivedEvents != null && receivedEvents.nonEmpty) {
-              val eventCount = receivedEvents.count(x => x.getBodyLength > 0)
-              val sequenceNumbers = receivedEvents.map(x =>
-                x.getSystemProperties.getSequenceNumber)
-              if (sequenceNumbers != null && sequenceNumbers.nonEmpty) {
-                val maximumSequenceNumber = sequenceNumbers.max
-                val minimumSequenceNumber = sequenceNumbers.min
-                val missingSequenceCount =
-                  maximumSequenceNumber - minimumSequenceNumber - eventCount + 1
-                val sequenceNumberDiscontinuity = minimumSequenceNumber - (lastMaximumSequence + 1)
-                lastMaximumSequence = maximumSequenceNumber
-                logDebug(s"Partition Id: $partitionId, Event Count: $eventCount," +
-                  s" Maximum Sequence Number: $maximumSequenceNumber, Minimum Sequence Number:" +
-                  s" $minimumSequenceNumber," +
-                  s" Missing Sequence Count: $missingSequenceCount," +
-                  s" Sequence Number Discontinuity = $sequenceNumberDiscontinuity")
-              } else {
-                logDebug(s"Partition Id: $partitionId, Event Count: $eventCount")
-              }
-              processReceivedMessagesInBatch(receivedEvents)
+      myOffsetStore.open()
+      // Create an EventHubs client receiver
+      receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore, maximumEventRate)
+      var lastMaximumSequence = 0L
+      while (!stopMessageHandler) {
+        try {
+          val receivedEvents = receiverClient.receive()
+          if (receivedEvents != null && receivedEvents.nonEmpty) {
+            val eventCount = receivedEvents.count(x => x.getBodyLength > 0)
+            val sequenceNumbers = receivedEvents.map(x =>
+              x.getSystemProperties.getSequenceNumber)
+            if (sequenceNumbers != null && sequenceNumbers.nonEmpty) {
+              val maximumSequenceNumber = sequenceNumbers.max
+              val minimumSequenceNumber = sequenceNumbers.min
+              val missingSequenceCount =
+                maximumSequenceNumber - minimumSequenceNumber - eventCount + 1
+              val sequenceNumberDiscontinuity = minimumSequenceNumber - (lastMaximumSequence + 1)
+              lastMaximumSequence = maximumSequenceNumber
+              logDebug(s"Partition Id: $partitionId, Event Count: $eventCount," +
+                s" Maximum Sequence Number: $maximumSequenceNumber, Minimum Sequence Number:" +
+                s" $minimumSequenceNumber," +
+                s" Missing Sequence Count: $missingSequenceCount," +
+                s" Sequence Number Discontinuity = $sequenceNumberDiscontinuity")
+            } else {
+              logDebug(s"Partition Id: $partitionId, Event Count: $eventCount")
             }
-            val currentTime = System.currentTimeMillis()
-            if (currentTime >= nextCheckpointTime && offsetToSave != savedOffset) {
-              logInfo(s"Partition Id: $partitionId, Current Time: $currentTime," +
-                s" Next Checkpoint Time: $nextCheckpointTime, Saved Offset: $offsetToSave")
-              myOffsetStore.write(offsetToSave)
-              savedOffset = offsetToSave
-              nextCheckpointTime = currentTime + checkpointInterval
-            }
-          } catch {
-            case e: Throwable =>
-              val errorMsg = s"Error Handling Messages, $e"
-              logError(errorMsg)
-              logInfo(s"recreating the receiver for partition $partitionId")
-              receiverClient.closeReceiver()
-              receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore,
-                maximumEventRate)
+            processReceivedMessagesInBatch(receivedEvents)
           }
+          val currentTime = System.currentTimeMillis()
+          if (currentTime >= nextCheckpointTime && offsetToSave != savedOffset) {
+            logInfo(s"Partition Id: $partitionId, Current Time: $currentTime," +
+              s" Next Checkpoint Time: $nextCheckpointTime, Saved Offset: $offsetToSave")
+            myOffsetStore.write(offsetToSave)
+            savedOffset = offsetToSave
+            nextCheckpointTime = currentTime + checkpointInterval
+          }
+        } catch {
+          case e: Throwable =>
+            val errorMsg = s"Error Handling Messages, ${e.getMessage}"
+            logError(errorMsg)
+            logInfo(s"recreating the receiver for partition $partitionId")
+            receiverClient.closeReceiver()
+            receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore,
+              maximumEventRate)
         }
       }
+
     }
   }
 }

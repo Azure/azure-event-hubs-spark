@@ -20,6 +20,8 @@ package org.apache.spark.eventhubscommon.utils
 import java.time.Instant
 import java.util.{Calendar, Date}
 
+import scala.reflect.ClassTag
+
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
@@ -103,6 +105,7 @@ private[spark] object EventHubsTestUtilities extends Logging {
       }.toMap
     }
   }
+
   private[spark] def generateEventData[T, U](
       payloadPropertyBag: Seq[(T, Seq[U])],
       partitionId: Int,

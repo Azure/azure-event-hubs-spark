@@ -80,7 +80,7 @@ class TestEventHubsReceiver(
     offsetType: EventHubsOffsetType)
   extends EventHubsClientWrapper {
 
-  val eventHubName = eventHubParameters("eventhubs.name")
+  val eventHubName: String = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")

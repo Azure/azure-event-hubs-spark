@@ -120,7 +120,7 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
     verify(eventhubsClientWrapperMock, times(1)).createReceiver(updatedEventhubsParams,
       eventhubPartitionId, offsetStoreMock, maximumEventRate)
     verify(eventhubsClientWrapperMock, atLeastOnce).receive()
-    verify(eventhubsClientWrapperMock, times(1)).close()
+    verify(eventhubsClientWrapperMock, times(1)).closeReceiver()
   }
 
   ignore("EventHubsReceiver can restart when exception is thrown") {

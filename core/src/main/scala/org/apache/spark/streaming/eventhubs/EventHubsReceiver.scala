@@ -153,8 +153,10 @@ private[eventhubs] class EventHubsReceiver(
             logError(errorMsg)
             logInfo(s"recreating the receiver for partition $partitionId")
             receiverClient.closeReceiver()
+            println("====================")
             receiverClient.createReceiver(eventhubsParams, partitionId, myOffsetStore,
               maximumEventRate)
+            println("====================")
         }
       }
 

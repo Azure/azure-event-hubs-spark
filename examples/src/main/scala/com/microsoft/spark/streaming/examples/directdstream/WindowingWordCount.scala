@@ -32,16 +32,10 @@ object WindowingWordCount {
       progressDir: String) = {
     val ssc = new StreamingContext(new SparkContext(), Seconds(batchDuration))
     ssc.checkpoint(sparkCheckpointDir)
-    val inputDirectStream = EventHubsUtils.createDirectStreams(
-      ssc,
-      namespace,
-      progressDir,
-      Map(eventHunName -> eventhubParams))
-
-    inputDirectStream.map(receivedRecord => (new String(receivedRecord.getBody), 1)).
+    val inputDirectStream = EventHubsUtils.createUnionStream(ssc, eventhubParams)
+    inputDirectStream.map(receivedRecord => (new String(receivedRecord), 1)).
       reduceByKeyAndWindow((v1, v2) => v1 + v2, (v1, v2) => v1 - v2, Seconds(batchDuration * 3),
         Seconds(batchDuration)).print()
-
     ssc
   }
 

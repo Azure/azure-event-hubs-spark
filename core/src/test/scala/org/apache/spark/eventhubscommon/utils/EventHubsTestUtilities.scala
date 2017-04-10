@@ -20,21 +20,23 @@ package org.apache.spark.eventhubscommon.utils
 import java.time.Instant
 import java.util.Calendar
 
+import scala.reflect.ClassTag
+
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
-
-import scala.reflect.ClassTag
 import org.powermock.reflect.Whitebox
+
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 object EventHubsTestUtilities extends Logging {
 
-  def simulateEventHubs
-  [T: ClassTag, U: ClassTag](eventHubsParameters: Map[String, String],
-                             eventPayloadsAndProperties: Seq[(T, Seq[U])]):
-  SimulatedEventHubs = {
+  def simulateEventHubs[T, U](
+                               eventHubsParameters: Map[String, String],
+                               eventPayloadsAndProperties: Seq[(T, Seq[U])]): SimulatedEventHubs = {
+
+    assert(eventHubsParameters != null)
 
     // Round-robin allocation of payloads to partitions
 
@@ -49,11 +51,23 @@ object EventHubsTestUtilities extends Logging {
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList,
       eventPayloadsAndProperties)
 
-    new SimulatedEventHubs(eventHubsNamespace, payloadPropertyStore)
+    simulatedEventHubs = new SimulatedEventHubs(eventHubsNamespace, payloadPropertyStore)
+
+    simulatedEventHubs
+  }
+
+  def getOrSimulateEventHubs[T, U](
+    eventHubsParameters: Map[String, String],
+    eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
+
+    if (simulatedEventHubs == null) simulatedEventHubs
+      = simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+
+    simulatedEventHubs
   }
 
   def getHighestOffsetPerPartition(eventHubs: SimulatedEventHubs):
-  Map[EventHubNameAndPartition, (Long, Long)] = {
+    Map[EventHubNameAndPartition, (Long, Long)] = {
 
     eventHubs.messageStore.map {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
@@ -61,41 +75,32 @@ object EventHubsTestUtilities extends Logging {
     }
   }
 
-  def addEventsToEventHubs
-  [T: ClassTag, U: ClassTag](
-                              eventHubs: SimulatedEventHubs,
-                              eventPayloadsAndProperties: Seq[(T, Seq[U])]) : SimulatedEventHubs = {
-
+  def addEventsToEventHubs[T, U](
+      eventHubs: SimulatedEventHubs,
+      eventPayloadsAndProperties: Seq[(T, Seq[U])]): SimulatedEventHubs = {
     val eventHubsPartitionList = eventHubs.eventHubsNamedPartitions
-
     // Round-robin allocation of payloads to partitions
-
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList,
       eventPayloadsAndProperties)
-
     eventHubs.send(payloadPropertyStore)
-
     eventHubs
   }
 
-  private def roundRobinAllocation
-  [T: ClassTag, U: ClassTag](
-                              eventHubsPartitionList: Seq[EventHubNameAndPartition],
-                              eventPayloadsAndProperties: Seq[(T, Seq[U])]):
-  Map[EventHubNameAndPartition, Array[EventData]] = {
+  private def roundRobinAllocation[T, U](
+      eventHubsPartitionList: Seq[EventHubNameAndPartition],
+      eventPayloadsAndProperties: Seq[(T, Seq[U])]):
+    Map[EventHubNameAndPartition, Array[EventData]] = {
 
-    val eventAllocation: Seq[(EventHubNameAndPartition, Seq[(T, Seq[U])])]
-    = if (eventHubsPartitionList.length >= eventPayloadsAndProperties.length) {
+    val eventAllocation: Seq[(EventHubNameAndPartition, Seq[(T, Seq[U])])] = {
+      if (eventHubsPartitionList.length >= eventPayloadsAndProperties.length) {
+        eventHubsPartitionList.zip(eventPayloadsAndProperties.map(x => Seq(x)))
+      } else {
 
-      eventHubsPartitionList.zip(eventPayloadsAndProperties.map(x => Seq(x)))
-
-    } else {
-
-      eventPayloadsAndProperties.zipWithIndex
-        .map(x => (x._1, eventHubsPartitionList(x._2 % eventHubsPartitionList.length)))
-        .map(x => (x._2, x._1)).groupBy(_._1).mapValues(z => z.map(_._2))
-
-    }.toSeq
+        eventPayloadsAndProperties.zipWithIndex
+          .map(x => (eventHubsPartitionList(x._2 % eventHubsPartitionList.length), x._1)).
+          groupBy(_._1).map{case (k, v) => (k, v.map(_._2))}
+      }.toSeq
+    }
 
     eventAllocation.map {
       case (eventHubNameAndPartition, payloadPropertyBag) =>
@@ -104,7 +109,7 @@ object EventHubsTestUtilities extends Logging {
     }.toMap
   }
 
-  private def generateEventData[T: ClassTag, U: ClassTag](
+  private def generateEventData[T, U](
       payloadPropertyBag: Seq[(T, Seq[U])],
       partitionId: Int): Array[EventData] = {
 
@@ -148,4 +153,6 @@ object EventHubsTestUtilities extends Logging {
 
     eventDataArray
   }
+
+  private var simulatedEventHubs: SimulatedEventHubs = _
 }

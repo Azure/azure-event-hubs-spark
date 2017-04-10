@@ -29,31 +29,28 @@ class SimulatedEventHubs(
     eventHubsNamespace: String,
     initialData: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
 
+  assert(initialData != null)
+
   var messageStore: Map[EventHubNameAndPartition, Array[EventData]] = initialData
   val eventHubsNamedPartitions: Seq[EventHubNameAndPartition] = initialData.keys.toSeq
 
   def search(eventHubsNamedPartition: EventHubNameAndPartition, eventOffset: Int, eventCount: Int):
       List[EventData] = {
-
     val resultData = new ListBuffer[EventData]
-
     for (i <- 0 until eventCount) {
-
       // as in eventhub, offset is exclusive
       val messageIndex = eventOffset + i + 1
       if (messageIndex < messageStore(eventHubsNamedPartition).length) {
         resultData += messageStore(eventHubsNamedPartition)(messageIndex)
       }
     }
-
     resultData.toList
   }
 
   def send(newData: Map[EventHubNameAndPartition, Array[EventData]]): Unit = {
-
-    val combinedData: Map[EventHubNameAndPartition, Array[EventData]]
-    = (messageStore.toSeq ++ newData.toSeq).groupBy(_._1).mapValues(_.flatMap(_._2).toArray)
-
+    val combinedData: Map[EventHubNameAndPartition, Array[EventData]] =
+      (messageStore.toSeq ++ newData.toSeq).groupBy(_._1)
+        .map{case (k, v) => (k, v.flatMap(_._2).toArray)}
     messageStore = combinedData
   }
 }
@@ -65,7 +62,7 @@ class TestEventHubsReceiver(
     startOffset: Long)
   extends EventHubsClientWrapper {
 
-  val eventHubName = eventHubParameters("eventhubs.name")
+  val eventHubName: String = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")

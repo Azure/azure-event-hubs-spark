@@ -29,19 +29,19 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
   override def shortName(): String = "eventhubs"
 
   override def sourceSchema(
-      sqlContext: SQLContext,
-      schema: Option[StructType],
-      providerName: String,
-      parameters: Map[String, String]): (String, StructType) = {
+                             sqlContext: SQLContext,
+                             schema: Option[StructType],
+                             providerName: String,
+                             parameters: Map[String, String]): (String, StructType) = {
     (shortName(), EventHubsSourceProvider.sourceSchema(parameters))
   }
 
   override def createSource(
-      sqlContext: SQLContext,
-      metadataPath: String,
-      schema: Option[StructType],
-      providerName: String,
-      parameters: Map[String, String]): Source = {
+                             sqlContext: SQLContext,
+                             metadataPath: String,
+                             schema: Option[StructType],
+                             providerName: String,
+                             parameters: Map[String, String]): Source = {
     // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
     // eventhubClientCreator
     new EventHubsSource(sqlContext, parameters)
@@ -51,7 +51,7 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
 private[sql] object EventHubsSourceProvider extends Serializable {
 
   private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(parameters: Map[String, String]):
-      (Boolean, Seq[String]) = {
+  (Boolean, Seq[String]) = {
     val containsProperties = parameters.getOrElse("eventhubs.sql.containsProperties",
       "false").toBoolean
     val userDefinedKeys = {

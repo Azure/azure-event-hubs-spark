@@ -35,6 +35,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{DStream, ForEachDStream}
 import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
+import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.util.{ManualClock, Utils}
 
 

@@ -328,7 +328,11 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
             val createQueryMethod = sparkSession.streams.getClass.getDeclaredMethods.filter(m =>
               m.getName == "createQuery").head
             createQueryMethod.setAccessible(true)
-            currentStream = createQueryMethod.invoke(sparkSession.streams, stream,
+            currentStream = createQueryMethod.invoke(
+              sparkSession.streams,
+              None,
+              Some(metadataRoot),
+              stream,
               sink,
               outputMode,
               Boolean.box(false),

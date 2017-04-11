@@ -189,6 +189,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     assert(dataFrame.select("body").count == 6)
     // Second batch
     offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    println(offset)
     dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)

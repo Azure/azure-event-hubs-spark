@@ -323,7 +323,6 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
             })
 
             lastStream = currentStream
-            val activeQueries = new mutable.HashMap[UUID, StreamingQuery]
             println(sparkSession.streams.getClass.getDeclaredMethods.toList.map(_.getName))
             val createQueryMethod = sparkSession.streams.getClass.getDeclaredMethods.filter(m =>
               m.getName == "createQuery").head
@@ -340,8 +339,11 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
               trigger,
               triggerClock).asInstanceOf[StreamExecution]
 
-            Whitebox.setInternalState(sparkSession.streams, "activeQueries",
-              activeQueries += currentStream.id -> currentStream)
+            val activeQueries = sparkSession.streams.getClass.getFields.filter(f =>
+              f.getName == "activeQueries").head.get(sparkSession.streams).
+              asInstanceOf[mutable.HashMap[UUID, StreamingQuery]]
+
+            activeQueries += currentStream.id -> currentStream
 
             val sources = currentStream.logicalPlan.collect {
               case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>

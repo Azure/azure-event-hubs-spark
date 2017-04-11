@@ -100,24 +100,6 @@ object EventHubsUtils {
   }
 
   /**
-   * create direct stream based on eventhubs
-   * @param ssc the streaming context this stream belongs to
-   * @param eventHubNamespace the namespace of eventhubs
-   * @param progressDir the checkpoint directory path (we only support HDFS-based checkpoint
-   *                      storage for now, so you have to prefix your path with hdfs://clustername/
-   * @param eventParams the parameters of your eventhub instances, format:
-   *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
-   */
-  def createDirectStreams(
-      ssc: StreamingContext,
-      eventHubNamespace: String,
-      progressDir: String,
-      eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
-    newStream
-  }
-
-  /**
    * A helper function to get EventHubsReceiver or ReliableEventHubsReceiver based on whether
    * Write Ahead Log is enabled or not ("spark.streaming.receiver.writeAheadLog.enable")
    */

@@ -33,7 +33,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-class EventHubsClientWrapper extends Serializable with EventHubClient with Logging {
+class EventHubsClientWrapper extends Serializable with Logging {
 
   var eventhubsClient: AzureEventHubClient = _
 
@@ -167,7 +167,7 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
     if (events == null) Iterable.empty else events.asScala
   }
 
-  override def close(): Unit = {
+  def close(): Unit = {
     if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
     if (eventhubsClient != null) eventhubsClient.closeSync()
   }
@@ -182,13 +182,6 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
   private var MAXIMUM_EVENT_RATE: Int = 0
   private val DEFAULT_RECEIVER_EPOCH = -1L
 
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
-      " yet, please use RestfulEventHubClient")
-  }
 }
 
 object EventHubsClientWrapper {

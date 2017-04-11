@@ -24,8 +24,7 @@ import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver}
 
-import org.apache.spark.SparkException
-import org.apache.spark.internal.Logging
+import org.apache.spark.{Logging, SparkException}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{StreamingContext, Time}
 import org.apache.spark.streaming.dstream.{DStreamCheckpointData, InputDStream}

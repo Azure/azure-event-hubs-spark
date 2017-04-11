@@ -30,7 +30,8 @@ import scala.xml.XML
 import com.microsoft.azure.servicebus.SharedAccessSignatureTokenProvider
 import scalaj.http.{Http, HttpResponse}
 
-import org.apache.spark.internal.Logging
+import org.apache.spark.Logging
+
 
 /**
  * a Restful API based client of EventHub

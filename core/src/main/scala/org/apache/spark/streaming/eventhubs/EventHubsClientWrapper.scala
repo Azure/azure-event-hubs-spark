@@ -25,7 +25,7 @@ import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus._
 
-import org.apache.spark.internal.Logging
+import org.apache.spark.Logging
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes._
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 

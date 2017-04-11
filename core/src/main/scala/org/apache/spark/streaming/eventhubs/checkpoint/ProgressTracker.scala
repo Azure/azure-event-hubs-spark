@@ -17,7 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs.checkpoint
 
-import java.io.{BufferedReader, InputStreamReader, IOException}
+import java.io.{BufferedReader, IOException, InputStreamReader}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -26,8 +26,8 @@ import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
-import org.apache.spark.internal.Logging
-import org.apache.spark.streaming.{StreamingContext, Time}
+import org.apache.spark.Logging
+import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.eventhubs.{EventHubDirectDStream, EventHubNameAndPartition}
 
 

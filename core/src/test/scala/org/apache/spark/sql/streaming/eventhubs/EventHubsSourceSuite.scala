@@ -183,6 +183,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestRestEventHubClient(highestOffsetPerPartition))
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    println(offset)
     var dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)

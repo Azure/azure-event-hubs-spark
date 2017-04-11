@@ -17,8 +17,8 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 ### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
     libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.0.0"
-
-### Maven Central for other dependency co-ordinates
+    
+### Getting Staging Version
 
 https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.0
 

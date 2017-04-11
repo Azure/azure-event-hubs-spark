@@ -181,7 +181,6 @@ class EventHubsClientWrapper extends Serializable with Logging {
   private var MAXIMUM_PREFETCH_COUNT: Int = 999
   private var MAXIMUM_EVENT_RATE: Int = 0
   private val DEFAULT_RECEIVER_EPOCH = -1L
-
 }
 
 object EventHubsClientWrapper {

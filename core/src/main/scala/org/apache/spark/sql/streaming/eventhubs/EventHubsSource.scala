@@ -20,10 +20,14 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
+<<<<<<< HEAD
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
+=======
+import org.apache.spark.eventhubscommon.{EventHubsConnector, EventHubNameAndPartition, RateControlUtils}
+>>>>>>> hi
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}

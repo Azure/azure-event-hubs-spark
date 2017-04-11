@@ -36,6 +36,7 @@ import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
@@ -410,9 +411,12 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(
               (eventHubsParameters: Map[String, String], partitionId: Int,
-               startOffset: Long, _: Int) => new TestEventHubsReceiver(eventHubsParameters,
-                eventHubs, partitionId, startOffset)
+               startOffset: Long, offsetType: EventHubsOffsetType, _: Int) =>
+                new TestEventHubsReceiver(eventHubsParameters, eventHubs, partitionId, startOffset,
+                  offsetType)
             )
+            currentStream.start()
+
             currentStream.start()
 
           case AdvanceManualClock(timeToAdd) =>

@@ -113,8 +113,6 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
     }
   }
 
-  // Test ignored due to an issue with mocking library unavailable to the executors.
-
   test("Reliable EventHubs input stream recover from exception") {
     // After 60 messages then exception, after 100 messages then receive null
     ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, 60)
@@ -160,11 +158,17 @@ class MyMockedEventHubsClientWrapper(
                                       currentOffset: String,
                                       receiverEpoch: Long): Unit = {
 
+    logInfo(s"calling createReceiverInternal with $currentOffset and $offsetType")
+
     if (offsetType != EventhubsOffsetTypes.None) {
 
       offset = currentOffset.toInt
       partition = partitionId
     }
+  }
+
+  override def closeReceiver(): Unit = {
+    // no ops
   }
 
   override def receive(): Iterable[EventData] = {

@@ -68,11 +68,6 @@ class ReliableEventHubsReceiver(
     super.onStart()
   }
 
-  @deprecated
-  override def processReceivedMessage(eventData: EventData): Unit = {
-    blockGenerator.addDataWithCallback(eventData.getBody, eventData.getSystemProperties.getOffset)
-  }
-
   override def processReceivedMessagesInBatch(eventDataBatch: Iterable[EventData]): Unit = {
     val maximumSequenceNumber = eventDataBatch.map(x => x.getSystemProperties.getSequenceNumber).
       reduceLeft { (x, y) => if (x > y) x else y }

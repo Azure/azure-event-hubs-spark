@@ -1,5 +1,9 @@
 ## Change Log
 
+### 2.0.5
+
+* fix the race condition in receiver based connection[59](https://github.com/hdinsight/spark-eventhubs/pull/59)
+
 ### 2.0.4
 
 * Enable the user to use WASB to store progress files [52](https://github.com/hdinsight/spark-eventhubs/pull/52)

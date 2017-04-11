@@ -21,9 +21,10 @@ import java.util.Calendar
 
 import org.scalatest.time.SpanSugar._
 
+import org.apache.spark.DebugFilesystem
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.streaming.{EventHubsStreamTest, ProcessingTime}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.{SharedSQLContext, TestSparkSession}
 
 abstract class EventHubsSourceTest extends EventHubsStreamTest with SharedSQLContext {
 

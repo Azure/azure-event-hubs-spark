@@ -36,6 +36,7 @@ import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 
+import org.apache.spark.DebugFilesystem
 import org.apache.spark.eventhubscommon.utils.{EventHubsTestUtilities, TestEventHubsReceiver, TestRestEventHubClient}
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder, encoderFor}
@@ -43,7 +44,7 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming.eventhubs.{EventHubsAddData, EventHubsSource, StreamAction}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.{SharedSQLContext, TestSparkSession}
 import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
 
 /**
@@ -72,6 +73,13 @@ import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
  */
 
 trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts with Serializable {
+
+
+  override protected def createSparkSession: TestSparkSession = {
+    new TestSparkSession(
+      sparkConf.set("spark.hadoop.fs.file.impl", classOf[DebugFilesystem].getName).setAppName(
+        s"EventHubsStreamTest_${System.currentTimeMillis()}"))
+  }
 
   /** How long to wait for an active stream to catch up when checking a result. */
   val streamingTimeout = 30.seconds

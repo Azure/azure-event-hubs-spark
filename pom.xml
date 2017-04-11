@@ -21,7 +21,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
+  <artifactId>spark-streaming-eventhubs_connector_2.10</artifactId>
   <version>1.6.3</version>
   <licenses>
     <license>
@@ -172,7 +172,7 @@
   </scm>
   <properties>
     <sbt.project.name>spark-streaming-eventhubs_connector</sbt.project.name>
-    <scala.binary.version>2.11</scala.binary.version>
+    <scala.binary.version>2.10</scala.binary.version>
     <spark.version>1.6.3</spark.version>
     <github.global.server>github</github.global.server>
   </properties>
@@ -191,11 +191,6 @@
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
       <version>0.13.1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.scalaj</groupId>
-      <artifactId>scalaj-http_2.11</artifactId>
-      <version>2.3.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
@@ -282,11 +277,6 @@
       <artifactId>junit-interface</artifactId>
       <scope>test</scope>
       <version>0.10</version>
-    </dependency>
-    <dependency>
-      <groupId>org.scala-lang.modules</groupId>
-      <artifactId>scala-xml_2.11</artifactId>
-      <version>1.0.6</version>
     </dependency>
   </dependencies>
   <build>

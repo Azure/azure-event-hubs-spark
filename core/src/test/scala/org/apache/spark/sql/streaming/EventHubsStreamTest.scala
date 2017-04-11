@@ -329,8 +329,8 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
             currentStream = createQueryMethod.invoke(sparkSession.streams, stream,
               sink,
               outputMode,
-              false,
-              true,
+              Boolean.box(false),
+              Boolean.box(true),
               trigger,
               triggerClock).asInstanceOf[StreamExecution]
 

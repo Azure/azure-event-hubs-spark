@@ -40,7 +40,7 @@ import org.apache.spark.DebugFilesystem
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
-import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder, encoderFor}
+import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
@@ -83,6 +83,13 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
     super.afterAll()
     FileSystem.get(new Configuration()).delete(new Path(s"$tempRoot/test-sql-context"), true)
   }
+
+  override protected def createSparkSession: TestSparkSession = {
+    new TestSparkSession(
+      sparkConf.set("spark.hadoop.fs.file.impl", classOf[DebugFilesystem].getName).setAppName(
+        s"EventHubsStreamTest_${System.currentTimeMillis()}"))
+  }
+
 
   override protected def createSparkSession: TestSparkSession = {
     new TestSparkSession(

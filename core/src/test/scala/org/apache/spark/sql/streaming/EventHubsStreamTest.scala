@@ -323,7 +323,6 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
             })
 
             lastStream = currentStream
-            println(sparkSession.streams.getClass.getDeclaredMethods.toList.map(_.getName))
             val createQueryMethod = sparkSession.streams.getClass.getDeclaredMethods.filter(m =>
               m.getName == "createQuery").head
             createQueryMethod.setAccessible(true)
@@ -340,10 +339,12 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
               triggerClock).asInstanceOf[StreamExecution]
 
             println(sparkSession.streams.getClass.getDeclaredFields.toList.map(_.getName))
-            val activeQueries = sparkSession.streams.getClass.getDeclaredFields.filter(f =>
+            val activeQueriesField = sparkSession.streams.getClass.getDeclaredFields.filter(f =>
               f.getName == "org$apache$spark$sql$streaming$StreamingQueryManager$$activeQueries").
-              head.get(sparkSession.streams).asInstanceOf[mutable.HashMap[UUID, StreamingQuery]]
-
+              head
+            activeQueriesField.setAccessible(true)
+            val activeQueries = activeQueriesField.get(sparkSession.streams).
+              asInstanceOf[mutable.HashMap[UUID, StreamingQuery]]
             activeQueries += currentStream.id -> currentStream
 
             val sources = currentStream.logicalPlan.collect {

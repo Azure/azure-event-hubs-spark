@@ -25,6 +25,7 @@ import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus._
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes._
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
@@ -32,7 +33,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-class EventHubsClientWrapper extends Serializable with EventHubClient {
+class EventHubsClientWrapper extends Serializable with EventHubClient with Logging {
 
   var eventhubsClient: AzureEventHubClient = _
 
@@ -118,6 +119,7 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
       eventhubsParams)
     val (offsetType, currentOffset) = configureStartOffset(eventhubsParams, offsetStore)
+    logInfo(s"start a receiver for partition $partitionId with the start offset $currentOffset")
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
     createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
@@ -168,6 +170,10 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
   override def close(): Unit = {
     if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
     if (eventhubsClient != null) eventhubsClient.closeSync()
+  }
+
+  def closeReceiver(): Unit = {
+    eventhubsReceiver.closeSync()
   }
 
   private var eventhubsReceiver: PartitionReceiver = _

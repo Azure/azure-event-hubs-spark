@@ -28,10 +28,10 @@ import org.apache.spark.SparkContext
  */
 @SerialVersionUID(1L)
 class DfsBasedOffsetStore(
-                         directory: String,
-                         namespace: String,
-                         name: String,
-                         partition: String) extends OffsetStore with Logging {
+    directory: String,
+    namespace: String,
+    name: String,
+    partition: String) extends OffsetStore with Logging {
 
   if (!SparkContext.getOrCreate().isLocal) {
     require(directory.startsWith("hdfs://") || directory.startsWith("adl://"),
@@ -181,15 +181,7 @@ class DfsBasedOffsetStore(
   }
 
   override def close(): Unit = {
-    if (checkpointFile != null) {
-      checkpointFile.close()
-      checkpointFile = null
-    }
-
-    if (backupCheckpointFile != null) {
-      backupCheckpointFile.close()
-      backupCheckpointFile = null
-    }
+    // pass
   }
 }
 

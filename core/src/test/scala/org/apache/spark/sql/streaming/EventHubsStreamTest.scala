@@ -341,8 +341,8 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
 
             println(sparkSession.streams.getClass.getDeclaredFields.toList.map(_.getName))
             val activeQueries = sparkSession.streams.getClass.getDeclaredFields.filter(f =>
-              f.getName == "activeQueries").head.get(sparkSession.streams).
-              asInstanceOf[mutable.HashMap[UUID, StreamingQuery]]
+              f.getName == "org$apache$spark$sql$streaming$StreamingQueryManager$$activeQueries").
+              head.get(sparkSession.streams).asInstanceOf[mutable.HashMap[UUID, StreamingQuery]]
 
             activeQueries += currentStream.id -> currentStream
 

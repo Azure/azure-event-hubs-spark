@@ -329,6 +329,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     // Second batch
     offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    println(offset)
     dataFrame = eventHubsSource.getBatch(None, offset)
     dataFrame.show(100)
     assert(dataFrame.schema == eventHubsSource.schema)

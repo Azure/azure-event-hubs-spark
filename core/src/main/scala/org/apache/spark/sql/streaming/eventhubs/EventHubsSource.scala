@@ -187,6 +187,7 @@ private[spark] class EventHubsSource(
   }
 
   private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
+    println(s"$committedOffsetsAndSeqNums")
     val offsetRanges = fetchedHighestOffsetsAndSeqNums.offsets.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,

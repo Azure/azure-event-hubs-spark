@@ -312,9 +312,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val eventHubs = EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
       eventPayloadsAndProperties)
-
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
-
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
       (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
@@ -323,24 +321,18 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
-
     var dataFrame = eventHubsSource.getBatch(None, offset)
-
+    dataFrame.show(100)
     assert(dataFrame.schema == eventHubsSource.schema)
-
     eventHubsSource.commit(offset)
-
     assert(dataFrame.select("body").count == 6)
 
     // Second batch
     offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
-
     dataFrame = eventHubsSource.getBatch(None, offset)
-
+    dataFrame.show(100)
     assert(dataFrame.schema == eventHubsSource.schema)
-
     eventHubsSource.commit(offset)
-
     assert(dataFrame.select("body").count == 4)
   }
 

@@ -324,6 +324,7 @@ trait EventHubsStreamTest extends QueryTest with SharedSQLContext with Timeouts 
 
             lastStream = currentStream
             val activeQueries = new mutable.HashMap[UUID, StreamingQuery]
+            println(sparkSession.streams.getClass.getDeclaredMethods.toList.map(_.getName))
             val createQueryMethod = sparkSession.streams.getClass.getDeclaredMethod("createQuery")
             createQueryMethod.setAccessible(true)
             currentStream = createQueryMethod.invoke(sparkSession.streams, stream,

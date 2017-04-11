@@ -65,7 +65,6 @@ object EventHubsUtils {
    * @return ReceiverInputStream
    */
   // scalastyle:on
-  @deprecated("this method is deprecated, please use createDirectStreams", "2.0.5")
   def createUnionStream(streamingContext: StreamingContext, eventhubsParams: Map[String, String],
       storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK_SER): DStream[Array[Byte]] = {
     val partitionCount = eventhubsParams("eventhubs.partition.count").toInt
@@ -87,7 +86,6 @@ object EventHubsUtils {
    * @param receiverClient   the EventHubs client implementation, defaults to EventHubsClientWrapper
    * @return ReceiverInputStream
    */
-  @deprecated("this method is deprecated, please use createDirectStreams", "2.0.5")
   def createStream(streamingContext: StreamingContext,
                    eventhubsParams: Map[String, String],
                    partitionId: String,

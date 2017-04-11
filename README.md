@@ -5,7 +5,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 
 For latest integration of EventHubs and Spark Streaming, the document can be found [here](docs/direct_stream.md).
 
-## Latest Release: 2.0.5
+## Latest Release: 2.0.5, 1.6.x
 
 [Change Log](doc/change_log.md)
 
@@ -16,20 +16,20 @@ For latest integration of EventHubs and Spark Streaming, the document can be fou
 We will have the official release in the maven central repo, you can add the following dependency to your project to reference Spark-EventHubs
 
 #### Maven Dependency
-    <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11 -->
+    <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_[2.10 for spark 1.6 or 2.11 for spark 2.x] -->
     <dependency>
         <groupId>com.microsoft.azure</groupId>
-        <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+        <artifactId>spark-streaming-eventhubs_[2.10 for spark 1.6 or 2.11 for spark 2.x]</artifactId>
         <version>[change it to latest version]</version>
     </dependency>
 
 #### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "[change it to latest version]"
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_[2.10 for spark 1.6 or 2.11 for spark 2.x]" % "[change it to latest version]"
 
 #### Maven Central for other dependency co-ordinates
 
-https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11/[change it to latest version]
+https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_[2.10 for spark 1.6 or 2.11 for spark 2.x]/[change it to latest version]
 
 ### Getting Staging Version
 
@@ -52,7 +52,7 @@ You can then add the following dependency to your project to take the pre-releas
     <!-- https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11 -->
     <dependency>
         <groupId>com.microsoft.azure</groupId>
-        <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+        <artifactId>spark-streaming-eventhubs_[2.10 for spark 1.6 or 2.11 for spark 2.x]</artifactId>
         <version>2.1.0-SNAPSHOT</version>
     </dependency>
 

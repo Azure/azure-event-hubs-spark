@@ -1,10 +1,14 @@
 ## Change Log
 
-### 2.0.5
+### 1.6.3 (April 11th, 2017)
+
+* fix the race condition in receiver based connection[62](https://github.com/hdinsight/spark-eventhubs/pull/62)
+
+### 2.0.5 (April 11th, 2017)
 
 * fix the race condition in receiver based connection[59](https://github.com/hdinsight/spark-eventhubs/pull/59)
 
-### 2.0.4
+### 2.0.4 (March 28th, 2017)
 
 * Enable the user to use WASB to store progress files [52](https://github.com/hdinsight/spark-eventhubs/pull/52)
 * Optimize the implementation RestfulClient to minimize the sending request number [52](https://github.com/hdinsight/spark-eventhubs/pull/52)
@@ -19,7 +23,7 @@
 
 * Due to the breaking changes in EventHubsClient, EventData.properties is typed as Map<String, Object> instead of the original Map<String, String>
 
-### 2.0.3
+### 2.0.3 (Jan 27th, 2017)
 
 * Fix the flaky test in receiver based stream [21](https://github.com/hdinsight/spark-eventhubs/pull/21)
 * Release Direct DStream [25](https://github.com/hdinsight/spark-eventhubs/pull/25)

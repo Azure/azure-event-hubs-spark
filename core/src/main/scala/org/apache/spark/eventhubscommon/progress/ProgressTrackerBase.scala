@@ -335,5 +335,31 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     ret.toMap
   }
 
+  def cleanProgressFile(timestampToClean: Long): Unit = {
+    val fs = progressDirPath.getFileSystem(hadoopConfiguration)
+    val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
+    }).map(_.getPath)
+    val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
+      fromPathToTimestamp(p2))
+    if (sortedFileList.nonEmpty) {
+      sortedFileList.tail.foreach { filePath =>
+        logInfo(s"delete $filePath")
+        fs.delete(filePath, true)
+      }
+    }
+    // clean temp directory
+    val allUselessTempFiles = fs.listStatus(progressTempDirPath, new PathFilter {
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
+    }).map(_.getPath)
+    if (allUselessTempFiles.nonEmpty) {
+      allUselessTempFiles.groupBy(fromPathToTimestamp).toList.sortWith((p1, p2) => p1._1 > p2._1).
+        tail.flatMap(_._2).foreach {
+        filePath => logInfo(s"delete $filePath")
+          fs.delete(filePath, true)
+      }
+    }
+  }
+
   def init(): Unit
 }

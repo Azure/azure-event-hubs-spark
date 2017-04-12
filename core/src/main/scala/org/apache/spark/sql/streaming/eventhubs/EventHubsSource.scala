@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, RateControlUtils}
@@ -69,6 +70,9 @@ private[spark] class EventHubsSource(
     (for (partitionId <- 0 until partitionCount)
       yield EventHubNameAndPartition(eventHubsName, partitionId)).toList
   }
+
+  private implicit val cleanupExecutorService = ExecutionContext.fromExecutor(
+    Executors.newFixedThreadPool(1))
 
   // EventHubsSource is created for each instance of program, that means it is different with
   // DStream which will load the serialized Direct DStream instance from checkpoint
@@ -132,6 +136,19 @@ private[spark] class EventHubsSource(
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
+
+  private def cleanupFiles(batchIdToClean: Long): Unit = {
+    Future {
+      progressTracker.cleanProgressFile(batchIdToClean)
+    }.onComplete {
+      case Success(r) =>
+        logInfo(s"finished cleanup for batch $batchIdToClean")
+      case Failure(exception) =>
+        logWarning(s"error happened when clean up for batch $batchIdToClean," +
+          s" $exception")
+    }
+  }
+
   /**
     * there are two things to do in this function, first is to collect the ending offsets of last
     * batch, so that we know the starting offset of the current batch. And then, we calculate the
@@ -144,7 +161,11 @@ private[spark] class EventHubsSource(
       " eventhubs")
     if (!firstBatch) {
       // committedOffsetsAndSeqNums.batchId is always no larger than the latest finished batch id
-      collectFinishedBatchOffsetsAndCommit(committedOffsetsAndSeqNums.batchId + 1)
+      val lastCommitedBatchId = committedOffsetsAndSeqNums.batchId
+      collectFinishedBatchOffsetsAndCommit(lastCommitedBatchId + 1)
+      // after the previous call the batch id of committedOffsetsAndSeqNums has been incremented
+      // with one
+      cleanupFiles(lastCommitedBatchId)
     } else {
       firstBatch = false
     }

@@ -104,11 +104,8 @@ private[spark] class DirectDStreamProgressTracker private[spark](
   def close(): Unit = {}
 
   // called in EventHubDirectDStream's clearCheckpointData method
-  def cleanProgressFile(checkpointTime: Long): Unit = driverLock.synchronized {
-    // because offset committing and checkpoint data cleanup are performed in two different threads,
-    // we need to always keep the latest file instead of blindly delete all files earlier than
-    // checkpointTime.
-    val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
+  override def cleanProgressFile(timestampToClean: Long): Unit = driverLock.synchronized {
+    val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     // clean progress directory
     // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
     // we have to disable cleanup thread
@@ -127,7 +124,7 @@ private[spark] class DirectDStreamProgressTracker private[spark](
     */
     // clean temp directory
     val allUselessTempFiles = fs.listStatus(progressTempDirPath, new PathFilter {
-      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime
+      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
     }).map(_.getPath)
     if (allUselessTempFiles.nonEmpty) {
       allUselessTempFiles.groupBy(fromPathToTimestamp).toList.sortWith((p1, p2) => p1._1 > p2._1).

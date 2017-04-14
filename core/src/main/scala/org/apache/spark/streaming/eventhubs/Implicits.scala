@@ -22,6 +22,8 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.language.implicitConversions
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder
+
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
@@ -35,8 +37,11 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 object Implicits {
 
   // will be used to execute requests to EventHub
-  private[eventhubs] implicit val exec = ExecutionContext.
-    fromExecutor(Executors.newCachedThreadPool)
+  private[eventhubs] implicit val exec = {
+    val tp = new ThreadFactoryBuilder().setDaemon(true).setNameFormat("restclientthread" + "-%d").
+      build()
+    ExecutionContext.fromExecutor(Executors.newCachedThreadPool(tp))
+  }
 
   /**
    * Converts the StreamingContext into an EventHub enabled streaming context

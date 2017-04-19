@@ -297,7 +297,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
    * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
    */
   def collectProgressRecordsForBatch(timestamp: Long):
-  Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
+    Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
     try {

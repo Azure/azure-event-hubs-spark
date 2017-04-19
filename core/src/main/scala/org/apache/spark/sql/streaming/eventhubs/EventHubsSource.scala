@@ -20,6 +20,9 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
+
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
@@ -30,15 +33,17 @@ import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingPr
 import org.apache.spark.sql.types._
 
 private[spark] class EventHubsSource(
-         sqlContext: SQLContext,
-         parameters: Map[String, String],
-         eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
-         EventHubsClientWrapper.getEventHubReceiver,
-         eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
-         RestfulEventHubClient.getInstance)
-  extends Source with EventHubsConnector with Logging {
+    sqlContext: SQLContext,
+    parameters: Map[String, String],
+    eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
+      EventHubsClientWrapper.getEventHubReceiver,
+    eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
+      RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
+
+  // the id of the stream which is mapped from eventhubs instance
+  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
 
   private val eventHubsNamespace: String = parameters("eventhubs.namespace")
   private val eventHubsName: String = parameters("eventhubs.name")
@@ -89,14 +94,14 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def setEventHubsReceiver(
-      eventhubReceiverCreator: (Map[String, String], Int, Long, Int)
-        => EventHubsClientWrapper): EventHubsSource = {
+      eventhubReceiverCreator: (Map[String, String], Int, Long, Int) =>
+        EventHubsClientWrapper): EventHubsSource = {
     _eventHubsReceiver = eventhubReceiverCreator
     this
   }
 
   // the flag to avoid committing in the first batch
-  private var firstBatch = true
+  private[spark] var firstBatch = true
   // the offsets which have been to the self-managed offset store
   private var committedOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
@@ -171,10 +176,11 @@ private[spark] class EventHubsSource(
     }
     val targetOffsets = RateControlUtils.clamp(committedOffsetsAndSeqNums.offsets,
       highestOffsetsOpt.get, parameters)
-    Some(EventHubsBatchRecord(committedOffsetsAndSeqNums.batchId + 1,
+    val a = Some(EventHubsBatchRecord(committedOffsetsAndSeqNums.batchId + 1,
       targetOffsets.map{case (ehNameAndPartition, seqNum) =>
         (ehNameAndPartition, math.min(seqNum,
           fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2))}))
+    a
   }
 
   /**
@@ -207,7 +213,6 @@ private[spark] class EventHubsSource(
   }
 
   private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
-    println(s"$committedOffsetsAndSeqNums")
     val offsetRanges = fetchedHighestOffsetsAndSeqNums.offsets.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         OffsetRange(eventHubNameAndPartition,
@@ -231,7 +236,7 @@ private[spark] class EventHubsSource(
     val (containsProperties, userDefinedKeys) =
       EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(parameters)
     val rowRDD = eventHubsRDD.map(eventData =>
-      Row.fromSeq(Seq(eventData.getBody, eventData.getSystemProperties.getOffset.toLong,
+      Row.fromSeq(Seq(eventData.getBytes, eventData.getSystemProperties.getOffset.toLong,
         eventData.getSystemProperties.getSequenceNumber,
         eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,
         eventData.getSystemProperties.getPublisher,
@@ -308,14 +313,10 @@ private[spark] class EventHubsSource(
 
   override def stop(): Unit = {}
 
-  // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
-  override def uid: String = s"${eventHubsNamespace}_$eventHubsName"
+  override def uid: String = s"${eventHubsNamespace}_${eventHubsName}_$streamId"
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
-
-  // the id of the stream which is mapped from eventhubs instance
-  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
 }
 
 private object EventHubsSource {

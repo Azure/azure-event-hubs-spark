@@ -64,10 +64,9 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark]
-  def clamp(
-             currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
-             highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-             eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+  def clamp(currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
+      eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
     defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, eventhubsParams)
   }
 

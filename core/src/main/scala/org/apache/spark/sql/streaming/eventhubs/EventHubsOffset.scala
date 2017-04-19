@@ -27,7 +27,7 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.sql.execution.streaming.Offset
 
 // the descriptor of EventHubsBatchRecord to communicate with StreamExecution
-private[eventhubs] case class EventHubsBatchRecord(batchId: Long,
+private[streaming] case class EventHubsBatchRecord(batchId: Long,
                                 targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset {
   override def json: String = JsonUtils.partitionAndSeqNum(batchId, targetSeqNums)
 }

@@ -7,7 +7,7 @@ For latest integration of EventHubs and Spark Streaming, the document can be fou
 
 ## Latest Release: 2.0.5, 1.6.x
 
-[Change Log](doc/change_log.md)
+[Change Log](docs/change_log.md)
 
 ## Usage
 

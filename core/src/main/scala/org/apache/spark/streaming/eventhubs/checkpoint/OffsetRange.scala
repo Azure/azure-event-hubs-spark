@@ -18,12 +18,15 @@
 package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
+import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes.EventHubsOffsetType
 
 private[eventhubs] case class OffsetRange(
     eventHubNameAndPartition: EventHubNameAndPartition,
     fromOffset: Long,
     fromSeq: Long,
-    untilSeq: Long) {
+    untilSeq: Long,
+    offsetType: EventHubsOffsetType) {
 
-  private[eventhubs] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
+  private[eventhubs] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq,
+    offsetType)
 }

@@ -26,14 +26,15 @@ import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes._
+import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes._
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-class EventHubsClientWrapper extends Serializable with EventHubClient with Logging {
+private[eventhubs] class EventHubsClientWrapper extends Serializable with EventHubClient
+  with Logging {
 
   var eventhubsClient: AzureEventHubClient = _
 
@@ -75,18 +76,10 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
 
   private def configureStartOffset(
       eventhubsParams: Map[String, String], offsetStore: OffsetStore):
-      (EventhubsOffsetType, String) = {
+      (EventHubsOffsetType, String) = {
     // Determine the offset to start receiving data
     val previousOffset = offsetStore.read()
-    if (previousOffset != "-1" && previousOffset != null) {
-      (EventhubsOffsetTypes.PreviousCheckpoint, previousOffset)
-    } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
-      (EventhubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
-    } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
-      (EventhubsOffsetTypes.InputTimeOffset, eventhubsParams("eventhubs.filter.enqueuetime"))
-    } else {
-      (EventhubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
-    }
+    EventHubsClientWrapper.configureStartOffset(previousOffset, eventhubsParams)
   }
 
   private def configureMaxEventRate(userDefinedEventRate: Int): Int = {
@@ -101,11 +94,14 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
     MAXIMUM_EVENT_RATE
   }
 
-  def createReceiver(eventhubsParams: Map[String, String],
-                     partitionId: String, startOffset: String, maximumEventRate: Int): Unit = {
+  def createReceiver(
+      eventhubsParams: Map[String, String],
+      partitionId: String,
+      startOffset: String,
+      offsetType: EventHubsOffsetType,
+      maximumEventRate: Int): Unit = {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
       eventhubsParams)
-    val offsetType = EventhubsOffsetTypes.PreviousCheckpoint
     val currentOffset = startOffset
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
     createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
@@ -126,25 +122,25 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
   }
 
   private[eventhubs] def createReceiverInternal(
-                             connectionString: String,
-                             consumerGroup: String,
-                             partitionId: String,
-                             offsetType: EventhubsOffsetType,
-                             currentOffset: String,
-                             receiverEpoch: Long): Unit = {
+      connectionString: String,
+      consumerGroup: String,
+      partitionId: String,
+      offsetType: EventHubsOffsetType,
+      currentOffset: String,
+      receiverEpoch: Long): Unit = {
     // Create Eventhubs client
     eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
     eventhubsReceiver = offsetType match {
-      case EventhubsOffsetTypes.None | EventhubsOffsetTypes.PreviousCheckpoint
-           | EventhubsOffsetTypes.InputByteOffset =>
+      case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
+           | EventHubsOffsetTypes.InputByteOffset =>
         if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
           eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset,
             receiverEpoch)
         } else {
           eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
         }
-      case EventhubsOffsetTypes.InputTimeOffset =>
+      case EventHubsOffsetTypes.InputTimeOffset =>
         if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
           eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId,
             Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch)
@@ -156,9 +152,26 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
     eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
   }
 
+  /**
+   * starting from EventHubs client 0.13.1, returning a null from receiver means that there is
+   * no message in server end
+   */
   def receive(): Iterable[EventData] = {
     val events = eventhubsReceiver.receive(MAXIMUM_EVENT_RATE).get()
-    if (events == null) Iterable.empty else events.asScala
+    if (events != null) events.asScala else null
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
+      " client yet, please use RestfulEventHubClient")
   }
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {
@@ -191,18 +204,32 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
   }
 }
 
-object EventHubsClientWrapper {
+private[eventhubs] object EventHubsClientWrapper {
+
+  private[eventhubs] def configureStartOffset(
+      previousOffset: String,
+      eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
+    if (previousOffset != "-1" && previousOffset != null) {
+      (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
+    } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
+      (EventHubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
+    } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
+      (EventHubsOffsetTypes.InputTimeOffset, eventhubsParams("eventhubs.filter.enqueuetime"))
+    } else {
+      (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
+    }
+  }
 
   def getEventHubReceiver(
       eventhubsParams: Map[String, String],
       partitionId: Int,
       startOffset: Long,
+      offsetType: EventHubsOffsetType,
       maximumEventRate: Int): EventHubsClientWrapper = {
-
     // TODO: reuse client
     val eventHubClientWrapperInstance = new EventHubsClientWrapper()
     eventHubClientWrapperInstance.createReceiver(eventhubsParams, partitionId.toString,
-      startOffset.toString, maximumEventRate)
+      startOffset.toString, offsetType, maximumEventRate)
     eventHubClientWrapperInstance
   }
 }

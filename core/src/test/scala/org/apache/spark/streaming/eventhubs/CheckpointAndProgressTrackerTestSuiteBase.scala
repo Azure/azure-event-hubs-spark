@@ -19,7 +19,6 @@ package org.apache.spark.streaming.eventhubs
 
 import scala.reflect.ClassTag
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
 
 import org.apache.spark.{SparkConf, SparkContext}

@@ -22,7 +22,7 @@ import org.mockito.Mockito._
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**
@@ -52,7 +52,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.anyString,
       Matchers.anyString,
       Matchers.anyString,
-      Matchers.eq[EventhubsOffsetType](EventhubsOffsetTypes.PreviousCheckpoint),
+      Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.PreviousCheckpoint),
       Matchers.anyString,
       Matchers.anyLong)
 
@@ -64,19 +64,19 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
         "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
       Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
       Matchers.eq("4"),
-      Matchers.eq(EventhubsOffsetTypes.PreviousCheckpoint),
+      Matchers.eq(EventHubsOffsetTypes.PreviousCheckpoint),
       Matchers.eq("2147483647"),
       Matchers.eq(-1L))
   }
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {
-    val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
-    ehParams2("eventhubs.consumergroup") = "$consumergroup"
+    var ehParams2 = ehParams
+    ehParams2 += "eventhubs.consumergroup" -> "$consumergroup"
     when(offsetStoreMock.read()).thenReturn("-1")
     doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString,
       Matchers.anyString,
       Matchers.anyString,
-      Matchers.eq[EventhubsOffsetType](EventhubsOffsetTypes.None),
+      Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.None),
       Matchers.anyString,
       Matchers.anyLong)
     ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
@@ -86,20 +86,20 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
         "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
       Matchers.eq("$consumergroup"),
       Matchers.eq("4"),
-      Matchers.eq(EventhubsOffsetTypes.None),
+      Matchers.eq(EventHubsOffsetTypes.None),
       Matchers.eq("-1"),
       Matchers.eq(-1L))
   }
 
   test("EventHubsClientWrapper converts parameters for enqueuetime filter") {
-    val ehParams2 = collection.mutable.Map[String, String]() ++= ehParams
-    ehParams2("eventhubs.filter.enqueuetime") = "1433887583"
+    var ehParams2 = ehParams
+    ehParams2 += "eventhubs.filter.enqueuetime" -> "1433887583"
     when(offsetStoreMock.read()).thenReturn("-1")
     doNothing().when(ehClientWrapperMock).createReceiverInternal(
       Matchers.anyString,
       Matchers.anyString,
       Matchers.anyString,
-      Matchers.eq[EventhubsOffsetType](EventhubsOffsetTypes.InputTimeOffset),
+      Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.InputTimeOffset),
       Matchers.anyString,
       Matchers.anyLong)
 
@@ -111,7 +111,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
         "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
       Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
       Matchers.eq("4"),
-      Matchers.eq(EventhubsOffsetTypes.InputTimeOffset),
+      Matchers.eq(EventHubsOffsetTypes.InputTimeOffset),
       Matchers.eq("1433887583"),
       Matchers.eq(-1L))
   }

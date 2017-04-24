@@ -18,13 +18,12 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.net.SocketTimeoutException
-import java.time.Duration
-import java.util.concurrent.Executors
+import java.time.{Duration, Instant}
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Success}
 import scala.xml.XML
 
 import com.microsoft.azure.servicebus.SharedAccessSignatureTokenProvider
@@ -136,9 +135,9 @@ private[eventhubs] class RestfulEventHubClient(
             throw e
         }
       }
-      val endpointOffset = fromResponseBodyToResult(response.body)
-      logDebug(s"latest offset of $ehNameAndPartition: $endpointOffset")
-      (ehNameAndPartition, endpointOffset)
+      val results = fromResponseBodyToResult(response.body)
+      logDebug(s"latest offset of $ehNameAndPartition: $results")
+      (ehNameAndPartition, results)
     }
   }
 
@@ -165,12 +164,34 @@ private[eventhubs] class RestfulEventHubClient(
     // empty
   }
 
+  /**
+   * return highest offset/seq and latest enqueueTime of each partition
+   */
   override def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     queryPartitionRuntimeInfo(targetEventHubsNameAndPartitions,
       fromResponseBodyToEndpoint, retryIfFail)
+  }
+
+  private def fromResponseBodyToEnqueueTime(responseBody: String): Long = {
+    val partitionDescription = XML.loadString(responseBody) \\ "entry" \
+      "content" \ "PartitionDescription"
+    Instant.parse((partitionDescription \ "LastEnqueuedTimeUtc").text).getEpochSecond
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+  Option[Map[EventHubNameAndPartition, Long]] = {
+    queryPartitionRuntimeInfo(targetEventHubNameAndPartitions,
+      fromResponseBodyToEnqueueTime, retryIfFail)
   }
 }
 

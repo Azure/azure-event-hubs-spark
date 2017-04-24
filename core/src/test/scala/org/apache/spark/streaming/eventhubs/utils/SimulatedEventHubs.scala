@@ -18,16 +18,33 @@
 package org.apache.spark.streaming.eventhubs.utils
 
 import scala.collection.mutable.ListBuffer
-import scala.reflect.ClassTag
 
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper, TestEventHubOutputStream}
+import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes.EventHubsOffsetType
+
 
 private[eventhubs] class SimulatedEventHubs(
     namespace: String,
     val messagesStore: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
+
+  def searchWithTime(
+      eventHubsNamedPartition: EventHubNameAndPartition,
+      enqueueTime: Long,
+      eventCount: Int): List[EventData] = {
+    val resultData = new ListBuffer[EventData]
+    for (msg <- messagesStore(eventHubsNamedPartition)) {
+      if (resultData.length >= eventCount) {
+        return resultData.toList
+      }
+      if (msg.getSystemProperties.getEnqueuedTime.getEpochSecond >= enqueueTime) {
+        resultData += msg
+      }
+    }
+    resultData.toList
+  }
 
   def search(ehPartition: EventHubNameAndPartition, offset: Int, eventNum: Int):
       List[EventData] = {
@@ -48,26 +65,48 @@ private[eventhubs] class TestEventHubsReceiver(
     eventHubParameters: Map[String, String],
     eventHubs: SimulatedEventHubs,
     partitionId: Int,
-    startOffset: Long)
-  extends EventHubsClientWrapper {
+    startOffset: Long,
+    offsetType: EventHubsOffsetType) extends EventHubsClientWrapper {
 
   val eventHubName = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")
-    eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
-      expectedEventNum)
+    if (offsetType != EventHubsOffsetTypes.InputTimeOffset) {
+      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
+        expectedEventNum)
+    } else {
+      eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
+        eventHubParameters("eventhubs.filter.enqueuetime").toLong, expectedEventNum)
+    }
   }
 }
 
 private[eventhubs] class TestRestEventHubClient(
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)]) extends EventHubClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
     Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    Some(latestRecords)
+    Some(latestRecords.map{case (ehNameAndPartition, (offset, seq, _)) =>
+      (ehNameAndPartition, (offset, seq))})
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, latestRecords(ehNameAndPartition)._3)
+    }.toMap)
   }
 
   override def close(): Unit = {}
@@ -89,6 +128,18 @@ private[eventhubs] class FragileEventHubClient private extends EventHubClient {
     } else {
       Some(latestRecords)
     }
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 
   override def close(): Unit = {}
@@ -130,6 +181,18 @@ private[eventhubs] class FluctuatedEventHubClient(
     } else {
       Some(latestRecords)
     }
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 
   override def close(): Unit = {}

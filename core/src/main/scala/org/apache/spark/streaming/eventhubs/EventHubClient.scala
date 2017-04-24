@@ -29,6 +29,15 @@ private[eventhubs] trait EventHubClient extends Serializable {
     Option[Map[EventHubNameAndPartition, (Long, Long)]]
 
   /**
+   * return the last enqueueTime of each partition
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]]
+
+  /**
    * close this client
    */
   def close(): Unit

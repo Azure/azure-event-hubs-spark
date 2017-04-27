@@ -21,15 +21,19 @@ package org.apache.spark.eventhubscommon.progress
  * this class represent the record written by ProgressWriter and read by ProgressTracker
  * this class is supposed to only be used by the classes within checkpoint package
  *
- * uid in DirectDStream refers to namespace and in Structured Streaming refers to "namespace_name"
+ * uid in DirectDStream refers to namespace and in Structured Streaming refers to
+ * "namespace_name_streamid"
  *
  * timestamp in DirectDStream refers to the batch time, and in Structured Streaming refers to
  * BatchID
  *
  */
 private[spark] case class ProgressRecord(
-    timestamp: Long, uid: String,
-    eventHubName: String, partitionId: Int, offset: Long,
+    timestamp: Long,
+    uid: String,
+    eventHubName: String,
+    partitionId: Int,
+    offset: Long,
     seqId: Long) {
   override def toString: String = {
     s"$timestamp $uid $eventHubName $partitionId $offset $seqId"

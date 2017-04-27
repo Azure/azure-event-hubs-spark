@@ -33,11 +33,12 @@ private[spark] object PathTools extends Serializable {
     s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}_temp"
   }
 
-  def progressTempFileStr(basePath: String,
-                          streamId: Int,
-                          uid: String,
-                          eventHubNameAndPartition: EventHubNameAndPartition,
-                          timestamp: Long): String = {
+  def progressTempFileStr(
+      basePath: String,
+      streamId: Int,
+      uid: String,
+      eventHubNameAndPartition: EventHubNameAndPartition,
+      timestamp: Long): String = {
     basePath + s"/$streamId-$uid-$eventHubNameAndPartition-$timestamp"
   }
 }

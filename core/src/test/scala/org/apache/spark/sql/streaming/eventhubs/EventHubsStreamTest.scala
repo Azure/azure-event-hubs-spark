@@ -15,11 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming
+package org.apache.spark.sql.streaming.eventhubs
 
 import java.lang.Thread.UncaughtExceptionHandler
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -27,21 +26,26 @@ import scala.language.experimental.macros
 import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.control.NonFatal
-import org.scalatest.{Assertions, BeforeAndAfter}
-import org.scalatest.concurrent.{Eventually, Timeouts}
+
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
+import org.scalatest.concurrent.{Eventually, Timeouts}
 import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
+import org.scalatest.{Assertions, BeforeAndAfter}
+
 import org.apache.spark.eventhubscommon.utils._
-import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder, encoderFor}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
-import org.apache.spark.sql.streaming.eventhubs.{EventHubsAddData, EventHubsBatchRecord, EventHubsSource, StreamAction}
+import org.apache.spark.sql.streaming._
+import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
 import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
 
 /**
@@ -137,7 +141,10 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   }
 
   /** Stops the stream. It must currently be running. */
-  case object StopStream extends StreamAction with StreamMustBeRunning
+  case class StopStream(recoverStreamId: Boolean = false,
+                        commitOffset: Boolean = false,
+                        commitPartialOffset: Boolean = false)
+    extends StreamAction with StreamMustBeRunning
 
   /** Starts the stream, resuming if data has already been processed. It must not be running. */
   case class StartStream(trigger: Trigger = ProcessingTime(0),
@@ -297,6 +304,32 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
          """.stripMargin)
     }
 
+    def searchCurrentSource(): EventHubsSource = {
+      val sources = currentStream.logicalPlan.collect {
+        case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
+          source.asInstanceOf[EventHubsSource]
+      }
+
+      if (sources.isEmpty) {
+        throw new Exception("Could not find EventHubs source in the StreamExecution" +
+          " logical plan to add data to")
+      } else if (sources.size > 1) {
+        throw new Exception("Could not select the EventHubs source in the StreamExecution " +
+          "logical plan as there" +
+          "are multiple EventHubs sources:\n\t" + sources.mkString("\n\t"))
+      }
+      sources.head
+    }
+
+    def createBrokenProgressFile(pathStr: String, timestamp: Long): Unit = {
+      val path = new Path(pathStr)
+      val fs = path.getFileSystem(new Configuration())
+      val fsos = fs.create(new Path(pathStr + s"/progress-$timestamp"), true)
+      // TODO: separate createBrokenProgressFile from StopStream action
+      fsos.writeBytes(s"$timestamp ns1_eh1_23 eh1 1 499 499")
+      fsos.close()
+    }
+
     val metadataRoot = Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath
     var manualClockExpectedTime = -1L
     try {
@@ -352,20 +385,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               asInstanceOf[mutable.HashMap[UUID, StreamingQuery]]
             activeQueries += currentStream.id -> currentStream
 
-            val sources = currentStream.logicalPlan.collect {
-              case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
-                source.asInstanceOf[EventHubsSource]
-            }
-
-            if (sources.isEmpty) {
-              throw new Exception("Could not find EventHubs source in the StreamExecution" +
-                " logical plan to add data to")
-            } else if (sources.size > 1) {
-              throw new Exception("Could not select the EventHubs source in the StreamExecution " +
-                "logical plan as there" +
-                "are multiple EventHubs sources:\n\t" + sources.mkString("\n\t"))
-            }
-            val eventHubsSource = sources.head
+            val eventHubsSource = searchCurrentSource()
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
 
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
@@ -374,13 +394,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                startOffset: Long, _: Int) => new TestEventHubsReceiver(eventHubsParameters,
                 eventHubs, partitionId, startOffset)
             )
-
-            currentStream.microBatchThread.setUncaughtExceptionHandler(
-              new UncaughtExceptionHandler {
-                override def uncaughtException(t: Thread, e: Throwable): Unit = {
-                  streamDeathCause = e
-                }
-              })
             println(s"checkpoint dir: stream ${currentStream.id}" +
               s" ${currentStream.offsetLog.metadataPath}")
 
@@ -405,13 +418,25 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               s"Unexpected clock time after updating: " +
                 s"expecting $manualClockExpectedTime, current ${clock.getTimeMillis()}")
 
-            val sources = currentStream.logicalPlan.collect {
-              case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
-                source.asInstanceOf[EventHubsSource]
-            }.head
-
-          case StopStream =>
+          case StopStream(recoverStreamId: Boolean, commitOffset: Boolean,
+            commitPartialOffset: Boolean) =>
             verify(currentStream != null, "can not stop a stream that is not running")
+            require(!(commitOffset && commitPartialOffset),
+              "cannot set both of commitOffset and commitPartialOffset as true")
+            if (recoverStreamId) {
+              EventHubsSource.streamIdGenerator.decrementAndGet()
+            }
+            if (commitOffset) {
+              val source = searchCurrentSource()
+              source.collectFinishedBatchOffsetsAndCommit(
+                source.committedOffsetsAndSeqNums.batchId + 1)
+            }
+            if (commitPartialOffset) {
+              val source = searchCurrentSource()
+              val progressTracker = StructuredStreamingProgressTracker.getInstance(source.uid)
+              createBrokenProgressFile(progressTracker.progressDirectoryPath.toString,
+                source.committedOffsetsAndSeqNums.batchId + 1)
+            }
             try failAfter(streamingTimeout) {
               currentStream.stop()
               verify(!currentStream.microBatchThread.isAlive,
@@ -527,11 +552,9 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               } catch {
                 case e: Exception =>
                   e.printStackTrace()
-                  println(currentStream.committedOffsets)
                   throw e
               }
             }
-
             val sparkAnswer = try if (lastOnly) sink.latestBatchData else sink.allData catch {
               case e: Exception =>
                 failTest("Exception while getting data from sink", e)
@@ -549,8 +572,16 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
       case _: org.scalatest.exceptions.TestFailedDueToTimeoutException =>
         failTest("Timed out waiting for stream")
     } finally {
-      if (currentStream != null && currentStream.microBatchThread.isAlive) {
-        currentStream.stop()
+      try {
+        failAfter(streamingTimeout) {
+          if (currentStream != null && currentStream.microBatchThread.isAlive) {
+            currentStream.stop()
+          }
+        }
+      } catch {
+        case e: Exception =>
+          e.printStackTrace()
+          failTest(s"cannot stop currentStream at ${currentStream.triggerClock.getTimeMillis()}")
       }
 
       // Rollback prev configuration values
@@ -624,7 +655,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
 
           case _ => // StopStream
             addCheck()
-            actions += StopStream
+            actions += StopStream()
             running = false
         }
       }

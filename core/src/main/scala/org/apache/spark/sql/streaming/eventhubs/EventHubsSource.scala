@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, RateControlUtils}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -103,7 +103,7 @@ private[spark] class EventHubsSource(
   // the flag to avoid committing in the first batch
   private[spark] var firstBatch = true
   // the offsets which have been to the self-managed offset store
-  private var committedOffsetsAndSeqNums: EventHubsOffset =
+  private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
   // the highest offsets in EventHubs side
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
@@ -118,7 +118,8 @@ private[spark] class EventHubsSource(
         null
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
-      }, committedOffsetsAndSeqNums.offsets) match {
+      },
+      committedOffsetsAndSeqNums.offsets) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = EventHubsOffset(committedOffsetsAndSeqNums.batchId,
           highestOffsets)
@@ -134,10 +135,10 @@ private[spark] class EventHubsSource(
   }
 
   /**
-    * when we have reached the end of the message queue in the remote end or we haven't get any
-    * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
-    * to prevent us from dying too much, we shall retry with 2-power interval in this case
-    */
+   * when we have reached the end of the message queue in the remote end or we haven't get any
+   * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
+   * to prevent us from dying too much, we shall retry with 2-power interval in this case
+   */
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
@@ -166,31 +167,32 @@ private[spark] class EventHubsSource(
       " eventhubs")
     if (!firstBatch) {
       // committedOffsetsAndSeqNums.batchId is always no larger than the latest finished batch id
-      val lastCommitedBatchId = committedOffsetsAndSeqNums.batchId
-      collectFinishedBatchOffsetsAndCommit(lastCommitedBatchId + 1)
+      val lastCommittedBatchId = committedOffsetsAndSeqNums.batchId
+      collectFinishedBatchOffsetsAndCommit(lastCommittedBatchId + 1)
       // after the previous call the batch id of committedOffsetsAndSeqNums has been incremented
-      // with one
-      cleanupFiles(lastCommitedBatchId)
+      // with one, we are safe to clean the progress files which have been committed before the last
+      // finished batch
+      cleanupFiles(lastCommittedBatchId)
     } else {
       firstBatch = false
     }
     val targetOffsets = RateControlUtils.clamp(committedOffsetsAndSeqNums.offsets,
       highestOffsetsOpt.get, parameters)
-    val a = Some(EventHubsBatchRecord(committedOffsetsAndSeqNums.batchId + 1,
+    Some(EventHubsBatchRecord(committedOffsetsAndSeqNums.batchId + 1,
       targetOffsets.map{case (ehNameAndPartition, seqNum) =>
         (ehNameAndPartition, math.min(seqNum,
           fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2))}))
-    a
   }
 
   /**
     * collect the ending offsets/seq from executors to driver and commit
     */
-  private def collectFinishedBatchOffsetsAndCommit(committedBatchId: Long): Unit = {
+  private[eventhubs] def collectFinishedBatchOffsetsAndCommit(committedBatchId: Long): Unit = {
     committedOffsetsAndSeqNums = fetchEndingOffsetOfLastBatch(committedBatchId)
+    println(s"committed ${committedOffsetsAndSeqNums}")
     // we have two ways to handle the failure of commit and precommit:
     // First, we will validate the progress file and overwrite the corrupted progress file when
-    // progressTracker is created; Second, to handle the case that we fail before we event create
+    // progressTracker is created; Second, to handle the case that we fail before we create
     // a file, we need to read the latest progress file in the directory and see if we have commit
     // the offsests (check if the timestamp matches) and then collect the files if necessary
     progressTracker.commit(Map(uid -> committedOffsetsAndSeqNums.offsets), committedBatchId)
@@ -258,9 +260,20 @@ private[spark] class EventHubsSource(
     sqlContext.createDataFrame(rowRDD, schema)
   }
 
+  private def validateReadResults(readProgress: OffsetRecord): Boolean = {
+    readProgress.offsets.keySet == connectedInstances.toSet
+  }
+
   private def readProgress(batchId: Long): EventHubsOffset = {
-    val progress = progressTracker.read(uid, batchId, fallBack = false)
-    EventHubsOffset(batchId, progress.offsets)
+    val nextBatchId = batchId + 1
+    val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
+    if (progress.timestamp.milliseconds == -1 || !validateReadResults(progress)) {
+      // next batch hasn't been committed
+      val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
+      EventHubsOffset(batchId, lastCommittedOffset.offsets)
+    } else {
+      EventHubsOffset(nextBatchId, progress.offsets)
+    }
   }
 
   private def recoverFromFailure(start: Option[Offset], end: Offset): Unit = {
@@ -284,6 +297,7 @@ private[spark] class EventHubsSource(
       collectFinishedBatchOffsetsAndCommit(recoveredCommittedBatchId)
     } else {
       committedOffsetsAndSeqNums = latestProgress
+      println(s"===update committedOffsetsAndSeqNums as $committedOffsetsAndSeqNums")
     }
     logInfo(s"recovered from a failure, startOffset: $start, endOffset: $end")
     val highestOffsets = composeHighestOffset(failAppIfRestEndpointFail)

@@ -25,8 +25,8 @@ import org.apache.spark.internal.Logging
 private[spark] object RateControlUtils extends Logging {
 
   private def maxRateLimitPerPartition(
-                                        eventHubName: String,
-                                        eventhubsParams: Map[String, _]): Int = {
+      eventHubName: String,
+      eventhubsParams: Map[String, _]): Int = {
     val maxRate = eventhubsParams.get(eventHubName) match {
       case Some(eventHubsConfigEntries) =>
         // this part shall be called by direct dstream where the parameters are indexed by eventhubs
@@ -50,9 +50,9 @@ private[spark] object RateControlUtils extends Logging {
     * @param highestEndpoints the latest offset/seq of each partition
     */
   private def defaultRateControl(
-                      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
-                      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-                      eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
+      eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
     highestEndpoints.map{
       case (eventHubNameAndPar, (_, latestSeq)) =>
         val maximumAllowedMessageCnt = maxRateLimitPerPartition(
@@ -63,8 +63,8 @@ private[spark] object RateControlUtils extends Logging {
     }
   }
 
-  private[spark]
-  def clamp(currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
+  private[spark] def clamp(
+      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
       highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
       eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
     defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, eventhubsParams)

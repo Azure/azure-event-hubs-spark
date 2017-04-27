@@ -19,7 +19,7 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import scala.reflect.ClassTag
 
-import org.apache.spark.eventhubscommon.utils.{EventHubsTestUtilities, SimulatedEventHubs}
+import org.apache.spark.eventhubscommon.utils.EventHubsTestUtilities
 import org.apache.spark.sql.execution.streaming._
 
 /** A trait for actions that can be performed while testing a streaming DataFrame. */
@@ -54,12 +54,12 @@ trait EventHubsAddData extends StreamAction with Serializable {
 }
 
 case class AddEventHubsData[T: ClassTag, U: ClassTag](
-     eventHubsParameters: Map[String, String], highestBatchId: Long = 0,
+     eventHubsParameters: Map[String, String],
+     highestBatchId: Long = 0,
      eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])])
   extends EventHubsAddData {
 
   override def addData(query: Option[StreamExecution]): (Source, Offset) = {
-
     val sources = query.get.logicalPlan.collect {
       case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
         source.asInstanceOf[EventHubsSource]
@@ -72,15 +72,12 @@ case class AddEventHubsData[T: ClassTag, U: ClassTag](
         "Could not select the EventHubs source in the StreamExecution logical plan as there" +
           "are multiple EventHubs sources:\n\t" + sources.mkString("\n\t"))
     }
-
     val eventHubsSource = sources.head
     val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(eventHubsParameters)
-
     EventHubsTestUtilities.addEventsToEventHubs(eventHubs, eventPayloadsAndProperties)
-
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
-
-    val targetOffsetPerPartition = highestOffsetPerPartition.map(x => x._1 -> x._2._2)
+    val targetOffsetPerPartition = highestOffsetPerPartition.map{
+      case (ehNameAndPartition, (offset, _)) => (ehNameAndPartition, offset)}
     val eventHubsBatchRecord = EventHubsBatchRecord(highestBatchId, targetOffsetPerPartition)
     (eventHubsSource, eventHubsBatchRecord)
   }

@@ -369,7 +369,6 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
       () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))
 
-
     ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
       _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =
       OffsetRecord(Time(2000L), Map(EventHubNameAndPartition("eh1", 0) -> (1L, 1L),

@@ -17,10 +17,7 @@
 
 package org.apache.spark.eventhubscommon.utils
 
-import java.time.Instant
 import java.util.Calendar
-
-import scala.reflect.ClassTag
 
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
@@ -30,7 +27,7 @@ import org.powermock.reflect.Whitebox
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
-object EventHubsTestUtilities extends Logging {
+private[spark] object EventHubsTestUtilities extends Logging {
 
   def simulateEventHubs[T, U](
      eventHubsParameters: Map[String, String],
@@ -40,18 +37,14 @@ object EventHubsTestUtilities extends Logging {
     assert(eventHubsParameters.nonEmpty)
 
     // Round-robin allocation of payloads to partitions
-
     val eventHubsNamespace = eventHubsParameters("eventhubs.namespace")
     val eventHubsName = eventHubsParameters("eventhubs.name")
-
     val eventHubsPartitionList = {
       for (i <- 0 until eventHubsParameters("eventhubs.partition.count").toInt)
         yield EventHubNameAndPartition(eventHubsName, i)
     }
-
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList.map(x => x -> 0).toMap,
       eventPayloadsAndProperties)
-
     simulatedEventHubs = new SimulatedEventHubs(eventHubsNamespace, payloadPropertyStore)
 
     simulatedEventHubs
@@ -85,9 +78,9 @@ object EventHubsTestUtilities extends Logging {
   }
 
   private def roundRobinAllocation[T, U](
-    eventHubsPartitionOffsetMap: Map[EventHubNameAndPartition, Int],
-    eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])]):
-  Map[EventHubNameAndPartition, Array[EventData]] = {
+      eventHubsPartitionOffsetMap: Map[EventHubNameAndPartition, Int],
+      eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])]):
+    Map[EventHubNameAndPartition, Array[EventData]] = {
 
     val eventHubsPartitionList : Seq[EventHubNameAndPartition] =
       eventHubsPartitionOffsetMap.keys.toSeq
@@ -116,7 +109,6 @@ object EventHubsTestUtilities extends Logging {
   private def generateEventData[T, U](
       payloadPropertyBag: Seq[(T, Seq[U])],
       partitionId: Int, startingOffset: Int): Array[EventData] = {
-
     var queueOffset = startingOffset
     var eventIndex = 0
     val eventDataArray = new Array[EventData](payloadPropertyBag.length)
@@ -135,10 +127,8 @@ object EventHubsTestUtilities extends Logging {
         publisherName.toString)
       systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
         Calendar.getInstance().getTime)
-
       val systemProperties = new SystemProperties(systemPropertiesMap)
       Whitebox.setInternalState(eventData, "systemProperties", systemProperties.asInstanceOf[Any])
-
       for (property <- properties) {
         property match {
           case p@Tuple2(_, _) =>
@@ -147,9 +137,7 @@ object EventHubsTestUtilities extends Logging {
             eventData.getProperties.put("output", property.asInstanceOf[AnyRef])
         }
       }
-
       eventDataArray(eventIndex) = eventData
-
       queueOffset += 1
       eventIndex += 1
     }

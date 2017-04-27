@@ -34,7 +34,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Import the members of this object to enable the use of the unionedEventhubStream and
  * eventhubStream methods on the StreamingContext instead of the EventHubsUtils class.
  */
-private[spark] object Implicits {
+private[eventhubscommon] object Implicits {
 
   // will be used to execute requests to EventHub
   implicit val exec = ExecutionContext.

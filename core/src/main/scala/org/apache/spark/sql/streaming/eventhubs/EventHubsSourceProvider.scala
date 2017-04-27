@@ -29,19 +29,19 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
   override def shortName(): String = "eventhubs"
 
   override def sourceSchema(
-                             sqlContext: SQLContext,
-                             schema: Option[StructType],
-                             providerName: String,
-                             parameters: Map[String, String]): (String, StructType) = {
+      sqlContext: SQLContext,
+      schema: Option[StructType],
+      providerName: String,
+      parameters: Map[String, String]): (String, StructType) = {
     (shortName(), EventHubsSourceProvider.sourceSchema(parameters))
   }
 
   override def createSource(
-                             sqlContext: SQLContext,
-                             metadataPath: String,
-                             schema: Option[StructType],
-                             providerName: String,
-                             parameters: Map[String, String]): Source = {
+      sqlContext: SQLContext,
+      metadataPath: String,
+      schema: Option[StructType],
+      providerName: String,
+      parameters: Map[String, String]): Source = {
     // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
     // eventhubClientCreator
     new EventHubsSource(sqlContext, parameters)
@@ -66,9 +66,6 @@ private[sql] object EventHubsSourceProvider extends Serializable {
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
     val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
-    // in this phase, we shall include the system properties as well as the ones defined in the
-    // application properties
-    // TODO: do we need to add body length?
     StructType(Seq(
       StructField("body", BinaryType),
       StructField("offset", LongType),

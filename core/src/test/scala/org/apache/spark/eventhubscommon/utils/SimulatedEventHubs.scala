@@ -62,11 +62,10 @@ class TestEventHubsReceiver(
     startOffset: Long)
   extends EventHubsClientWrapper {
 
-  val eventHubName: String = eventHubParameters("eventhubs.name")
+  val eventHubName = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")
-
     eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
       expectedEventNum)
   }
@@ -75,10 +74,9 @@ class TestEventHubsReceiver(
 class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends EventHubClient {
 
   override def endPointOfPartition(
-    retryIfFail: Boolean,
-    targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-  Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
+    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     Some(eventHubs.messageStore
       .map(x => x._1 -> (x._2.length.toLong - 1, x._2.length.toLong - 1)))
   }

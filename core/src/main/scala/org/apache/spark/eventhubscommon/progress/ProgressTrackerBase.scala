@@ -55,10 +55,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   protected def allEventNameAndPartitionExist(
       candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
-    println("======" + eventHubNameAndPartitions + "======")
     eventHubNameAndPartitions.forall{
       case (uid, ehNameAndPartitions) =>
-        println(s"${ehNameAndPartitions == null} $candidateEhNameAndPartitions")
         candidateEhNameAndPartitions.contains(uid) &&
           ehNameAndPartitions.forall(candidateEhNameAndPartitions(uid).contains)
     }
@@ -166,7 +164,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   /**
-   * pinpoint the progress file named "progress-timestamp"
+   * pinpoint the progress file named as "progress-timestamp"
    */
   private[spark] def pinPointProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {

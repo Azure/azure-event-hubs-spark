@@ -111,10 +111,11 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
       currentOffset, receiverEpoch)
   }
 
-  def createReceiver(eventhubsParams: Map[String, String],
-                     partitionId: String,
-                     offsetStore: OffsetStore,
-                     maximumEventRate: Int): Unit = {
+  def createReceiver(
+      eventhubsParams: Map[String, String],
+      partitionId: String,
+      offsetStore: OffsetStore,
+      maximumEventRate: Int): Unit = {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
       eventhubsParams)
     val (offsetType, currentOffset) = configureStartOffset(eventhubsParams, offsetStore)
@@ -124,12 +125,12 @@ class EventHubsClientWrapper extends Serializable with EventHubClient {
   }
 
   private[spark] def createReceiverInternal(
-                             connectionString: String,
-                             consumerGroup: String,
-                             partitionId: String,
-                             offsetType: EventhubsOffsetType,
-                             currentOffset: String,
-                             receiverEpoch: Long): Unit = {
+      connectionString: String,
+      consumerGroup: String,
+      partitionId: String,
+      offsetType: EventhubsOffsetType,
+      currentOffset: String,
+      receiverEpoch: Long): Unit = {
     // Create Eventhubs client
     eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString)
 

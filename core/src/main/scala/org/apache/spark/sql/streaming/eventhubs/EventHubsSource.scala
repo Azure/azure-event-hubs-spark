@@ -191,7 +191,6 @@ private[spark] class EventHubsSource(
     */
   private[eventhubs] def collectFinishedBatchOffsetsAndCommit(committedBatchId: Long): Unit = {
     committedOffsetsAndSeqNums = fetchEndingOffsetOfLastBatch(committedBatchId)
-    println(s"committed ${committedOffsetsAndSeqNums}")
     // we have two ways to handle the failure of commit and precommit:
     // First, we will validate the progress file and overwrite the corrupted progress file when
     // progressTracker is created; Second, to handle the case that we fail before we create
@@ -299,7 +298,6 @@ private[spark] class EventHubsSource(
       collectFinishedBatchOffsetsAndCommit(recoveredCommittedBatchId)
     } else {
       committedOffsetsAndSeqNums = latestProgress
-      println(s"===update committedOffsetsAndSeqNums as $committedOffsetsAndSeqNums")
     }
     logInfo(s"recovered from a failure, startOffset: $start, endOffset: $end")
     val highestOffsets = composeHighestOffset(failAppIfRestEndpointFail)

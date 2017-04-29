@@ -29,23 +29,23 @@ import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.scalatest.{Assertions, BeforeAndAfter}
+import org.scalatest.concurrent.{Eventually, Timeouts}
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.concurrent.{Eventually, Timeouts}
 import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
-import org.scalatest.{Assertions, BeforeAndAfter}
 
 import org.apache.spark.eventhubscommon.utils._
-import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder, encoderFor}
+import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming._
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
 import org.apache.spark.sql.test.SharedSQLContext
-import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
 
 /**
@@ -76,6 +76,13 @@ import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
 trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   with SharedSQLContext with Timeouts with Serializable {
 
+  protected val tempRoot = "/tmp"
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    FileSystem.get(new Configuration()).delete(new Path(s"$tempRoot/test-sql-context"), true)
+  }
+
   /** How long to wait for an active stream to catch up when checking a result. */
   val streamingTimeout = 60.seconds
 
@@ -101,6 +108,15 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
     * This operation automatically blocks until all added data has been processed.
     */
   object CheckAnswer {
+    def apply[A : Encoder](isSort: Boolean, data: A*): CheckAnswerRows = {
+      val encoder = encoderFor[A]
+      val toExternalRow = RowEncoder(encoder.schema).resolveAndBind()
+      CheckAnswerRows(
+        data.map(d => toExternalRow.fromRow(encoder.toRow(d))),
+        lastOnly = false,
+        isSorted = isSort)
+    }
+
     def apply[A : Encoder](data: A*): CheckAnswerRows = {
       val encoder = encoderFor[A]
       val toExternalRow = RowEncoder(encoder.schema).resolveAndBind()
@@ -143,7 +159,8 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   /** Stops the stream. It must currently be running. */
   case class StopStream(recoverStreamId: Boolean = false,
                         commitOffset: Boolean = false,
-                        commitPartialOffset: Boolean = false)
+                        commitPartialOffset: Boolean = false,
+                        partialType: String = "delete")
     extends StreamAction with StreamMustBeRunning
 
   /** Starts the stream, resuming if data has already been processed. It must not be running. */
@@ -321,13 +338,17 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
       sources.head
     }
 
-    def createBrokenProgressFile(pathStr: String, timestamp: Long): Unit = {
+    def createBrokenProgressFile(pathStr: String, timestamp: Long, brokenType: String): Unit = {
       val path = new Path(pathStr)
       val fs = path.getFileSystem(new Configuration())
-      val fsos = fs.create(new Path(pathStr + s"/progress-$timestamp"), true)
-      // TODO: separate createBrokenProgressFile from StopStream action
-      fsos.writeBytes(s"$timestamp ns1_eh1_23 eh1 1 499 499")
-      fsos.close()
+      if (brokenType == "partial") {
+        val fsos = fs.create(new Path(pathStr + s"/progress-$timestamp"), true)
+        // TODO: separate createBrokenProgressFile from StopStream action
+        fsos.writeBytes(s"$timestamp ns1_eh1_23 eh1 1 499 499")
+        fsos.close()
+      } else {
+        fs.delete(new Path(pathStr + s"/progress-$timestamp"), true)
+      }
     }
 
     val metadataRoot = Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath
@@ -386,6 +407,9 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             activeQueries += currentStream.id -> currentStream
 
             val eventHubsSource = searchCurrentSource()
+            val progressTracker = StructuredStreamingProgressTracker.getInstance(
+              eventHubsSource.uid)
+
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
 
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
@@ -394,9 +418,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                startOffset: Long, _: Int) => new TestEventHubsReceiver(eventHubsParameters,
                 eventHubs, partitionId, startOffset)
             )
-            println(s"checkpoint dir: stream ${currentStream.id}" +
-              s" ${currentStream.offsetLog.metadataPath}")
-
             currentStream.start()
 
           case AdvanceManualClock(timeToAdd) =>
@@ -419,26 +440,26 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                 s"expecting $manualClockExpectedTime, current ${clock.getTimeMillis()}")
 
           case StopStream(recoverStreamId: Boolean, commitOffset: Boolean,
-            commitPartialOffset: Boolean) =>
+            commitPartialOffset: Boolean, partialType: String) =>
             verify(currentStream != null, "can not stop a stream that is not running")
             require(!(commitOffset && commitPartialOffset),
               "cannot set both of commitOffset and commitPartialOffset as true")
             if (recoverStreamId) {
               EventHubsSource.streamIdGenerator.decrementAndGet()
             }
-            if (commitOffset) {
-              val source = searchCurrentSource()
-              source.collectFinishedBatchOffsetsAndCommit(
-                source.committedOffsetsAndSeqNums.batchId + 1)
-            }
-            if (commitPartialOffset) {
-              val source = searchCurrentSource()
-              val progressTracker = StructuredStreamingProgressTracker.getInstance(source.uid)
-              createBrokenProgressFile(progressTracker.progressDirectoryPath.toString,
-                source.committedOffsetsAndSeqNums.batchId + 1)
-            }
             try failAfter(streamingTimeout) {
               currentStream.stop()
+              if (commitOffset) {
+                val source = searchCurrentSource()
+                source.collectFinishedBatchOffsetsAndCommit(
+                  source.committedOffsetsAndSeqNums.batchId + 1)
+              }
+              if (commitPartialOffset) {
+                val source = searchCurrentSource()
+                val progressTracker = StructuredStreamingProgressTracker.getInstance(source.uid)
+                createBrokenProgressFile(progressTracker.progressDirectoryPath.toString,
+                  source.committedOffsetsAndSeqNums.batchId + 1, partialType)
+              }
               verify(!currentStream.microBatchThread.isAlive,
                 s"microbatch thread not stopped")
               verify(!currentStream.isActive,
@@ -523,7 +544,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               }
 
               // Store the expected offset of added data to wait for it later
-              println(s"=====expected ${offset.asInstanceOf[EventHubsBatchRecord]}")
               awaiting.put(sourceIndex, offset)
             } catch {
               case NonFatal(e) =>

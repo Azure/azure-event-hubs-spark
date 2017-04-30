@@ -38,8 +38,8 @@ import org.scalatest.time.SpanSugar._
 
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming._
@@ -92,20 +92,15 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   /** A trait to mark actions that require the stream to be actively running. */
   trait StreamMustBeRunning
 
-  /**
-    * Adds the given data to the stream. Subsequent check answers will block until this data has
-    * been processed.
-    */
-
   /** A trait that can be extended when testing a source. */
   trait ExternalAction extends StreamAction with Serializable {
     def runAction(): Unit
   }
 
   /**
-    * Checks to make sure that the current data stored in the sink matches the `expectedAnswer`.
-    * This operation automatically blocks until all added data has been processed.
-    */
+   * Checks to make sure that the current data stored in the sink matches the `expectedAnswer`.
+   * This operation automatically blocks until all added data has been processed.
+   */
   object CheckAnswer {
 
     def apply[A : Encoder](isSort: Boolean, data: A*): CheckAnswerRows = {
@@ -130,9 +125,9 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   }
 
   /**
-    * Checks to make sure that the current data stored in the sink matches the `expectedAnswer`.
-    * This operation automatically blocks until all added data has been processed.
-    */
+   * Checks to make sure that the current data stored in the sink matches the `expectedAnswer`.
+   * This operation automatically blocks until all added data has been processed.
+   */
   object CheckLastBatch {
     def apply[A : Encoder](data: A*): CheckAnswerRows = {
       apply(isSorted = false, data: _*)
@@ -223,12 +218,12 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
 
 
   /**
-    * Executes the specified actions on the given streaming DataFrame and provides helpful
-    * error messages in the case of failures or incorrect answers.
-    *
-    * Note that if the stream is not explicitly started before an action that requires it to be
-    * running then it will be automatically started before performing any other actions.
-    */
+   * Executes the specified actions on the given streaming DataFrame and provides helpful
+   * error messages in the case of failures or incorrect answers.
+   *
+   * Note that if the stream is not explicitly started before an action that requires it to be
+   * running then it will be automatically started before performing any other actions.
+   */
   def testStream(_stream: Dataset[_],
                  outputMode: OutputMode = OutputMode.Append)(actions: StreamAction*): Unit = {
 
@@ -612,13 +607,13 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   }
 
   /**
-    * Creates a stress test that randomly starts/stops/adds data/checks the result.
-    *
-    * @param ds a dataframe that executes + 1 on a stream of integers, returning the result
-    * @param addData an add data action that adds the given numbers to the stream, encoding them
-    *                as needed
-    * @param iterations the iteration number
-    */
+   * Creates a stress test that randomly starts/stops/adds data/checks the result.
+   *
+   * @param ds         a dataframe that executes + 1 on a stream of integers, returning the result
+   * @param addData    an add data action that adds the given numbers to the stream, encoding them
+   *                   as needed
+   * @param iterations the iteration number
+   */
   def runStressTest(ds: Dataset[Int],
                     addData: Seq[Int] => StreamAction,
                     iterations: Int = 100): Unit = {
@@ -626,14 +621,16 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   }
 
   /**
-    * Creates a stress test that randomly starts/stops/adds data/checks the result.
-    *
-    * @param ds a dataframe that executes + 1 on a stream of integers, returning the result
-    * @param prepareActions actions need to run before starting the stress test.
-    * @param addData an add data action that adds the given numbers to the stream, encoding them
-    *                as needed
-    * @param iterations the iteration number
-    */
+   * Creates a stress test that randomly starts/stops/adds data/checks the result.
+   *
+   * @param ds             a dataframe that executes + 1 on a stream of integers,
+   *                       returning the result
+   * @param prepareActions actions need to run before starting the stress test.
+   * @param addData        an add data action that adds the given numbers to the stream,
+   *                       encoding them
+   *                       as needed
+   * @param iterations     the iteration number
+   */
   def runStressTest(ds: Dataset[Int],
                     prepareActions: Seq[StreamAction],
                     addData: (Seq[Int], Boolean) => StreamAction,

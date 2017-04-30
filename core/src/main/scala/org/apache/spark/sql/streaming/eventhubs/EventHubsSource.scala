@@ -158,11 +158,12 @@ private[spark] class EventHubsSource(
   }
 
   /**
-    * there are two things to do in this function, first is to collect the ending offsets of last
-    * batch, so that we know the starting offset of the current batch. And then, we calculate the
-    * target seq number of the current batch
-    * @return return the target seqNum of current batch
-    */
+   * there are two things to do in this function, first is to collect the ending offsets of last
+   * batch, so that we know the starting offset of the current batch. And then, we calculate the
+   * target seq number of the current batch
+   *
+   * @return return the target seqNum of current batch
+   */
   override def getOffset: Option[Offset] = {
     val highestOffsetsOpt = composeHighestOffset(failAppIfRestEndpointFail)
     require(highestOffsetsOpt.isDefined, "cannot get highest offset from rest endpoint of" +
@@ -187,8 +188,8 @@ private[spark] class EventHubsSource(
   }
 
   /**
-    * collect the ending offsets/seq from executors to driver and commit
-    */
+   * collect the ending offsets/seq from executors to driver and commit
+   */
   private[eventhubs] def collectFinishedBatchOffsetsAndCommit(committedBatchId: Long): Unit = {
     committedOffsetsAndSeqNums = fetchEndingOffsetOfLastBatch(committedBatchId)
     // we have two ways to handle the failure of commit and precommit:

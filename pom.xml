@@ -167,9 +167,9 @@
     </profile>
   </profiles>
   <scm>
-     <connection>scm:git:git:/github.com/hdinsight/spark-eventhubs.git</connection>
-     <developerConnection>scm:git:ssh://github.com/hdinsight/spark-eventhubs.git</developerConnection>
-     <url>https://github.com/hdinsight/spark-eventhubs/tree/master</url>
+    <connection>scm:git:git:/github.com/hdinsight/spark-eventhubs.git</connection>
+    <developerConnection>scm:git:ssh://github.com/hdinsight/spark-eventhubs.git</developerConnection>
+    <url>https://github.com/hdinsight/spark-eventhubs/tree/master</url>
   </scm>
   <properties>
     <sbt.project.name>spark-streaming-eventhubs_connector</sbt.project.name>
@@ -214,6 +214,8 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_2.11</artifactId>
       <version>${spark.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>

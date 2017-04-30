@@ -46,10 +46,10 @@ object EventHubsAddData {
 /** A trait that can be extended when testing a source. */
 trait EventHubsAddData extends StreamAction with Serializable {
   /**
-    * Called to adding the data to a source. It should find the source to add data to from
-    * the active query, and then return the source object the data was added, as well as the
-    * offset of added data.
-    */
+   * Called to adding the data to a source. It should find the source to add data to from
+   * the active query, and then return the source object the data was added, as well as the
+   * offset of added data.
+   */
   def addData(query: Option[StreamExecution]): (Source, Offset)
 }
 

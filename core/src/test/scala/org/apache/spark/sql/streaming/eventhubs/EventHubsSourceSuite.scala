@@ -20,11 +20,10 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.scalatest.time.SpanSugar._
-
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, SparkSession}
-import org.apache.spark.sql.streaming.ProcessingTime
+import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
+import org.apache.spark.sql.types.{LongType, TimestampType}
 import org.apache.spark.util.Utils
 
 class EventHubsSourceSuite extends EventHubsStreamTest {
@@ -43,7 +42,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       "eventhubs.name" -> s"$name",
       "eventhubs.partition.count" -> s"$partitionCount",
       "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.progressTrackingDir" -> "/tmp",
+      "eventhubs.progressTrackingDir" -> tempRoot,
       "eventhubs.maxRate" -> s"$maxRate",
       "eventhubs.sql.containsProperties" -> s"$containsProperties"
     ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map())
@@ -235,6 +234,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
+    assert(!dataFrame.columns.contains("creationTime"))
     assert(dataFrame.columns.contains("otherUserDefinedKey"))
   }
 
@@ -480,7 +480,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
-      StopStream(recoverStreamId = true),
+      StopStream(recoverStreamId = true, commitPartialOffset = true, partialType = "delete"),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
         additionalConfs = Map("eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))
@@ -490,7 +490,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected dataframe can be retrieved when the stream is stopped after the last" +
-    " batch's offset is committed and before the data is stopped") {
+    " batch's offset is committed") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
@@ -527,12 +527,12 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
-      StopStream(recoverStreamId = true, commitPartialOffset = true),
+      StopStream(recoverStreamId = true, commitPartialOffset = true, partialType = "partial"),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
         additionalConfs = Map("eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
-    val thirdBatch = Seq(CheckAnswer(541 to 1000: _*))
+    val thirdBatch = Seq(CheckAnswer(601 to 1000: _*))
     testStream(sourceQuery)(firstBatch ++ clockMove ++ secondBatch ++ clockMove2 ++ thirdBatch: _*)
   }
 
@@ -564,5 +564,76 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       AdvanceManualClock(10),
       CheckAnswer(1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
     )
+  }
+
+  private def testDataForWindowingOperation(batchSize: Int, creationTime: Long) = {
+    for (bodyId <- 0 until batchSize)
+      yield bodyId -> Seq("creationTime" -> s"1999-12-31 00:00:$creationTime")
+  }
+
+  test("Verify expected dataframe is retrieved with windowing operation") {
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 40,
+      containsProperties = true, userDefinedKeys = Some("creationTime"))
+    val eventPayloadsAndProperties = {
+      for (time <- Range(0, 10))
+        yield testDataForWindowingOperation(100, time)
+    }.reduce((a, b) => a ++ b)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
+      eventPayloadsAndProperties)
+    val sourceQuery = spark.readStream.format("eventhubs").options(eventHubsParameters).load()
+    import sourceQuery.sparkSession.implicits._
+    import org.apache.spark.sql.functions._
+    val windowedStream = sourceQuery.groupBy(
+      window($"creationTime".cast(TimestampType),
+      "3 second",
+      "1 second")).count().sort("window").select("count")
+    val manualClock = new StreamManualClock
+    val firstBatch = Seq(StartStream(trigger = ProcessingTime(1000), triggerClock = manualClock))
+    val clockMove = Array.fill(13)(AdvanceManualClock(1000)).toSeq
+    val secondBatch = Seq(
+      AddEventHubsData(eventHubsParameters, 12),
+      CheckAnswer(true, 100, 200, 300, 300, 300, 300, 300, 300, 300, 300, 200, 100))
+    testStream(windowedStream, outputMode = OutputMode.Complete())(
+      firstBatch ++ clockMove ++ secondBatch: _*)
+  }
+
+  private def testDataForWatermark(batchSize: Int) = {
+    val normalData = {
+      for (ct <- 0 until 20)
+        yield 1 -> Seq("creationTime" -> s"1999-12-31 00:00:$ct")
+    }
+    val lateData = {
+      for (ct <- 15 until 25)
+        yield 1 -> Seq("creationTime" -> s"1999-12-31 00:00:$ct")
+    }
+    val rejectData = {
+      for (ct <- 10 until 15)
+        yield 1 -> Seq("creationTime" -> s"1999-12-31 00:00:$ct")
+    }
+    normalData ++ lateData ++ rejectData
+  }
+
+  test("Verify expected dataframe is retrieved with watermarks") {
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 1, 1,
+      containsProperties = true, userDefinedKeys = Some("creationTime"))
+    val eventPayloadsAndProperties = testDataForWatermark(2)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
+      eventPayloadsAndProperties)
+    val sourceQuery = spark.readStream.format("eventhubs").options(eventHubsParameters).load()
+    import sourceQuery.sparkSession.implicits._
+    import org.apache.spark.sql.functions._
+    val windowedStream = sourceQuery.selectExpr(
+      "CAST(creationTime AS TIMESTAMP) as creationTimeT").
+      withWatermark("creationTimeT", "5 second").
+      groupBy(window($"creationTimeT", "3 second", "1 second")).
+      count().select("count")
+    val manualClock = new StreamManualClock
+    val firstBatch = Seq(StartStream(trigger = ProcessingTime(1000), triggerClock = manualClock))
+    val clockMove = Array.fill(35)(AdvanceManualClock(1000)).toSeq
+    val secondBatch = Seq(
+      AddEventHubsData(eventHubsParameters, 35),
+      CheckAnswer(true, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 5, 6, 6))
+    testStream(windowedStream, outputMode = OutputMode.Append())(
+      firstBatch ++ clockMove ++ secondBatch: _*)
   }
 }

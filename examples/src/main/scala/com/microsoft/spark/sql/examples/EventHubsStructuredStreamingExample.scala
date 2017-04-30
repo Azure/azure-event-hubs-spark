@@ -17,8 +17,9 @@
 
 package com.microsoft.spark.sql.examples
 
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.streaming.ProcessingTime
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions._
 
 object EventHubsStructuredStreamingExample {
 
@@ -47,19 +48,19 @@ object EventHubsStructuredStreamingExample {
       "eventhubs.partition.count" -> "32",
       "eventhubs.consumergroup" -> "$Default",
       "eventhubs.progressTrackingDir" -> progressDir,
-      "eventhubs.maxRate" -> s"$maxRate"
+      "eventhubs.maxRate" -> s"$maxRate",
+      "eventhubs.sql.containsProperties" -> "true",
+      "eventhubs.sql.userDefinedKeys" -> "creationTime,randomUserProperty"
     )
 
     val sparkSession = SparkSession.builder().getOrCreate()
     val inputStream = sparkSession.readStream.format("eventhubs").options(eventhubParameters)
       .load()
-
-    val streamingQuery = inputStream.writeStream.
+    val streamingQuery1 = inputStream.writeStream.
       outputMode("append").
-      trigger(ProcessingTime("5 seconds")).
+      trigger(ProcessingTime("10 seconds")).
       option("checkpointLocation", checkpointLocation).
-      format("parquet").option("path", outputPath).partitionBy("enqueuedTime").start()
-    streamingQuery.awaitTermination()
-
+      format("parquet").option("path", outputPath + "/ETL").partitionBy("creationTime").start()
+    streamingQuery1.awaitTermination()
   }
 }

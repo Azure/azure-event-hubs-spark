@@ -140,6 +140,7 @@ private[spark] class DirectDStreamProgressTracker private[spark](
 }
 
 object DirectDStreamProgressTracker {
+
   val registeredConnectors = new ListBuffer[EventHubsConnector]
 
   private var _progressTracker: DirectDStreamProgressTracker = _

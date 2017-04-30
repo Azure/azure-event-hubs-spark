@@ -46,7 +46,6 @@ private[spark] object EventHubsTestUtilities extends Logging {
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList.map(x => x -> 0).toMap,
       eventPayloadsAndProperties)
     simulatedEventHubs = new SimulatedEventHubs(eventHubsNamespace, payloadPropertyStore)
-
     simulatedEventHubs
   }
 
@@ -81,26 +80,23 @@ private[spark] object EventHubsTestUtilities extends Logging {
       eventHubsPartitionOffsetMap: Map[EventHubNameAndPartition, Int],
       eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])]):
     Map[EventHubNameAndPartition, Array[EventData]] = {
-
-    val eventHubsPartitionList : Seq[EventHubNameAndPartition] =
-      eventHubsPartitionOffsetMap.keys.toSeq
-
+    val eventHubsPartitionList = eventHubsPartitionOffsetMap.keys.toSeq
     if (eventPayloadsAndProperties.isEmpty) {
       eventHubsPartitionList.map(x => x -> Seq.empty[EventData].toArray).toMap
     } else {
-      val eventAllocation: Seq[(EventHubNameAndPartition, Seq[(T, Seq[U])])] = {
+      val eventAllocation = {
         if (eventHubsPartitionList.length >= eventPayloadsAndProperties.length) {
           eventHubsPartitionList.zip(eventPayloadsAndProperties.map(x => Seq(x)))
         } else {
           eventPayloadsAndProperties.zipWithIndex
-            .map(x => (eventHubsPartitionList(x._2 % eventHubsPartitionList.length), x._1)).
-            groupBy(_._1).map { case (k, v) => (k, v.map(_._2)) }
+            .map(x => (eventHubsPartitionList(x._2 % eventHubsPartitionList.length), x._1))
+            .groupBy(_._1).map { case (k, v) => (k, v.map(_._2)) }
         }.toSeq
       }
       eventAllocation.map {
         case (eventHubNameAndPartition, payloadPropertyBag) =>
-          (eventHubNameAndPartition, generateEventData(payloadPropertyBag,
-            eventHubNameAndPartition.partitionId,
+          (eventHubNameAndPartition,
+            generateEventData(payloadPropertyBag, eventHubNameAndPartition.partitionId,
             eventHubsPartitionOffsetMap(eventHubNameAndPartition)))
       }.toMap
     }

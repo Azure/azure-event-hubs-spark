@@ -18,6 +18,7 @@
 package org.apache.spark.sql.streaming.eventhubs.checkpoint
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -52,6 +53,7 @@ class StructuredStreamingProgressTracker(
         if (!validationPass) {
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
+            println(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
             val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp)
             commit(progressRecords, latestFileTimestamp)

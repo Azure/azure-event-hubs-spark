@@ -39,7 +39,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 private[eventhubscommon] object Implicits {
 
   // will be used to execute requests to EventHub
-  private[eventhubs] implicit val exec = {
+  private[spark] implicit val exec = {
     val tp = new ThreadFactoryBuilder().setDaemon(true).setNameFormat("restclientthread" + "-%d").
       build()
     ExecutionContext.fromExecutor(Executors.newCachedThreadPool(tp))

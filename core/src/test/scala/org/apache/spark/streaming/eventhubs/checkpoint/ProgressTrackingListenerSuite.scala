@@ -56,9 +56,6 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     assert(fs.exists(new Path(progressTracker.progressDirectoryPath + "/progress-1000")))
     val record = progressTracker.asInstanceOf[DirectDStreamProgressTracker].read(eventhubNamespace,
       1000L, fallBack = false)
-    assert(fs.exists(new Path(progressTracker.progressDirPath + "/progress-1000")))
-    val record = progressTracker.asInstanceOf[DirectDStreamProgressTracker].read(eventhubNamespace,
-      1000L, fallBack = false)
     assert(record === OffsetRecord(Time(1000L),
       Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
         EventHubNameAndPartition("eh1", 1) -> (1L, 2L))))

@@ -65,7 +65,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
-  private val eventhubNameAndPartitions = {
+  private[eventhubs] val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;
          partitionId <- 0 until eventhubsParams(eventHubName)(
       "eventhubs.partition.count").toInt) yield EventHubNameAndPartition(eventHubName, partitionId)

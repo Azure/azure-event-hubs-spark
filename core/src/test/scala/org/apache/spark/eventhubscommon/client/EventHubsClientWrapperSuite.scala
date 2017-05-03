@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.client
 
 import com.microsoft.azure.eventhubs._
 import org.mockito.{Matchers, Mockito}
@@ -22,7 +22,7 @@ import org.mockito.Mockito._
 import org.scalatest.{BeforeAndAfter, FunSuite}
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.eventhubscommon.client.EventhubsOffsetTypes.EventhubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**

@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.client
 
-object EventhubsOffsetTypes extends Enumeration {
+private[spark] object EventhubsOffsetTypes extends Enumeration {
 
   type EventhubsOffsetType = Value
 

@@ -86,7 +86,7 @@
           <plugin>
             <groupId>com.github.github</groupId>
             <artifactId>site-maven-plugin</artifactId>
-            <version>0.11</version>
+            <version>0.12</version>
             <configuration>
               <message>Maven artifacts for ${project.version}</message>
               <noJekyll>true</noJekyll>
@@ -167,14 +167,14 @@
     </profile>
   </profiles>
   <scm>
-     <connection>scm:git:git:/github.com/hdinsight/spark-eventhubs.git</connection>
-     <developerConnection>scm:git:ssh://github.com/hdinsight/spark-eventhubs.git</developerConnection>
-     <url>https://github.com/hdinsight/spark-eventhubs/tree/master</url>
+    <connection>scm:git:git:/github.com/hdinsight/spark-eventhubs.git</connection>
+    <developerConnection>scm:git:ssh://github.com/hdinsight/spark-eventhubs.git</developerConnection>
+    <url>https://github.com/hdinsight/spark-eventhubs/tree/master</url>
   </scm>
   <properties>
     <sbt.project.name>spark-streaming-eventhubs_connector</sbt.project.name>
     <scala.binary.version>2.11</scala.binary.version>
-    <spark.version>2.0.2</spark.version>
+    <spark.version>2.1.0</spark.version>
     <github.global.server>github</github.global.server>
   </properties>
   <packaging>pom</packaging>
@@ -189,6 +189,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_2.11</artifactId>
+      <version>${spark.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
       <version>0.13.1</version>
@@ -201,6 +206,13 @@
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
+      <version>${spark.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_2.11</artifactId>
       <version>${spark.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
@@ -276,7 +288,7 @@
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest_${scala.binary.version}</artifactId>
       <scope>test</scope>
-      <version>2.2.4</version>
+      <version>2.2.6</version>
     </dependency>
     <dependency>
       <groupId>com.novocode</groupId>

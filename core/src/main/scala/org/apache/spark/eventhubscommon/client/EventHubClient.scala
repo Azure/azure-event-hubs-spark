@@ -15,15 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.client
 
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
-private[eventhubs] case class OffsetRange(
-    eventHubNameAndPartition: EventHubNameAndPartition,
-    fromOffset: Long,
-    fromSeq: Long,
-    untilSeq: Long) {
+private[spark] trait EventHubClient extends Serializable {
 
-  private[eventhubs] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
+  /**
+   * return the end point of each partition
+   * @return a map from eventhubName-partition to (offset, seq)
+   */
+  def endPointOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
+    Option[Map[EventHubNameAndPartition, (Long, Long)]]
+
+  /**
+   * close this client
+   */
+  def close(): Unit
 }

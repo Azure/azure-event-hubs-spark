@@ -21,13 +21,15 @@ import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterEach, FunSuite}
+import org.scalatest.{BeforeAndAfterEach, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.eventhubscommon.EventHubsConnector
+import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.checkpoint.{ProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
 
-private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
+private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   val appName = "dummyapp"
   val streamId = 0
@@ -35,9 +37,9 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   var fs: FileSystem = _
   var progressRootPath: Path = _
-  var progressListener: ProgressTrackingListener = _
   var ssc: StreamingContext = _
-  var progressTracker: ProgressTracker = _
+  var progressListener: ProgressTrackingListener = _
+  var progressTracker: ProgressTrackerBase[_ <: EventHubsConnector] = _
 
   protected val streamingClock = "org.apache.spark.util.SystemClock"
 
@@ -59,12 +61,12 @@ private[eventhubs] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     sparkContext.setLogLevel("INFO")
     ssc = new StreamingContext(sparkContext, batchDuration)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
   }
 
   protected def reset(): Unit = {
-    ProgressTracker.reset()
+    DirectDStreamProgressTracker.reset()
     progressTracker = null
     progressListener = null
     EventHubDirectDStream.lastCleanupTime = -1

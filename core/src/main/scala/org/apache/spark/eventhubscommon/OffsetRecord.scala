@@ -15,26 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon
 
 import org.apache.spark.streaming.Time
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
-private[checkpoint] object PathTools extends Serializable {
-
-  def progressDirPathStr(checkpointDir: String, appName: String): String = {
-    s"$checkpointDir/$appName"
-  }
-
-  def progressTempDirPathStr(checkpointDir: String, appName: String): String = {
-    s"$checkpointDir/${appName}_temp"
-  }
-
-  def progressTempFileStr(basePath: String,
-                          streamId: Int,
-                          namespace: String,
-                          eventHubNameAndPartition: EventHubNameAndPartition,
-                          timestamp: Long): String = {
-    basePath + s"/$streamId-$namespace-$eventHubNameAndPartition-$timestamp"
-  }
-}
+/**
+ * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
+ */
+// TODO: timestamp shall be typed as Long, epoch branch has fixed that
+case class OffsetRecord(timestamp: Time, offsets: Map[EventHubNameAndPartition, (Long, Long)])

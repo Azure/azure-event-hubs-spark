@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.rdd
 
 // scalastyle:off
 import scala.collection.mutable.ListBuffer
@@ -23,14 +23,16 @@ import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.progress.ProgressWriter
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRange, OffsetStoreParams, ProgressWriter}
 import org.apache.spark.streaming.Time
+import org.apache.spark.{Partition, SparkContext, TaskContext}
 // scalastyle:on
 
-private[eventhubs] class EventHubRDDPartition(
+private class EventHubRDDPartition(
     val sparkPartitionId: Int,
     val eventHubNameAndPartitionID: EventHubNameAndPartition,
     val fromOffset: Long,
@@ -40,11 +42,11 @@ private[eventhubs] class EventHubRDDPartition(
   override def index: Int = sparkPartitionId
 }
 
-class EventHubRDD(
+private[spark] class EventHubsRDD(
     sc: SparkContext,
     eventHubsParamsMap: Map[String, Map[String, String]],
     val offsetRanges: List[OffsetRange],
-    batchTime: Time,
+    batchTime: Long,
     offsetParams: OffsetStoreParams,
     eventHubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper)
   extends RDD[EventData](sc, Nil) {
@@ -79,13 +81,13 @@ class EventHubRDD(
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
     val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
-    val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
-      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      eventHubPartition.eventHubNameAndPartitionID, batchTime.milliseconds, new Configuration())
+    val progressWriter = new ProgressWriter(offsetParams.streamId, offsetParams.uid,
+      eventHubPartition.eventHubNameAndPartitionID, batchTime, new Configuration(),
+      offsetParams.checkpointDir, offsetParams.subDirs: _*)
     val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
       logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
+      progressWriter.write(batchTime, eventHubPartition.fromOffset,
         eventHubPartition.fromSeq)
       logInfo(s"write offset $fromOffset, sequence number" +
         s" ${eventHubPartition.fromSeq} for EventHub" +
@@ -104,7 +106,7 @@ class EventHubRDD(
         eventHubReceiver, maxRate)
       val lastEvent = receivedEvents.last
       val endOffset = lastEvent.getSystemProperties.getOffset.toLong
-      progressWriter.write(batchTime.milliseconds, endOffset,
+      progressWriter.write(batchTime, endOffset,
         lastEvent.getSystemProperties.getSequenceNumber)
       logInfo(s"write offset $endOffset, sequence number" +
         s" ${lastEvent.getSystemProperties.getSequenceNumber} for EventHub" +

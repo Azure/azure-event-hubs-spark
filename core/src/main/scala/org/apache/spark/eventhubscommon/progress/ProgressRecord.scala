@@ -15,28 +15,38 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.progress
 
 /**
  * this class represent the record written by ProgressWriter and read by ProgressTracker
  * this class is supposed to only be used by the classes within checkpoint package
+ *
+ * uid in DirectDStream refers to namespace and in Structured Streaming refers to
+ * "namespace_name_streamid"
+ *
+ * timestamp in DirectDStream refers to the batch time, and in Structured Streaming refers to
+ * BatchID
+ *
  */
-private[checkpoint] case class ProgressRecord(
-    timestamp: Long, namespace: String, streamId: Int,
-    eventHubName: String, partitionId: Int, offset: Long,
+private[spark] case class ProgressRecord(
+    timestamp: Long,
+    uid: String,
+    eventHubName: String,
+    partitionId: Int,
+    offset: Long,
     seqId: Long) {
   override def toString: String = {
-    s"$timestamp $namespace $streamId $eventHubName $partitionId $offset $seqId"
+    s"$timestamp $uid $eventHubName $partitionId $offset $seqId"
   }
 }
 
-private[checkpoint] object ProgressRecord {
+private[spark] object ProgressRecord {
 
   def parse(line: String): Option[ProgressRecord] = {
     try {
-      val Array(timestampStr, namespace, streamId, eventHubName, partitionIdStr, offsetStr,
+      val Array(timestampStr, namespace, eventHubName, partitionIdStr, offsetStr,
         seqStr) = line.split(" ")
-      Some(ProgressRecord(timestampStr.toLong, namespace, streamId.toInt, eventHubName,
+      Some(ProgressRecord(timestampStr.toLong, namespace, eventHubName,
         partitionIdStr.toInt, offsetStr.toLong, seqStr.toLong))
     } catch {
       case m: RuntimeException =>

@@ -24,9 +24,10 @@ import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.utils.FragileEventHubClient
 import org.apache.spark.streaming._
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker, ProgressTrackingListener}
-import org.apache.spark.streaming.eventhubs.utils.FragileEventHubClient
+import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
 import org.apache.spark.util.ManualClock
 
 class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTestSuiteBase
@@ -37,8 +38,8 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     fs = progressRootPath.getFileSystem(new Configuration())
     ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
-    progressTracker = ProgressTracker.initInstance(progressRootPath.toString, appName,
-      new Configuration())
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
+      appName, new Configuration())
   }
 
   override def batchDuration: Duration = Seconds(1)
@@ -78,7 +79,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
         EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
-    assert(ProgressTracker.getInstance != null)
+    assert(DirectDStreamProgressTracker.getInstance != null)
     assert(eventHubDirectDStream.eventHubClient != null)
   }
 
@@ -367,7 +368,6 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
 
     ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
       () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))
-
 
     ssc.graph.getInputStreams().filter(_.isInstanceOf[EventHubDirectDStream]).map(
       _.asInstanceOf[EventHubDirectDStream]).head.currentOffsetsAndSeqNums =

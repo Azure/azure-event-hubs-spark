@@ -15,16 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.rdd
 
-private[eventhubs] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
-  override def toString: String = s"$eventHubName-partition-$partitionId"
-}
+private[spark] case class OffsetRange(
+    eventHubNameAndPartition: EventHubNameAndPartition,
+    fromOffset: Long,
+    fromSeq: Long,
+    untilSeq: Long) {
 
-private[eventhubs] object EventHubNameAndPartition {
-  def fromString(str: String): EventHubNameAndPartition = {
-    val Array(name, partition) = str.split("-partition-")
-    EventHubNameAndPartition(name, partition.toInt)
-  }
+  private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq)
 }

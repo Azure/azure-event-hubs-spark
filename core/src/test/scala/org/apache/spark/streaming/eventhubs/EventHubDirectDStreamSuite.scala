@@ -17,21 +17,13 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.util.concurrent.ConcurrentLinkedQueue
-
-import scala.reflect.ClassTag
-
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.{SparkConf, SparkContext, SparkException}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.client.EventHubClient
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
-import org.apache.spark.streaming.dstream.DStream
-import org.apache.spark.streaming.eventhubs.checkpoint.{OffsetRecord, ProgressTracker, ProgressTrackingListener}
-import org.apache.spark.streaming.eventhubs.utils.{SimulatedEventHubs, TestEventHubsReceiver, TestRestEventHubClient}
-import org.apache.spark.util.Utils
-
 
 class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar with SharedUtils {
 

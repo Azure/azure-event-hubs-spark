@@ -15,21 +15,8 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.rdd
 
-private[eventhubs] trait EventHubClient extends Serializable {
-
-  /**
-   * return the end point of each partition
-   * @return a map from eventhubName-partition to (offset, seq)
-   */
-  def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-    Option[Map[EventHubNameAndPartition, (Long, Long)]]
-
-  /**
-   * close this client
-   */
-  def close(): Unit
-}
+// a helper object to avoid serialzing offsetstore instances
+private[spark] case class OffsetStoreParams(
+    checkpointDir: String, streamId: Int, uid: String, subDirs: String*)

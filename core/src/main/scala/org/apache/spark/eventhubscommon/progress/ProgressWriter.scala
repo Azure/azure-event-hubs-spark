@@ -15,30 +15,30 @@
  * limitations under the License.
  */
 
-package org.apache.spark.streaming.eventhubs.checkpoint
+package org.apache.spark.eventhubscommon.progress
 
 import java.io.IOException
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FSDataOutputStream, Path}
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
-import org.apache.spark.streaming.eventhubs.EventHubNameAndPartition
 
-private[eventhubs] class ProgressWriter(
-     progressDir: String,
-     appName: String,
+private[spark] class ProgressWriter(
      streamId: Int,
-     namespace: String,
+     uid: String,
      eventHubNameAndPartition: EventHubNameAndPartition,
      timestamp: Long,
-     hadoopConfiguration: Configuration) extends Logging {
+     hadoopConfiguration: Configuration,
+     progressDir: String,
+     subDirIdentifiers: String*) extends Logging {
 
   private val tempProgressTrackingPointStr = PathTools.progressTempFileStr(
-    PathTools.progressTempDirPathStr(progressDir, appName),
-    streamId, namespace, eventHubNameAndPartition, timestamp)
+    PathTools.progressTempDirPathStr(progressDir, subDirIdentifiers: _*),
+    streamId, uid, eventHubNameAndPartition, timestamp)
 
-  private[eventhubs] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
+  private[spark] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
 
   def write(recordTime: Long, cpOffset: Long, cpSeq: Long): Unit = {
     val fs = tempProgressTrackingPointPath.getFileSystem(hadoopConfiguration)
@@ -47,7 +47,7 @@ private[eventhubs] class ProgressWriter(
       // it would be safe to overwrite checkpoint, since we will not start a new job when
       // checkpoint hasn't been committed
       cpFileStream = fs.create(tempProgressTrackingPointPath, true)
-      val record = ProgressRecord(recordTime, namespace, streamId,
+      val record = ProgressRecord(recordTime, uid,
         eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
         cpSeq)
       cpFileStream.writeBytes(s"$record")

@@ -14,19 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubscommon.client
 
 import java.time.Instant
 
 import scala.collection.JavaConverters._
 import scala.collection.Map
 
-import com.microsoft.azure.eventhubs._
-import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
+import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import com.microsoft.azure.servicebus._
+import EventhubsOffsetTypes.EventhubsOffsetType
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
-import org.apache.spark.streaming.eventhubs.EventhubsOffsetTypes._
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**
@@ -66,7 +66,7 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
       evhPolicyKey)
     // Set the consumer group if specified.
     val consumerGroup = eventhubsParams.getOrElse("eventhubs.consumergroup",
-      EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
+      AzureEventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
     // Set the epoch if specified
     val receiverEpoch = eventhubsParams.getOrElse("eventhubs.epoch",
       DEFAULT_RECEIVER_EPOCH.toString).toLong
@@ -112,10 +112,11 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
       currentOffset, receiverEpoch)
   }
 
-  def createReceiver(eventhubsParams: Map[String, String],
-                     partitionId: String,
-                     offsetStore: OffsetStore,
-                     maximumEventRate: Int): Unit = {
+  def createReceiver(
+      eventhubsParams: Map[String, String],
+      partitionId: String,
+      offsetStore: OffsetStore,
+      maximumEventRate: Int): Unit = {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
       eventhubsParams)
     val (offsetType, currentOffset) = configureStartOffset(eventhubsParams, offsetStore)
@@ -125,15 +126,15 @@ class EventHubsClientWrapper extends Serializable with EventHubClient with Loggi
       currentOffset, receiverEpoch)
   }
 
-  private[eventhubs] def createReceiverInternal(
-                             connectionString: String,
-                             consumerGroup: String,
-                             partitionId: String,
-                             offsetType: EventhubsOffsetType,
-                             currentOffset: String,
-                             receiverEpoch: Long): Unit = {
+  private[spark] def createReceiverInternal(
+      connectionString: String,
+      consumerGroup: String,
+      partitionId: String,
+      offsetType: EventhubsOffsetType,
+      currentOffset: String,
+      receiverEpoch: Long): Unit = {
     // Create Eventhubs client
-    eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
+    eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString)
 
     eventhubsReceiver = offsetType match {
       case EventhubsOffsetTypes.None | EventhubsOffsetTypes.PreviousCheckpoint

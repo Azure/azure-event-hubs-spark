@@ -37,6 +37,7 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
   with Logging {
 
   var eventhubsClient: AzureEventHubClient = _
+  var partitionRuntimeInformation: ReceiverRuntimeInformation = _
 
   // TODO: the design of this class is not simple enough
   // ideally, we shall not require the user to explicitly call createReceiver first
@@ -131,22 +132,27 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
     // Create Eventhubs client
     eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
+    // Enabling flag to receive runtime info from eventhub client.
+    val receiverOptions = new ReceiverOptions
+    receiverOptions.setReceiverRuntimeMetricEnabled(true)
+
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
            | EventHubsOffsetTypes.InputByteOffset =>
         if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
           eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset,
-            receiverEpoch)
+            receiverEpoch, receiverOptions)
         } else {
-          eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
+          eventhubsClient.createReceiverSync(consumerGroup, partitionId,
+            currentOffset, receiverOptions)
         }
       case EventHubsOffsetTypes.InputTimeOffset =>
         if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
           eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId,
-            Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch)
+            Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch, receiverOptions)
         } else {
           eventhubsClient.createReceiverSync(consumerGroup, partitionId,
-            Instant.ofEpochSecond(currentOffset.toLong))
+            Instant.ofEpochSecond(currentOffset.toLong), receiverOptions)
         }
     }
     eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
@@ -177,7 +183,13 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
   def receive(expectedEventNum: Int): Iterable[EventData] = {
     val events = eventhubsReceiver.receive(
       math.min(expectedEventNum, eventhubsReceiver.getPrefetchCount)).get()
-    if (events == null) Iterable.empty else events.asScala
+    if (events == null) {
+      Iterable.empty
+    }
+    else {
+      partitionRuntimeInformation = eventhubsReceiver.getRuntimeInformation
+      events.asScala
+    }
   }
 
   override def close(): Unit = {

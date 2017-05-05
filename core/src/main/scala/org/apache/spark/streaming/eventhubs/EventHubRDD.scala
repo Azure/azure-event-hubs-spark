@@ -19,10 +19,8 @@ package org.apache.spark.streaming.eventhubs
 
 // scalastyle:off
 import scala.collection.mutable.ListBuffer
-
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
@@ -60,10 +58,9 @@ class EventHubRDD(
     }.toArray
   }
 
-  private def wrappingReceive(
-      eventHubNameAndPartition: EventHubNameAndPartition,
-      eventHubClient: EventHubsClientWrapper,
-      expectedEventNumber: Int): List[EventData] = {
+  private def wrappingReceive(eventHubNameAndPartition: EventHubNameAndPartition,
+                              eventHubClient: EventHubsClientWrapper, expectedEventNumber: Int):
+  List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
     val receivingTrace = new ListBuffer[Long]
     var cnt = 0
@@ -72,16 +69,21 @@ class EventHubRDD(
         throw new Exception(s"$eventHubNameAndPartition cannot return data, the trace is" +
           s" ${receivingTrace.toList}")
       }
-      val receivedEventsItr = eventHubClient.receive(expectedEventNumber - receivedBuffer.size)
-      if (receivedEventsItr == null) {
-        // no more messages
-        return receivedBuffer.toList
-      }
-      val receivedEvents = receivedEventsItr.toList
+      val receivedEvents = eventHubClient.receive(expectedEventNumber - receivedBuffer.size).
+        toList
       receivingTrace += receivedEvents.length
       cnt += 1
       receivedBuffer ++= receivedEvents
+
+      receivingTrace += receivedEvents.length
+      if(receivedEvents.length > 0 && eventHubClient.partitionRuntimeInformation != null) {
+        if (receivedEvents.last.getSystemProperties.getSequenceNumber ==
+          eventHubClient.partitionRuntimeInformation.getLastSequenceNumber) {
+          return receivedBuffer.toList
+        }
+      }
     }
+
     receivedBuffer.toList
   }
 

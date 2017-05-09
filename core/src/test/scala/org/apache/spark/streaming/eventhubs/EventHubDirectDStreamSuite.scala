@@ -46,7 +46,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       Map("eh1" -> eventhubParameters))
     val eventHubClientMock = mock[EventHubClient]
     Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = true,
-      targetEventHubNameAndPartitions = ehDStream.eventhubNameAndPartitions.toList)).
+      targetEventHubNameAndPartitions = ehDStream.connectedInstances)).
       thenReturn(None)
     ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()

@@ -17,8 +17,6 @@
 
 package org.apache.spark.eventhubscommon
 
-import org.apache.spark.streaming.Time
-
 /**
  * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
  */

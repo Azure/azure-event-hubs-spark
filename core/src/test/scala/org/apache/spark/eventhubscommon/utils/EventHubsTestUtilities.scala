@@ -114,6 +114,7 @@ private[spark] object EventHubsTestUtilities extends Logging {
     val eventDataArray = new Array[EventData](payloadPropertyBag.length)
     val publisherName = "Microsoft Corporation"
     var enqueueTime = 0L
+    var eventIndex = 0
     for((payload, properties) <- payloadPropertyBag) {
       val eventData = new EventData(payload.toString.getBytes)
       val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()
@@ -137,8 +138,9 @@ private[spark] object EventHubsTestUtilities extends Logging {
             eventData.getProperties.put("output", property.asInstanceOf[AnyRef])
         }
       }
-      eventDataArray(offsetSetInQueue) = eventData
+      eventDataArray(eventIndex) = eventData
       offsetSetInQueue += 1
+      eventIndex += 1
       enqueueTime += 1000
     }
     eventDataArray

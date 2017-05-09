@@ -36,7 +36,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       partitionCount: Int,
       maxRate: Int,
       containsProperties: Boolean = false,
-      userDefinedKeys: Option[String] = None): Map[String, String] = {
+      userDefinedKeys: Option[String] = None,
+      enqueueTime: Option[Long] = None): Map[String, String] = {
     Map[String, String](
       "eventhubs.policyname" -> "policyName",
       "eventhubs.policykey" -> "policyKey",
@@ -47,7 +48,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       "eventhubs.progressTrackingDir" -> tempRoot,
       "eventhubs.maxRate" -> s"$maxRate",
       "eventhubs.sql.containsProperties" -> s"$containsProperties"
-    ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map())
+    ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map()) ++
+      enqueueTime.map(et => Map("eventhubs.filter.enqueueTime" -> et.toString)).getOrElse(Map())
   }
 
   private def generateIntKeyedData(num: Int, offset: Int = 0): Seq[(Int, Seq[(String, String)])] = {

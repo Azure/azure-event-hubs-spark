@@ -44,6 +44,9 @@ private[spark] class EventHubsSource(
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
+  // the id of the stream which is mapped from eventhubs instance
+  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
+  
   private val eventHubsNamespace: String = eventHubsParams("eventhubs.namespace")
   private val eventHubsName: String = eventHubsParams("eventhubs.name")
 
@@ -350,8 +353,6 @@ private[spark] class EventHubsSource(
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
 
-  // the id of the stream which is mapped from eventhubs instance
-  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
 }
 
 private object EventHubsSource {

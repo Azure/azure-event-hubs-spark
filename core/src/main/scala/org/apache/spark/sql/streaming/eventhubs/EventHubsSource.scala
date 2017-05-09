@@ -46,7 +46,7 @@ private[spark] class EventHubsSource(
 
   // the id of the stream which is mapped from eventhubs instance
   override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
-  
+
   private val eventHubsNamespace: String = eventHubsParams("eventhubs.namespace")
   private val eventHubsName: String = eventHubsParams("eventhubs.name")
 

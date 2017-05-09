@@ -183,14 +183,12 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestRestEventHubClient(highestOffsetPerPartition))
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
-    println(offset)
     var dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
     assert(dataFrame.select("body").count == 6)
     // Second batch
     offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
-    println(offset)
     dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -311,8 +309,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   private def generateInputQuery(
-                                  eventHubsParams: Map[String, String],
-                                  sparkSession: SparkSession): Dataset[_] = {
+      eventHubsParams: Map[String, String],
+      sparkSession: SparkSession): Dataset[_] = {
     import sparkSession.implicits._
     val dataSource = spark
       .readStream
@@ -577,8 +575,9 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       CheckAnswer(1, 2, 3, 4, 5, 6),
       StopStream(),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
-        additionalConfs = Map("eventhubs.test.checkpointLocation" ->
-          s"${Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath}",
+        additionalConfs = Map(
+          "eventhubs.test.checkpointLocation" ->
+            s"${Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath}",
           "eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters),
       CheckAnswer(1, 2, 3, 4, 5, 6),
@@ -608,7 +607,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     import sourceQuery.sparkSession.implicits._
     import org.apache.spark.sql.functions._
     val windowedStream = sourceQuery.groupBy(
-      window($"creationTime".cast(TimestampType),
+      window(
+        $"creationTime".cast(TimestampType),
         "3 second",
         "1 second")).count().sort("window").select("count")
     val manualClock = new StreamManualClock

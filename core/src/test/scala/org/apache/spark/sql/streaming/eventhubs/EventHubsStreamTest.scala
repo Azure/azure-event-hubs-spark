@@ -90,13 +90,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         s"EventHubsStreamTest_${System.currentTimeMillis()}"))
   }
 
-
-  override protected def createSparkSession: TestSparkSession = {
-    new TestSparkSession(
-      sparkConf.set("spark.hadoop.fs.file.impl", classOf[DebugFilesystem].getName).setAppName(
-        s"EventHubsStreamTest_${System.currentTimeMillis()}"))
-  }
-
   /** How long to wait for an active stream to catch up when checking a result. */
   val streamingTimeout = 60.seconds
 
@@ -419,8 +412,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             activeQueries += currentStream.id -> currentStream
 
             val eventHubsSource = searchCurrentSource()
-            val progressTracker = StructuredStreamingProgressTracker.getInstance(
-              eventHubsSource.uid)
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(

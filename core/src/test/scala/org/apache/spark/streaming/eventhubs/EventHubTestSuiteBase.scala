@@ -258,57 +258,16 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         }.toArray
         ehList.zip(input)
     }.toMap
-    new SimulatedEventHubs(namespace, ehAndRawInputMap.map {
-      case (eventHubNameAndPartition, propertyQueue) =>
-        (eventHubNameAndPartition,
-          EventHubsTestUtilities.generateEventData(
-            propertyQueue.map(property => ('e', Seq(property))),
-            eventHubNameAndPartition.partitionId))
-    })
-    /*
-    new SimulatedEventHubs(namespace, ehAndRawInputMap.map {
-      case (eventHubNameAndPartition, propertyQueue) =>
-        (eventHubNameAndPartition,
-          fromPayloadToEventData(propertyQueue, eventHubNameAndPartition.partitionId))
-    })
-    */
+    new SimulatedEventHubs(namespace,
+      ehAndRawInputMap.map {
+        case (eventHubNameAndPartition, propertyQueue) =>
+          (eventHubNameAndPartition,
+            EventHubsTestUtilities.generateEventData(
+              propertyQueue.map(property => ('e', Seq(property))),
+              eventHubNameAndPartition.partitionId,
+              0))
+      })
   }
-
-  /*
-  private def fromPayloadToEventData[U: ClassTag](
-      rawInputSeq: Seq[U], partitionId: Int): Array[EventData] = {
-    var offsetSetInQueue = 0
-    val eventDataArray = new Array[EventData](rawInputSeq.length)
-    var enqueueTime = 0L
-    // take input as a kv pair in payload
-    for (input <- rawInputSeq) {
-      // dummy payload
-      val payLoad = Array.fill[Byte](1)('e')
-      val msg = new EventData(payLoad)
-      val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()
-      systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME,
-        offsetSetInQueue.toString)
-      systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME,
-        Long.box(offsetSetInQueue))
-      systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME,
-        Int.box(partitionId))
-      systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME,
-        Date.from(Instant.ofEpochMilli(enqueueTime)))
-      val systemProperties = new SystemProperties(systemPropertiesMap)
-      Whitebox.setInternalState(msg, "systemProperties", systemProperties.asInstanceOf[Any])
-      input match {
-        case p @ Tuple2(_, _) =>
-          msg.getProperties.put(p._1.toString, p._2.asInstanceOf[AnyRef])
-        case _ =>
-          msg.getProperties.put("output", input.asInstanceOf[AnyRef])
-      }
-      eventDataArray(offsetSetInQueue) = msg
-      offsetSetInQueue += 1
-      enqueueTime += 1000
-    }
-    eventDataArray
-  }
-  */
 
   protected def verifyOffsetsAndSeqs(
       ssc: StreamingContext,

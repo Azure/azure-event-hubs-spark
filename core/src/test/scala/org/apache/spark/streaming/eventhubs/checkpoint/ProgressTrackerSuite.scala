@@ -67,15 +67,15 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   private def writeProgressFile(
-                                 progressPath: String,
-                                 streamId: Int,
-                                 fs: FileSystem,
-                                 timestamp: Long,
-                                 namespace: String,
-                                 ehName: String,
-                                 partitionRange: Range,
-                                 offset: Int,
-                                 seq: Int): Unit = {
+      progressPath: String,
+      streamId: Int,
+      fs: FileSystem,
+      timestamp: Long,
+      namespace: String,
+      ehName: String,
+      partitionRange: Range,
+      offset: Int,
+      seq: Int): Unit = {
     for (partitionId <- partitionRange) {
       Files.write(
         Paths.get(progressPath + s"/progress-$timestamp"),
@@ -121,8 +121,8 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   private def verifyProgressFile(
-                                  namespace: String, ehName: String, partitionRange: Range,
-                                  timestamp: Long, expectedOffsetAndSeq: Seq[(Long, Long)]): Unit = {
+      namespace: String, ehName: String, partitionRange: Range,
+      timestamp: Long, expectedOffsetAndSeq: Seq[(Long, Long)]): Unit = {
     val ehMap = progressTracker.asInstanceOf[DirectDStreamProgressTracker].
       read(namespace, timestamp - 1000L, fallBack = false)
     var expectedOffsetAndSeqIdx = 0

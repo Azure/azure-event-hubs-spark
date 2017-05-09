@@ -80,7 +80,7 @@ class TestEventHubsReceiver(
     offsetType: EventHubsOffsetType)
   extends EventHubsClientWrapper {
 
-  val eventHubName: String = eventHubParameters("eventhubs.name")
+  val eventHubName = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")
@@ -94,7 +94,8 @@ class TestEventHubsReceiver(
   }
 }
 
-class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends EventHubClient {
+class SimulatedEventHubsRestClient(
+    eventHubs: SimulatedEventHubs) extends EventHubClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -105,10 +106,28 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends EventH
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map{
+      ehNameAndPartition =>
+        (ehNameAndPartition,
+          eventHubs.messageStore(ehNameAndPartition).last.getSystemProperties.getEnqueuedTime.
+            toEpochMilli)
+    }.toMap)
+  }
 }
 
 class TestRestEventHubClient(
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)]) extends EventHubClient {
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
+  extends EventHubClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,

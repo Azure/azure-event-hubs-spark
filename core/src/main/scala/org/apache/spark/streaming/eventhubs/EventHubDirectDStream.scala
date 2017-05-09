@@ -24,12 +24,8 @@ import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-<<<<<<< HEAD
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes, RestfulEventHubClient}
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-=======
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
->>>>>>> Eventhub reader (#17)
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -258,7 +254,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
         subDirs = ssc.sparkContext.appName),
       eventhubReceiverCreator)
-    logInfo(s"OFFSET RANGES in batch $validTime: $offsetRanges")
     reportInputInto(validTime, offsetRanges,
       offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
     Some(eventHubRDD)

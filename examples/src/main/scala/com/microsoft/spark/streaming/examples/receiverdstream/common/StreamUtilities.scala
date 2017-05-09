@@ -17,12 +17,7 @@
 
 package com.microsoft.spark.streaming.examples.receiverdstream.common
 
-<<<<<<< HEAD:examples/src/main/scala/com/microsoft/spark/streaming/examples/receiverdstream/common/StreamUtilities.scala
 object StreamUtilities {
-=======
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.streaming.Time
->>>>>>> refactor client part:core/src/main/scala/org/apache/spark/streaming/eventhubs/checkpoint/PathTools.scala
 
   def getSqlJdbcConnectionString(sqlServerFQDN: String, sqlDatabaseName: String,
                              databaseUsername: String, databasePassword: String): String = {

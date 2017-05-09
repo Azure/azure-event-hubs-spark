@@ -47,13 +47,11 @@ object WindowingWordCount {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.length != 9) {
+    if (args.length != 8) {
       println("Usage: program progressDir PolicyName PolicyKey EventHubNamespace EventHubName" +
-        " BatchDuration(seconds) Spark_Checkpoint_Directory maxRate enqueueTime")
+        " BatchDuration(seconds) Spark_Checkpoint_Directory maxRate")
       sys.exit(1)
     }
-
-    Thread.currentThread().setName("WINDOWING_MAIN_THREAD")
 
     val progressDir = args(0)
     val policyName = args(1)
@@ -63,7 +61,6 @@ object WindowingWordCount {
     val batchDuration = args(5).toInt
     val sparkCheckpointDir = args(6)
     val maxRate = args(7)
-    val enqueueTime = args(8)
 
     val eventhubParameters = Map[String, String] (
       "eventhubs.policyname" -> policyName,
@@ -72,8 +69,7 @@ object WindowingWordCount {
       "eventhubs.name" -> name,
       "eventhubs.partition.count" -> "32",
       "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.maxRate" -> s"$maxRate",
-      "eventhubs.filter.enqueuetime" -> enqueueTime
+      "eventhubs.maxRate" -> s"$maxRate"
     )
 
     val ssc = StreamingContext.getOrCreate(sparkCheckpointDir,

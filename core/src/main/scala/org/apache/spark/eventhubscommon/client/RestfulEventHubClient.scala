@@ -65,9 +65,6 @@ private[spark] class RestfulEventHubClient(
   }
 
   private def fromResponseBodyToEndpoint(responseBody: String): (Long, Long) = {
-    /**
-     *(partitionDescription \ "LastEnqueuedTimeUtc").text.toLong
-     */
     val partitionDescription = XML.loadString(responseBody) \\ "entry" \
       "content" \ "PartitionDescription"
     ((partitionDescription \ "LastEnqueuedOffset").text.toLong,

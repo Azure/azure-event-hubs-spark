@@ -23,7 +23,7 @@ private[spark] trait EventHubClient extends Serializable {
 
   /**
    * return the end point of each partition
-   * @return a map from eventhubName-partition to (offset, seq, latestEnqueueTime)
+   * @return a map from eventhubName-partition to (offset, seq)
    */
   def endPointOfPartition(
       retryIfFail: Boolean,

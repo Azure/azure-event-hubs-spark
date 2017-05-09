@@ -20,14 +20,10 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-<<<<<<< HEAD
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
-=======
-import org.apache.spark.eventhubscommon.{EventHubsConnector, EventHubNameAndPartition, RateControlUtils}
->>>>>>> hi
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
@@ -142,10 +138,10 @@ private[spark] class EventHubsSource(
   }
 
   /**
-    * when we have reached the end of the message queue in the remote end or we haven't get any
-    * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
-    * to prevent us from dying too much, we shall retry with 2-power interval in this case
-    */
+   * when we have reached the end of the message queue in the remote end or we haven't get any
+   * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
+   * to prevent us from dying too much, we shall retry with 2-power interval in this case
+   */
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 

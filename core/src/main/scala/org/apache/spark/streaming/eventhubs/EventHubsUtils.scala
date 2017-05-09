@@ -96,7 +96,8 @@ object EventHubsUtils {
                    offsetStore: OffsetStore = null,
                    receiverClient: EventHubsClientWrapper = new EventHubsClientWrapper):
       ReceiverInputDStream[Array[Byte]] = {
-    streamingContext.receiverStream(getReceiver(streamingContext, eventhubsParams, partitionId,
+    streamingContext.receiverStream(
+      getReceiver(streamingContext, eventhubsParams.toMap, partitionId,
       storageLevel, Option(offsetStore), receiverClient))
   }
 
@@ -123,11 +124,11 @@ object EventHubsUtils {
    * Write Ahead Log is enabled or not ("spark.streaming.receiver.writeAheadLog.enable")
    */
   private[eventhubs] def getReceiver(streamingContext: StreamingContext,
-                          eventhubsParams: Map[String, String],
-                          partitionId: String,
-                          storageLevel: StorageLevel,
-                          offsetStore: Option[OffsetStore],
-                          receiverClient: EventHubsClientWrapper): Receiver[Array[Byte]] = {
+      eventhubsParams: scala.collection.immutable.Map[String, String],
+      partitionId: String,
+      storageLevel: StorageLevel,
+      offsetStore: Option[OffsetStore],
+      receiverClient: EventHubsClientWrapper): Receiver[Array[Byte]] = {
     val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", 0)
     val walEnabled = streamingContext.conf.getBoolean(
       "spark.streaming.receiver.writeAheadLog.enable", false)

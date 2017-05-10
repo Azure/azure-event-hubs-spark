@@ -58,6 +58,7 @@ class SimulatedEventHubs(
       // as in eventhub, offset is exclusive
       val messageIndex = eventOffset + i + 1
       if (messageIndex < messageStore(eventHubsNamedPartition).length) {
+        println(s"get message $messageIndex")
         resultData += messageStore(eventHubsNamedPartition)(messageIndex)
       }
     }

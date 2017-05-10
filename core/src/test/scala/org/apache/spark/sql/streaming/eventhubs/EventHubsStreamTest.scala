@@ -545,6 +545,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                   "Could find index of the source to which data was added")
               }
               // Store the expected offset of added data to wait for it later
+              println(s"===expected $sourceIndex, $offset")
               awaiting.put(sourceIndex, offset)
             } catch {
               case NonFatal(e) =>

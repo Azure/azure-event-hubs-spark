@@ -662,4 +662,23 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     testStream(windowedStream, outputMode = OutputMode.Append())(
       firstBatch ++ clockMove ++ secondBatch: _*)
   }
+
+  test("Filter enqueuetime correctly in structured streaming") {
+    import testImplicits._
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
+    val eventPayloadsAndProperties = generateIntKeyedData(15)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters)
+    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val manualClock = new StreamManualClock
+    val highestBatchId = 3
+    testStream(sourceQuery)(
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      CheckAnswer(),
+      AddEventHubsData(eventHubsParameters, highestBatchId, eventPayloadsAndProperties),
+      AdvanceManualClock(10),
+      AdvanceManualClock(10),
+      AdvanceManualClock(10),
+      CheckAnswer(7, 9, 11, 13, 15, 8, 10, 12, 14)
+    )
+  }
 }

@@ -582,6 +582,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             // Block until all data added has been processed for all the source
             {if (!partial) awaiting else partialAwaiting}.foreach { case (sourceIndex, offset) =>
               try {
+                println(s"==waiting $offset")
                 failAfter(streamingTimeout) {
                   currentStream.awaitOffset(indexToSource(sourceIndex), offset)
                 }

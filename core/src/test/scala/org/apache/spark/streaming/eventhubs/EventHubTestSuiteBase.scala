@@ -18,18 +18,12 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.io.{IOException, ObjectInputStream}
-import java.time.Instant
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import com.microsoft.azure.eventhubs.EventData
-import com.microsoft.azure.eventhubs.EventData.SystemProperties
-import com.microsoft.azure.servicebus.amqp.AmqpConstants
-import org.powermock.reflect.Whitebox
-
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
@@ -108,10 +102,15 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
-    new EventHubDirectDStream(ssc, namespace,
-      progressRootPath.toString, eventhubsParams,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
+    new EventHubDirectDStream(
+      ssc,
+      namespace,
+      progressRootPath.toString,
+      eventhubsParams,
+      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId,
+          startOffset, eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) => FragileEventHubClient.getInstance("",
         Map()))
   }
@@ -151,15 +150,15 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       simulatedEventHubs: SimulatedEventHubs,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
-    val maxOffsetForEachEventHub = simulatedEventHubs.messageStore.map {
-      case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
-        (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
-    }
+    val maxOffsetForEachEventHub = EventHubsTestUtilities.getHighestOffsetPerPartition(
+      simulatedEventHubs)
 
     new EventHubDirectDStream(ssc, namespace,
       progressRootPath.toString, eventhubsParams,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
+      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(maxOffsetForEachEventHub))
   }
@@ -242,7 +241,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace: String,
       input: Seq[Seq[U]],
       eventhubsParams: Map[String, Map[String, String]]): SimulatedEventHubs = {
-    val propertyStore = eventhubsParams.keys.flatMap {
+    val ehAndRawInputMap = eventhubsParams.keys.flatMap {
       eventHubName =>
         val ehList = {
           for (i <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
@@ -250,41 +249,15 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         }.toArray
         ehList.zip(input)
     }.toMap
-    new SimulatedEventHubs(namespace, propertyStore.map {
-      case (eventHubNameAndPartition, propertyQueue) =>
-        (eventHubNameAndPartition,
-          fromPayloadToEventData(propertyQueue, eventHubNameAndPartition.partitionId))
-    })
-  }
-
-  private def fromPayloadToEventData[U: ClassTag](
-      propertySequence: Seq[U], partitionId: Int): Array[EventData] = {
-    var offsetSetInQueue = 0
-    val eventDataArray = new Array[EventData](propertySequence.length)
-    for (property <- propertySequence) {
-      // dummy payload
-      val payLoad = Array.fill[Byte](1)('e')
-      val msg = new EventData(payLoad)
-      val systemPropertiesMap = new java.util.HashMap[String, AnyRef]()
-      systemPropertiesMap.put(AmqpConstants.OFFSET_ANNOTATION_NAME,
-        offsetSetInQueue.toString)
-      systemPropertiesMap.put(AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME,
-        Long.box(offsetSetInQueue))
-      systemPropertiesMap.put(AmqpConstants.PARTITION_KEY_ANNOTATION_NAME,
-        Int.box(partitionId))
-      systemPropertiesMap.put(AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME, Instant.now())
-      val systemProperties = new SystemProperties(systemPropertiesMap)
-      Whitebox.setInternalState(msg, "systemProperties", systemProperties.asInstanceOf[Any])
-      property match {
-        case p @ Tuple2(_, _) =>
-          msg.getProperties.put(p._1.toString, p._2.asInstanceOf[AnyRef])
-        case _ =>
-          msg.getProperties.put("output", property.asInstanceOf[AnyRef])
-      }
-      eventDataArray(offsetSetInQueue) = msg
-      offsetSetInQueue += 1
-    }
-    eventDataArray
+    new SimulatedEventHubs(namespace,
+      ehAndRawInputMap.map {
+        case (eventHubNameAndPartition, propertyQueue) =>
+          (eventHubNameAndPartition,
+            EventHubsTestUtilities.generateEventData(
+              propertyQueue.map(property => ('e', Seq(property))),
+              eventHubNameAndPartition.partitionId,
+              0))
+      })
   }
 
   protected def verifyOffsetsAndSeqs(
@@ -305,7 +278,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       timestamp: Long): Unit = {
     val producedOffsetsAndSeqs = DirectDStreamProgressTracker.getInstance.
       asInstanceOf[DirectDStreamProgressTracker].read(namespace,
-      timestamp - batchDuration.milliseconds, fallBack = false)
+      timestamp - batchDuration.milliseconds, fallBack = true)
     assert(producedOffsetsAndSeqs === expectedOffsetsAndSeqs)
   }
 
@@ -353,16 +326,18 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       case (ehNameAndPartition, messageQueue) => (ehNameAndPartition,
         (messageQueue.length.toLong - 1, messageQueue.length.toLong - 1))
     }
-
-    new EventHubDirectDStream(ssc, namespace,
-      progressRootPath.toString, eventhubsParams,
-      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset),
+    new EventHubDirectDStream(ssc,
+      namespace,
+      progressRootPath.toString,
+      eventhubsParams,
+      (eventHubParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new FluctuatedEventHubClient(ssc, messagesBeforeEmpty, numBatchesBeforeNewData,
           maxOffsetForEachEventHub))
   }
-
 
   private def setupFluctuatedEventHubStream[V: ClassTag](
       simulatedEventHubs: SimulatedEventHubs,

@@ -18,8 +18,6 @@ package org.apache.spark.streaming.eventhubs
 
 import java.util.concurrent.ExecutorService
 
-import scala.collection.Map
-
 import com.microsoft.azure.eventhubs._
 
 import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper

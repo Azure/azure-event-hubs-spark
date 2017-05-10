@@ -77,7 +77,7 @@ case class AddEventHubsData[T: ClassTag, U: ClassTag](
     EventHubsTestUtilities.addEventsToEventHubs(eventHubs, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val targetOffsetPerPartition = highestOffsetPerPartition.map{
-      case (ehNameAndPartition, (offset, _)) => (ehNameAndPartition, offset)}
+      case (ehNameAndPartition, (offset, _, _)) => (ehNameAndPartition, offset)}
     val eventHubsBatchRecord = EventHubsBatchRecord(highestBatchId, targetOffsetPerPartition)
     (eventHubsSource, eventHubsBatchRecord)
   }

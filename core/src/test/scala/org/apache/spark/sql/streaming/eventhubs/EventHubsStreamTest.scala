@@ -36,6 +36,8 @@ import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 
+import org.apache.spark.DebugFilesystem
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
@@ -44,7 +46,7 @@ import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming._
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.{SharedSQLContext, TestSparkSession}
 import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
 
 /**
@@ -80,6 +82,12 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   override def afterAll(): Unit = {
     super.afterAll()
     FileSystem.get(new Configuration()).delete(new Path(s"$tempRoot/test-sql-context"), true)
+  }
+
+  override protected def createSparkSession: TestSparkSession = {
+    new TestSparkSession(
+      sparkConf.set("spark.hadoop.fs.file.impl", classOf[DebugFilesystem].getName).setAppName(
+        s"EventHubsStreamTest_${System.currentTimeMillis()}"))
   }
 
   /** How long to wait for an active stream to catch up when checking a result. */
@@ -404,14 +412,13 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             activeQueries += currentStream.id -> currentStream
 
             val eventHubsSource = searchCurrentSource()
-            val progressTracker = StructuredStreamingProgressTracker.getInstance(
-              eventHubsSource.uid)
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(
               (eventHubsParameters: Map[String, String], partitionId: Int,
-               startOffset: Long, _: Int) => new TestEventHubsReceiver(eventHubsParameters,
-                eventHubs, partitionId, startOffset)
+               startOffset: Long, offsetType: EventHubsOffsetType, _: Int) =>
+                new TestEventHubsReceiver(eventHubsParameters, eventHubs, partitionId, startOffset,
+                  offsetType)
             )
             currentStream.start()
 
@@ -538,6 +545,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                   "Could find index of the source to which data was added")
               }
               // Store the expected offset of added data to wait for it later
+              println(s"===expected $sourceIndex, $offset")
               awaiting.put(sourceIndex, offset)
             } catch {
               case NonFatal(e) =>

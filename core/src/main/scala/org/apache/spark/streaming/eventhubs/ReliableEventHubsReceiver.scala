@@ -18,7 +18,7 @@ package org.apache.spark.streaming.eventhubs
 
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.{mutable, Map}
+import scala.collection.mutable.ArrayBuffer
 
 import com.microsoft.azure.eventhubs._
 
@@ -89,13 +89,13 @@ class ReliableEventHubsReceiver(
    */
   private def storeBlockAndCommitOffset(
       blockId: StreamBlockId,
-      arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
+      arrayBuffer: ArrayBuffer[_]): Unit = {
     var count = 0
     var pushed = false
     var exception: Exception = null
     while (!pushed && count < RETRY_COUNT) {
       try {
-        store(arrayBuffer.asInstanceOf[mutable.ArrayBuffer[Array[Byte]]])
+        store(arrayBuffer.asInstanceOf[ArrayBuffer[Array[Byte]]])
         pushed = true
       } catch {
         case e: Exception =>
@@ -131,7 +131,7 @@ class ReliableEventHubsReceiver(
       blockOffsetMap.put(blockId, latestOffsetCurBlock)
     }
 
-    def onPushBlock(blockId: StreamBlockId, arrayBuffer: mutable.ArrayBuffer[_]): Unit = {
+    def onPushBlock(blockId: StreamBlockId, arrayBuffer: ArrayBuffer[_]): Unit = {
 
       // Store block and commit the blocks offset
       storeBlockAndCommitOffset(blockId, arrayBuffer)

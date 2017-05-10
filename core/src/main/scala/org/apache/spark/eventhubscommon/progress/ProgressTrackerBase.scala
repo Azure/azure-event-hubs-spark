@@ -28,7 +28,6 @@ import org.apache.hadoop.fs._
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
 import org.apache.spark.internal.Logging
-import org.apache.spark.streaming.Time
 
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String, appName: String, hadoopConfiguration: Configuration) extends Logging {
@@ -232,7 +231,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         ias.printStackTrace()
         throw ias
     }
-    OffsetRecord(Time(readTimestamp), recordToReturn)
+    OffsetRecord(readTimestamp, recordToReturn)
   }
 
   // write offsetToCommit to a progress tracking file

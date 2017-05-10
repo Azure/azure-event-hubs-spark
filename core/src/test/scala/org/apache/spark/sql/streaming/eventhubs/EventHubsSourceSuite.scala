@@ -683,10 +683,14 @@ private[streaming] case class EventHubsBatchRecord(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       AddEventHubsData(eventHubsParameters, 2, eventPayloadsAndProperties),
       UpdatePartialCheck(
-        EventHubsBatchRecord(1,
+        EventHubsBatchRecord(0,
           Map(EventHubNameAndPartition("eh0", 1) -> 2, EventHubNameAndPartition("eh0", 0) -> 2))),
       CheckAnswer(true, 7, 8, 9, 10, 11, 12),
-      AdvanceManualClock(10)
+      UpdatePartialCheck(
+        EventHubsBatchRecord(1,
+          Map(EventHubNameAndPartition("eh0", 1) -> 5, EventHubNameAndPartition("eh0", 0) -> 5))),
+      AdvanceManualClock(10),
+      CheckAnswer(7, 8, 9, 10, 11, 12, 13, 14, 15)
     )
   }
 }

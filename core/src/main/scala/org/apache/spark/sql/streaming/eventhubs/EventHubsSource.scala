@@ -234,7 +234,6 @@ private[spark] class EventHubsSource(
       case (ehNameAndPartition, seqNum) =>
         val (offsetType, offset) = RateControlUtils.calculateStartOffset(ehNameAndPartition,
           filterOffsetAndType, committedOffsetsAndSeqNums.offsets)
-        println(s"generate type $offsetType")
         OffsetRange(ehNameAndPartition,
           fromOffset = offset,
           fromSeq = committedOffsetsAndSeqNums.offsets(ehNameAndPartition)._2,

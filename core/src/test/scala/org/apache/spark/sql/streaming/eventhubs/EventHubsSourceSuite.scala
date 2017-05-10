@@ -49,7 +49,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       "eventhubs.maxRate" -> s"$maxRate",
       "eventhubs.sql.containsProperties" -> s"$containsProperties"
     ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map()) ++
-      enqueueTime.map(et => Map("eventhubs.filter.enqueueTime" -> et.toString)).getOrElse(Map())
+      enqueueTime.map(et => Map("eventhubs.filter.enqueuetime" -> et.toString)).getOrElse(Map())
   }
 
   private def generateIntKeyedData(num: Int, offset: Int = 0): Seq[(Int, Seq[(String, String)])] = {
@@ -670,11 +670,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
     val manualClock = new StreamManualClock
-    val highestBatchId = 3
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       CheckAnswer(),
-      AddEventHubsData(eventHubsParameters, highestBatchId, eventPayloadsAndProperties),
+      AddEventHubsData(eventHubsParameters, 2, eventPayloadsAndProperties),
       AdvanceManualClock(10),
       AdvanceManualClock(10),
       AdvanceManualClock(10),

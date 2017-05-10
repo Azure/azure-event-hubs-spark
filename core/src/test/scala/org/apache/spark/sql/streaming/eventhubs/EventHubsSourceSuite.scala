@@ -672,15 +672,9 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
     val manualClock = new StreamManualClock
-    /**
-     * // the descriptor of EventHubsBatchRecord to communicate with StreamExecution
-private[streaming] case class EventHubsBatchRecord(
-    batchId: Long, targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset {
-  override def json: String = JsonUtils.partitionAndSeqNum(batchId, targetSeqNums)
-}
-     */
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      AddEventHubsData(eventHubsParameters, 2),
       UpdatePartialCheck(
         EventHubsBatchRecord(0,
           Map(EventHubNameAndPartition("eh0", 1) -> 2, EventHubNameAndPartition("eh0", 0) -> 2))),

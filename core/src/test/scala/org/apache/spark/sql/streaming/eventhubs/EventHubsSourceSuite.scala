@@ -678,8 +678,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       UpdatePartialCheck(
         EventHubsBatchRecord(0,
           Map(EventHubNameAndPartition("eh0", 1) -> 2, EventHubNameAndPartition("eh0", 0) -> 2))),
-      CheckAnswer(true, false, 7, 8, 9, 10, 11, 12),
       AdvanceManualClock(10),
+      CheckAnswer(true, false, 7, 8, 9, 10, 11, 12),
       UpdatePartialCheck(
         EventHubsBatchRecord(1,
           Map(EventHubNameAndPartition("eh0", 1) -> 5, EventHubNameAndPartition("eh0", 0) -> 5))),

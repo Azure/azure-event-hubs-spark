@@ -131,8 +131,13 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
 
     def apply(rows: Row*): CheckAnswerRows = CheckAnswerRows(rows, false, false)
 
-    def apply(partial: Boolean, rows: Row*): CheckAnswerRows =
-      CheckAnswerRows(rows, lastOnly = true, isSorted = false, partial)
+    def apply[A : Encoder](partial: Boolean, lastOnly: Boolean, rows: A*): CheckAnswerRows = {
+      val encoder = encoderFor[A]
+      val toExternalRow = RowEncoder(encoder.schema).resolveAndBind()
+      CheckAnswerRows(
+        rows.map(r => toExternalRow.fromRow(encoder.toRow(r))),
+        isSorted = false, lastOnly = lastOnly, ifCheckPartialResult = partial)
+    }
   }
 
   /**

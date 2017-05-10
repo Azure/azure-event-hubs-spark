@@ -578,6 +578,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               .zipWithIndex
               .map(_.swap)
               .toMap
+            println(s"==partial awaiting: ${partialAwaiting}")
 
             // Block until all data added has been processed for all the source
             {if (!partial) awaiting else partialAwaiting}.foreach { case (sourceIndex, offset) =>

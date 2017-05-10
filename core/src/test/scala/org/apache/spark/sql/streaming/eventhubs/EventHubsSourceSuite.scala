@@ -692,7 +692,6 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val manualClock = new StreamManualClock
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-      CheckAnswer(),
       AddEventHubsData(eventHubsParameters, 2, eventPayloadsAndProperties),
       AdvanceManualClock(10),
       AdvanceManualClock(10),

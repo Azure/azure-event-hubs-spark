@@ -20,6 +20,7 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
@@ -671,10 +672,20 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
     val manualClock = new StreamManualClock
+    /**
+     * // the descriptor of EventHubsBatchRecord to communicate with StreamExecution
+private[streaming] case class EventHubsBatchRecord(
+    batchId: Long, targetSeqNums: Map[EventHubNameAndPartition, Long]) extends Offset {
+  override def json: String = JsonUtils.partitionAndSeqNum(batchId, targetSeqNums)
+}
+     */
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       AddEventHubsData(eventHubsParameters, 2, eventPayloadsAndProperties),
-      CheckAnswer(7, 8, 9, 10, 11, 12),
+      UpdatePartialCheck(
+        EventHubsBatchRecord(1,
+          Map(EventHubNameAndPartition("eh0", 1) -> 2, EventHubNameAndPartition("eh0", 0) -> 2))),
+      CheckAnswer(true, 7, 8, 9, 10, 11, 12),
       AdvanceManualClock(10)
     )
   }

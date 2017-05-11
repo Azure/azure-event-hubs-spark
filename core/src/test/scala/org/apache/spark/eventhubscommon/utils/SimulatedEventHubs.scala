@@ -40,13 +40,11 @@ class SimulatedEventHubs(
       enqueueTime: Long,
       eventCount: Int): List[EventData] = {
     val resultData = new ListBuffer[EventData]
-    println("called searchWithTime")
     for (msg <- messageStore(eventHubsNamedPartition)) {
       if (resultData.length >= eventCount) {
         return resultData.toList
       }
       if (msg.getSystemProperties.getEnqueuedTime.getEpochSecond >= enqueueTime) {
-        println(s"get message ${msg.getSystemProperties.getOffset}")
         resultData += msg
       }
     }

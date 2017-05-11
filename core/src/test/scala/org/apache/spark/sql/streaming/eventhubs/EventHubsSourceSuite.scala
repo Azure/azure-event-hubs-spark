@@ -667,7 +667,6 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   test("Filter enqueuetime correctly in structured streaming") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
-    println(eventHubsParameters)
     val eventPayloadsAndProperties = generateIntKeyedData(15)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
@@ -679,11 +678,25 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         EventHubsBatchRecord(0,
           Map(EventHubNameAndPartition("eh1", 1) -> 2, EventHubNameAndPartition("eh1", 0) -> 2))),
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12),
+      // in the second batch we have the right seq number of msgs
       UpdatePartialCheck(
         EventHubsBatchRecord(1,
-          Map(EventHubNameAndPartition("eh1", 1) -> 4, EventHubNameAndPartition("eh1", 0) -> 5))),
+          Map(EventHubNameAndPartition("eh1", 1) -> 6, EventHubNameAndPartition("eh1", 0) -> 7))),
       AdvanceManualClock(10),
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+    )
+  }
+
+  test("Users cannot submit enqueueTime which is later than the latest in the queue") {
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3,
+      enqueueTime = Some(Long.MaxValue))
+    val eventPayloadsAndProperties = generateIntKeyedData(15)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val manualClock = new StreamManualClock
+    testStream(sourceQuery)(
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      ExpectFailure[IllegalArgumentException]()
     )
   }
 }

@@ -178,7 +178,6 @@ private[spark] class EventHubsSource(
       // after the previous call the batch id of committedOffsetsAndSeqNums has been incremented
       // with one, we are safe to clean the progress files which have been committed before the last
       // finished batch
-      println(s"committed $committedOffsetsAndSeqNums")
       cleanupFiles(lastCommittedBatchId)
     } else {
       firstBatch = false

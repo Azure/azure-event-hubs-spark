@@ -517,6 +517,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                 s"incorrect exception returned by query.exception()")
 
               val exception = currentStream.exception.get
+              exception.printStackTrace()
               verify(exception.cause.getClass === ef.causeClass,
                 "incorrect cause in exception returned by query.exception()\n" +
                   s"\tExpected: ${ef.causeClass}\n\tReturned: ${exception.cause.getClass}")
@@ -564,7 +565,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                   "Could find index of the source to which data was added")
               }
               // Store the expected offset of added data to wait for it later
-              println(s"===expected $sourceIndex, $offset")
               awaiting.put(sourceIndex, offset)
             } catch {
               case NonFatal(e) =>
@@ -583,12 +583,10 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               .zipWithIndex
               .map(_.swap)
               .toMap
-            println(s"==partial awaiting: ${partialAwaiting} $partial")
 
             // Block until all data added has been processed for all the source
             {if (!partial) awaiting else partialAwaiting}.foreach { case (sourceIndex, offset) =>
               try {
-                println(s"==waiting $offset")
                 failAfter(streamingTimeout) {
                   currentStream.awaitOffset(indexToSource(sourceIndex), offset)
                 }

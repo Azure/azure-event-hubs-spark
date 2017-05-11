@@ -174,11 +174,11 @@ private[spark] class EventHubsSource(
     if (!firstBatch) {
       // committedOffsetsAndSeqNums.batchId is always no larger than the latest finished batch id
       val lastCommittedBatchId = committedOffsetsAndSeqNums.batchId
-      println(s"committed $committedOffsetsAndSeqNums")
       collectFinishedBatchOffsetsAndCommit(lastCommittedBatchId + 1)
       // after the previous call the batch id of committedOffsetsAndSeqNums has been incremented
       // with one, we are safe to clean the progress files which have been committed before the last
       // finished batch
+      println(s"committed $committedOffsetsAndSeqNums")
       cleanupFiles(lastCommittedBatchId)
     } else {
       firstBatch = false

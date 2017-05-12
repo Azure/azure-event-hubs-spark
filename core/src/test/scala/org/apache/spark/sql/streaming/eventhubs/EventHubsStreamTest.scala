@@ -517,7 +517,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                 s"incorrect exception returned by query.exception()")
 
               val exception = currentStream.exception.get
-              exception.printStackTrace()
               verify(exception.cause.getClass === ef.causeClass,
                 "incorrect cause in exception returned by query.exception()\n" +
                   s"\tExpected: ${ef.causeClass}\n\tReturned: ${exception.cause.getClass}")

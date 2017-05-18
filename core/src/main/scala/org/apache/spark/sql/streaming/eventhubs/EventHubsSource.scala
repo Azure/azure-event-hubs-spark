@@ -25,6 +25,7 @@ import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
 import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
@@ -34,31 +35,33 @@ import org.apache.spark.sql.types._
 
 private[spark] class EventHubsSource(
     sqlContext: SQLContext,
-    parameters: Map[String, String],
-    eventhubReceiverCreator: (Map[String, String], Int, Long, Int) => EventHubsClientWrapper =
-      EventHubsClientWrapper.getEventHubReceiver,
-    eventhubClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient =
-      RestfulEventHubClient.getInstance) extends Source with EventHubsConnector with Logging {
+    eventHubsParams: Map[String, String],
+    eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+      EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+    eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
+      EventHubClient = RestfulEventHubClient.getInstance)
+  extends Source with EventHubsConnector with Logging {
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
   // the id of the stream which is mapped from eventhubs instance
   override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
 
-  private val eventHubsNamespace: String = parameters("eventhubs.namespace")
-  private val eventHubsName: String = parameters("eventhubs.name")
+  private val eventHubsNamespace: String = eventHubsParams("eventhubs.namespace")
+  private val eventHubsName: String = eventHubsParams("eventhubs.name")
 
   require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
   require(eventHubsName != null, "eventhubs.name is not defined")
 
   private var _eventHubsClient: EventHubClient = _
 
-  private var _eventHubsReceiver: (Map[String, String], Int, Long, Int)
+  private var _eventHubsReceiver: (Map[String, String], Int, Long, EventHubsOffsetType, Int)
     => EventHubsClientWrapper = _
 
   private[eventhubs] def eventHubClient = {
     if (_eventHubsClient == null) {
-      _eventHubsClient = eventhubClientCreator(eventHubsNamespace, Map(eventHubsName -> parameters))
+      _eventHubsClient = eventhubClientCreator(eventHubsNamespace,
+        Map(eventHubsName -> eventHubsParams))
     }
     _eventHubsClient
   }
@@ -71,7 +74,7 @@ private[spark] class EventHubsSource(
   }
 
   private val ehNameAndPartitions = {
-    val partitionCount = parameters("eventhubs.partition.count").toInt
+    val partitionCount = eventHubsParams("eventhubs.partition.count").toInt
     (for (partitionId <- 0 until partitionCount)
       yield EventHubNameAndPartition(eventHubsName, partitionId)).toList
   }
@@ -85,7 +88,7 @@ private[spark] class EventHubsSource(
 
   // initialize ProgressTracker
   private val progressTracker = StructuredStreamingProgressTracker.initInstance(
-    uid, parameters("eventhubs.progressTrackingDir"), sqlContext.sparkContext.appName,
+    uid, eventHubsParams("eventhubs.progressTrackingDir"), sqlContext.sparkContext.appName,
     sqlContext.sparkContext.hadoopConfiguration)
 
   private[spark] def setEventHubClient(eventHubClient: EventHubClient): EventHubsSource = {
@@ -94,7 +97,7 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def setEventHubsReceiver(
-      eventhubReceiverCreator: (Map[String, String], Int, Long, Int) =>
+      eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
         EventHubsClientWrapper): EventHubsSource = {
     _eventHubsReceiver = eventhubReceiverCreator
     this
@@ -105,15 +108,16 @@ private[spark] class EventHubsSource(
   // the offsets which have been to the self-managed offset store
   private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
+
   // the highest offsets in EventHubs side
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset = _
 
   override def schema: StructType = {
-    EventHubsSourceProvider.sourceSchema(parameters)
+    EventHubsSourceProvider.sourceSchema(eventHubsParams)
   }
 
   private[spark] def composeHighestOffset(retryIfFail: Boolean):
-      Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+  Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     RateControlUtils.fetchLatestOffset(eventHubClient,
       retryIfFail = retryIfFail,
       if (fetchedHighestOffsetsAndSeqNums == null) {
@@ -143,7 +147,6 @@ private[spark] class EventHubsSource(
    */
   private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
     committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
-
 
   private def cleanupFiles(batchIdToClean: Long): Unit = {
     Future {
@@ -180,7 +183,7 @@ private[spark] class EventHubsSource(
       firstBatch = false
     }
     val targetOffsets = RateControlUtils.clamp(committedOffsetsAndSeqNums.offsets,
-      highestOffsetsOpt.get, parameters)
+      highestOffsetsOpt.get, eventHubsParams)
     Some(EventHubsBatchRecord(committedOffsetsAndSeqNums.batchId + 1,
       targetOffsets.map{case (ehNameAndPartition, seqNum) =>
         (ehNameAndPartition, math.min(seqNum,
@@ -212,24 +215,41 @@ private[spark] class EventHubsSource(
       EventHubsOffset(committedBatchId,
         startOffsetOfUndergoingBatch.filter { case (connectorUID, _) =>
           connectorUID == uid
-        }.values.head.filter(_._1.eventHubName == parameters("eventhubs.name")))
+        }.values.head.filter(_._1.eventHubName == eventHubsParams("eventhubs.name")))
     }
   }
 
-  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
-    val offsetRanges = fetchedHighestOffsetsAndSeqNums.offsets.map {
-      case (eventHubNameAndPartition, (_, endSeqNum)) =>
-        OffsetRange(eventHubNameAndPartition,
-          fromOffset = committedOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._1,
-          fromSeq = committedOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
-          untilSeq = endOffset.targetSeqNums(eventHubNameAndPartition))
+  private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
+    val filterOffsetAndType = {
+      if (committedOffsetsAndSeqNums.batchId == -1) {
+        RateControlUtils.validateFilteringParams(eventHubClient, eventHubsParams,
+          ehNameAndPartitions)
+        RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,
+          committedOffsetsAndSeqNums.offsets)
+      } else {
+        Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
+      }
+    }
+    endOffset.targetSeqNums.map {
+      case (ehNameAndPartition, seqNum) =>
+        val (offsetType, offset) = RateControlUtils.calculateStartOffset(ehNameAndPartition,
+          filterOffsetAndType, committedOffsetsAndSeqNums.offsets)
+        OffsetRange(ehNameAndPartition,
+          fromOffset = offset,
+          fromSeq = committedOffsetsAndSeqNums.offsets(ehNameAndPartition)._2,
+          untilSeq = seqNum,
+          offsetType = offsetType)
     }.toList
+  }
+
+  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
+    val offsetRanges = composeOffsetRange(endOffset)
     new EventHubsRDD(
       sqlContext.sparkContext,
-      Map(parameters("eventhubs.name") -> parameters),
+      Map(eventHubsParams("eventhubs.name") -> eventHubsParams),
       offsetRanges,
       committedOffsetsAndSeqNums.batchId + 1,
-      OffsetStoreParams(parameters("eventhubs.progressTrackingDir"),
+      OffsetStoreParams(eventHubsParams("eventhubs.progressTrackingDir"),
         streamId, uid = uid, subDirs = sqlContext.sparkContext.appName, uid),
       eventHubsReceiver
     )
@@ -238,7 +258,7 @@ private[spark] class EventHubsSource(
   private def convertEventHubsRDDToDataFrame(eventHubsRDD: EventHubsRDD): DataFrame = {
     import scala.collection.JavaConverters._
     val (containsProperties, userDefinedKeys) =
-      EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(parameters)
+      EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(eventHubsParams)
     val rowRDD = eventHubsRDD.map(eventData =>
       Row.fromSeq(Seq(eventData.getBytes, eventData.getSystemProperties.getOffset.toLong,
         eventData.getSystemProperties.getSequenceNumber,
@@ -269,7 +289,7 @@ private[spark] class EventHubsSource(
   private def readProgress(batchId: Long): EventHubsOffset = {
     val nextBatchId = batchId + 1
     val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
-    if (progress.timestamp.milliseconds == -1 || !validateReadResults(progress)) {
+    if (progress.timestamp == -1 || !validateReadResults(progress)) {
       // next batch hasn't been committed
       val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
       EventHubsOffset(batchId, lastCommittedOffset.offsets)
@@ -332,6 +352,7 @@ private[spark] class EventHubsSource(
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
+
 }
 
 private object EventHubsSource {

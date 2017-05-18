@@ -20,6 +20,9 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
@@ -34,7 +37,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       partitionCount: Int,
       maxRate: Int,
       containsProperties: Boolean = false,
-      userDefinedKeys: Option[String] = None): Map[String, String] = {
+      userDefinedKeys: Option[String] = None,
+      enqueueTime: Option[Long] = None): Map[String, String] = {
     Map[String, String](
       "eventhubs.policyname" -> "policyName",
       "eventhubs.policykey" -> "policyKey",
@@ -45,7 +49,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       "eventhubs.progressTrackingDir" -> tempRoot,
       "eventhubs.maxRate" -> s"$maxRate",
       "eventhubs.sql.containsProperties" -> s"$containsProperties"
-    ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map())
+    ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map()) ++
+      enqueueTime.map(et => Map("eventhubs.filter.enqueuetime" -> et.toString)).getOrElse(Map())
   }
 
   private def generateIntKeyedData(num: Int, offset: Int = 0): Seq[(Int, Seq[(String, String)])] = {
@@ -66,8 +71,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -82,8 +89,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       offsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          EventHubsOffsetTypes.PreviousCheckpoint),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -99,8 +108,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     // First batch
@@ -126,8 +137,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -144,8 +157,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -163,8 +178,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     // First batch
@@ -197,8 +214,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -226,8 +245,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       ehOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          ehOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -245,8 +266,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -269,8 +292,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
-      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long, _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset),
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -553,9 +578,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       CheckAnswer(1, 2, 3, 4, 5, 6),
       StopStream(),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
-        additionalConfs = Map("eventhubs.test.checkpointLocation" ->
-          s"${Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath}",
-        "eventhubs.test.newSink" -> "true")),
+        additionalConfs = Map(
+          "eventhubs.test.checkpointLocation" ->
+            s"${Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath}",
+          "eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters),
       CheckAnswer(1, 2, 3, 4, 5, 6),
       AddEventHubsData(eventHubsParameters, highestBatchId.incrementAndGet().toLong,
@@ -584,9 +610,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     import sourceQuery.sparkSession.implicits._
     import org.apache.spark.sql.functions._
     val windowedStream = sourceQuery.groupBy(
-      window($"creationTime".cast(TimestampType),
-      "3 second",
-      "1 second")).count().sort("window").select("count")
+      window(
+        $"creationTime".cast(TimestampType),
+        "3 second",
+        "1 second")).count().sort("window").select("count")
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(1000), triggerClock = manualClock))
     val clockMove = Array.fill(13)(AdvanceManualClock(1000)).toSeq
@@ -635,5 +662,41 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       CheckAnswer(true, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 5, 6, 6))
     testStream(windowedStream, outputMode = OutputMode.Append())(
       firstBatch ++ clockMove ++ secondBatch: _*)
+  }
+
+  test("Filter enqueuetime correctly in structured streaming") {
+    import testImplicits._
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
+    val eventPayloadsAndProperties = generateIntKeyedData(15)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val manualClock = new StreamManualClock
+    testStream(sourceQuery)(
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      AddEventHubsData(eventHubsParameters, 2),
+      UpdatePartialCheck(
+        EventHubsBatchRecord(0,
+          Map(EventHubNameAndPartition("eh1", 1) -> 2, EventHubNameAndPartition("eh1", 0) -> 2))),
+      CheckAnswer(true, false, 7, 8, 9, 10, 11, 12),
+      // in the second batch we have the right seq number of msgs
+      UpdatePartialCheck(
+        EventHubsBatchRecord(1,
+          Map(EventHubNameAndPartition("eh1", 1) -> 6, EventHubNameAndPartition("eh1", 0) -> 7))),
+      AdvanceManualClock(10),
+      CheckAnswer(true, false, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+    )
+  }
+
+  test("Users cannot submit enqueueTime which is later than the latest in the queue") {
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3,
+      enqueueTime = Some(Long.MaxValue))
+    val eventPayloadsAndProperties = generateIntKeyedData(15)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val manualClock = new StreamManualClock
+    testStream(sourceQuery)(
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      ExpectFailure[IllegalArgumentException]()
+    )
   }
 }

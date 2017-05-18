@@ -30,8 +30,8 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{EventHubsClientWrapper, EventhubsOffsetTypes}
-import org.apache.spark.eventhubscommon.client.EventhubsOffsetTypes.EventhubsOffsetType
+import org.apache.spark.eventhubscommon.client.{EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
@@ -155,14 +155,10 @@ class MyMockedEventHubsClientWrapper(
   override def createReceiverInternal(connectionString: String,
                                       consumerGroup: String,
                                       partitionId: String,
-                                      offsetType: EventhubsOffsetType,
+                                      offsetType: EventHubsOffsetType,
                                       currentOffset: String,
                                       receiverEpoch: Long): Unit = {
-
-    logInfo(s"calling createReceiverInternal with $currentOffset and $offsetType")
-
-    if (offsetType != EventhubsOffsetTypes.None) {
-
+    if (offsetType != EventHubsOffsetTypes.None) {
       offset = currentOffset.toInt
       partition = partitionId
     }

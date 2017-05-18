@@ -36,6 +36,8 @@ import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 
+import org.apache.spark.DebugFilesystem
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
 import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
@@ -44,7 +46,7 @@ import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming._
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.{SharedSQLContext, TestSparkSession}
 import org.apache.spark.util.{Clock, ManualClock, SystemClock, Utils}
 
 /**
@@ -80,6 +82,12 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   override def afterAll(): Unit = {
     super.afterAll()
     FileSystem.get(new Configuration()).delete(new Path(s"$tempRoot/test-sql-context"), true)
+  }
+
+  override protected def createSparkSession: TestSparkSession = {
+    new TestSparkSession(
+      sparkConf.set("spark.hadoop.fs.file.impl", classOf[DebugFilesystem].getName).setAppName(
+        s"EventHubsStreamTest_${System.currentTimeMillis()}"))
   }
 
   /** How long to wait for an active stream to catch up when checking a result. */
@@ -122,6 +130,14 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
     }
 
     def apply(rows: Row*): CheckAnswerRows = CheckAnswerRows(rows, false, false)
+
+    def apply[A : Encoder](partial: Boolean, lastOnly: Boolean, rows: A*): CheckAnswerRows = {
+      val encoder = encoderFor[A]
+      val toExternalRow = RowEncoder(encoder.schema).resolveAndBind()
+      CheckAnswerRows(
+        rows.map(r => toExternalRow.fromRow(encoder.toRow(r))),
+        isSorted = false, lastOnly = lastOnly, ifCheckPartialResult = partial)
+    }
   }
 
   /**
@@ -142,14 +158,21 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         isSorted = isSorted)
     }
 
-    def apply(rows: Row*): CheckAnswerRows = CheckAnswerRows(rows, true, false)
+    def apply(rows: Row*): CheckAnswerRows = CheckAnswerRows(rows, lastOnly = true,
+      isSorted = false)
   }
 
-  case class CheckAnswerRows(expectedAnswer: Seq[Row], lastOnly: Boolean, isSorted: Boolean)
+  case class CheckAnswerRows(
+      expectedAnswer: Seq[Row],
+      lastOnly: Boolean,
+      isSorted: Boolean,
+      ifCheckPartialResult: Boolean = false)
     extends StreamAction with StreamMustBeRunning {
     override def toString: String = s"$operatorName: ${expectedAnswer.mkString(",")}"
     private def operatorName = if (lastOnly) "CheckLastBatch" else "CheckAnswer"
   }
+
+  case class UpdatePartialCheck(expectedOffset: Offset) extends StreamAction
 
   /** Stops the stream. It must currently be running. */
   case class StopStream(recoverStreamId: Boolean = false,
@@ -233,6 +256,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
     var currentStream: StreamExecution = null
     var lastStream: StreamExecution = null
     val awaiting = new mutable.HashMap[Int, Offset]() // source index -> offset to wait for
+    val partialAwaiting = new mutable.HashMap[Int, Offset]()
     var sink = new MemorySink(stream.schema, outputMode)
     val resetConfValues = mutable.Map[String, Option[String]]()
 
@@ -293,6 +317,14 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         case NonFatal(e) =>
           failTest(message, e)
       }
+    }
+
+    def findSourceIndex(plan: LogicalPlan, source: Source): Option[Int] = {
+      plan
+        .collect { case StreamingExecutionRelation(s, _) => s }
+        .zipWithIndex
+        .find(_._1 == source)
+        .map(_._2)
     }
 
     def failTest(message: String, cause: Throwable = null) = {
@@ -404,14 +436,13 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             activeQueries += currentStream.id -> currentStream
 
             val eventHubsSource = searchCurrentSource()
-            val progressTracker = StructuredStreamingProgressTracker.getInstance(
-              eventHubsSource.uid)
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(
               (eventHubsParameters: Map[String, String], partitionId: Int,
-               startOffset: Long, _: Int) => new TestEventHubsReceiver(eventHubsParameters,
-                eventHubs, partitionId, startOffset)
+               startOffset: Long, offsetType: EventHubsOffsetType, _: Int) =>
+                new TestEventHubsReceiver(eventHubsParameters, eventHubs, partitionId, startOffset,
+                  offsetType)
             )
             currentStream.start()
 
@@ -500,39 +531,34 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               currentStream = null
               streamDeathCause = null
             }
-
           case a: AssertOnQuery =>
             verify(currentStream != null || lastStream != null,
               "cannot assert when not stream has been started")
             val streamToAssert = Option(currentStream).getOrElse(lastStream)
             verify(a.condition(streamToAssert), s"Assert on query failed: ${a.message}")
-
           case a: Assert =>
             val streamToAssert = Option(currentStream).getOrElse(lastStream)
             verify({ a.run(); true }, s"Assert failed: ${a.message}")
-
+          case UpdatePartialCheck(expectedOffset: Offset) =>
+            val sources = currentStream.logicalPlan.collect {
+              case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
+                source.asInstanceOf[EventHubsSource]
+            }.head
+            val sourceIndex = findSourceIndex(currentStream.logicalPlan, sources)
+            partialAwaiting.put(sourceIndex.get, expectedOffset)
           case a: EventHubsAddData =>
             try {
               // Add data and get the source where it was added, and the expected offset of the
               // added data.
               val queryToUse = Option(currentStream).orElse(Option(lastStream))
               val (source, offset) = a.addData(queryToUse)
-
-              def findSourceIndex(plan: LogicalPlan): Option[Int] = {
-                plan
-                  .collect { case StreamingExecutionRelation(s, _) => s }
-                  .zipWithIndex
-                  .find(_._1 == source)
-                  .map(_._2)
-              }
-
               // Try to find the index of the source to which data was added. Either get the index
               // from the current active query or the original input logical plan.
               val sourceIndex =
               queryToUse.flatMap { query =>
-                findSourceIndex(query.logicalPlan)
+                findSourceIndex(query.logicalPlan, source)
               }.orElse {
-                findSourceIndex(stream.logicalPlan)
+                findSourceIndex(stream.logicalPlan, source)
               }.getOrElse {
                 throw new IllegalArgumentException(
                   "Could find index of the source to which data was added")
@@ -547,7 +573,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
           case e: ExternalAction =>
             e.runAction()
 
-          case CheckAnswerRows(expectedAnswer, lastOnly, isSorted) =>
+          case CheckAnswerRows(expectedAnswer, lastOnly, isSorted, partial) =>
             verify(currentStream != null, "stream not running")
             // Get the map of source index to the current source objects
             val indexToSource = currentStream
@@ -558,7 +584,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               .toMap
 
             // Block until all data added has been processed for all the source
-            awaiting.foreach { case (sourceIndex, offset) =>
+            {if (!partial) awaiting else partialAwaiting}.foreach { case (sourceIndex, offset) =>
               try {
                 failAfter(streamingTimeout) {
                   currentStream.awaitOffset(indexToSource(sourceIndex), offset)

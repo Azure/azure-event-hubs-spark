@@ -18,8 +18,10 @@
 package org.apache.spark.eventhubscommon
 
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
 
-import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
 private[spark] object RateControlUtils extends Logging {
@@ -111,5 +113,61 @@ private[spark] object RateControlUtils extends Logging {
     } else {
       r
     }
+  }
+
+  private[spark] def validateFilteringParams(
+      eventHubsClient: EventHubClient,
+      eventhubsParams: Map[String, _],
+      ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
+    // first check if the parameters are valid
+    val latestEnqueueTimeOfPartitions = eventHubsClient.lastEnqueueTimeOfPartitions(
+      retryIfFail = true, ehNameAndPartitions)
+    require(latestEnqueueTimeOfPartitions.isDefined, "cannot get latest enqueue time from Event" +
+      " Hubs Rest Endpoint")
+    latestEnqueueTimeOfPartitions.get.foreach {
+      case (ehNameAndPartition, latestEnqueueTime) =>
+        val passInEnqueueTime = eventhubsParams.get(ehNameAndPartition.eventHubName) match {
+          case Some(ehParams) =>
+            ehParams.asInstanceOf[Map[String, String]].getOrElse(
+              "eventhubs.filter.enqueuetime", Long.MinValue.toString).toLong
+          case None =>
+            eventhubsParams.asInstanceOf[Map[String, String]].getOrElse(
+              "eventhubs.filter.enqueuetime", Long.MinValue.toString).toLong
+        }
+        require(latestEnqueueTime >= passInEnqueueTime,
+          "you cannot pass in an enqueue time which is later than the highest enqueue time in" +
+            s" event hubs, ($ehNameAndPartition, pass-in-enqueuetime $passInEnqueueTime," +
+            s" latest-enqueuetime $latestEnqueueTime)")
+    }
+  }
+
+  private[spark] def composeFromOffsetWithFilteringParams(
+      eventhubsParams: Map[String, _],
+      fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)]):
+    Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
+    fetchedStartOffsetsInNextBatch.map {
+      case (ehNameAndPartition, (offset, seq)) =>
+        val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
+          offset.toString,
+          eventhubsParams.get(ehNameAndPartition.eventHubName) match {
+            case Some(ehConfig) =>
+              ehConfig.asInstanceOf[Map[String, String]]
+            case None =>
+              eventhubsParams.asInstanceOf[Map[String, String]]
+          })
+        (ehNameAndPartition, (offsetType, offsetStr.toLong))
+    }
+  }
+
+  private[spark] def calculateStartOffset(
+      ehNameAndPartition: EventHubNameAndPartition,
+      filteringOffsetAndType: Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)],
+      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)]):
+    (EventHubsOffsetType, Long) = {
+    filteringOffsetAndType.getOrElse(
+      ehNameAndPartition,
+      (EventHubsOffsetTypes.PreviousCheckpoint,
+        startOffsetInNextBatch(ehNameAndPartition)._1)
+    )
   }
 }

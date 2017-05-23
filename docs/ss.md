@@ -98,6 +98,8 @@ This is the approach we adopt in the example. By setting both entries, users wil
 
 The interested properties' keys are delimited by `,`. 
 
+NOTE: We currently only support String-typed properties.
+
 ### Future Directions
 
 We will continuously improve the stability and performance of EventHub integration. Some of the improvements are as following:

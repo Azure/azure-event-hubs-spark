@@ -81,6 +81,7 @@ By only setting `eventhubs.sql.containsProperties` to true, all properties in Ap
 
 This is the approach we adopt in the example. By setting both entries, users will get the DataFrame like 
 
+```
 +-------+------+---------+------------+--------------------+------------+-------------------+--------------------+
 |   body|offset|seqNumber|enqueuedTime|           publisher|partitionKey|otherUserDefinedKey|        creationTime|
 +-------+------+---------+------------+--------------------+------------+-------------------+--------------------+
@@ -91,7 +92,7 @@ This is the approach we adopt in the example. By setting both entries, users wil
 |   [37]|     1|        1|        1000|Microsoft Corpora...|           1|                  1|Tue May 23 11:16:...|
 |[31 31]|     2|        2|        2000|Microsoft Corpora...|           1|                  1|Tue May 23 11:16:...|
 +-------+------+---------+------------+--------------------+------------+-------------------+--------------------+
-
+```
 
 The interested properties' keys are delimited by `,`. 
 

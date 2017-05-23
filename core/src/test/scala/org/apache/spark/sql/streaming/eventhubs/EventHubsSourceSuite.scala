@@ -222,6 +222,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
+    dataFrame.show()
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
     val properties = dataFrame.select("properties").rdd.map(r => r.get(0)
@@ -253,6 +254,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestRestEventHubClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
+    dataFrame.show()
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
     assert(!dataFrame.columns.contains("creationTime"))

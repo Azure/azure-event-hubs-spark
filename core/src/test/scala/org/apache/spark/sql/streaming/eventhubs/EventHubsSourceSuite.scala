@@ -233,7 +233,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify user-defined keys show up in dataframe schema if specify userDefinedKey") {
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 10,
-      containsProperties = true, userDefinedKeys = Some("otherUserDefinedKey,"))
+      containsProperties = true, userDefinedKeys = Some("otherUserDefinedKey,creationTime"))
     val eventPayloadsAndProperties = Seq(
       1 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),
       3 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),

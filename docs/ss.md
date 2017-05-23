@@ -1,8 +1,8 @@
 ## Streaming Analytics for Structured Data with Spark and Azure Event Hubs
 
-In the latest release of spark-eventhubs, we offset the support of connecting Azure Event Hubs and Spark's structured streaming engine.
+With the latest release of spark-eventhubs, users can analyze real-time data ingested by Azure Event Hubs with Spark's Structured Streaming engine.
 
-[Structured Streaming](http://spark.apache.org/docs/latest/structured-streaming-programming-guide.html) is a new streaming procecessing engine built on top of Spark SQL Engine. With Structured Streaming, users can describe the computation in the same way as Spark SQL. Structured Streaming internals applies the user-defined computation over the continuously arriving data and update the data analytic results to deliver.
+[Structured Streaming](http://spark.apache.org/docs/latest/structured-streaming-programming-guide.html) is a new streaming procecessing engine built on top of Spark SQL. With Structured Streaming, users can describe the computation in the same way as with Spark SQL. Structured Streaming internals applies the user-defined computation over the continuously arriving data and update the data analytic results to deliver.
 
 ### Overview of Structured Streaming
 
@@ -10,13 +10,13 @@ The following figure shows the workflow of Spark Structured Streaming Connector 
 
 Structured Streaming also follows `micro-batch` model. It periodically fetches data from data source and uses a DataFrame to represent the fetched data for a certain batch. In Spark Structured Streaming Connector for EventHubs, we use a DataFrame to represent the data fetched from a `single EventHubs instance` for a certain batch. (If you are a user of Direct DStream-based Spark Streaming connector, note that this abstraction level is a bit different with Direct DStream design)
 
-For example, if the user has two EventHubs instaces, say `eh1` and `eh2`. Both of "eh1" and "eh2" contains 32 partitions. In this scenario, the user will create two DataFrames with the APIs we will introduce later. The DataFrames contain 64 partitions each of which maps to partition 0 - 31 of "eh1" and "eh2".
+For example, if the user has two EventHubs instaces, say `eh1` and `eh2`. Both of "eh1" and "eh2" contains 32 partitions. In this scenario, the user will create two DataFrames with the APIs we will introduce later. The DataFrames contain 32 partitions each of which maps to partition 0 - 31 of "eh1" and "eh2".
 
 ### How We Use It
 
 #### Establishing the Connection with Azure EventHubs
 
-The new API is simple to use. In the following code snippet, we establish a connection with eventhubs `eh1`.
+The new API is simple to use. In the following code snippet, we establish a connection between Structured Streaming and Azure Event Hubs.
 
 ```scala
 val eventhubParameters = Map[String, String] (
@@ -43,8 +43,10 @@ val streamingQuery1 = inputStream.writeStream.
 streamingQuery1.awaitTermination()
 ```
 
-`sparkSession` is an created SparkSession object as in every Spark SQL application (Spark 2.0+); in `eventhubParameters`, we specify the parameters required for Event Hubs connection, e.g. policyName, policyKey, consumergroup, etc. To establish the connection between Azure Event Hubs and Spark Structured Streaming connector for EventHubs, users only need to specify the stream format as `"eventhubs"`, e.g. `val inputStream = sparkSession.readStream.format("eventhubs").options(eventhubParameters)
+`sparkSession` is a SparkSession object which is needed in every Spark SQL application (Spark 2.0+). in `eventhubParameters`, we specify the parameters required for Event Hubs connection, e.g. policyName, policyKey, consumergroup, etc. To establish the connection, users only need to specify the stream format as `"eventhubs"`, e.g. `val inputStream = sparkSession.readStream.format("eventhubs").options(eventhubParameters)
   .load()`.
+  
+The following steps are exactly the same with other structured streaming applications, like set outputMode, trigger and specify Sink.
 
 #### Building Schema of Messages
 

@@ -56,7 +56,7 @@ In the above example, we have two additional parameters, `eventhubs.sql.contains
 
 In Event Hubs Client, users can serialize data in the `body` of EventData and additionally pack in some properties with application properties (more details see [Event Hubs Java Client](https://github.com/Azure/azure-event-hubs-java). ApplicationProperties is essentially a HashMap which types key as string and value as `java.lang.Object`.
 
-This feature is very useful when the user needs to mark the message with customized properties, e.g. the generated timestamp of the event. Transforming the user-added properties to the columns in DataFrame will facilitate the usage of Structured Streaming features, e.g. windowing, groupBy, and watermarks [More Details](http://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#operations-on-streaming-dataframesdatasets). 
+This feature is very useful when the user needs to mark the message with customized properties, e.g. the generated timestamp of the event. Transforming the user-added properties to the columns in DataFrame will facilitate the usage of Structured Streaming features, e.g. `windowing`, `groupBy`, and `watermarks`. [More Details](http://spark.apache.org/docs/latest/structured-streaming-programming-guide.html#operations-on-streaming-dataframesdatasets)
 
 The users of our structured streaming connector have two ways to transform the key-value pairs in ApplicationProperties to columns in DataFrame:
 

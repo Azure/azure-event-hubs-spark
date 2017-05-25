@@ -5,6 +5,12 @@
 * Structured Streaming Integration with Azure Event Hubs [77](https://github.com/hdinsight/spark-eventhubs/pull/77)
 * Support enqueueTime for 2.1.x [84](https://github.com/hdinsight/spark-eventhubs/pull/84)
 * Fix leaked no-daemon thread for 2.1.x [77](https://github.com/hdinsight/spark-eventhubs/pull/77)
+
+### 2.0.6 (May 25th, 2017)
+
+* Support enqueueTime for 2.1.x [74](https://github.com/hdinsight/spark-eventhubs/pull/74)
+* Fix leaked no-daemon thread for 2.0.x [68](https://github.com/hdinsight/spark-eventhubs/pull/68)
+
  
 ### 1.6.3 (April 11th, 2017)
 

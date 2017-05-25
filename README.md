@@ -5,7 +5,7 @@ This is the source code of EventHubsReceiver for Spark Streaming.
 
 For latest integration of EventHubs and Spark Streaming, the document can be found [here](docs/direct_stream.md).
 
-## Latest Release: 2.1.0, 2.0.5, 1.6.3
+## Latest Release: 2.1.0, 2.0.6, 1.6.3
 
 [Change Log](docs/change_log.md)
 

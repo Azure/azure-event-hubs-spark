@@ -40,8 +40,7 @@ import org.apache.spark.util.Utils
  * implementation of EventHub-based direct stream
  * @param _ssc the streaming context this stream belongs to
  * @param eventHubNameSpace the namespace of evenhub instances
- * @param progressDir the checkpoint directory path (we only support HDFS-based checkpoint
- *                      storage for now, so you have to prefix your path with hdfs://clustername/
+ * @param progressDir the path of directory saving the progress file
  * @param eventhubsParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */

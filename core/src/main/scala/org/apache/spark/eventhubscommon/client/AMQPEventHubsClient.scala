@@ -93,7 +93,7 @@ private[client] class AMQPEventHubsClient(
     try {
       val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
       Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, runTimeInfo.getLastEnqueuedTimeUtc.toEpochMilli)}.toMap)
+        (ehNameAndPartition, runTimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)}.toMap)
     } catch {
       case e: Exception =>
         e.printStackTrace()

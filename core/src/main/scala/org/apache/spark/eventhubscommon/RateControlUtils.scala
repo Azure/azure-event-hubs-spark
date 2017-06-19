@@ -166,8 +166,7 @@ private[spark] object RateControlUtils extends Logging {
     (EventHubsOffsetType, Long) = {
     filteringOffsetAndType.getOrElse(
       ehNameAndPartition,
-      (EventHubsOffsetTypes.PreviousCheckpoint,
-        startOffsetInNextBatch(ehNameAndPartition)._1)
+      (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(ehNameAndPartition)._1)
     )
   }
 }

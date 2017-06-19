@@ -356,7 +356,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace: String,
       simulatedEventHubs: SimulatedEventHubs,
       messagesBeforeEmpty: Long,
-      numBatchesBeforeNewData: Int,
+      timestampOfNewData: Long,
       eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
 
     val maxOffsetForEachEventHub = simulatedEventHubs.messagesStore.map {
@@ -371,7 +371,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
           offsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new FluctuatedEventHubClient(ssc, messagesBeforeEmpty, numBatchesBeforeNewData,
+        new FluctuatedEventHubClient(ssc, messagesBeforeEmpty, timestampOfNewData,
           maxOffsetForEachEventHub))
   }
 
@@ -381,10 +381,10 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       eventhubsParams: Map[String, Map[String, String]],
       operation: EventHubDirectDStream => DStream[V],
       messagesBeforeEmpty: Long,
-      numBatchesBeforeNewData: Int): StreamingContext = {
+      timestampOfNewData: Long): StreamingContext = {
 
     val inputStream = setupFluctuatedInputStream(eventhubNamespace, simulatedEventHubs,
-      messagesBeforeEmpty, numBatchesBeforeNewData, eventhubsParams)
+      messagesBeforeEmpty, timestampOfNewData, eventhubsParams)
     val operatedStream = operation(inputStream)
     val outputStream = new TestEventHubOutputStream(operatedStream,
       new ConcurrentLinkedQueue[Seq[Seq[V]]], None)
@@ -399,14 +399,14 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       operation: EventHubDirectDStream => DStream[V],
       expectedOutput: Seq[Seq[V]],
       messagesBeforeEmpty: Long,
-      numBatchesBeforeNewData: Int) {
+      timestampOfNewData: Long) {
 
     val numBatches_ = expectedOutput.size
     val simulatedEventHubs = createSimulatedEventHub(eventhubNamespace, input, eventhubsParams)
 
     withStreamingContext(
       setupFluctuatedEventHubStream(simulatedEventHubs, eventhubsParams, operation,
-        messagesBeforeEmpty, numBatchesBeforeNewData)) {
+        messagesBeforeEmpty, timestampOfNewData)) {
       ssc =>
         runStreamsWithEventHubInput(ssc, numBatches_, expectedOutput, useSet = false)
     }

@@ -102,7 +102,6 @@ private[eventhubs] class TestRestEventHubClient(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
-
     Some(targetEventHubNameAndPartitions.map {
       ehNameAndPartition =>
         (ehNameAndPartition, latestRecords(ehNameAndPartition)._3)
@@ -110,6 +109,20 @@ private[eventhubs] class TestRestEventHubClient(
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
+  }
 }
 
 private[eventhubs] class FragileEventHubClient private extends EventHubClient {
@@ -143,6 +156,20 @@ private[eventhubs] class FragileEventHubClient private extends EventHubClient {
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+  Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
+  }
 }
 
 // ugly stuff to make things checkpointable in tests
@@ -196,5 +223,19 @@ private[eventhubs] class FluctuatedEventHubClient(
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+  Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
+  }
 }
 

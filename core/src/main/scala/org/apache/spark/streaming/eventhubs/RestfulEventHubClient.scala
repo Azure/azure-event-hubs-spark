@@ -70,6 +70,12 @@ private[eventhubs] class RestfulEventHubClient(
       (partitionDescription \ "EndSequenceNumber").text.toLong)
   }
 
+  private def fromResponseBodyToStartSeq(responseBody: String): Long = {
+    val partitionDescription = XML.loadString(responseBody) \\ "entry" \
+      "content" \ "PartitionDescription"
+    (partitionDescription \ "BeginSequenceNumber").text.toLong
+  }
+
   private def fromParametersToURLString(eventHubName: String, partitionId: Int): String = {
     s"https://$eventHubNamespace.servicebus.windows.net/$eventHubName" +
       s"/consumergroups/${consumerGroups(eventHubName)}/partitions/$partitionId?api-version=2015-01"
@@ -192,6 +198,19 @@ private[eventhubs] class RestfulEventHubClient(
   Option[Map[EventHubNameAndPartition, Long]] = {
     queryPartitionRuntimeInfo(targetEventHubNameAndPartitions,
       fromResponseBodyToEnqueueTime, retryIfFail)
+  }
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    queryPartitionRuntimeInfo(targetEventHubNameAndPartitions,
+      fromResponseBodyToStartSeq, retryIfFail)
   }
 }
 

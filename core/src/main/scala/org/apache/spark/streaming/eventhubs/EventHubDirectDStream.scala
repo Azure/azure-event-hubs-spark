@@ -173,8 +173,19 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds,
       ssc.graph.batchDuration.milliseconds, fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
-    OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
-      offsetRecord.timestamp.milliseconds)), offsetRecord.offsets)
+    if (offsetRecord.timestamp.milliseconds != -1) {
+      OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
+        offsetRecord.timestamp.milliseconds)), offsetRecord.offsets)
+    } else {
+      // query start startSeqs
+      val startSeqs = eventHubClient.startSeqOfPartition(retryIfFail = false,
+        eventhubNameAndPartitions.toList)
+      OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
+        offsetRecord.timestamp.milliseconds)), offsetRecord.offsets.map{
+        case (ehNameAndPartition, (offset, seq)) =>
+          (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))
+        })
+    }
   }
 
   private def reportInputInto(validTime: Time,

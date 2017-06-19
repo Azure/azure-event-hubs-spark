@@ -183,7 +183,7 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Predef.Map[EventHubNameAndPartition, Long]] = {
     throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
-      " client yet, please use RestfulEventHubClient")
+      " client yet, please use AMQPEventHubsClient")
   }
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {
@@ -212,7 +212,20 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
       targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
-      " yet, please use RestfulEventHubClient")
+      " yet, please use AMQPEventHubsClient")
+  }
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("startSeqOfPartition is not supported by this client" +
+      " yet, please use AMQPEventHubsClient")
   }
 }
 

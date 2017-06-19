@@ -89,7 +89,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     x
   }
 
-  private var _eventHubClient: EventHubClient = _
+  @transient private var _eventHubClient: EventHubClient = _
 
   private def progressTracker = ProgressTracker.getInstance
 

@@ -128,8 +128,6 @@ private[eventhubs] class AMQPEventHubsClient(
       ehClient.closeSync()
     }
   }
-
-
 }
 
 private[eventhubs] object AMQPEventHubsClient {

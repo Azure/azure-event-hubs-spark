@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -39,7 +39,7 @@ private[spark] class EventHubsSource(
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = RestfulEventHubClient.getInstance)
+      EventHubClient = AMQPEventHubsClient.getInstance)
   extends Source with EventHubsConnector with Logging {
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
@@ -222,6 +222,11 @@ private[spark] class EventHubsSource(
   private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
     val filterOffsetAndType = {
       if (committedOffsetsAndSeqNums.batchId == -1) {
+        val startSeqs = eventHubClient.startSeqOfPartition(false, connectedInstances)
+        require(startSeqs.isDefined, s"cannot fetch start seqs for eventhubs $eventHubsName")
+        committedOffsetsAndSeqNums = EventHubsOffset(-1, committedOffsetsAndSeqNums.offsets.map {
+          case (ehNameAndPartition, (offset, _)) =>
+            (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))})
         RateControlUtils.validateFilteringParams(eventHubClient, eventHubsParams,
           ehNameAndPartitions)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,

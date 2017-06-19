@@ -123,6 +123,20 @@ class SimulatedEventHubsRestClient(
             toEpochMilli)
     }.toMap)
   }
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
+  }
 }
 
 class TestRestEventHubClient(
@@ -153,6 +167,20 @@ class TestRestEventHubClient(
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
+  }
 }
 
 class FragileEventHubClient private extends EventHubClient {
@@ -186,6 +214,20 @@ class FragileEventHubClient private extends EventHubClient {
   }
 
   override def close(): Unit = {}
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
+  }
 }
 
 // ugly stuff to make things checkpointable in tests
@@ -238,6 +280,20 @@ class FluctuatedEventHubClient(
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
     Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
+  }
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map {
+      ehNameAndPartition =>
+        (ehNameAndPartition, -1L)}.toMap)
   }
 }
 

@@ -24,7 +24,7 @@ import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -52,7 +52,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = RestfulEventHubClient.getInstance)
+      EventHubClient = AMQPEventHubsClient.getInstance)
   extends InputDStream[EventData](_ssc) with EventHubsConnector with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
@@ -90,7 +90,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     */
   }
 
-  private var _eventHubClient: EventHubClient = _
+  @transient private var _eventHubClient: EventHubClient = _
 
   private def progressTracker = DirectDStreamProgressTracker.getInstance.
     asInstanceOf[DirectDStreamProgressTracker]
@@ -137,11 +137,21 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    * @return EventHubName-Partition -> (offset, seq)
    */
   private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
-    val offsetRecord = progressTracker.read(eventHubNameSpace,
-      validTime.milliseconds - ssc.graph.batchDuration.milliseconds, fallBack)
+    val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds, fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
-    OffsetRecord(math.max(ssc.graph.startTime.milliseconds,
-      offsetRecord.timestamp), offsetRecord.offsets)
+    if (offsetRecord.timestamp != -1) {
+      OffsetRecord(math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
+        offsetRecord.offsets)
+    } else {
+      // query start startSeqs
+      val startSeqs = eventHubClient.startSeqOfPartition(retryIfFail = false,
+        eventhubNameAndPartitions.toList)
+      OffsetRecord(math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
+        offsetRecord.offsets.map {
+          case (ehNameAndPartition, (offset, seq)) =>
+            (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))
+        })
+    }
   }
 
   private def reportInputInto(validTime: Time,

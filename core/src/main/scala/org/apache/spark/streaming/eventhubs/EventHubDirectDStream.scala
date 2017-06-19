@@ -51,7 +51,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = RestfulEventHubClient.getInstance)
+      EventHubClient = AMQPEventHubsClient.getInstance)
   extends InputDStream[EventData](_ssc) with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"

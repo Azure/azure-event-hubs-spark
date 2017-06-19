@@ -24,6 +24,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}
+import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 import org.apache.spark.streaming.receiver.Receiver
 
@@ -114,6 +115,24 @@ object EventHubsUtils {
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
     val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
+    newStream
+  }
+
+  /**
+   * internal API to test, by default, we do not allow user to change eventhubsReceiverCreator and
+   * eventHubsClientCreator
+   */
+  private[eventhubs] def createDirectStreams(
+      ssc: StreamingContext,
+      eventHubNamespace: String,
+      progressDir: String,
+      eventParams: Predef.Map[String, Predef.Map[String, String]],
+      eventHubsReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+        EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+      eventHubsClientCreator: (String, Map[String, Map[String, String]]) => EventHubClient ):
+    EventHubDirectDStream = {
+    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams,
+      eventHubsReceiverCreator, eventHubsClientCreator)
     newStream
   }
 

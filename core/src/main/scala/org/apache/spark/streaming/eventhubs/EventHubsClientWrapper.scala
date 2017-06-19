@@ -94,6 +94,18 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
     MAXIMUM_EVENT_RATE
   }
 
+  /**
+   * create a client without initializing receivers
+   *
+   * the major purpose of this API is for creating AMQP management client
+   */
+  def createClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
+    val (connectionString, _, _) = configureGeneralParameters(
+      eventhubsParams)
+    eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString.toString)
+    eventhubsClient
+  }
+
   def createReceiver(
       eventhubsParams: Map[String, String],
       partitionId: String,
@@ -218,6 +230,10 @@ private[eventhubs] object EventHubsClientWrapper {
     } else {
       (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
     }
+  }
+
+  def getEventHubsClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
+    new EventHubsClientWrapper().createClient(eventhubsParams)
   }
 
   def getEventHubReceiver(

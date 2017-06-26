@@ -22,6 +22,16 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 private[spark] trait EventHubClient extends Serializable {
 
   /**
+   * return the start seq number of each partition
+   * @return a map from eventhubName-partition to seq
+   */
+  def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
+    Option[Map[EventHubNameAndPartition, Long]]
+
+
+  /**
    * return the end point of each partition
    * @return a map from eventhubName-partition to (offset, seq)
    */

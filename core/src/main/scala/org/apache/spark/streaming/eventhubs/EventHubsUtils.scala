@@ -21,7 +21,8 @@ import scala.collection.Map
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.{DStream, ReceiverInputDStream}
@@ -116,6 +117,24 @@ object EventHubsUtils {
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
     val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
+    newStream
+  }
+
+  /**
+   * internal API to test, by default, we do not allow user to change eventhubsReceiverCreator and
+   * eventHubsClientCreator
+   */
+  private[eventhubs] def createDirectStreams(
+      ssc: StreamingContext,
+      eventHubNamespace: String,
+      progressDir: String,
+      eventParams: Predef.Map[String, Predef.Map[String, String]],
+      eventHubsReceiverCreator: (Predef.Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+        EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+      eventHubsClientCreator: (String, Predef.Map[String, Predef.Map[String, String]]) =>
+        EventHubClient): EventHubDirectDStream = {
+    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams,
+      eventHubsReceiverCreator, eventHubsClientCreator)
     newStream
   }
 

@@ -76,6 +76,12 @@ private[spark] class RestfulEventHubClient(
       s"/consumergroups/${consumerGroups(eventHubName)}/partitions/$partitionId?api-version=2015-01"
   }
 
+  private def fromResponseBodyToStartSeq(responseBody: String): Long = {
+    val partitionDescription = XML.loadString(responseBody) \\ "entry" \
+      "content" \ "PartitionDescription"
+    (partitionDescription \ "BeginSequenceNumber").text.toLong
+  }
+
   private def aggregateResults[T](undergoingRequests: List[Future[(EventHubNameAndPartition, T)]]):
       Option[Map[EventHubNameAndPartition, T]] = {
     Await.ready(Future.sequence(undergoingRequests), 60 seconds).value.get match {
@@ -192,6 +198,19 @@ private[spark] class RestfulEventHubClient(
     Option[Map[EventHubNameAndPartition, Long]] = {
     queryPartitionRuntimeInfo(targetEventHubNameAndPartitions,
       fromResponseBodyToEnqueueTime, retryIfFail)
+  }
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Map[EventHubNameAndPartition, Long]] = {
+    queryPartitionRuntimeInfo(targetEventHubNameAndPartitions,
+      fromResponseBodyToStartSeq, retryIfFail)
   }
 }
 

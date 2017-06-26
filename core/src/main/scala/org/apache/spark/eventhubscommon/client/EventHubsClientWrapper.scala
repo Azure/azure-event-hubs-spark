@@ -92,6 +92,18 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     MAXIMUM_EVENT_RATE
   }
 
+  /**
+   * create a client without initializing receivers
+   *
+   * the major purpose of this API is for creating AMQP management client
+   */
+  def createClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
+    val (connectionString, _, _) = configureGeneralParameters(
+      eventhubsParams)
+    eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString.toString)
+    eventhubsClient
+  }
+
   def createReceiver(
       eventhubsParams: Predef.Map[String, String],
       partitionId: String,
@@ -186,7 +198,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
       targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
-      " yet, please use RestfulEventHubClient")
+      " yet, please use AMQPEventHubsClient")
   }
 
   /**
@@ -199,7 +211,20 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Predef.Map[EventHubNameAndPartition, Long]] = {
     throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
-      " client yet, please use RestfulEventHubClient")
+      " client yet, please use AMQPEventHubsClient")
+  }
+
+  /**
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
+    throw new UnsupportedOperationException("startSeqOfPartition is not supported by this client" +
+      " yet, please use AMQPEventHubsClient")
   }
 }
 
@@ -217,6 +242,10 @@ private[spark] object EventHubsClientWrapper {
     } else {
       (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
     }
+  }
+
+  def getEventHubsClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
+    new EventHubsClientWrapper().createClient(eventhubsParams)
   }
 
   def getEventHubReceiver(

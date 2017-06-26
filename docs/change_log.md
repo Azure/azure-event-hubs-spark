@@ -1,5 +1,13 @@
 ## Change Log
 
+### 2.1.1 (June 25th, 2017)
+
+* replace Rest Client with latest SDK call to query partition info [97](https://github.com/hdinsight/spark-eventhubs/pull/97)
+
+### 2.0.7 (June 25th, 2017)
+
+* replace Rest Client with latest SDK call to query partition info [95](https://github.com/hdinsight/spark-eventhubs/pull/95)
+
 ### 2.1.0 (May 25th, 2017)
 
 * Structured Streaming Integration with Azure Event Hubs [77](https://github.com/hdinsight/spark-eventhubs/pull/77)

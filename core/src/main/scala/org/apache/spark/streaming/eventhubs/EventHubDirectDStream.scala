@@ -51,7 +51,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = RestfulEventHubClient.getInstance)
+      EventHubClient = AMQPEventHubsClient.getInstance)
   extends InputDStream[EventData](_ssc) with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
@@ -89,7 +89,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     x
   }
 
-  private var _eventHubClient: EventHubClient = _
+  @transient private var _eventHubClient: EventHubClient = _
 
   private def progressTracker = ProgressTracker.getInstance
 
@@ -173,8 +173,19 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val offsetRecord = progressTracker.read(eventHubNameSpace, validTime.milliseconds,
       ssc.graph.batchDuration.milliseconds, fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
-    OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
-      offsetRecord.timestamp.milliseconds)), offsetRecord.offsets)
+    if (offsetRecord.timestamp.milliseconds != -1) {
+      OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
+        offsetRecord.timestamp.milliseconds)), offsetRecord.offsets)
+    } else {
+      // query start startSeqs
+      val startSeqs = eventHubClient.startSeqOfPartition(retryIfFail = false,
+        eventhubNameAndPartitions.toList)
+      OffsetRecord(Time(math.max(ssc.graph.startTime.milliseconds,
+        offsetRecord.timestamp.milliseconds)), offsetRecord.offsets.map{
+        case (ehNameAndPartition, (offset, seq)) =>
+          (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))
+        })
+    }
   }
 
   private def reportInputInto(validTime: Time,

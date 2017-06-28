@@ -24,11 +24,12 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.{EventHubsClientWrapper, EventHubsReceiver}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
 import org.apache.spark.rdd.RDD
+import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 // scalastyle:on
 
@@ -53,6 +54,8 @@ private[spark] class EventHubsRDD(
       EventHubsClientWrapper)
   extends RDD[EventData](sc, Nil) {
 
+  import EventHubsReceiver._
+
   override def getPartitions: Array[Partition] = {
     offsetRanges.zipWithIndex.map { case (offsetRange, index) =>
       new EventHubRDDPartition(index, offsetRange.eventHubNameAndPartition, offsetRange.fromOffset,
@@ -60,6 +63,32 @@ private[spark] class EventHubsRDD(
     }.toArray
   }
 
+  private def wrappingReceive[T: EventHubsReceiver](
+      eventHubNameAndPartition: EventHubNameAndPartition,
+      eventHubClient: T,
+      expectedEventNumber: Int)(implicit receiver: EventHubsReceiver[T]): List[EventData] = {
+    val receivedBuffer = new ListBuffer[EventData]
+    val receivingTrace = new ListBuffer[Long]
+    var cnt = 0
+    while (receivedBuffer.size < expectedEventNumber) {
+      if (cnt > expectedEventNumber * 2) {
+        throw new Exception(s"$eventHubNameAndPartition cannot return data, the trace is" +
+          s" ${receivingTrace.toList}")
+      }
+      val receivedEventsItr = receiver.receive(eventHubClient, expectedEventNumber)
+      if (receivedEventsItr == null) {
+        // no more messages
+        return receivedBuffer.toList
+      }
+      val receivedEvents = receivedEventsItr.toList
+      receivingTrace += receivedEvents.length
+      cnt += 1
+      receivedBuffer ++= receivedEvents
+    }
+    receivedBuffer.toList
+  }
+
+  /*
   private def wrappingReceive(
       eventHubNameAndPartition: EventHubNameAndPartition,
       eventHubClient: EventHubsClientWrapper,
@@ -84,6 +113,77 @@ private[spark] class EventHubsRDD(
     }
     receivedBuffer.toList
   }
+  */
+
+  private def executors(): Array[ExecutorCacheTaskLocation] = {
+    val bm = sparkContext.env.blockManager
+    bm.master.getPeers(bm.blockManagerId).toArray
+      .map(x => ExecutorCacheTaskLocation(x.host, x.executorId))
+      .sortWith(compareExecutors)
+  }
+
+  private def compareExecutors(
+      a: ExecutorCacheTaskLocation,
+      b: ExecutorCacheTaskLocation): Boolean = {
+    if (a.host == b.host) {
+      a.executorId > b.executorId
+    } else {
+      a.host > b.host
+    }
+  }
+
+  override def getPreferredLocations(part: Partition): Seq[String] = {
+    val eventHubsPart = part.asInstanceOf[EventHubRDDPartition]
+    val allExecs = executors()
+    val ehNameAndPartition = eventHubsPart.eventHubNameAndPartitionID
+    // execs is sorted, tp.hashCode depends only on topic and partition, so consistent index
+    val index = Math.floorMod(ehNameAndPartition.hashCode(), allExecs.length)
+    val chosen = allExecs(index)
+    Seq(chosen.toString)
+  }
+
+  private def processExaustedPartition(
+      progressWriter: ProgressWriter,
+      eventHubsPartition: EventHubRDDPartition):
+    Iterator[EventData] = {
+    logInfo(s"No new data in ${eventHubsPartition.eventHubNameAndPartitionID} at $batchTime")
+    val fromOffset = eventHubsPartition.fromOffset
+    progressWriter.write(batchTime, eventHubsPartition.fromOffset,
+      eventHubsPartition.fromSeq)
+    logInfo(s"write offset $fromOffset, sequence number" +
+      s" ${eventHubsPartition.fromSeq} for EventHub" +
+      s" ${eventHubsPartition.eventHubNameAndPartitionID} at $batchTime")
+    Iterator()
+  }
+
+  private def fetchDataFromEventHubs(
+      progressWriter: ProgressWriter,
+      eventHubsPartition: EventHubRDDPartition): Iterator[EventData] = {
+    val fromOffset = eventHubsPartition.fromOffset
+    val maxRate = (eventHubsPartition.untilSeq - eventHubsPartition.fromSeq).toInt
+    val startTime = System.currentTimeMillis()
+    logInfo(s"${eventHubsPartition.eventHubNameAndPartitionID}" +
+      s" expected rate $maxRate, fromSeq ${eventHubsPartition.fromSeq} (exclusive) untilSeq" +
+      s" ${eventHubsPartition.untilSeq} (inclusive) at $batchTime")
+    val eventHubParameters = eventHubsParamsMap(eventHubsPartition.eventHubNameAndPartitionID.
+      eventHubName)
+    val eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
+      eventHubsPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
+      eventHubsPartition.offsetType, maxRate)
+    val receivedEvents = wrappingReceive(eventHubsPartition.eventHubNameAndPartitionID,
+      eventHubReceiver, maxRate)
+    logInfo(s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
+      s" there is no more messages, time cost:" +
+      s" ${(System.currentTimeMillis() - startTime) / 1000.0} seconds")
+    val lastEvent = receivedEvents.last
+    val endOffset = lastEvent.getSystemProperties.getOffset.toLong
+    val endSeq = lastEvent.getSystemProperties.getSequenceNumber
+    progressWriter.write(batchTime, endOffset, endSeq)
+    logInfo(s"write offset $endOffset, sequence number $endSeq for EventHub" +
+      s" ${eventHubsPartition.eventHubNameAndPartitionID} at $batchTime")
+    eventHubReceiver.close()
+    receivedEvents.iterator
+  }
 
   @DeveloperApi
   override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
@@ -93,37 +193,9 @@ private[spark] class EventHubsRDD(
       offsetParams.checkpointDir, offsetParams.subDirs: _*)
     val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
-      logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      progressWriter.write(batchTime, eventHubPartition.fromOffset,
-        eventHubPartition.fromSeq)
-      logInfo(s"write offset $fromOffset, sequence number" +
-        s" ${eventHubPartition.fromSeq} for EventHub" +
-        s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      Iterator()
+      processExaustedPartition(progressWriter, eventHubPartition)
     } else {
-      val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt
-      val startTime = System.currentTimeMillis()
-      logInfo(s"${eventHubPartition.eventHubNameAndPartitionID}" +
-        s" expected rate $maxRate, fromSeq ${eventHubPartition.fromSeq} (exclusive) untilSeq" +
-        s" ${eventHubPartition.untilSeq} (inclusive) at $batchTime")
-      val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
-        eventHubName)
-      val eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
-        eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
-        eventHubPartition.offsetType, maxRate)
-      val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
-        eventHubReceiver, maxRate)
-      logInfo(s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
-        s" there is no more messages, time cost:" +
-        s" ${(System.currentTimeMillis() - startTime) / 1000.0} seconds")
-      val lastEvent = receivedEvents.last
-      val endOffset = lastEvent.getSystemProperties.getOffset.toLong
-      val endSeq = lastEvent.getSystemProperties.getSequenceNumber
-      progressWriter.write(batchTime, endOffset, endSeq)
-      logInfo(s"write offset $endOffset, sequence number $endSeq for EventHub" +
-        s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      eventHubReceiver.close()
-      receivedEvents.iterator
+      fetchDataFromEventHubs(progressWriter, eventHubPartition)
     }
   }
 }

@@ -19,9 +19,10 @@ package org.apache.spark.eventhubscommon.client
 
 import java.time.Instant
 
-import com.microsoft.azure.eventhubs.{PartitionReceiver, EventHubClient => AzureEventHubClient}
+import com.microsoft.azure.eventhubs.{EventData, PartitionReceiver, EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus.ConnectionStringBuilder
 
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 

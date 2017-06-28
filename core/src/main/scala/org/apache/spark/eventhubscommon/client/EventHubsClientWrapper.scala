@@ -29,17 +29,12 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsClientWrapper extends Serializable with EventHubClient with Logging {
+private[spark] class EventHubsClientWrapper extends EventHubClient with Logging {
 
   import Common._
 
   var eventhubsClient: AzureEventHubClient = _
   private var eventhubsReceiver: PartitionReceiver = _
-
-  // TODO: the design of this class is not simple enough
-  // ideally, we shall not require the user to explicitly call createReceiver first
-  // and then call receive
-  // we shall let the user pass parameters in the constructor directly
 
   /**
    * create a client without initializing receivers

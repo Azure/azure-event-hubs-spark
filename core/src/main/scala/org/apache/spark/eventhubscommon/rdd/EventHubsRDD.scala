@@ -137,9 +137,13 @@ private[spark] class EventHubsRDD(
     val allExecs = executors()
     val ehNameAndPartition = eventHubsPart.eventHubNameAndPartitionID
     // execs is sorted, tp.hashCode depends only on topic and partition, so consistent index
-    val index = Math.floorMod(ehNameAndPartition.hashCode(), allExecs.length)
-    val chosen = allExecs(index)
-    Seq(chosen.toString)
+    if (allExecs.nonEmpty) {
+      val index = Math.floorMod(ehNameAndPartition.hashCode(), allExecs.length)
+      val chosen = allExecs(index)
+      Seq(chosen.toString)
+    } else {
+      Seq()
+    }
   }
 
   private def processExaustedPartition(

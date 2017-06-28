@@ -63,7 +63,7 @@ private[spark] class EventHubsRDD(
     }.toArray
   }
 
-  private def wrappingReceive[T: EventHubsReceiver](
+  private def wrappingReceive[T](
       eventHubNameAndPartition: EventHubNameAndPartition,
       eventHubClient: T,
       expectedEventNumber: Int)(implicit receiver: EventHubsReceiver[T]): List[EventData] = {

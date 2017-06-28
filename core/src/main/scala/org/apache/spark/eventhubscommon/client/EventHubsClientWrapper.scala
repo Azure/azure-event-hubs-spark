@@ -16,12 +16,9 @@
  */
 package org.apache.spark.eventhubscommon.client
 
-import java.time.Instant
-
 import scala.collection.JavaConverters._
 
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
-import com.microsoft.azure.servicebus._
 import EventHubsOffsetTypes.EventHubsOffsetType
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
@@ -34,63 +31,15 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 @SerialVersionUID(1L)
 private[spark] class EventHubsClientWrapper extends Serializable with EventHubClient with Logging {
 
+  import Common._
+
   var eventhubsClient: AzureEventHubClient = _
+  private var eventhubsReceiver: PartitionReceiver = _
 
   // TODO: the design of this class is not simple enough
   // ideally, we shall not require the user to explicitly call createReceiver first
   // and then call receive
   // we shall let the user pass parameters in the constructor directly
-
-  private def configureGeneralParameters(eventhubsParams: Predef.Map[String, String]) = {
-    if (eventhubsParams.contains("eventhubs.uri") &&
-      eventhubsParams.contains("eventhubs.namespace")) {
-      throw new IllegalArgumentException(s"Eventhubs URI and namespace cannot both be specified" +
-        s" at the same time.")
-    }
-
-    val namespaceName = if (eventhubsParams.contains("eventhubs.namespace")) {
-      eventhubsParams.get("eventhubs.namespace")
-    } else {
-      eventhubsParams.get("eventhubs.uri")
-    }
-    if (namespaceName.isEmpty) {
-      throw new IllegalArgumentException(s"Either Eventhubs URI or namespace nust be" +
-        s" specified.")
-    }
-    // TODO: validate inputs
-    val evhName = eventhubsParams("eventhubs.name")
-    val evhPolicyName = eventhubsParams("eventhubs.policyname")
-    val evhPolicyKey = eventhubsParams("eventhubs.policykey")
-    val connectionString = new ConnectionStringBuilder(namespaceName.get, evhName, evhPolicyName,
-      evhPolicyKey)
-    // Set the consumer group if specified.
-    val consumerGroup = eventhubsParams.getOrElse("eventhubs.consumergroup",
-      AzureEventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
-    // Set the epoch if specified
-    val receiverEpoch = eventhubsParams.getOrElse("eventhubs.epoch",
-      DEFAULT_RECEIVER_EPOCH.toString).toLong
-    (connectionString, consumerGroup, receiverEpoch)
-  }
-
-  private def configureStartOffset(
-      eventhubsParams: Predef.Map[String, String], offsetStore: OffsetStore):
-      (EventHubsOffsetType, String) = {
-    // Determine the offset to start receiving data
-    val previousOffset = offsetStore.read()
-    EventHubsClientWrapper.configureStartOffset(previousOffset, eventhubsParams)
-  }
-
-  private def configureMaxEventRate(userDefinedEventRate: Int): Int = {
-    if (userDefinedEventRate > 0 && userDefinedEventRate < MINIMUM_PREFETCH_COUNT) {
-      MAXIMUM_PREFETCH_COUNT = MINIMUM_PREFETCH_COUNT
-    } else if (userDefinedEventRate >= MINIMUM_PREFETCH_COUNT &&
-      userDefinedEventRate < MAXIMUM_PREFETCH_COUNT) {
-      MAXIMUM_PREFETCH_COUNT = userDefinedEventRate + 1
-    } else {
-      MAXIMUM_EVENT_RATE = MAXIMUM_PREFETCH_COUNT - 1
-    }
-    MAXIMUM_EVENT_RATE
-  }
 
   /**
    * create a client without initializing receivers
@@ -98,8 +47,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
    * the major purpose of this API is for creating AMQP management client
    */
   def createClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
-    val (connectionString, _, _) = configureGeneralParameters(
-      eventhubsParams)
+    val (connectionString, _, _) = configureGeneralParameters(eventhubsParams)
     eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString.toString)
     eventhubsClient
   }
@@ -141,25 +89,8 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
       receiverEpoch: Long): Unit = {
     // Create Eventhubs client
     eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString)
-
-    eventhubsReceiver = offsetType match {
-      case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
-           | EventHubsOffsetTypes.InputByteOffset =>
-        if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
-          eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId, currentOffset,
-            receiverEpoch)
-        } else {
-          eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
-        }
-      case EventHubsOffsetTypes.InputTimeOffset =>
-        if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
-          eventhubsClient.createEpochReceiverSync(consumerGroup, partitionId,
-            Instant.ofEpochSecond(currentOffset.toLong), receiverEpoch)
-        } else {
-          eventhubsClient.createReceiverSync(consumerGroup, partitionId,
-            Instant.ofEpochSecond(currentOffset.toLong))
-        }
-    }
+    eventhubsReceiver = createNewReceiver(eventhubsClient,
+      consumerGroup, partitionId, offsetType, currentOffset, receiverEpoch)
     eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
   }
 
@@ -186,12 +117,6 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
   def closeReceiver(): Unit = {
     eventhubsReceiver.closeSync()
   }
-
-  private var eventhubsReceiver: PartitionReceiver = _
-  private val MINIMUM_PREFETCH_COUNT: Int = 10
-  private var MAXIMUM_PREFETCH_COUNT: Int = 999
-  private var MAXIMUM_EVENT_RATE: Int = 0
-  private val DEFAULT_RECEIVER_EPOCH = -1L
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -228,7 +153,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
   }
 }
 
-private[spark] object EventHubsClientWrapper {
+private[spark] object EventHubsClientWrapper extends Logging {
 
   private[eventhubscommon] def configureStartOffset(
       previousOffset: String,

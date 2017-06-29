@@ -104,6 +104,7 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
   }
 
   def close(): Unit = {
+    System.out.println("close")
     if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
     if (eventhubsClient != null) eventhubsClient.closeSync()
   }

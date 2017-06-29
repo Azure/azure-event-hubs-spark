@@ -28,7 +28,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsReceiverWrapper extends Logging {
+private[spark] class EventHubsReceiverWrapper extends Serializable with Logging {
 
   import Common._
 

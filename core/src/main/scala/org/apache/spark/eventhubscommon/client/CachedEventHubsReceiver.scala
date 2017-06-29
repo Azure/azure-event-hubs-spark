@@ -36,7 +36,7 @@ private[spark] class CachedEventHubsReceiver(
     offsetType: EventHubsOffsetType,
     maximumEventRate: Int,
     batchInterval: Long,
-    currentTimestamp: Long) {
+    currentTimestamp: Long) extends Serializable with Logging {
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {
     val receiver = CachedEventHubsReceiver.getOrCreateReceiver(eventhubsParams,
@@ -48,7 +48,7 @@ private[spark] class CachedEventHubsReceiver(
 }
 
 
-private[spark] object CachedEventHubsReceiver extends Logging {
+private object CachedEventHubsReceiver extends Logging {
 
   private var _eventhubsClient: AzureEventHubClient = _
   private var _receiverCache: Cache[EventHubNameAndPartition, (PartitionReceiver, Long)] = _

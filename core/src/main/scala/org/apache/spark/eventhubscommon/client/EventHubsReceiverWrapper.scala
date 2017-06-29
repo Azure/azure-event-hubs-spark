@@ -29,7 +29,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsClientWrapper extends EventHubClient with Logging {
+private[spark] class EventHubsReceiverWrapper extends Logging {
 
   import Common._
 
@@ -104,7 +104,7 @@ private[spark] class EventHubsClientWrapper extends EventHubClient with Logging 
     if (events != null) events.asScala else null
   }
 
-  override def close(): Unit = {
+  def close(): Unit = {
     if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
     if (eventhubsClient != null) eventhubsClient.closeSync()
   }
@@ -112,43 +112,9 @@ private[spark] class EventHubsClientWrapper extends EventHubClient with Logging 
   def closeReceiver(): Unit = {
     eventhubsReceiver.closeSync()
   }
-
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubsNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    throw new UnsupportedOperationException("endPointOfPartition is not supported by this client" +
-      " yet, please use AMQPEventHubsClient")
-  }
-
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
-    throw new UnsupportedOperationException("lastEnqueueTimeOfPartitions is not supported by this" +
-      " client yet, please use AMQPEventHubsClient")
-  }
-
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Predef.Map[EventHubNameAndPartition, Long]] = {
-    throw new UnsupportedOperationException("startSeqOfPartition is not supported by this client" +
-      " yet, please use AMQPEventHubsClient")
-  }
 }
 
-private[spark] object EventHubsClientWrapper extends Logging {
+private[spark] object EventHubsReceiverWrapper extends Logging {
 
   private[eventhubscommon] def configureStartOffset(
       previousOffset: String,
@@ -165,7 +131,7 @@ private[spark] object EventHubsClientWrapper extends Logging {
   }
 
   def getEventHubsClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
-    new EventHubsClientWrapper().createClient(eventhubsParams)
+    new EventHubsReceiverWrapper().createClient(eventhubsParams)
   }
 
   def getEventHubReceiver(
@@ -173,10 +139,10 @@ private[spark] object EventHubsClientWrapper extends Logging {
       partitionId: Int,
       startOffset: Long,
       offsetType: EventHubsOffsetType,
-      maximumEventRate: Int): EventHubsClientWrapper = {
+      maximumEventRate: Int): EventHubsReceiverWrapper = {
 
     // TODO: reuse client
-    val eventHubClientWrapperInstance = new EventHubsClientWrapper()
+    val eventHubClientWrapperInstance = new EventHubsReceiverWrapper()
     eventHubClientWrapperInstance.createReceiver(eventhubsParams, partitionId.toString,
       startOffset.toString, offsetType, maximumEventRate)
     eventHubClientWrapperInstance

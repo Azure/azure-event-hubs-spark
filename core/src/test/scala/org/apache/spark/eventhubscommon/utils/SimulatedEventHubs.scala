@@ -21,7 +21,7 @@ import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
 
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsReceiverWrapper$, EventHubsOffsetTypes}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
@@ -78,7 +78,7 @@ class TestEventHubsReceiver(
     partitionId: Int,
     startOffset: Long,
     offsetType: EventHubsOffsetType)
-  extends EventHubsClientWrapper {
+  extends EventHubsReceiverWrapper {
 
   val eventHubName = eventHubParameters("eventhubs.name")
 
@@ -95,7 +95,7 @@ class TestEventHubsReceiver(
 }
 
 class SimulatedEventHubsRestClient(
-    eventHubs: SimulatedEventHubs) extends EventHubClient {
+    eventHubs: SimulatedEventHubs) extends EventHubsClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -104,8 +104,6 @@ class SimulatedEventHubsRestClient(
     Some(eventHubs.messageStore
       .map(x => x._1 -> (x._2.length.toLong - 1, x._2.length.toLong - 1)))
   }
-
-  override def close(): Unit = {}
 
   /**
    * return the last enqueueTime of each partition
@@ -137,11 +135,16 @@ class SimulatedEventHubsRestClient(
       ehNameAndPartition =>
         (ehNameAndPartition, -1L)}.toMap)
   }
+
+  /**
+   * stop this client
+   */
+  override def close(): Unit = {}
 }
 
-class TestRestEventHubClient(
+class TestRestEventHubsClient(
     latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
-  extends EventHubClient {
+  extends EventHubsClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -166,8 +169,6 @@ class TestRestEventHubClient(
     }.toMap)
   }
 
-  override def close(): Unit = {}
-
   /**
    * return the start seq number of each partition
    *
@@ -181,15 +182,20 @@ class TestRestEventHubClient(
       ehNameAndPartition =>
         (ehNameAndPartition, -1L)}.toMap)
   }
+
+  /**
+   * stop this client
+   */
+  override def close(): Unit = {}
 }
 
-class FragileEventHubClient private extends EventHubClient {
+class FragileEventHubsClient private extends EventHubsClient {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
     Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    import FragileEventHubClient._
+    import FragileEventHubsClient._
 
     callIndex += 1
     if (callIndex < numBatchesBeforeCrashedEndpoint) {
@@ -213,8 +219,6 @@ class FragileEventHubClient private extends EventHubClient {
     Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 
-  override def close(): Unit = {}
-
   /**
    * return the start seq number of each partition
    *
@@ -228,10 +232,15 @@ class FragileEventHubClient private extends EventHubClient {
       ehNameAndPartition =>
         (ehNameAndPartition, -1L)}.toMap)
   }
+
+  /**
+   * stop this client
+   */
+  override def close(): Unit = {}
 }
 
 // ugly stuff to make things checkpointable in tests
-object FragileEventHubClient {
+object FragileEventHubsClient {
 
   var callIndex = -1
   var numBatchesBeforeCrashedEndpoint = 0
@@ -239,17 +248,17 @@ object FragileEventHubClient {
   var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()
 
   def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
-    FragileEventHubClient = {
-    new FragileEventHubClient()
+    FragileEventHubsClient = {
+    new FragileEventHubsClient()
   }
 }
 
 
-class FluctuatedEventHubClient(
+class FluctuatedEventHubsClient(
     ssc: StreamingContext,
     messagesBeforeEmpty: Long,
     numBatchesBeforeNewData: Int,
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubsClient {
 
   private var callIndex = -1
 
@@ -267,8 +276,6 @@ class FluctuatedEventHubClient(
       Some(latestRecords)
     }
   }
-
-  override def close(): Unit = {}
 
   /**
    * return the last enqueueTime of each partition
@@ -295,5 +302,10 @@ class FluctuatedEventHubClient(
       ehNameAndPartition =>
         (ehNameAndPartition, -1L)}.toMap)
   }
+
+  /**
+   * stop this client
+   */
+  override def close(): Unit = {}
 }
 

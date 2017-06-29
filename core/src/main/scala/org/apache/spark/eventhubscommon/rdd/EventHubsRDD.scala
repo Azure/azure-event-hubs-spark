@@ -24,7 +24,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.{EventHubsClientWrapper, EventHubsReceiver}
+import org.apache.spark.eventhubscommon.client.{EventHubsReceiverWrapper$, EventHubsReceiver}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
@@ -51,7 +51,7 @@ private[spark] class EventHubsRDD(
     batchTime: Long,
     offsetParams: OffsetStoreParams,
     eventHubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-      EventHubsClientWrapper)
+      EventHubsReceiverWrapper)
   extends RDD[EventData](sc, Nil) {
 
   import EventHubsReceiver._

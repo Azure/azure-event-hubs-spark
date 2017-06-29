@@ -27,7 +27,7 @@ import org.apache.spark.internal.Logging
 private[client] class AMQPEventHubsClient(
     eventHubNamespace: String,
     eventHubsNames: List[String],
-    ehParams: Map[String, Map[String, String]]) extends EventHubClient with Logging {
+    ehParams: Map[String, Map[String, String]]) extends EventHubsClient with Logging {
 
   private val ehNameToClient = new mutable.HashMap[String, AzureEventHubClient]
 
@@ -36,7 +36,7 @@ private[client] class AMQPEventHubsClient(
   private def init(): Unit = {
     for (ehName <- eventHubsNames) {
       ehNameToClient += ehName ->
-        new EventHubsClientWrapper().createClient(ehParams(ehName))
+        new EventHubsReceiverWrapper().createClient(ehParams(ehName))
     }
   }
 
@@ -129,8 +129,6 @@ private[client] class AMQPEventHubsClient(
       ehClient.closeSync()
     }
   }
-
-
 }
 
 private[spark] object AMQPEventHubsClient {

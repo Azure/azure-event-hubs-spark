@@ -30,7 +30,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{EventHubsReceiverWrapper$, EventHubsOffsetTypes}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}
@@ -45,7 +45,7 @@ import org.apache.spark.util.Utils
 class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with BeforeAndAfterAll
     with MockitoSugar with Eventually {
   private var streamingContext: StreamingContext = _
-  private var ehClientWrapperMock: EventHubsClientWrapper = _
+  private var ehClientWrapperMock: EventHubsReceiverWrapper = _
   private var offsetStoreMock: OffsetStore = _
   private var tempDirectory: File = null
 
@@ -97,7 +97,7 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
 
   test("Reliable EventHubs input stream") {
     // after 100 messages then start to receive null
-    ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, -1)
+    ehClientWrapperMock = new MyMockedEventHubsReceiverWrapper(100, -1)
     val stream = EventHubsUtils.createStream(streamingContext, eventhubParameters, "0",
       StorageLevel.MEMORY_ONLY, offsetStoreMock, ehClientWrapperMock)
     var count = 0
@@ -116,7 +116,7 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
 
   test("Reliable EventHubs input stream recover from exception") {
     // After 60 messages then exception, after 100 messages then receive null
-    ehClientWrapperMock = new MyMockedEventHubsClientWrapper(100, 60)
+    ehClientWrapperMock = new MyMockedEventHubsReceiverWrapper(100, 60)
     val stream = EventHubsUtils.createStream(streamingContext, eventhubParameters, "0",
       StorageLevel.MEMORY_ONLY, offsetStoreMock, ehClientWrapperMock)
     var count = 0
@@ -144,9 +144,9 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
  * @param exceptionCount the number of message emitted before it throws exception
  *                       it only throws exception once
  */
-class MyMockedEventHubsClientWrapper(
+class MyMockedEventHubsReceiverWrapper(
     emitCount: Int,
-    exceptionCount: Int) extends EventHubsClientWrapper with MockitoSugar {
+    exceptionCount: Int) extends EventHubsReceiverWrapper with MockitoSugar {
   var offset = -1
   var count = 0
   var partition = "0"

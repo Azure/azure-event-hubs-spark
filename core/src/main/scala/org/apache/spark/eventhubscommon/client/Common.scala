@@ -36,7 +36,7 @@ private[client] object Common {
     (EventHubsOffsetType, String) = {
     // Determine the offset to start receiving data
     val previousOffset = offsetStore.read()
-    EventHubsClientWrapper.configureStartOffset(previousOffset, eventhubsParams)
+    EventHubsReceiverWrapper.configureStartOffset(previousOffset, eventhubsParams)
   }
 
   def configureMaxEventRate(userDefinedEventRate: Int): Int = {

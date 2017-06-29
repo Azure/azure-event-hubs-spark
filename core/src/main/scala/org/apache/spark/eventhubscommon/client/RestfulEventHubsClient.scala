@@ -41,12 +41,12 @@ import org.apache.spark.internal.Logging
  * @param policyKeys a map from eventHub name to (policyName, policyKey) pair
  * @param threadNum the number of threads used to communicate with remote EventHub
  */
-private[spark] class RestfulEventHubClient(
+private[spark] class RestfulEventHubsClient(
     eventHubNamespace: String,
     numPartitionsEventHubs: Map[String, Int],
     consumerGroups: Map[String, String],
     policyKeys: Map[String, Tuple2[String, String]],
-    threadNum: Int) extends EventHubClient with Logging {
+    threadNum: Int) extends EventHubsClient with Logging {
 
   private val RETRY_INTERVAL_SECONDS = Array(8, 16, 32, 64, 128)
 
@@ -214,10 +214,10 @@ private[spark] class RestfulEventHubClient(
   }
 }
 
-private[spark] object RestfulEventHubClient {
+private[spark] object RestfulEventHubsClient {
   def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
-  RestfulEventHubClient = {
-    new RestfulEventHubClient(eventHubNameSpace,
+  RestfulEventHubsClient = {
+    new RestfulEventHubsClient(eventHubNameSpace,
       numPartitionsEventHubs = {
         eventhubsParams.map { case (eventhubName, params) => (eventhubName,
           params("eventhubs.partition.count").toInt)

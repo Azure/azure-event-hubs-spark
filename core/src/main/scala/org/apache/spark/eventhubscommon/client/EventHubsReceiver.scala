@@ -32,19 +32,20 @@ private[spark] trait EventHubsReceiver[T] {
 }
 
 private[spark] object EventHubsReceiver {
-  implicit object eventHubsReceiverWrapper extends EventHubsReceiver[EventHubsClientWrapper] {
-    override def receive(receiver: EventHubsClientWrapper, expectedEventNum: Int):
+
+  implicit object eventHubsReceiverWrapper extends EventHubsReceiver[EventHubsReceiverWrapper] {
+    override def receive(receiver: EventHubsReceiverWrapper, expectedEventNum: Int):
       Iterable[EventData] = {
       receiver.receive(expectedEventNum)
     }
 
-    override def closeClient(receiver: EventHubsClientWrapper): Unit = {
+    override def closeClient(receiver: EventHubsReceiverWrapper): Unit = {
       receiver.close()
     }
 
     override def closeReceiver(
-       receiver: EventHubsClientWrapper,
-       ehNameAndPartition: EventHubNameAndPartition): Unit = {
+                                receiver: EventHubsReceiverWrapper,
+                                ehNameAndPartition: EventHubNameAndPartition): Unit = {
       receiver.closeReceiver()
     }
   }

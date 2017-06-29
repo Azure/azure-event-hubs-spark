@@ -24,7 +24,7 @@ import scala.language.implicitConversions
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.EventHubsReceiverWrapper$
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
@@ -108,7 +108,7 @@ private[eventhubscommon] object Implicits {
         partitionId: String,
         storageLevel: StorageLevel = StorageLevel.MEMORY_ONLY,
         offsetStore: OffsetStore = null,
-        receiverClient: EventHubsClientWrapper = new EventHubsClientWrapper):
+        receiverClient: EventHubsReceiverWrapper = new EventHubsReceiverWrapper):
         DStream[Array[Byte]] = {
       EventHubsUtils.createStream(ssc, eventhubsParams, partitionId, storageLevel, offsetStore,
         receiverClient)

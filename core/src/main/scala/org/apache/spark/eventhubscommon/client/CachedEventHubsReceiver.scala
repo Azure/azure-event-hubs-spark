@@ -24,9 +24,9 @@ import scala.collection.JavaConverters._
 import com.google.common.cache.{Cache, CacheBuilder, RemovalListener, RemovalNotification}
 import com.microsoft.azure.eventhubs.{EventData, EventHubClient => AzureEventHubClient, PartitionReceiver}
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.Common.{configureGeneralParameters, configureMaxEventRate, createNewReceiver, MAXIMUM_EVENT_RATE}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, ReceiverState}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubscommon.client.ReceiverConfigUtils.{configureGeneralParameters, configureMaxEventRate, createNewReceiver}
 import org.apache.spark.internal.Logging
 
 private[spark] class CachedEventHubsReceiver(
@@ -36,10 +36,10 @@ private[spark] class CachedEventHubsReceiver(
     offsetType: EventHubsOffsetType,
     maximumEventRate: Int,
     batchInterval: Long,
-    currentTimestamp: Long) extends Serializable with Logging {
+    currentTimestamp: Long) extends ReceiverState with Serializable with Logging {
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val receiver = CachedEventHubsReceiver.getOrCreateReceiver(eventhubsParams,
+    val receiver = CachedEventHubsReceiver.getOrCreateReceiver(this, eventhubsParams,
       partitionId.toString, startOffset.toString, offsetType, maximumEventRate, batchInterval,
       currentTimestamp)
     val events = receiver.receive(math.min(expectedEventNum, receiver.getPrefetchCount)).get()
@@ -54,6 +54,7 @@ private object CachedEventHubsReceiver extends Logging {
   private var _receiverCache: Cache[EventHubNameAndPartition, (PartitionReceiver, Long)] = _
 
   private def createAndCacheReceiver(
+      receiverState: ReceiverState,
       connectionString: String,
       consumerGroup: String,
       ehNameAndPartition: EventHubNameAndPartition,
@@ -63,7 +64,7 @@ private object CachedEventHubsReceiver extends Logging {
       currentTimestamp: Long,
       batchInterval: Long): PartitionReceiver = {
     implicit val batchIntervalImplicit = batchInterval
-    val newReceiver = createNewReceiver(azureEventHubsClient(connectionString),
+    val newReceiver = createNewReceiver(receiverState, azureEventHubsClient(connectionString),
       consumerGroup, ehNameAndPartition.partitionId.toString, offsetType, currentOffset,
       receiverEpoch)
     receiverCache.put(ehNameAndPartition, (newReceiver, currentTimestamp))
@@ -71,6 +72,7 @@ private object CachedEventHubsReceiver extends Logging {
   }
 
   def getOrCreateReceiver(
+      receiverState: ReceiverState,
       eventhubsParams: Predef.Map[String, String],
       partitionId: String,
       startOffset: String,
@@ -80,9 +82,10 @@ private object CachedEventHubsReceiver extends Logging {
       currentTimestamp: Long): PartitionReceiver = {
     implicit val batchIntervalImplicit = batchInterval
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
+      receiverState,
       eventhubsParams)
     val currentOffset = startOffset
-    MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
+    configureMaxEventRate(receiverState, maximumEventRate)
     val ehName = eventhubsParams("eventhubs.name")
     val ehNameAndPartition = EventHubNameAndPartition(ehName, partitionId.toInt)
     val receiverAndTimestamp = receiverCache.getIfPresent(ehNameAndPartition)
@@ -95,24 +98,24 @@ private object CachedEventHubsReceiver extends Logging {
       } else {
         logInfo(s"Cached receiver for $ehNameAndPartition is too old (timestamp: $ts)," +
           s" creating a new one")
-        createAndCacheReceiver(connectionString, consumerGroup, ehNameAndPartition, offsetType,
-          currentOffset, receiverEpoch, currentTimestamp, batchInterval)
+        createAndCacheReceiver(receiverState, connectionString, consumerGroup, ehNameAndPartition,
+          offsetType, currentOffset, receiverEpoch, currentTimestamp, batchInterval)
       }
     } else {
       logInfo(s"missed receiverCache for $ehNameAndPartition at $currentTimestamp")
-      createAndCacheReceiver(connectionString, consumerGroup, ehNameAndPartition, offsetType,
-        currentOffset, receiverEpoch, currentTimestamp, batchInterval)
+      createAndCacheReceiver(receiverState, connectionString, consumerGroup, ehNameAndPartition,
+        offsetType, currentOffset, receiverEpoch, currentTimestamp, batchInterval)
     }
   }
 
-  def azureEventHubsClient(connectionString: String): AzureEventHubClient = synchronized {
+  private def azureEventHubsClient(connectionString: String): AzureEventHubClient = synchronized {
     if (_eventhubsClient == null) {
       _eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString)
     }
     _eventhubsClient
   }
 
-  def receiverCache(implicit batchInterval: Long):
+  private def receiverCache(implicit batchInterval: Long):
       Cache[EventHubNameAndPartition, (PartitionReceiver, Long)] = synchronized {
     if (_receiverCache == null) {
       _receiverCache = initReceiverCache(batchInterval)

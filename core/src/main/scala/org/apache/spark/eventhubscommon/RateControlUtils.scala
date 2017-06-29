@@ -19,7 +19,7 @@ package org.apache.spark.eventhubscommon
 
 import scala.collection.mutable.ListBuffer
 
-import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsOffsetTypes, EventHubsReceiverWrapper}
+import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsOffsetTypes, EventHubsReceiverWrapper, ReceiverConfigUtils}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
@@ -146,7 +146,7 @@ private[spark] object RateControlUtils extends Logging {
     Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
     fetchedStartOffsetsInNextBatch.map {
       case (ehNameAndPartition, (offset, seq)) =>
-        val (offsetType, offsetStr) = EventHubsReceiverWrapper.configureStartOffset(
+        val (offsetType, offsetStr) = ReceiverConfigUtils.configureStartOffset(
           offset.toString,
           eventhubsParams.get(ehNameAndPartition.eventHubName) match {
             case Some(ehConfig) =>

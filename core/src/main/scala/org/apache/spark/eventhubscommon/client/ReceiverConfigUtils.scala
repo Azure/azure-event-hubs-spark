@@ -22,24 +22,30 @@ import java.time.Instant
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, PartitionReceiver}
 import com.microsoft.azure.servicebus.ConnectionStringBuilder
 
+import org.apache.spark.eventhubscommon.ReceiverState
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
-private[client] object Common {
+private[eventhubscommon] object ReceiverConfigUtils {
 
-  val MINIMUM_PREFETCH_COUNT: Int = 10
-  var MAXIMUM_PREFETCH_COUNT: Int = 999
-  var MAXIMUM_EVENT_RATE: Int = 0
-  val DEFAULT_RECEIVER_EPOCH: Long = -1L
-
-  def configureStartOffset(eventhubsParams: Predef.Map[String, String], offsetStore: OffsetStore):
+  def configureStartOffset(
+      previousOffset: String,
+      eventhubsParams: Predef.Map[String, String]):
     (EventHubsOffsetType, String) = {
     // Determine the offset to start receiving data
-    val previousOffset = offsetStore.read()
-    EventHubsReceiverWrapper.configureStartOffset(previousOffset, eventhubsParams)
+    if (previousOffset != "-1" && previousOffset != null) {
+      (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
+    } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
+      (EventHubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
+    } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
+      (EventHubsOffsetTypes.InputTimeOffset, eventhubsParams("eventhubs.filter.enqueuetime"))
+    } else {
+      (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
+    }
   }
 
-  def configureMaxEventRate(userDefinedEventRate: Int): Int = {
+  def configureMaxEventRate(receiverState: ReceiverState, userDefinedEventRate: Int): Int = {
+    import receiverState._
     if (userDefinedEventRate > 0 && userDefinedEventRate < MINIMUM_PREFETCH_COUNT) {
       MAXIMUM_PREFETCH_COUNT = MINIMUM_PREFETCH_COUNT
     } else if (userDefinedEventRate >= MINIMUM_PREFETCH_COUNT &&
@@ -52,12 +58,14 @@ private[client] object Common {
   }
 
   def createNewReceiver(
+      receiverState: ReceiverState,
       eventhubsClient: AzureEventHubClient,
       consumerGroup: String,
       partitionId: String,
       offsetType: EventHubsOffsetType,
       currentOffset: String,
       receiverEpoch: Long): PartitionReceiver = {
+    import receiverState._
     offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
            | EventHubsOffsetTypes.InputByteOffset =>
@@ -78,14 +86,15 @@ private[client] object Common {
     }
   }
 
-  def configureGeneralParameters(eventhubsParams: Predef.Map[String, String]):
-    (String, String, Long) = {
+  def configureGeneralParameters(
+      receiverState: ReceiverState,
+      eventhubsParams: Predef.Map[String, String]): (String, String, Long) = {
+    import receiverState._
     if (eventhubsParams.contains("eventhubs.uri") &&
       eventhubsParams.contains("eventhubs.namespace")) {
       throw new IllegalArgumentException(s"Eventhubs URI and namespace cannot both be specified" +
         s" at the same time.")
     }
-
     val namespaceName = if (eventhubsParams.contains("eventhubs.namespace")) {
       eventhubsParams.get("eventhubs.namespace")
     } else {

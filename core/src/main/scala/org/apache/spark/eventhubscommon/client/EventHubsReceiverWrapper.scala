@@ -21,6 +21,7 @@ import scala.collection.JavaConverters._
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import EventHubsOffsetTypes.EventHubsOffsetType
 
+import org.apache.spark.eventhubscommon.ReceiverState
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
@@ -28,9 +29,9 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsReceiverWrapper extends Serializable with Logging {
+private[spark] class EventHubsReceiverWrapper extends ReceiverState with Serializable with Logging {
 
-  import Common._
+  import ReceiverConfigUtils._
 
   var eventhubsClient: AzureEventHubClient = _
   private var eventhubsReceiver: PartitionReceiver = _
@@ -41,7 +42,7 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
    * the major purpose of this API is for creating AMQP management client
    */
   def createClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
-    val (connectionString, _, _) = configureGeneralParameters(eventhubsParams)
+    val (connectionString, _, _) = configureGeneralParameters(this, eventhubsParams)
     eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString.toString)
     eventhubsClient
   }
@@ -53,9 +54,10 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
       offsetType: EventHubsOffsetType,
       maximumEventRate: Int): Unit = {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
+      this,
       eventhubsParams)
     val currentOffset = startOffset
-    MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
+    MAXIMUM_EVENT_RATE = configureMaxEventRate(this, maximumEventRate)
     createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
   }
@@ -66,10 +68,12 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
       offsetStore: OffsetStore,
       maximumEventRate: Int): Unit = {
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
+      this,
       eventhubsParams)
-    val (offsetType, currentOffset) = configureStartOffset(eventhubsParams, offsetStore)
+    val prevOffset = offsetStore.read()
+    val (offsetType, currentOffset) = configureStartOffset(prevOffset, eventhubsParams)
     logInfo(s"start a receiver for partition $partitionId with the start offset $currentOffset")
-    MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
+    MAXIMUM_EVENT_RATE = configureMaxEventRate(this, maximumEventRate)
     createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
   }
@@ -83,7 +87,7 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
       receiverEpoch: Long): Unit = {
     // Create Eventhubs client
     eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString)
-    eventhubsReceiver = createNewReceiver(eventhubsClient,
+    eventhubsReceiver = createNewReceiver(this, eventhubsClient,
       consumerGroup, partitionId, offsetType, currentOffset, receiverEpoch)
     eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
   }
@@ -104,7 +108,6 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
   }
 
   def close(): Unit = {
-    System.out.println("close")
     if (eventhubsReceiver != null) eventhubsReceiver.closeSync()
     if (eventhubsClient != null) eventhubsClient.closeSync()
   }
@@ -115,20 +118,6 @@ private[spark] class EventHubsReceiverWrapper extends Serializable with Logging 
 }
 
 private[spark] object EventHubsReceiverWrapper extends Logging {
-
-  private[eventhubscommon] def configureStartOffset(
-      previousOffset: String,
-      eventhubsParams: Predef.Map[String, String]): (EventHubsOffsetType, String) = {
-    if (previousOffset != "-1" && previousOffset != null) {
-      (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
-    } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
-    } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
-      (EventHubsOffsetTypes.InputTimeOffset, eventhubsParams("eventhubs.filter.enqueuetime"))
-    } else {
-      (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
-    }
-  }
 
   def getEventHubsClient(eventhubsParams: Map[String, String]): AzureEventHubClient = {
     new EventHubsReceiverWrapper().createClient(eventhubsParams)

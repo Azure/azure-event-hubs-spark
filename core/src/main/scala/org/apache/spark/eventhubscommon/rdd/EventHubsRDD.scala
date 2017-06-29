@@ -192,7 +192,6 @@ private[spark] class EventHubsRDD(
     val progressWriter = new ProgressWriter(offsetParams.streamId, offsetParams.uid,
       eventHubPartition.eventHubNameAndPartitionID, batchTime, new Configuration(),
       offsetParams.checkpointDir, offsetParams.subDirs: _*)
-    val fromOffset = eventHubPartition.fromOffset
     if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
       processExaustedPartition(progressWriter, eventHubPartition)
     } else {

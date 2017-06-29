@@ -78,7 +78,8 @@ private[spark] class EventHubsRDD(
         throw new Exception(s"$eventHubNameAndPartition cannot return data, the trace is" +
           s" ${receivingTrace.toList}")
       }
-      val receivedEventsItr = receiver.receive(eventHubClient, expectedEventNumber)
+      val receivedEventsItr = receiver.receive(eventHubClient,
+        expectedEventNumber - receivedBuffer.size)
       if (receivedEventsItr == null) {
         // no more messages
         return receivedBuffer.toList
@@ -177,8 +178,6 @@ private[spark] class EventHubsRDD(
     val endOffset = lastEvent.getSystemProperties.getOffset.toLong
     val endSeq = lastEvent.getSystemProperties.getSequenceNumber
     progressWriter.write(batchTime, endOffset, endSeq)
-    println(s"write offset $endOffset, sequence number $endSeq for EventHub" +
-      s" ${eventHubsPartition.eventHubNameAndPartitionID} at $batchTime")
     logInfo(s"write offset $endOffset, sequence number $endSeq for EventHub" +
       s" ${eventHubsPartition.eventHubNameAndPartitionID} at $batchTime")
     if (eventHubReceiver.isLeft) {

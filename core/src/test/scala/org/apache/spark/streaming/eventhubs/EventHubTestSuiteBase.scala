@@ -221,7 +221,6 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       val startTime = System.currentTimeMillis()
       while (output.size < numExpectedOutput &&
         System.currentTimeMillis() - startTime < maxWaitTimeMillis) {
-        println("output.size = " + output.size + ", numExpectedOutput = " + numExpectedOutput)
         logInfo("output.size = " + output.size + ", numExpectedOutput = " + numExpectedOutput)
         ssc.awaitTerminationOrTimeout(50)
       }

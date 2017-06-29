@@ -33,7 +33,26 @@ private[spark] trait EventHubsReceiver[T] {
 
 private[spark] object EventHubsReceiver {
 
-  implicit object eventHubsReceiverWrapper extends EventHubsReceiver[EventHubsReceiverWrapper] {
+  implicit object CachedEventHubsReceiverWrapper extends
+    EventHubsReceiver[CachedEventHubsReceiver] {
+
+    override def receive(receiver: CachedEventHubsReceiver, expectedEventNum: Int):
+      Iterable[EventData] = {
+      receiver.receive(expectedEventNum)
+    }
+
+    override def closeClient(receiver: CachedEventHubsReceiver): Unit = {
+      // CachedReceiver is not supposed to be closed explicitly
+    }
+
+    override def closeReceiver(
+        receiver: CachedEventHubsReceiver,
+        ehNameAndPartition: EventHubNameAndPartition): Unit = {
+      // CachedReceiver is not supposed to be closed explicitly
+    }
+  }
+
+  implicit object EventHubsReceiverWrapper extends EventHubsReceiver[EventHubsReceiverWrapper] {
     override def receive(receiver: EventHubsReceiverWrapper, expectedEventNum: Int):
       Iterable[EventData] = {
       receiver.receive(expectedEventNum)
@@ -44,8 +63,8 @@ private[spark] object EventHubsReceiver {
     }
 
     override def closeReceiver(
-                                receiver: EventHubsReceiverWrapper,
-                                ehNameAndPartition: EventHubNameAndPartition): Unit = {
+        receiver: EventHubsReceiverWrapper,
+        ehNameAndPartition: EventHubNameAndPartition): Unit = {
       receiver.closeReceiver()
     }
   }

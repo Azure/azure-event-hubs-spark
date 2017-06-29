@@ -42,6 +42,9 @@ private[spark] class EventHubsSource(
       EventHubsClient = AMQPEventHubsClient.getInstance)
   extends Source with EventHubsConnector with Logging {
 
+  private val reuseReceiver = eventHubsParams.getOrElse("eventhubs.reuseReceiver", "false").
+    toBoolean
+
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
   // the id of the stream which is mapped from eventhubs instance
@@ -253,10 +256,12 @@ private[spark] class EventHubsSource(
       sqlContext.sparkContext,
       Map(eventHubsParams("eventhubs.name") -> eventHubsParams),
       offsetRanges,
+      1L,
       committedOffsetsAndSeqNums.batchId + 1,
       OffsetStoreParams(eventHubsParams("eventhubs.progressTrackingDir"),
         streamId, uid = uid, subDirs = sqlContext.sparkContext.appName, uid),
-      eventHubsReceiver
+      eventHubsReceiver,
+      reuseReceiver
     )
   }
 

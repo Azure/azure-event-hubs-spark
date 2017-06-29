@@ -21,7 +21,6 @@ import scala.collection.JavaConverters._
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import EventHubsOffsetTypes.EventHubsOffsetType
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 

@@ -19,16 +19,36 @@ package org.apache.spark.eventhubscommon.client
 
 import java.util.concurrent.TimeUnit
 
+import scala.collection.JavaConverters._
+
 import com.google.common.cache.{Cache, CacheBuilder, RemovalListener, RemovalNotification}
-import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, PartitionReceiver}
+import com.microsoft.azure.eventhubs.{EventData, EventHubClient => AzureEventHubClient, PartitionReceiver}
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.Common.{configureGeneralParameters, configureMaxEventRate, createNewReceiver, MAXIMUM_EVENT_RATE}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
+private[spark] class CachedEventHubsReceiver(
+    eventhubsParams: Map[String, String],
+    partitionId: Int,
+    startOffset: Long,
+    offsetType: EventHubsOffsetType,
+    maximumEventRate: Int,
+    batchInterval: Long,
+    currentTimestamp: Long) {
 
-private object CachedEventHubsReceiver extends Logging {
+  def receive(expectedEventNum: Int): Iterable[EventData] = {
+    val receiver = CachedEventHubsReceiver.getOrCreateReceiver(eventhubsParams,
+      partitionId.toString, startOffset.toString, offsetType, maximumEventRate, batchInterval,
+      currentTimestamp)
+    val events = receiver.receive(math.min(expectedEventNum, receiver.getPrefetchCount)).get()
+    if (events != null) events.asScala else null
+  }
+}
+
+
+private[spark] object CachedEventHubsReceiver extends Logging {
 
   private var _eventhubsClient: AzureEventHubClient = _
   private var _receiverCache: Cache[EventHubNameAndPartition, (PartitionReceiver, Long)] = _
@@ -57,7 +77,7 @@ private object CachedEventHubsReceiver extends Logging {
       offsetType: EventHubsOffsetType,
       maximumEventRate: Int,
       batchInterval: Long,
-      currentTimestamp: Int): PartitionReceiver = {
+      currentTimestamp: Long): PartitionReceiver = {
     implicit val batchIntervalImplicit = batchInterval
     val (connectionString, consumerGroup, receiverEpoch) = configureGeneralParameters(
       eventhubsParams)

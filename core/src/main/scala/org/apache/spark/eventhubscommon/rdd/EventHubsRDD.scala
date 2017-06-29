@@ -24,7 +24,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.{EventHubsReceiver, EventHubsReceiverWrapper}
+import org.apache.spark.eventhubscommon.client.{CachedEventHubsReceiver, EventHubsReceiver, EventHubsReceiverWrapper}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
@@ -49,10 +49,11 @@ private[spark] class EventHubsRDD(
     eventHubsParamsMap: Map[String, Map[String, String]],
     val offsetRanges: List[OffsetRange],
     batchTime: Long,
+    batchInterval: Long,
     offsetParams: OffsetStoreParams,
     eventHubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-      EventHubsReceiverWrapper)
-  extends RDD[EventData](sc, Nil) {
+      EventHubsReceiverWrapper,
+    useCachedReceiver: Boolean) extends RDD[EventData](sc, Nil) {
 
   import EventHubsReceiver._
 
@@ -63,10 +64,12 @@ private[spark] class EventHubsRDD(
     }.toArray
   }
 
-  private def wrappingReceive[T](
+  private def wrappingReceive[T: EventHubsReceiver](
       eventHubNameAndPartition: EventHubNameAndPartition,
-      eventHubClient: T,
-      expectedEventNumber: Int)(implicit receiver: EventHubsReceiver[T]): List[EventData] = {
+      eventHubReceiverCreator: T,
+      expectedEventNumber: Int): List[EventData] = {
+    val receiver = implicitly[EventHubsReceiver[T]]
+    val eventHubClient = eventHubReceiverCreator
     val receivedBuffer = new ListBuffer[EventData]
     val receivingTrace = new ListBuffer[Long]
     var cnt = 0
@@ -133,22 +136,40 @@ private[spark] class EventHubsRDD(
     Iterator()
   }
 
+  private def createEventHubsReceiver(eventHubsPartition: EventHubRDDPartition):
+      Either[EventHubsReceiverWrapper, CachedEventHubsReceiver] = {
+    val eventHubParameters = eventHubsParamsMap(eventHubsPartition.eventHubNameAndPartitionID.
+      eventHubName)
+    val fromOffset = eventHubsPartition.fromOffset
+    val maxRate = (eventHubsPartition.untilSeq - eventHubsPartition.fromSeq).toInt
+    if (!useCachedReceiver) {
+      Left(eventHubReceiverCreator(eventHubParameters,
+        eventHubsPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
+        eventHubsPartition.offsetType, maxRate))
+    } else {
+      Right(new CachedEventHubsReceiver(eventHubParameters,
+        eventHubsPartition.eventHubNameAndPartitionID.partitionId,
+        fromOffset, eventHubsPartition.offsetType, maxRate, batchInterval, batchTime))
+    }
+  }
+
   private def fetchDataFromEventHubs(
       progressWriter: ProgressWriter,
       eventHubsPartition: EventHubRDDPartition): Iterator[EventData] = {
-    val fromOffset = eventHubsPartition.fromOffset
     val maxRate = (eventHubsPartition.untilSeq - eventHubsPartition.fromSeq).toInt
     val startTime = System.currentTimeMillis()
     logInfo(s"${eventHubsPartition.eventHubNameAndPartitionID}" +
       s" expected rate $maxRate, fromSeq ${eventHubsPartition.fromSeq} (exclusive) untilSeq" +
       s" ${eventHubsPartition.untilSeq} (inclusive) at $batchTime")
-    val eventHubParameters = eventHubsParamsMap(eventHubsPartition.eventHubNameAndPartitionID.
-      eventHubName)
-    val eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
-      eventHubsPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
-      eventHubsPartition.offsetType, maxRate)
-    val receivedEvents = wrappingReceive(eventHubsPartition.eventHubNameAndPartitionID,
-      eventHubReceiver, maxRate)
+    val eventHubReceiver = createEventHubsReceiver(eventHubsPartition)
+    val receivedEvents = eventHubReceiver match {
+      case Left(uncachedReceiver) =>
+        wrappingReceive(eventHubsPartition.eventHubNameAndPartitionID, uncachedReceiver,
+          maxRate)
+      case Right(cachedReceiver) =>
+        wrappingReceive(eventHubsPartition.eventHubNameAndPartitionID, cachedReceiver,
+          maxRate)
+    }
     logInfo(s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
       s" there is no more messages, time cost:" +
       s" ${(System.currentTimeMillis() - startTime) / 1000.0} seconds")
@@ -158,7 +179,9 @@ private[spark] class EventHubsRDD(
     progressWriter.write(batchTime, endOffset, endSeq)
     logInfo(s"write offset $endOffset, sequence number $endSeq for EventHub" +
       s" ${eventHubsPartition.eventHubNameAndPartitionID} at $batchTime")
-    eventHubReceiver.close()
+    if (eventHubReceiver.isLeft) {
+      eventHubReceiver.left.get.close()
+    }
     receivedEvents.iterator
   }
 

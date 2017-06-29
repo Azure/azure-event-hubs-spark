@@ -18,9 +18,8 @@
 package org.apache.spark.eventhubscommon
 
 import scala.collection.mutable.ListBuffer
-import scala.reflect.ClassTag
 
-import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsReceiverWrapper$, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsOffsetTypes, EventHubsReceiverWrapper}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
@@ -116,9 +115,9 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def validateFilteringParams(
-                                              eventHubsClient: EventHubsClient,
-                                              eventhubsParams: Map[String, _],
-                                              ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
+      eventHubsClient: EventHubsClient,
+      eventhubsParams: Map[String, _],
+      ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
     // first check if the parameters are valid
     val latestEnqueueTimeOfPartitions = eventHubsClient.lastEnqueueTimeOfPartitions(
       retryIfFail = true, ehNameAndPartitions)

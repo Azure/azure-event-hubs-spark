@@ -24,7 +24,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.{EventHubsReceiverWrapper$, EventHubsReceiver}
+import org.apache.spark.eventhubscommon.client.{EventHubsReceiver, EventHubsReceiverWrapper}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
@@ -87,33 +87,6 @@ private[spark] class EventHubsRDD(
     }
     receivedBuffer.toList
   }
-
-  /*
-  private def wrappingReceive(
-      eventHubNameAndPartition: EventHubNameAndPartition,
-      eventHubClient: EventHubsClientWrapper,
-      expectedEventNumber: Int): List[EventData] = {
-    val receivedBuffer = new ListBuffer[EventData]
-    val receivingTrace = new ListBuffer[Long]
-    var cnt = 0
-    while (receivedBuffer.size < expectedEventNumber) {
-      if (cnt > expectedEventNumber * 2) {
-        throw new Exception(s"$eventHubNameAndPartition cannot return data, the trace is" +
-          s" ${receivingTrace.toList}")
-      }
-      val receivedEventsItr = eventHubClient.receive(expectedEventNumber - receivedBuffer.size)
-      if (receivedEventsItr == null) {
-        // no more messages
-        return receivedBuffer.toList
-      }
-      val receivedEvents = receivedEventsItr.toList
-      receivingTrace += receivedEvents.length
-      cnt += 1
-      receivedBuffer ++= receivedEvents
-    }
-    receivedBuffer.toList
-  }
-  */
 
   private def executors(): Array[ExecutorCacheTaskLocation] = {
     val bm = sparkContext.env.blockManager

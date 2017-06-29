@@ -24,7 +24,7 @@ import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubsClient, EventHubsReceiverWrapper$, RestfulEventHubsClient}
+import org.apache.spark.eventhubscommon.client._
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -45,13 +45,13 @@ import org.apache.spark.util.Utils
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
-                                                                    _ssc: StreamingContext,
-                                                                    private[eventhubs] val eventHubNameSpace: String,
-                                                                    progressDir: String,
-                                                                    eventhubsParams: Map[String, Map[String, String]],
-                                                                    eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+    _ssc: StreamingContext,
+    private[eventhubs] val eventHubNameSpace: String,
+    progressDir: String,
+    eventhubsParams: Map[String, Map[String, String]],
+    eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsReceiverWrapper = EventHubsReceiverWrapper.getEventHubReceiver,
-                                                                    eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
+    eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
       EventHubsClient = AMQPEventHubsClient.getInstance)
   extends InputDStream[EventData](_ssc) with EventHubsConnector with Logging {
 

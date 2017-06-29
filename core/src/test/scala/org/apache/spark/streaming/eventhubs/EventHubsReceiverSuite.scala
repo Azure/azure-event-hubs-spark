@@ -23,10 +23,9 @@ import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.mockito.Mockito._
 import org.mockito.internal.util.reflection.Whitebox
-import org.scalatest.Ignore
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.eventhubscommon.client.EventHubsReceiverWrapper$
+import org.apache.spark.eventhubscommon.client.EventHubsReceiverWrapper
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore

@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubsClient, EventHubsReceiverWrapper$, RestfulEventHubsClient}
+import org.apache.spark.eventhubscommon.client._
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -34,11 +34,11 @@ import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingPr
 import org.apache.spark.sql.types._
 
 private[spark] class EventHubsSource(
-                                      sqlContext: SQLContext,
-                                      eventHubsParams: Map[String, String],
-                                      eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
+    sqlContext: SQLContext,
+    eventHubsParams: Map[String, String],
+    eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsReceiverWrapper = EventHubsReceiverWrapper.getEventHubReceiver,
-                                      eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
+    eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
       EventHubsClient = AMQPEventHubsClient.getInstance)
   extends Source with EventHubsConnector with Logging {
 

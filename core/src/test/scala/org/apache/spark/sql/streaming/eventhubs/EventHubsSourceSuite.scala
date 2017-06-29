@@ -26,7 +26,7 @@ import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOff
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
-import org.apache.spark.sql.types.{LongType, TimestampType}
+import org.apache.spark.sql.types.{TimestampType}
 import org.apache.spark.util.Utils
 
 class EventHubsSourceSuite extends EventHubsStreamTest {

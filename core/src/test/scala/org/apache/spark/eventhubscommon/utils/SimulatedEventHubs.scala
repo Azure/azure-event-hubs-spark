@@ -21,7 +21,7 @@ import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
 
-import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsReceiverWrapper$, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsOffsetTypes, EventHubsReceiverWrapper}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext

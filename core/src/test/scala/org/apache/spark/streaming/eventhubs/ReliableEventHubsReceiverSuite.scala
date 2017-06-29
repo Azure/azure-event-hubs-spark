@@ -30,7 +30,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{EventHubsReceiverWrapper$, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{EventHubsOffsetTypes, EventHubsReceiverWrapper}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{Milliseconds, StreamingContext}

@@ -59,6 +59,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
   private var latestCheckpointTime: Time = _
+  private val batchInterval = _ssc.graph.batchDuration.milliseconds
 
   private var initialized = false
 
@@ -389,7 +390,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           eventhubsParams,
           b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
             OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)}.toList,
-          context.graph.batchDuration.milliseconds,
+          eventHubDirectDStream.batchInterval,
           t.milliseconds,
           OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
             subDirs = appName),

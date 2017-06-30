@@ -48,8 +48,8 @@ private[spark] class EventHubsRDD(
     sc: SparkContext,
     eventHubsParamsMap: Map[String, Map[String, String]],
     val offsetRanges: List[OffsetRange],
-    batchTime: Long,
     batchInterval: Long,
+    batchTime: Long,
     offsetParams: OffsetStoreParams,
     eventHubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsReceiverWrapper,

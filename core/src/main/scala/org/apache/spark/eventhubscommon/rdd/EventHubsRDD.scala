@@ -162,6 +162,9 @@ private[spark] class EventHubsRDD(
     logInfo(s"${eventHubsPartition.eventHubNameAndPartitionID}" +
       s" expected rate $maxRate, fromSeq ${eventHubsPartition.fromSeq} (exclusive) untilSeq" +
       s" ${eventHubsPartition.untilSeq} (inclusive) at $batchTime")
+    println(s"${eventHubsPartition.eventHubNameAndPartitionID}" +
+      s" expected rate $maxRate, fromSeq ${eventHubsPartition.fromSeq} (exclusive) untilSeq" +
+      s" ${eventHubsPartition.untilSeq} (inclusive) at $batchTime")
     val eventHubReceiver = createEventHubsReceiver(eventHubsPartition)
     val receivedEvents = eventHubReceiver match {
       case Left(uncachedReceiver) =>

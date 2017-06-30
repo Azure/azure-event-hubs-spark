@@ -19,7 +19,7 @@ package org.apache.spark.eventhubscommon.client
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
-private[spark] trait EventHubClient extends Serializable {
+private[spark] trait EventHubsClient extends Serializable {
 
   /**
    * return the start seq number of each partition
@@ -50,7 +50,7 @@ private[spark] trait EventHubClient extends Serializable {
     Option[Map[EventHubNameAndPartition, Long]]
 
   /**
-   * close this client
+   * stop this client
    */
-  def close(): Unit
+  def close()
 }

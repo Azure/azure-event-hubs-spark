@@ -20,7 +20,7 @@ import java.util.concurrent.ExecutorService
 
 import com.microsoft.azure.eventhubs._
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.EventHubsReceiverWrapper
 import org.apache.spark.internal.Logging
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.eventhubs.checkpoint.{DfsBasedOffsetStore, OffsetStore}
@@ -32,7 +32,7 @@ private[eventhubs] class EventHubsReceiver(
     partitionId: String,
     storageLevel: StorageLevel,
     offsetStore: Option[OffsetStore],
-    receiverClient: EventHubsClientWrapper,
+    receiverClient: EventHubsReceiverWrapper,
     maximumEventRate: Int) extends Receiver[Array[Byte]](storageLevel) with Logging {
 
   // If offset store is empty we construct one using provided parameters

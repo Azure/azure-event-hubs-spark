@@ -21,7 +21,7 @@ import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.eventhubscommon.client.EventHubsClient
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Duration, Seconds, Time}
 
@@ -44,7 +44,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
   test("skip the batch when failed to fetch the latest offset of partitions") {
     val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> eventhubParameters))
-    val eventHubClientMock = mock[EventHubClient]
+    val eventHubClientMock = mock[EventHubsClient]
     Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = true,
       targetEventHubNameAndPartitions = ehDStream.connectedInstances)).
       thenReturn(None)

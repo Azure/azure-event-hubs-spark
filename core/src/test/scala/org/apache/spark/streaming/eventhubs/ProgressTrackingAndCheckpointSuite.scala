@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.utils.FragileEventHubClient
+import org.apache.spark.eventhubscommon.utils.FragileEventHubsClient
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
 import org.apache.spark.util.ManualClock
@@ -468,9 +468,9 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq(), Seq(), Seq())
 
     // ugly stuff to make things serializable
-    FragileEventHubClient.numBatchesBeforeCrashedEndpoint = 3
-    FragileEventHubClient.lastBatchWhenEndpointCrashed = 6
-    FragileEventHubClient.latestRecords = Map(
+    FragileEventHubsClient.numBatchesBeforeCrashedEndpoint = 3
+    FragileEventHubsClient.lastBatchWhenEndpointCrashed = 6
+    FragileEventHubsClient.latestRecords = Map(
       EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
       EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
       EventHubNameAndPartition("eh1", 2) -> (9L, 9L))

@@ -18,9 +18,8 @@
 package org.apache.spark.eventhubscommon
 
 import scala.collection.mutable.ListBuffer
-import scala.reflect.ClassTag
 
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsOffsetTypes, EventHubsReceiverWrapper, ReceiverConfigUtils}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
@@ -92,7 +91,7 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def fetchLatestOffset(
-      eventHubClient: EventHubClient,
+      eventHubClient: EventHubsClient,
       retryIfFail: Boolean,
       fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
       currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)]):
@@ -116,7 +115,7 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def validateFilteringParams(
-      eventHubsClient: EventHubClient,
+      eventHubsClient: EventHubsClient,
       eventhubsParams: Map[String, _],
       ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
     // first check if the parameters are valid
@@ -147,7 +146,7 @@ private[spark] object RateControlUtils extends Logging {
     Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
     fetchedStartOffsetsInNextBatch.map {
       case (ehNameAndPartition, (offset, seq)) =>
-        val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
+        val (offsetType, offsetStr) = ReceiverConfigUtils.configureStartOffset(
           offset.toString,
           eventhubsParams.get(ehNameAndPartition.eventHubName) match {
             case Some(ehConfig) =>

@@ -24,7 +24,7 @@ import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client._
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -50,14 +50,16 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-      EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+      EventHubsReceiverWrapper = EventHubsReceiverWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = AMQPEventHubsClient.getInstance)
+      EventHubsClient = AMQPEventHubsClient.getInstance,
+    private[eventhubs] val reuseCachedReceiver: Boolean = false)
   extends InputDStream[EventData](_ssc) with EventHubsConnector with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
   private var latestCheckpointTime: Time = _
+  private val batchInterval = _ssc.graph.batchDuration.milliseconds
 
   private var initialized = false
 
@@ -90,12 +92,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     */
   }
 
-  @transient private var _eventHubClient: EventHubClient = _
+  @transient private var _eventHubClient: EventHubsClient = _
 
   private def progressTracker = DirectDStreamProgressTracker.getInstance.
     asInstanceOf[DirectDStreamProgressTracker]
 
-  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
+  private[eventhubs] def setEventHubClient(eventHubClient: EventHubsClient):
       EventHubDirectDStream = {
     _eventHubClient = eventHubClient
     this
@@ -260,10 +262,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       context.sparkContext,
       eventhubsParams,
       offsetRanges,
+      ssc.graph.batchDuration.milliseconds,
       validTime.milliseconds,
       OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
         subDirs = ssc.sparkContext.appName),
-      eventhubReceiverCreator)
+      eventhubReceiverCreator,
+      reuseCachedReceiver)
     reportInputInto(validTime, offsetRanges,
       offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
     Some(eventHubRDD)
@@ -386,10 +390,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           eventhubsParams,
           b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
             OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)}.toList,
+          eventHubDirectDStream.batchInterval,
           t.milliseconds,
           OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
             subDirs = appName),
-          eventhubReceiverCreator)
+          eventhubReceiverCreator,
+          eventHubDirectDStream.reuseCachedReceiver)
       }
     }
   }

@@ -21,7 +21,7 @@ import scala.collection.Map
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.client.{EventHubsClient, EventHubsReceiverWrapper, EventHubsReceiverWrapper$}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.StreamingContext
@@ -95,7 +95,7 @@ object EventHubsUtils {
                    partitionId: String,
                    storageLevel: StorageLevel = StorageLevel.MEMORY_AND_DISK_SER,
                    offsetStore: OffsetStore = null,
-                   receiverClient: EventHubsClientWrapper = new EventHubsClientWrapper):
+                   receiverClient: EventHubsReceiverWrapper = new EventHubsReceiverWrapper):
       ReceiverInputDStream[Array[Byte]] = {
     streamingContext.receiverStream(
       getReceiver(streamingContext, eventhubsParams.toMap, partitionId,
@@ -130,9 +130,9 @@ object EventHubsUtils {
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]],
       eventHubsReceiverCreator: (Predef.Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-        EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+        EventHubsReceiverWrapper = EventHubsReceiverWrapper.getEventHubReceiver,
       eventHubsClientCreator: (String, Predef.Map[String, Predef.Map[String, String]]) =>
-        EventHubClient): EventHubDirectDStream = {
+        EventHubsClient): EventHubDirectDStream = {
     val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams,
       eventHubsReceiverCreator, eventHubsClientCreator)
     newStream
@@ -147,7 +147,7 @@ object EventHubsUtils {
       partitionId: String,
       storageLevel: StorageLevel,
       offsetStore: Option[OffsetStore],
-      receiverClient: EventHubsClientWrapper): Receiver[Array[Byte]] = {
+      receiverClient: EventHubsReceiverWrapper): Receiver[Array[Byte]] = {
     val maximumEventRate = streamingContext.conf.getInt("spark.streaming.receiver.maxRate", 0)
     val walEnabled = streamingContext.conf.getBoolean(
       "spark.streaming.receiver.writeAheadLog.enable", false)

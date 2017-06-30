@@ -26,7 +26,7 @@ import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOff
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
-import org.apache.spark.sql.types.{LongType, TimestampType}
+import org.apache.spark.sql.types.{TimestampType}
 import org.apache.spark.util.Utils
 
 class EventHubsSourceSuite extends EventHubsStreamTest {
@@ -76,7 +76,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     assert(offset.batchId == 0)
     offset.targetSeqNums.values.foreach(x => assert(x == 1))
@@ -94,7 +94,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           EventHubsOffsetTypes.PreviousCheckpoint),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     assert(offset.batchId == 0)
     offset.targetSeqNums.values.foreach(x => assert(x == 2))
@@ -113,7 +113,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     var dataFrame = eventHubsSource.getBatch(None, offset)
@@ -142,7 +142,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
@@ -162,7 +162,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
@@ -183,7 +183,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     var dataFrame = eventHubsSource.getBatch(None, offset)
@@ -219,7 +219,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
@@ -250,7 +250,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           ehOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
@@ -271,7 +271,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
@@ -297,7 +297,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(highestOffsetPerPartition))
+        new TestRestEventHubsClient(highestOffsetPerPartition))
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)

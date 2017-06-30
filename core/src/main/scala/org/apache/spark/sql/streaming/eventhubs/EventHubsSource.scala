@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client._
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -37,10 +37,13 @@ private[spark] class EventHubsSource(
     sqlContext: SQLContext,
     eventHubsParams: Map[String, String],
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-      EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
+      EventHubsReceiverWrapper = EventHubsReceiverWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = AMQPEventHubsClient.getInstance)
+      EventHubsClient = AMQPEventHubsClient.getInstance)
   extends Source with EventHubsConnector with Logging {
+
+  private val reuseReceiver = eventHubsParams.getOrElse("eventhubs.reuseReceiver", "false").
+    toBoolean
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
 
@@ -53,10 +56,10 @@ private[spark] class EventHubsSource(
   require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
   require(eventHubsName != null, "eventhubs.name is not defined")
 
-  private var _eventHubsClient: EventHubClient = _
+  private var _eventHubsClient: EventHubsClient = _
 
   private var _eventHubsReceiver: (Map[String, String], Int, Long, EventHubsOffsetType, Int)
-    => EventHubsClientWrapper = _
+    => EventHubsReceiverWrapper = _
 
   private[eventhubs] def eventHubClient = {
     if (_eventHubsClient == null) {
@@ -91,14 +94,14 @@ private[spark] class EventHubsSource(
     uid, eventHubsParams("eventhubs.progressTrackingDir"), sqlContext.sparkContext.appName,
     sqlContext.sparkContext.hadoopConfiguration)
 
-  private[spark] def setEventHubClient(eventHubClient: EventHubClient): EventHubsSource = {
+  private[spark] def setEventHubClient(eventHubClient: EventHubsClient): EventHubsSource = {
     _eventHubsClient = eventHubClient
     this
   }
 
   private[spark] def setEventHubsReceiver(
       eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-        EventHubsClientWrapper): EventHubsSource = {
+        EventHubsReceiverWrapper): EventHubsSource = {
     _eventHubsReceiver = eventhubReceiverCreator
     this
   }
@@ -253,10 +256,12 @@ private[spark] class EventHubsSource(
       sqlContext.sparkContext,
       Map(eventHubsParams("eventhubs.name") -> eventHubsParams),
       offsetRanges,
+      1L,
       committedOffsetsAndSeqNums.batchId + 1,
       OffsetStoreParams(eventHubsParams("eventhubs.progressTrackingDir"),
         streamId, uid = uid, subDirs = sqlContext.sparkContext.appName, uid),
-      eventHubsReceiver
+      eventHubsReceiver,
+      reuseReceiver
     )
   }
 

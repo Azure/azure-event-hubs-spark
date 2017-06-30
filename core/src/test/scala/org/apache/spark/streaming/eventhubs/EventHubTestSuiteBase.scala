@@ -111,7 +111,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
        eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId,
           startOffset, eventHubsOffsetType),
-      (_: String, _: Map[String, Map[String, String]]) => FragileEventHubClient.getInstance("",
+      (_: String, _: Map[String, Map[String, String]]) => FragileEventHubsClient.getInstance("",
         Map()))
   }
 
@@ -160,7 +160,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(maxOffsetForEachEventHub))
+        new TestRestEventHubsClient(maxOffsetForEachEventHub))
   }
 
   def runEventHubStreams[V: ClassTag](
@@ -335,7 +335,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
         new TestEventHubsReceiver(eventHubParams, simulatedEventHubs, partitionId, startOffset,
           eventHubsOffsetType),
       (_: String, _: Map[String, Map[String, String]]) =>
-        new FluctuatedEventHubClient(ssc, messagesBeforeEmpty, numBatchesBeforeNewData,
+        new FluctuatedEventHubsClient(ssc, messagesBeforeEmpty, numBatchesBeforeNewData,
           maxOffsetForEachEventHub))
   }
 

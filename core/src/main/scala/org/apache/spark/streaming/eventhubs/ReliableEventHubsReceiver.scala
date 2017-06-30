@@ -23,7 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 import com.microsoft.azure.eventhubs._
 
 import org.apache.spark.SparkEnv
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.{EventHubsReceiverWrapper, EventHubsReceiverWrapper$}
 import org.apache.spark.storage.{StorageLevel, StreamBlockId}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 import org.apache.spark.streaming.receiver.{BlockGenerator, BlockGeneratorListener}
@@ -44,7 +44,7 @@ class ReliableEventHubsReceiver(
     partitionId: String,
     storageLevel: StorageLevel,
     offsetStore: Option[OffsetStore],
-    receiverClient: EventHubsClientWrapper,
+    receiverClient: EventHubsReceiverWrapper,
     maximumEventRate: Int)
   extends EventHubsReceiver(
     eventhubsParams, partitionId, storageLevel, offsetStore, receiverClient, maximumEventRate) {

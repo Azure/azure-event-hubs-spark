@@ -23,10 +23,9 @@ import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.servicebus.amqp.AmqpConstants
 import org.mockito.Mockito._
 import org.mockito.internal.util.reflection.Whitebox
-import org.scalatest.Ignore
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.EventHubsReceiverWrapper
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
@@ -38,7 +37,7 @@ import org.apache.spark.streaming.receiver.ReceiverSupervisor
  * This suite of tests are low level unit tests, they directly call EventHubsReceiver with mocks
  */
 class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
-  var eventhubsClientWrapperMock: EventHubsClientWrapper = _
+  var eventhubsClientWrapperMock: EventHubsReceiverWrapper = _
   var offsetStoreMock: OffsetStore = _
   var executorMock: ReceiverSupervisor = _
 
@@ -53,7 +52,7 @@ class EventHubsReceiverSuite extends TestSuiteBase with MockitoSugar{
   )
 
   override def beforeFunction(): Unit = {
-    eventhubsClientWrapperMock = mock[EventHubsClientWrapper]
+    eventhubsClientWrapperMock = mock[EventHubsReceiverWrapper]
     offsetStoreMock = mock[OffsetStore]
     executorMock = mock[ReceiverSupervisor]
   }

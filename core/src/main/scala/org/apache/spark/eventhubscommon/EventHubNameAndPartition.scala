@@ -19,7 +19,40 @@ package org.apache.spark.eventhubscommon
 
 private[spark] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
 
+  private var hash: Option[Int] = None
+
   override def toString: String = s"$eventHubName-partition-$partitionId"
+
+  override def hashCode(): Int = {
+    if (hash.isEmpty) {
+      val prime = 31
+      var result = 1
+      result = prime * result + partitionId
+      result = prime * result + eventHubName.hashCode
+      hash = Some(result)
+    }
+    hash.get
+  }
+
+  override def equals(obj: Any): Boolean = {
+    if (this.eq(obj.asInstanceOf[Object])) {
+      true
+    } else if (obj == null) {
+      false
+    } else if (getClass != obj.getClass) {
+      false
+    } else {
+      val otherEhNameAndPartition = obj.asInstanceOf[EventHubNameAndPartition]
+      if (otherEhNameAndPartition.partitionId != partitionId) {
+        false
+      } else {
+        if (eventHubName != otherEhNameAndPartition.eventHubName) {
+          return false
+        }
+        true
+      }
+    }
+  }
 }
 
 private[spark] object EventHubNameAndPartition {

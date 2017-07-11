@@ -84,34 +84,34 @@ class EventHubRDD(
     }
     receivedBuffer.toList
   }
+  private def processFullyConsumedPartition(
+      ehRDDPartition: EventHubRDDPartition, progressWriter: ProgressWriter): Iterator[EventData] = {
+    logInfo(s"No new data in ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
+    val fromOffset = ehRDDPartition.fromOffset
+    progressWriter.write(batchTime.milliseconds, ehRDDPartition.fromOffset,
+      ehRDDPartition.fromSeq)
+    logInfo(s"write offset $fromOffset, sequence number" +
+      s" ${ehRDDPartition.fromSeq} for EventHub" +
+      s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
+    Iterator()
+  }
 
-  @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
-    val eventHubPartition = split.asInstanceOf[EventHubRDDPartition]
-    val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
-      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
-      eventHubPartition.eventHubNameAndPartitionID, batchTime.milliseconds, new Configuration())
-    val fromOffset = eventHubPartition.fromOffset
-    if (eventHubPartition.fromSeq >= eventHubPartition.untilSeq) {
-      logInfo(s"No new data in ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      progressWriter.write(batchTime.milliseconds, eventHubPartition.fromOffset,
-        eventHubPartition.fromSeq)
-      logInfo(s"write offset $fromOffset, sequence number" +
-        s" ${eventHubPartition.fromSeq} for EventHub" +
-        s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      Iterator()
-    } else {
-      val maxRate = (eventHubPartition.untilSeq - eventHubPartition.fromSeq).toInt
-      val startTime = System.currentTimeMillis()
-      logInfo(s"${eventHubPartition.eventHubNameAndPartitionID}" +
-        s" expected rate $maxRate, fromSeq ${eventHubPartition.fromSeq} (exclusive) untilSeq" +
-        s" ${eventHubPartition.untilSeq} (inclusive) at $batchTime")
-      val eventHubParameters = eventHubsParamsMap(eventHubPartition.eventHubNameAndPartitionID.
+  private def retrieveDataFromPartition(
+      ehRDDPartition: EventHubRDDPartition, progressWriter: ProgressWriter): Iterator[EventData] = {
+    val fromOffset = ehRDDPartition.fromOffset
+    val maxRate = (ehRDDPartition.untilSeq - ehRDDPartition.fromSeq).toInt
+    val startTime = System.currentTimeMillis()
+    logInfo(s"${ehRDDPartition.eventHubNameAndPartitionID}" +
+      s" expected rate $maxRate, fromSeq ${ehRDDPartition.fromSeq} (exclusive) untilSeq" +
+      s" ${ehRDDPartition.untilSeq} (inclusive) at $batchTime")
+    var eventHubReceiver: EventHubsClientWrapper = null
+    try {
+      val eventHubParameters = eventHubsParamsMap(ehRDDPartition.eventHubNameAndPartitionID.
         eventHubName)
-      val eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
-        eventHubPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
-        eventHubPartition.offsetType, maxRate)
-      val receivedEvents = wrappingReceive(eventHubPartition.eventHubNameAndPartitionID,
+      eventHubReceiver = eventHubReceiverCreator(eventHubParameters,
+        ehRDDPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
+        ehRDDPartition.offsetType, maxRate)
+      val receivedEvents = wrappingReceive(ehRDDPartition.eventHubNameAndPartitionID,
         eventHubReceiver, maxRate)
       logInfo(s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
         s" there is no more messages, time cost:" +
@@ -121,9 +121,29 @@ class EventHubRDD(
       val endSeq = lastEvent.getSystemProperties.getSequenceNumber
       progressWriter.write(batchTime.milliseconds, endOffset, endSeq)
       logInfo(s"write offset $endOffset, sequence number $endSeq for EventHub" +
-        s" ${eventHubPartition.eventHubNameAndPartitionID} at $batchTime")
-      eventHubReceiver.close()
+        s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
       receivedEvents.iterator
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
+    } finally {
+      if (eventHubReceiver != null) {
+        eventHubReceiver.close()
+      }
+    }
+  }
+
+  @DeveloperApi
+  override def compute(split: Partition, context: TaskContext): Iterator[EventData] = {
+    val ehRDDPartition = split.asInstanceOf[EventHubRDDPartition]
+    val progressWriter = new ProgressWriter(offsetParams.checkpointDir,
+      offsetParams.appName, offsetParams.streamId, offsetParams.eventHubNamespace,
+      ehRDDPartition.eventHubNameAndPartitionID, batchTime.milliseconds, new Configuration())
+    if (ehRDDPartition.fromSeq >= ehRDDPartition.untilSeq) {
+      processFullyConsumedPartition(ehRDDPartition, progressWriter)
+    } else {
+      retrieveDataFromPartition(ehRDDPartition, progressWriter)
     }
   }
 }

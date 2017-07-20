@@ -152,7 +152,7 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
     receiverOption.setReceiverRuntimeMetricEnabled(false)
     receiverOption.setIdentifier(
       s"$consumerGroup-$eventHubsName-$partitionId-$currentOffset")
-    
+
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
            | EventHubsOffsetTypes.InputByteOffset =>

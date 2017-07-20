@@ -52,6 +52,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.anyString,
       Matchers.anyString,
       Matchers.anyString,
+      Matchers.anyString,
       Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.PreviousCheckpoint),
       Matchers.anyString,
       Matchers.anyLong)
@@ -62,6 +63,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;" +
         "SharedAccessKeyName=policyname;" +
         "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
+      Matchers.anyString,
       Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
       Matchers.eq("4"),
       Matchers.eq(EventHubsOffsetTypes.PreviousCheckpoint),
@@ -76,6 +78,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
     doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString,
       Matchers.anyString,
       Matchers.anyString,
+      Matchers.anyString,
       Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.None),
       Matchers.anyString,
       Matchers.anyLong)
@@ -84,6 +87,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;" +
         "SharedAccessKeyName=policyname;" +
         "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
+      Matchers.anyString,
       Matchers.eq("$consumergroup"),
       Matchers.eq("4"),
       Matchers.eq(EventHubsOffsetTypes.None),
@@ -99,6 +103,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.anyString,
       Matchers.anyString,
       Matchers.anyString,
+      Matchers.anyString,
       Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.InputTimeOffset),
       Matchers.anyString,
       Matchers.anyLong)
@@ -109,6 +114,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
       Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;" +
         "SharedAccessKeyName=policyname;" +
         "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
+      Matchers.anyString,
       Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
       Matchers.eq("4"),
       Matchers.eq(EventHubsOffsetTypes.InputTimeOffset),

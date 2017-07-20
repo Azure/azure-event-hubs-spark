@@ -116,7 +116,9 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
       eventhubsParams)
     val currentOffset = startOffset
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
-    createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
+    createReceiverInternal(connectionString.toString,
+      eventhubsParams("eventhubs.name"),
+      consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
   }
 
@@ -129,12 +131,15 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
     val (offsetType, currentOffset) = configureStartOffset(eventhubsParams, offsetStore)
     logInfo(s"start a receiver for partition $partitionId with the start offset $currentOffset")
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
-    createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
+    createReceiverInternal(connectionString.toString,
+      eventhubsParams("eventhubs.name"),
+      consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
   }
 
   private[eventhubs] def createReceiverInternal(
       connectionString: String,
+      eventHubsName: String,
       consumerGroup: String,
       partitionId: String,
       offsetType: EventHubsOffsetType,
@@ -143,6 +148,11 @@ private[eventhubs] class EventHubsClientWrapper extends Serializable with EventH
     // Create Eventhubs client
     eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
+    val receiverOption = new ReceiverOptions()
+    receiverOption.setReceiverRuntimeMetricEnabled(false)
+    receiverOption.setIdentifier(
+      s"$consumerGroup-$eventHubsName-$partitionId-$currentOffset")
+    
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
            | EventHubsOffsetTypes.InputByteOffset =>

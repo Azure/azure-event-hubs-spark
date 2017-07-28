@@ -59,7 +59,7 @@ object EventHubsUtils {
    *                         Optional parameters are:
    *                         "eventhubs.consumergroup": EventHubs consumer group name, default to "\$default"
    *                         "eventhubs.filter.offset": Starting offset of EventHubs, default to "-1"
-   *                         "eventhubs.filter.enqueuetime": Unix time, millisecond since epoch, default to "0"
+   *                         "eventhubs.filter.enqueuetime": Unix time, seconds since epoch, default to "0"
    *                         "eventhubs.default.credits": default AMQP credits, default to -1 (which is 1024)
    *                         "eventhubs.checkpoint.interval": checkpoint interval in second, default to 10
    * @param storageLevel     Storage level, by default it is MEMORY_ONLY

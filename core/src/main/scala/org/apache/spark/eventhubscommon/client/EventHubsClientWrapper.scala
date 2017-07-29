@@ -114,7 +114,9 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
       eventhubsParams)
     val currentOffset = startOffset
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
-    createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
+    createReceiverInternal(connectionString.toString,
+      eventhubsParams("eventhubs.name"),
+      consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
   }
 
@@ -128,12 +130,15 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     val (offsetType, currentOffset) = configureStartOffset(eventhubsParams, offsetStore)
     logInfo(s"start a receiver for partition $partitionId with the start offset $currentOffset")
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
-    createReceiverInternal(connectionString.toString, consumerGroup, partitionId, offsetType,
+    createReceiverInternal(connectionString.toString,
+      eventhubsParams("eventhubs.name"),
+      consumerGroup, partitionId, offsetType,
       currentOffset, receiverEpoch)
   }
 
   private[spark] def createReceiverInternal(
       connectionString: String,
+      eventHubsName: String,
       consumerGroup: String,
       partitionId: String,
       offsetType: EventHubsOffsetType,
@@ -141,6 +146,11 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
       receiverEpoch: Long): Unit = {
     // Create Eventhubs client
     eventhubsClient = AzureEventHubClient.createFromConnectionStringSync(connectionString)
+
+    val receiverOption = new ReceiverOptions()
+    receiverOption.setReceiverRuntimeMetricEnabled(false)
+    receiverOption.setIdentifier(
+      s"$consumerGroup-$eventHubsName-$partitionId-$currentOffset")
 
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint
@@ -160,6 +170,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
             Instant.ofEpochSecond(currentOffset.toLong))
         }
     }
+
     eventhubsReceiver.setPrefetchCount(MAXIMUM_PREFETCH_COUNT)
   }
 

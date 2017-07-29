@@ -152,12 +152,14 @@ class MyMockedEventHubsClientWrapper(
   var partition = "0"
   var myExceptionCount = exceptionCount
 
-  override def createReceiverInternal(connectionString: String,
-                                      consumerGroup: String,
-                                      partitionId: String,
-                                      offsetType: EventHubsOffsetType,
-                                      currentOffset: String,
-                                      receiverEpoch: Long): Unit = {
+  override def createReceiverInternal(
+      connectionString: String,
+      eventhubsName: String,
+      consumerGroup: String,
+      partitionId: String,
+      offsetType: EventHubsOffsetType,
+      currentOffset: String,
+      receiverEpoch: Long): Unit = {
     if (offsetType != EventHubsOffsetTypes.None) {
       offset = currentOffset.toInt
       partition = partitionId

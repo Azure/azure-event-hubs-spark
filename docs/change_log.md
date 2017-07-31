@@ -1,5 +1,21 @@
 ## Change Log
 
+### 2.1.2 (July 31st, 2017)
+
+* fix the receiver leaking issue [105](https://github.com/hdinsight/spark-eventhubs/pull/105)
+
+* post receiver id to eventhubs when creating it [109](https://github.com/hdinsight/spark-eventhubs/pull/109)
+ 
+* fix incorrect comments about eventhubs.filter.enqueuetime [96](https://github.com/hdinsight/spark-eventhubs/issues/96)
+
+### 2.0.8 (July 31st, 2017)
+
+* fix the receiver leaking issue [105](https://github.com/hdinsight/spark-eventhubs/pull/105)
+
+* post receiver id to eventhubs when creating it [109](https://github.com/hdinsight/spark-eventhubs/pull/109)
+ 
+* fix incorrect comments about eventhubs.filter.enqueuetime [96](https://github.com/hdinsight/spark-eventhubs/issues/96)
+
 ### 2.1.1 (June 25th, 2017)
 
 * replace Rest Client with latest SDK call to query partition info [97](https://github.com/hdinsight/spark-eventhubs/pull/97)

@@ -224,13 +224,54 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
     }
   }
 
-  class StreamManualClock(time: Long = 0L) extends ManualClock(time) with Serializable {
+  class StreamManualClock(@volatile var currentTime: Long = 0L)
+    extends ManualClock(currentTime) with Serializable {
+
     private var waitStartTime: Option[Long] = None
 
+    private var stream: StreamExecution = _
+
+    /**
+     * @return `ManualClock` with initial time 0
+     */
+    def this() = this(0L)
+
+    def setStream(currentStream: StreamExecution): Unit = {
+      stream = currentStream
+    }
+
+    override def getTimeMillis(): Long =
+      synchronized {
+        currentTime
+      }
+
+    /**
+     * @param timeToSet new time (in milliseconds) that the clock should represent
+     */
+    override def setTime(timeToSet: Long): Unit = synchronized {
+      currentTime = timeToSet
+      notifyAll()
+    }
+
+    /**
+     * @param timeToAdd time (in milliseconds) to add to the clock's time
+     */
+    override def advance(timeToAdd: Long): Unit = synchronized {
+      currentTime += timeToAdd
+      notifyAll()
+    }
+
+    /**
+     * @param targetTime block until the clock time is set or advanced to at least this time
+     * @return current time reported by the clock when waiting finishes
+     */
     override def waitTillTime(targetTime: Long): Long = synchronized {
       try {
         waitStartTime = Some(getTimeMillis())
-        super.waitTillTime(targetTime)
+        while (currentTime < targetTime && (stream == null || stream.isActive)) {
+          wait(10)
+        }
+        getTimeMillis()
       } finally {
         waitStartTime = None
       }
@@ -427,6 +468,12 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               trigger,
               triggerClock).asInstanceOf[StreamExecution]
 
+            triggerClock match {
+              case smc: StreamManualClock =>
+                smc.setStream(currentStream)
+              case _ =>
+            }
+
             val activeQueriesField = sparkSession.streams.getClass.getDeclaredFields.filter(f =>
               f.getName == "org$apache$spark$sql$streaming$StreamingQueryManager$$activeQueries").
               head
@@ -603,6 +650,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             QueryTest.sameRows(expectedAnswer, sparkAnswer, isSorted).foreach {
               error => failTest(error)
             }
+            println("checking answer")
         }
         pos += 1
       }

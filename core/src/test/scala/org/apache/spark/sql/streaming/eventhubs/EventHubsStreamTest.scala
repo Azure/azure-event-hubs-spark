@@ -650,7 +650,6 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             QueryTest.sameRows(expectedAnswer, sparkAnswer, isSorted).foreach {
               error => failTest(error)
             }
-            println("checking answer")
         }
         pos += 1
       }

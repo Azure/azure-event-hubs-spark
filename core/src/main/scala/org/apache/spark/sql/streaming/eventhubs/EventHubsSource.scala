@@ -278,7 +278,7 @@ private[spark] class EventHubsSource(
             })
           } else {
             Seq(eventData.getProperties.asScala.map { case (k, v) =>
-              k -> (if (v == null) "" else v.toString) })
+              k -> (if (v == null) null else v.toString) })
           }
         } else {
           Seq()

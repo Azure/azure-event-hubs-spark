@@ -63,6 +63,11 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
       yield bodyId.toString -> Seq("propertyV" -> "v")
   }
 
+  private def generateKeyedDataWithNullValue(num: Int): Seq[(String, Seq[(String, String)])] = {
+    for (bodyId <- 0 until num)
+      yield bodyId.toString -> Seq("propertyV" -> null, "property" -> null)
+  }
+
   test("Verify expected offsets are correct when rate is less than the available data") {
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 2)
     val eventPayloadsAndProperties = generateIntKeyedData(6).map{case (body, properties) =>
@@ -257,6 +262,33 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     eventHubsSource.commit(offset)
     assert(!dataFrame.columns.contains("creationTime"))
     assert(dataFrame.columns.contains("otherUserDefinedKey"))
+  }
+
+  test("Verify null references in user-defined keys are handled correctly") {
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 10,
+      containsProperties = true)
+    val eventPayloadsAndProperties = generateKeyedDataWithNullValue(6)
+    val eventHubs = EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
+      eventPayloadsAndProperties)
+    val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
+    val eventHubsSource = new EventHubsSource(spark.sqlContext, eventHubsParameters,
+      (eventHubsParams: Map[String, String], partitionId: Int, startOffset: Long,
+       eventHubsOffsetType: EventHubsOffsetType, _: Int) =>
+        new TestEventHubsReceiver(eventHubsParams, eventHubs, partitionId, startOffset,
+          eventHubsOffsetType),
+      (_: String, _: Map[String, Map[String, String]]) =>
+        new TestRestEventHubClient(highestOffsetPerPartition))
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val dataFrame = eventHubsSource.getBatch(None, offset)
+    assert(dataFrame.schema == eventHubsSource.schema)
+    eventHubsSource.commit(offset)
+    val sparkSession = spark
+    import sparkSession.implicits._
+    val bodyDataFrame = dataFrame.select("body")
+      .map(r => new String(r.getAs[Array[Byte]](0), "UTF-8"))
+    val inputArray = eventPayloadsAndProperties.map(x => x._1).toArray
+    val outputArray = bodyDataFrame.collect()
+    assert(outputArray.sorted.corresponds(inputArray.sorted) {_ == _})
   }
 
   test("Verify dataframe body is correct for String type") {

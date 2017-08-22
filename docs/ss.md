@@ -19,36 +19,52 @@ For example, if the user has two Event Hubs instances, say `eh1` and `eh2`, and 
 The new API is simple to use. In the following code snippet, we establish a connection between Structured Streaming and Azure Event Hubs.
 
 ```scala
-val eventhubParameters = Map[String, String] (
-      "eventhubs.policyname" -> policyName,
-      "eventhubs.policykey" -> policyKey,
-      "eventhubs.namespace" -> eventHubNamespace,
-      "eventhubs.name" -> eventHubName,
-      "eventhubs.partition.count" -> "32",
-      "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.progressTrackingDir" -> progressDir,
-      "eventhubs.maxRate" -> s"$maxRate",
-      "eventhubs.sql.containsProperties" -> "true",
-      "eventhubs.sql.userDefinedKeys" -> "creationTime,randomUserProperty"
-    )
+val eventhubParameters = Map[String, String](
+  "eventhubs.policyname" -> policyName,
+  "eventhubs.policykey" -> policyKey,
+  "eventhubs.namespace" -> eventHubNamespace,
+  "eventhubs.name" -> eventHubName,
+  "eventhubs.partition.count" -> "32",
+  "eventhubs.consumergroup" -> "$Default",
+  "eventhubs.progressTrackingDir" -> progressDir,
+  "eventhubs.maxRate" -> s"$maxRate",
+  "eventhubs.sql.containsProperties" -> "true",
+  "eventhubs.sql.userDefinedKeys" -> "creationTime,randomUserProperty"
+)
 
-val sparkSession = SparkSession.builder().getOrCreate()
-val inputStream = sparkSession.readStream.
+val spark = SparkSession.builder.getOrCreate
+val inputStream = spark.readStream.
   format("eventhubs").
   options(eventhubParameters).
-  load()
-val streamingQuery1 = inputStream.writeStream.
-  outputMode("append").
-  trigger(ProcessingTime("10 seconds")).
+  load
+
+// Describe your streaming computation using Dataset API
+// Use inputStream as if it was a regular Dataset
+
+import org.apache.spark.sql.streaming.{OutputMode, Trigger}
+import scala.concurrent.duration._
+val streamingQuery = inputStream.writeStream.
+  format("parquet").
+  outputMode(OutputMode.Append).
+  trigger(Trigger.ProcessingTime(10.seconds)).
   option("checkpointLocation", checkpointLocation).
-  format("parquet").option("path", outputPath + "/ETL").partitionBy("creationTime").start()
-streamingQuery1.awaitTermination()
+  option("path", outputPath + "/ETL").
+  partitionBy("creationTime").
+  start
+
+streamingQuery.awaitTermination()
 ```
 
-`sparkSession` is a SparkSession object which is needed in every Spark SQL application (Spark 2.0+). In `eventhubParameters`, we specify the parameters required for Event Hubs connection, e.g. policyName, policyKey, consumergroup, etc. To establish the connection, users only need to specify the stream format as `"eventhubs"`, e.g. `val inputStream = sparkSession.readStream.format("eventhubs").options(eventhubParameters)
-  .load()`.
+`spark` is a [SparkSession](http://spark.apache.org/docs/latest/api/scala/index.html#org.apache.spark.sql.SparkSession) object which is required in every Spark SQL application (as of Spark 2.0.0). In `eventhubParameters`, we specify the parameters required for Event Hubs connection, e.g. `policyName`, `policyKey`, `consumergroup`, etc. To establish the connection, users only need to specify the stream format as `"eventhubs"`, e.g.
+
+```scala
+val inputStream = spark.readStream.
+  format("eventhubs"). // <-- specifying Event Hubs as the input data source
+  options(eventhubParameters).
+  load
+```
   
-The following steps are exactly the same with other structured streaming applications, like set outputMode, trigger and specify Sink.
+The following steps are exactly the same with other Structured Streaming applications, like set `outputMode`, `trigger` and specify output data sink (to write the results of a streaming query to).
 
 #### Building Schema of Messages
 

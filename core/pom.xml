@@ -23,7 +23,7 @@
   <parent>
     <groupId>com.microsoft.azure</groupId>
     <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
-    <version>${project.version}</version>
+    <version>2.0.9-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>spark-streaming-eventhubs_2.11</artifactId>

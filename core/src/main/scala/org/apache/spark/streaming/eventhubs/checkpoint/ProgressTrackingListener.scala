@@ -39,21 +39,23 @@ private[eventhubs] class ProgressTrackingListener private (
         // build current offsets
         val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
         // merge with the temp directory
+        val startTime = System.currentTimeMillis()
         val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
         logInfo(s"progressInLastBatch $progressInLastBatch")
-        ssc.graph.synchronized {
-          if (progressInLastBatch.nonEmpty) {
-            val contentToCommit = allEventDStreams.map {
-              case dstream: EventHubDirectDStream =>
-                (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
-            }.toMap.map { case (namespace, currentOffsets) =>
-              (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
-            }
-            progressTracker.commit(contentToCommit, batchTime)
-            logInfo(s"commit ending offset of Batch $batchTime $contentToCommit")
-          } else {
-            logInfo(s"read RDD data from Checkpoint at $batchTime, skip commits")
+        if (progressInLastBatch.nonEmpty) {
+          val contentToCommit = allEventDStreams.map {
+            case dstream: EventHubDirectDStream =>
+              (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
+          }.toMap.map { case (namespace, currentOffsets) =>
+            (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
           }
+          progressTracker.commit(contentToCommit, batchTime)
+          logInfo(s"commit ending offset of Batch $batchTime $contentToCommit time cost:" +
+            s" ${System.currentTimeMillis() - startTime}")
+        } else {
+          logInfo(s"read RDD data from Checkpoint at $batchTime, skip commits")
+        }
+        ssc.graph.synchronized {
           ssc.graph.notifyAll()
         }
       }

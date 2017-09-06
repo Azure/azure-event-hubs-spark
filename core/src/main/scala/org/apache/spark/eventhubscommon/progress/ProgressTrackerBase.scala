@@ -293,6 +293,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
             ehNameAndPartition,
             timestamp)
         }")
+    // we need to check this to handle the case of partially evaluated RDDs caused by RDD.take(x)
     allPossiblePath.filter(fs.exists _)
   }
 

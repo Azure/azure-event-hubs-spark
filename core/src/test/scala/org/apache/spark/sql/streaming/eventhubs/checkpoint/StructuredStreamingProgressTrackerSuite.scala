@@ -216,13 +216,14 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
 
     val progressTracker1 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
-    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp),
+    progressTracker1.commit(
+      progressTracker1.collectProgressRecordsForBatch(unixTimestamp, List(eventhubsSource1)),
       unixTimestamp)
 
     val progressTracker2 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource2.uid, progressRootPath.toString, appName, new Configuration())
-    progressTracker2.commit(progressTracker2.collectProgressRecordsForBatch(unixTimestamp),
-      unixTimestamp)
+    progressTracker2.commit(progressTracker2.collectProgressRecordsForBatch(unixTimestamp,
+      List(eventhubsSource2)), unixTimestamp)
 
     val eh1Progress = progressTracker1.read(eventhubsSource1.uid, unixTimestamp,
       fallBack = false)
@@ -280,15 +281,15 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
 
     val progressTracker1 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
-    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp),
-      unixTimestamp)
+    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp,
+      List(eventhubsSource1)), unixTimestamp)
 
     val progressTracker2 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource2.uid, progressRootPath.toString, appName, new Configuration())
 
     intercept[IllegalStateException] {
-      progressTracker2.commit(progressTracker2.collectProgressRecordsForBatch(unixTimestamp),
-        unixTimestamp)
+      progressTracker2.commit(progressTracker2.collectProgressRecordsForBatch(unixTimestamp,
+        List(eventhubsSource2)), unixTimestamp)
     }
   }
 
@@ -337,13 +338,13 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
 
     val progressTracker1 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
-    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp),
-      unixTimestamp)
+    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(
+      unixTimestamp, List(eventhubsSource1)), unixTimestamp)
 
     val progressTracker2 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource2.uid, progressRootPath.toString, appName, new Configuration())
-    progressTracker2.commit(progressTracker2.collectProgressRecordsForBatch(unixTimestamp),
-      unixTimestamp)
+    progressTracker2.commit(progressTracker2.collectProgressRecordsForBatch(
+      unixTimestamp, List(eventhubsSource2)), unixTimestamp)
 
     var progressTempPath = PathTools.progressTempDirPathStr(progressRootPath.toString,
       appName, eventhubsSource1.uid)
@@ -419,12 +420,12 @@ class StructuredStreamingProgressTrackerSuite extends SharedSQLContext {
     val progressTracker1 = StructuredStreamingProgressTracker
       .initInstance(eventhubsSource1.uid, progressRootPath.toString, appName, new Configuration())
 
-    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp),
-      unixTimestamp)
-    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp + 1000L),
-      unixTimestamp + 1000L)
-    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(unixTimestamp + 2000L),
-      unixTimestamp + 2000L)
+    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(
+      unixTimestamp, List(eventhubsSource1)), unixTimestamp)
+    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(
+      unixTimestamp + 1000L, List(eventhubsSource1)), unixTimestamp + 1000L)
+    progressTracker1.commit(progressTracker1.collectProgressRecordsForBatch(
+      unixTimestamp + 2000L, List(eventhubsSource1)), unixTimestamp + 2000L)
 
     var eh1Progress = progressTracker1.read(eventhubsSource1.uid, unixTimestamp,
       fallBack = false)

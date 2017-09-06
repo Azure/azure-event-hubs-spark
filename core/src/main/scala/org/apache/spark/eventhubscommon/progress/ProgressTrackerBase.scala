@@ -241,7 +241,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
      commitTime: Long): Unit = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"), true)
+      oos = fs.create(new Path(progressDirStr +
+        s"/${PathTools.progressFileNamePattern(commitTime)}"), true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
@@ -283,11 +284,11 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       timestamp: Long,
       ehConnectors: List[EventHubsConnector]): List[Path] = {
     for (ehConnector <- ehConnectors; ehNameAndPartition <- ehConnector.connectedInstances)
-      yield new Path(progressTempDirStr + "/" + PathTools.progressFileNamePattern(
+      yield new Path(progressTempDirStr + s"/${PathTools.progressTempFileNamePattern(
         ehConnector.streamId,
         ehConnector.uid,
         ehNameAndPartition,
-        timestamp))
+        timestamp)}")
   }
 
   /**

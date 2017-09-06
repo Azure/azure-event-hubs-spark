@@ -207,7 +207,7 @@ private[spark] class EventHubsSource(
 
   private def fetchEndingOffsetOfLastBatch(committedBatchId: Long) = {
     val startOffsetOfUndergoingBatch = progressTracker.collectProgressRecordsForBatch(
-      committedBatchId)
+      committedBatchId, List(this))
     if (startOffsetOfUndergoingBatch.isEmpty) {
       // first batch, take the initial value of the offset, -1
       EventHubsOffset(committedBatchId, committedOffsetsAndSeqNums.offsets)

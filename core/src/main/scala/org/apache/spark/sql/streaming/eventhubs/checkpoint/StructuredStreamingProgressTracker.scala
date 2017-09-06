@@ -55,7 +55,8 @@ class StructuredStreamingProgressTracker(
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             println(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
-            val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp)
+            val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp,
+              List(StructuredStreamingProgressTracker.registeredConnectors(uid)))
             commit(progressRecords, latestFileTimestamp)
           }
         }

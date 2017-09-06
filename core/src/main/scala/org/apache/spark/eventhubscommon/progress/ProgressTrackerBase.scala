@@ -283,12 +283,16 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private def allProgressRecords(
       timestamp: Long,
       ehConnectors: List[EventHubsConnector]): List[Path] = {
-    for (ehConnector <- ehConnectors; ehNameAndPartition <- ehConnector.connectedInstances)
-      yield new Path(progressTempDirStr + s"/${PathTools.progressTempFileNamePattern(
-        ehConnector.streamId,
-        ehConnector.uid,
-        ehNameAndPartition,
-        timestamp)}")
+    val fs = progressTempDirectoryPath.getFileSystem(hadoopConfiguration)
+    for (ehConnector <- ehConnectors; ehNameAndPartition <- ehConnector.connectedInstances) {
+      yield new Path(progressTempDirStr + s"/${
+        PathTools.progressTempFileNamePattern(
+          ehConnector.streamId,
+          ehConnector.uid,
+          ehNameAndPartition,
+          timestamp)
+      }")
+    }.filter(fs.exists _)
   }
 
   /**
@@ -299,7 +303,6 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       timestamp: Long,
       ehConnectors: List[EventHubsConnector]):
     Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
-
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
     try {

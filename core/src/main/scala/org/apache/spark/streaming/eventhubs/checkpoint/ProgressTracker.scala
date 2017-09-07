@@ -379,7 +379,8 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     // we need to check this to handle the case of partially evaluated RDDs caused by RDD.take(x)
     allEHDirectDStreams.flatMap{ehDStream =>
       ehDStream.eventhubNameAndPartitions.map(
-        ehNameAndPartition => new Path(s"${ehDStream.id}-${ehDStream.eventHubNameSpace}-" +
+        ehNameAndPartition => new Path(s"$progressTempDirStr/" +
+          s"${ehDStream.id}-${ehDStream.eventHubNameSpace}-" +
           s"$ehNameAndPartition-$timestamp")
       )
     }.filter(fs.exists _)

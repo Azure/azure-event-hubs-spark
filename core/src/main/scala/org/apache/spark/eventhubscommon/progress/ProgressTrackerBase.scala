@@ -284,17 +284,12 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       timestamp: Long,
       ehConnectors: List[EventHubsConnector]): List[Path] = {
     val fs = progressTempDirectoryPath.getFileSystem(hadoopConfiguration)
-    val allPossiblePath =
-      for (ehConnector <- ehConnectors; ehNameAndPartition <- ehConnector.connectedInstances)
-        yield new Path(progressTempDirStr + s"/${
-          PathTools.progressTempFileNamePattern(
-            ehConnector.streamId,
-            ehConnector.uid,
-            ehNameAndPartition,
-            timestamp)
-        }")
-    // we need to check this to handle the case of partially evaluated RDDs caused by RDD.take(x)
-    allPossiblePath.filter(fs.exists _)
+    ehConnectors.flatMap { ehConnector =>
+      ehConnector.connectedInstances.map(ehNameAndPartition =>
+        new Path(progressTempDirStr +
+          s"/${PathTools.progressTempFileNamePattern(ehConnector.streamId, ehConnector.uid,
+            ehNameAndPartition, timestamp)}"))
+    }.filter(fs.exists _)
   }
 
   /**

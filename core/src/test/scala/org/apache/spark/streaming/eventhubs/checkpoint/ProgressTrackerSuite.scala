@@ -206,6 +206,12 @@ class ProgressTrackerSuite extends SharedUtils {
   test("snapshot progress tracking records can be read correctly") {
     progressTracker = ProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
+    val dStream1 = new EventHubDirectDStream(ssc, "namespace1", "",
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "1")))
+    val dStream2 = new EventHubDirectDStream(ssc, "namespace2", "",
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "1")))
     var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
       EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 0, 1)
@@ -218,7 +224,7 @@ class ProgressTrackerSuite extends SharedUtils {
     progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
       EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 20, 30)
-    val s = progressTracker.collectProgressRecordsForBatch(1000L)
+    val s = progressTracker.collectProgressRecordsForBatch(1000L, List(dStream1, dStream2))
     assert(s.contains("namespace1"))
     assert(s.contains("namespace2"))
     assert(s("namespace1")(EventHubNameAndPartition("eh1", 0)) === (0, 1))
@@ -230,6 +236,12 @@ class ProgressTrackerSuite extends SharedUtils {
   test("inconsistent timestamp in temp progress directory can be detected") {
     progressTracker = ProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
+    val dStream1 = new EventHubDirectDStream(ssc, "namespace1", "",
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "1")))
+    val dStream2 = new EventHubDirectDStream(ssc, "namespace2", "",
+      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "1")))
     var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
       EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 0, 1)
@@ -243,7 +255,7 @@ class ProgressTrackerSuite extends SharedUtils {
       EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 20, 30)
     intercept[IllegalStateException] {
-      progressTracker.collectProgressRecordsForBatch(1000L)
+      progressTracker.collectProgressRecordsForBatch(1000L, List(dStream1, dStream2))
     }
   }
 

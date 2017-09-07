@@ -372,30 +372,33 @@ private[eventhubs] class ProgressTracker private[checkpoint](
     }
   }
 
-  private def allProgressRecords(timestamp: Long): List[FileStatus] = {
+  private def allProgressRecords(
+      timestamp: Long,
+      allEHDirectDStreams: List[EventHubDirectDStream]): List[Path] = {
     val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-    val r = fs.listStatus(progressTempDirPath, new PathFilter {
-      override def accept(path: Path) = {
-        path.getName.split("-").last == timestamp.toString
-      }
-    }).toList
-    r
+    // we need to check this to handle the case of partially evaluated RDDs caused by RDD.take(x)
+    allEHDirectDStreams.flatMap{ehDStream =>
+      ehDStream.eventhubNameAndPartitions.map(
+        ehNameAndPartition => new Path(s"${ehDStream.id}-${ehDStream.eventHubNameSpace}-" +
+          s"$ehNameAndPartition-$timestamp")
+      )
+    }.filter(fs.exists _)
   }
 
   /**
    * read progress records from temp directories
    * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
    */
-  def collectProgressRecordsForBatch(timestamp: Long):
+  def collectProgressRecordsForBatch(timestamp: Long, allEhDStreams: List[EventHubDirectDStream]):
       Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
     try {
       val fs = progressTempDirPath.getFileSystem(new Configuration())
-      val files = allProgressRecords(timestamp).iterator
+      val files = allProgressRecords(timestamp, allEhDStreams).iterator
       while (files.hasNext) {
         val file = files.next()
-        val progressRecords = readProgressRecordLines(file.getPath, fs)
+        val progressRecords = readProgressRecordLines(file, fs)
         records ++= progressRecords
       }
       // check timestamp consistency

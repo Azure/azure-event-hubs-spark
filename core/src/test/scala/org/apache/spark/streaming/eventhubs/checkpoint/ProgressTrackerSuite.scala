@@ -212,16 +212,20 @@ class ProgressTrackerSuite extends SharedUtils {
     val dStream2 = new EventHubDirectDStream(ssc, "namespace2", "",
       Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
         "eh2" -> Map("eventhubs.partition.count" -> "1")))
-    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream1.id,
+      "namespace1",
       EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream1.id,
+      "namespace1",
       EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream2.id,
+      "namespace2",
       EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 10, 20)
-    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream2.id,
+      "namespace2",
       EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 20, 30)
     val s = progressTracker.collectProgressRecordsForBatch(1000L, List(dStream1, dStream2))
@@ -242,16 +246,20 @@ class ProgressTrackerSuite extends SharedUtils {
     val dStream2 = new EventHubDirectDStream(ssc, "namespace2", "",
       Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
         "eh2" -> Map("eventhubs.partition.count" -> "1")))
-    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+    var progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream1.id,
+      "namespace1",
       EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace1",
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream1.id,
+      "namespace1",
       EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream2.id,
+      "namespace2",
       EventHubNameAndPartition("eh1", 0), 1000L, new Configuration())
     progressWriter.write(2000L, 10, 20)
-    progressWriter = new ProgressWriter(progressRootPath.toString, appName, 0, "namespace2",
+    progressWriter = new ProgressWriter(progressRootPath.toString, appName, dStream2.id,
+      "namespace2",
       EventHubNameAndPartition("eh2", 0), 1000L, new Configuration())
     progressWriter.write(1000L, 20, 30)
     intercept[IllegalStateException] {

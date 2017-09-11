@@ -241,7 +241,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
      commitTime: Long): Unit = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr + s"/progress-$commitTime"), true)
+      oos = fs.create(new Path(progressDirStr +
+        s"/${PathTools.progressFileNamePattern(commitTime)}"), true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
@@ -279,30 +280,34 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
-  private def allProgressRecords(timestamp: Long): List[FileStatus] = {
-    val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-    val r = fs.listStatus(progressTempDirPath, new PathFilter {
-      override def accept(path: Path) = {
-        path.getName.split("-").last == timestamp.toString
-      }
-    }).toList
-    r
+  private def allProgressRecords(
+      timestamp: Long,
+      ehConnectors: List[EventHubsConnector]): List[Path] = {
+    val fs = progressTempDirectoryPath.getFileSystem(hadoopConfiguration)
+    ehConnectors.flatMap { ehConnector =>
+      ehConnector.connectedInstances.map(ehNameAndPartition =>
+        new Path(progressTempDirStr +
+          s"/${PathTools.progressTempFileNamePattern(ehConnector.streamId, ehConnector.uid,
+            ehNameAndPartition, timestamp)}"))
+    }.filter(fs.exists _)
   }
 
   /**
    * read progress records from temp directories
    * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
    */
-  def collectProgressRecordsForBatch(timestamp: Long):
+  def collectProgressRecordsForBatch(
+      timestamp: Long,
+      ehConnectors: List[EventHubsConnector]):
     Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
     try {
       val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-      val files = allProgressRecords(timestamp).iterator
+      val files = allProgressRecords(timestamp, ehConnectors).iterator
       while (files.hasNext) {
         val file = files.next()
-        val progressRecords = readProgressRecordLines(file.getPath, fs)
+        val progressRecords = readProgressRecordLines(file, fs)
         records ++= progressRecords
       }
       // check timestamp consistency

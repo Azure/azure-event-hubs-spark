@@ -18,16 +18,34 @@
 package org.apache.spark.streaming.eventhubs.checkpoint
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
+import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressTrackerBase, ProgressWriter}
-import org.apache.spark.streaming.Time
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
+import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressWriter}
 import org.apache.spark.streaming.eventhubs.SharedUtils
 
 class ProgressTrackerSuite extends SharedUtils {
+
+  class DummyEventHubsConnector(
+      sId: Int,
+      uniqueId: String,
+      connedInstances: List[EventHubNameAndPartition]) extends EventHubsConnector {
+
+    override def streamId: Int = {
+      sId
+    }
+
+    override def uid: String = {
+      uniqueId
+    }
+
+    override def connectedInstances: List[EventHubNameAndPartition] = {
+      connedInstances
+    }
+  }
 
   override def beforeEach(): Unit = {
     super.beforeEach()
@@ -209,20 +227,25 @@ class ProgressTrackerSuite extends SharedUtils {
   test("snapshot progress tracking records can be read correctly") {
     progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
-    var progressWriter = new ProgressWriter(0, "namespace1", EventHubNameAndPartition("eh1", 0),
+    val eh1Partition0 = EventHubNameAndPartition("eh1", 0)
+    val eh2Partition0 = EventHubNameAndPartition("eh2", 0)
+    val connectedInstances = List(eh1Partition0, eh2Partition0)
+    val connector1 = new DummyEventHubsConnector(0, "namespace1", connectedInstances)
+    val connector2 = new DummyEventHubsConnector(0, "namespace2", connectedInstances)
+    var progressWriter = new ProgressWriter(0, "namespace1", eh1Partition0,
       1000L, new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(0, "namespace1", EventHubNameAndPartition("eh2", 0), 1000L,
+    progressWriter = new ProgressWriter(0, "namespace1", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(0, "namespace2", EventHubNameAndPartition("eh1", 0), 1000L,
+    progressWriter = new ProgressWriter(0, "namespace2", eh1Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 10, 20)
-    progressWriter = new ProgressWriter(0, "namespace2", EventHubNameAndPartition("eh2", 0), 1000L,
+    progressWriter = new ProgressWriter(0, "namespace2", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 20, 30)
     val s = progressTracker.asInstanceOf[DirectDStreamProgressTracker].
-      collectProgressRecordsForBatch(1000L)
+      collectProgressRecordsForBatch(1000L, List(connector1, connector2))
     assert(s.contains("namespace1"))
     assert(s.contains("namespace2"))
     assert(s("namespace1")(EventHubNameAndPartition("eh1", 0)) === (0, 1))
@@ -234,22 +257,26 @@ class ProgressTrackerSuite extends SharedUtils {
   test("inconsistent timestamp in temp progress directory can be detected") {
     progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
       new Configuration())
-    var progressWriter = new ProgressWriter(0, "namespace1",
-      EventHubNameAndPartition("eh1", 0), 1000L, new Configuration(), progressRootPath.toString,
-      appName)
+    val eh1Partition0 = EventHubNameAndPartition("eh1", 0)
+    val eh2Partition0 = EventHubNameAndPartition("eh2", 0)
+    val connectedInstances = List(eh1Partition0, eh2Partition0)
+    val connector1 = new DummyEventHubsConnector(0, "namespace1", connectedInstances)
+    val connector2 = new DummyEventHubsConnector(0, "namespace2", connectedInstances)
+    var progressWriter = new ProgressWriter(0, "namespace1", eh1Partition0,
+      1000L, new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(0, "namespace1", EventHubNameAndPartition("eh2", 0), 1000L,
+    progressWriter = new ProgressWriter(0, "namespace1", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-    progressWriter = new ProgressWriter(0, "namespace2", EventHubNameAndPartition("eh1", 0), 1000L,
+    progressWriter = new ProgressWriter(0, "namespace2", eh1Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(2000L, 10, 20)
-    progressWriter = new ProgressWriter(0, "namespace2", EventHubNameAndPartition("eh2", 0), 1000L,
+    progressWriter = new ProgressWriter(0, "namespace2", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 20, 30)
     intercept[IllegalStateException] {
       progressTracker.asInstanceOf[DirectDStreamProgressTracker].
-        collectProgressRecordsForBatch(1000L)
+        collectProgressRecordsForBatch(1000L, List(connector1, connector2))
     }
   }
 

@@ -20,9 +20,11 @@ import java.time.Instant
 
 import scala.collection.JavaConverters._
 import scala.collection.Map
+
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient}
 import com.microsoft.azure.servicebus._
+
 import org.apache.spark.{SparkEnv, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes._

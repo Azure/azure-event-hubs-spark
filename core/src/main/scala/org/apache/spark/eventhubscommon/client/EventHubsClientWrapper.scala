@@ -24,6 +24,7 @@ import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import com.microsoft.azure.servicebus._
 import EventHubsOffsetTypes.EventHubsOffsetType
 
+import org.apache.spark.{SparkEnv, TaskContext}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
@@ -150,7 +151,7 @@ private[spark] class EventHubsClientWrapper extends Serializable with EventHubCl
     val receiverOption = new ReceiverOptions()
     receiverOption.setReceiverRuntimeMetricEnabled(false)
     receiverOption.setIdentifier(
-      s"$consumerGroup-$eventHubsName-$partitionId-$currentOffset")
+      s"${SparkEnv.get.executorId}-${TaskContext.get().taskAttemptId()}")
 
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint

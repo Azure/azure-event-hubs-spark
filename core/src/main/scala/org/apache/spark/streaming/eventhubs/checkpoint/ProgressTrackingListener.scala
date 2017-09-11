@@ -41,7 +41,8 @@ private[eventhubs] class ProgressTrackingListener private (
         val allEventDStreams = ProgressTracker.eventHubDirectDStreams
         // merge with the temp directory
         val startTime = System.currentTimeMillis()
-        val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(batchTime)
+        val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(
+          batchTime, allEventDStreams.toList)
         logInfo(s"progressInLastBatch $progressInLastBatch")
         if (progressInLastBatch.nonEmpty) {
           val contentToCommit = allEventDStreams.map {

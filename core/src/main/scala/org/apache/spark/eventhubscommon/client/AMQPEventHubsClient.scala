@@ -44,6 +44,7 @@ private[client] class AMQPEventHubsClient(
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]) = {
     val results = new mutable.HashMap[EventHubNameAndPartition, EventHubPartitionRuntimeInformation]
     try {
+      logInfo("Getting PartitionRuntimeInformation from EventHubs instance.")
       for (ehNameAndPartition <- targetEventHubNameAndPartitions) {
         val ehName = ehNameAndPartition.eventHubName
         val partitionId = ehNameAndPartition.partitionId
@@ -53,6 +54,7 @@ private[client] class AMQPEventHubsClient(
         results += ehNameAndPartition -> runTimeInfo
       }
       results.toMap.view
+      logInfo("Retrieved PartitionRuntimeInformation from EventHubs instance.")
     } catch {
       case e: Exception =>
         e.printStackTrace()

@@ -67,6 +67,8 @@ private[spark] class EventHubsRDD(
       expectedHighestSeqNum: Long): List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
     val receivingTrace = new ListBuffer[Long]
+
+    logInfo(s"Starting to ingest events from partition ${eventHubNameAndPartition.partitionId}")
     var cnt = 0
     while (receivedBuffer.size < expectedEventNumber) {
       if (cnt > expectedEventNumber * 2) {
@@ -89,6 +91,7 @@ private[spark] class EventHubsRDD(
         return receivedBuffer.toList
       }
     }
+    logInfo(s"Finished ingesting events from partition ${eventHubNameAndPartition.partitionId}")
     receivedBuffer.toList
   }
 

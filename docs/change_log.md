@@ -1,5 +1,33 @@
 ## Change Log
 
+### 2.1.3 (Sept 18th, 2017)
+
+* Fix issue of unnecessary waiting when customer passes in filtering parameters [141](https://github.com/hdinsight/spark-eventhubs/pull/141)
+
+* Change Receiver Id [135](https://github.com/CodingCat/spark-eventhubs/commit/cf3288a0746c0b1fb5a8cf879834249aa07acf8e)
+
+* Eliminate Listing Operations to handle performance issue with blob storage [134](https://github.com/hdinsight/spark-eventhubs/pull/134)
+
+* Optimize thread synchronization and show metrics of reading progress files [124](https://github.com/hdinsight/spark-eventhubs/pull/124)
+
+* fix NPE in structured streaming [123](https://github.com/hdinsight/spark-eventhubs/pull/123)
+
+* fix flaky test in SS [120](https://github.com/hdinsight/spark-eventhubs/pull/120)
+
+* Add IotHub Spark setup instructions [117](https://github.com/hdinsight/spark-eventhubs/pull/117)
+
+* Add Getting Start Instructions [116](https://github.com/hdinsight/spark-eventhubs/pull/116)
+
+* Update Structured Streaming Doc [129](https://github.com/hdinsight/spark-eventhubs/pull/129)
+
+### 2.0.9 (Sept 18th, 2017)
+
+* Change Receiver Id [138](https://github.com/hdinsight/spark-eventhubs/pull/138)
+
+* Eliminate Listing Operations to handle performance issue with blob storage [136](https://github.com/hdinsight/spark-eventhubs/pull/136)
+
+* Optimize thread synchronization and show metrics of reading progress files [125](https://github.com/hdinsight/spark-eventhubs/pull/125)
+
 ### 2.1.2 (July 31st, 2017)
 
 * fix the receiver leaking issue [105](https://github.com/hdinsight/spark-eventhubs/pull/105)

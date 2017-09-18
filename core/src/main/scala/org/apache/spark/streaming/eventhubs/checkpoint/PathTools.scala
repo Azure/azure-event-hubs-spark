@@ -30,11 +30,12 @@ private[checkpoint] object PathTools extends Serializable {
     s"$checkpointDir/${appName}_temp"
   }
 
-  def progressTempFileStr(basePath: String,
-                          streamId: Int,
-                          namespace: String,
-                          eventHubNameAndPartition: EventHubNameAndPartition,
-                          timestamp: Long): String = {
+  def progressTempFileStr(
+      basePath: String,
+      streamId: Int,
+      namespace: String,
+      eventHubNameAndPartition: EventHubNameAndPartition,
+      timestamp: Long): String = {
     basePath + s"/$streamId-$namespace-$eventHubNameAndPartition-$timestamp"
   }
 }

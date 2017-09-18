@@ -104,6 +104,21 @@ private[spark] class EventHubsRDD(
     Iterator()
   }
 
+  private def extractOffsetAndSeqToWrite(
+      receivedEvents: List[EventData],
+      eventHubReceiver: EventHubsClientWrapper,
+      ehRDDPartition: EventHubRDDPartition): (Long, Long) = {
+    if (receivedEvents.nonEmpty) {
+      val lastEvent = receivedEvents.last
+      (lastEvent.getSystemProperties.getOffset.toLong,
+        lastEvent.getSystemProperties.getSequenceNumber)
+    } else {
+      val partitionInfo = eventHubReceiver.eventhubsClient.getPartitionRuntimeInformation(
+        ehRDDPartition.eventHubNameAndPartitionID.partitionId.toString).get()
+      (partitionInfo.getLastEnqueuedOffset.toLong, partitionInfo.getLastEnqueuedSequenceNumber)
+    }
+  }
+
   private def retrieveDataFromPartition(
       ehRDDPartition: EventHubRDDPartition, progressWriter: ProgressWriter): Iterator[EventData] = {
     val fromOffset = ehRDDPartition.fromOffset
@@ -126,15 +141,10 @@ private[spark] class EventHubsRDD(
       logInfo(s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
         s" there is no more messages, time cost:" +
         s" ${(System.currentTimeMillis() - startTime) / 1000.0} seconds")
-      var offsetOfLastEvent = fromOffset
-      var seqOfLastEvent = fromSeq
-      if (receivedEvents.nonEmpty) {
-        val lastEvent = receivedEvents.last
-        offsetOfLastEvent = lastEvent.getSystemProperties.getOffset.toLong
-        seqOfLastEvent = lastEvent.getSystemProperties.getSequenceNumber
-      }
-      progressWriter.write(batchTime, offsetOfLastEvent, seqOfLastEvent)
-      logInfo(s"write offset $offsetOfLastEvent, sequence number $seqOfLastEvent for EventHub" +
+      val (offsetToWrite, seqToWrite) = extractOffsetAndSeqToWrite(receivedEvents, eventHubReceiver,
+        ehRDDPartition)
+      progressWriter.write(batchTime, offsetToWrite, seqToWrite)
+      logInfo(s"write offset $offsetToWrite, sequence number $seqToWrite for EventHub" +
         s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
       receivedEvents.iterator
     } catch {

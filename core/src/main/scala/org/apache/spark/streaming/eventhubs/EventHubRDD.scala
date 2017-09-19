@@ -63,7 +63,8 @@ class EventHubRDD(
   private def wrappingReceive(
       eventHubNameAndPartition: EventHubNameAndPartition,
       eventHubClient: EventHubsClientWrapper,
-      expectedEventNumber: Int): List[EventData] = {
+      expectedEventNumber: Int,
+      expectedHighestSeqNum: Long): List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
     val receivingTrace = new ListBuffer[Long]
     var cnt = 0
@@ -81,6 +82,12 @@ class EventHubRDD(
       receivingTrace += receivedEvents.length
       cnt += 1
       receivedBuffer ++= receivedEvents
+      if (receivedBuffer.nonEmpty &&
+        receivedBuffer.last.getSystemProperties.getSequenceNumber >= expectedHighestSeqNum) {
+        // this is for the case where user has passed in filtering params and the remaining
+        // msg number is less than expectedEventNumber
+        return receivedBuffer.toList
+      }
     }
     receivedBuffer.toList
   }
@@ -94,6 +101,21 @@ class EventHubRDD(
       s" ${ehRDDPartition.fromSeq} for EventHub" +
       s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
     Iterator()
+  }
+
+  private def extractOffsetAndSeqToWrite(
+      receivedEvents: List[EventData],
+      eventHubReceiver: EventHubsClientWrapper,
+      ehRDDPartition: EventHubRDDPartition): (Long, Long) = {
+    if (receivedEvents.nonEmpty) {
+      val lastEvent = receivedEvents.last
+      (lastEvent.getSystemProperties.getOffset.toLong,
+        lastEvent.getSystemProperties.getSequenceNumber)
+    } else {
+      val partitionInfo = eventHubReceiver.eventhubsClient.getPartitionRuntimeInformation(
+        ehRDDPartition.eventHubNameAndPartitionID.partitionId.toString).get()
+      (partitionInfo.getLastEnqueuedOffset.toLong, partitionInfo.getLastEnqueuedSequenceNumber)
+    }
   }
 
   private def retrieveDataFromPartition(
@@ -112,15 +134,14 @@ class EventHubRDD(
         ehRDDPartition.eventHubNameAndPartitionID.partitionId, fromOffset,
         ehRDDPartition.offsetType, maxRate)
       val receivedEvents = wrappingReceive(ehRDDPartition.eventHubNameAndPartitionID,
-        eventHubReceiver, maxRate)
+        eventHubReceiver, maxRate, ehRDDPartition.untilSeq.toLong)
       logInfo(s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
         s" there is no more messages, time cost:" +
         s" ${(System.currentTimeMillis() - startTime) / 1000.0} seconds")
-      val lastEvent = receivedEvents.last
-      val endOffset = lastEvent.getSystemProperties.getOffset.toLong
-      val endSeq = lastEvent.getSystemProperties.getSequenceNumber
-      progressWriter.write(batchTime.milliseconds, endOffset, endSeq)
-      logInfo(s"write offset $endOffset, sequence number $endSeq for EventHub" +
+      val (offsetToWrite, seqToWrite) = extractOffsetAndSeqToWrite(receivedEvents, eventHubReceiver,
+        ehRDDPartition)
+      progressWriter.write(batchTime.milliseconds, offsetToWrite, seqToWrite)
+      logInfo(s"write offset $offsetToWrite, sequence number $seqToWrite for EventHub" +
         s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
       receivedEvents.iterator
     } catch {

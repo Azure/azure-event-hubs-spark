@@ -4,8 +4,8 @@
   <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
   <versioning>
     <versions>
-      <version>2.1.3-SNAPSHOT</version>
+      <version>2.1.4-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20170916023731</lastUpdated>
+    <lastUpdated>20170919202252</lastUpdated>
   </versioning>
 </metadata>

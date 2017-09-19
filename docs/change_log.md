@@ -2,6 +2,8 @@
 
 ### 2.1.3 (Sept 18th, 2017)
 
+* fix wrong start offset in the first batch (#146)
+
 * Fix issue of unnecessary waiting when customer passes in filtering parameters [141](https://github.com/hdinsight/spark-eventhubs/pull/141)
 
 * Change Receiver Id [135](https://github.com/CodingCat/spark-eventhubs/commit/cf3288a0746c0b1fb5a8cf879834249aa07acf8e)

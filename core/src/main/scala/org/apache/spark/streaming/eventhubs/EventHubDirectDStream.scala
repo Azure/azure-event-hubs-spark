@@ -332,6 +332,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           s" ${validTime.milliseconds}")
         graph.wait()
         logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
+        // we need to update highest offset here because
+        // 1) when the user pass in filtering params they may have received events whose seq number
+        // is higher than the saved one -> leads to an exception;
+        // 2) when the last batch was delayed, we should catch up by detecting the latest highest
+        // offset
+        val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
+        logInfo(s"updating highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
         startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
       }
       logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +

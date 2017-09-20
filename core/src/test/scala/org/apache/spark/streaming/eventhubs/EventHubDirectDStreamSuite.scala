@@ -49,17 +49,42 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
   )
 
 
-  test("skip the batch when failed to fetch the latest offset of partitions") {
+  test("skip the batch when EH endpoint is unavailable for starting seq number query") {
     val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
       Map("eh1" -> eventhubParameters))
     val eventHubClientMock = mock[EventHubClient]
-    Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = true,
-      targetEventHubNameAndPartitions = ehDStream.eventhubNameAndPartitions.toList)).
+    Mockito.when(eventHubClientMock.startSeqOfPartition(retryIfFail = false,
+      ehDStream.eventhubNameAndPartitions.toList)).
       thenReturn(None)
     ehDStream.setEventHubClient(eventHubClientMock)
     ssc.scheduler.start()
-    intercept[IllegalStateException] {
+    intercept[IllegalArgumentException] {
       ehDStream.compute(Time(1000))
+    }
+  }
+
+  test("skip the batch when EH endpoint is unavailable for highest offset query") {
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    val eventHubClientMock = mock[EventHubClient]
+    val dummyStartSeqMap = (0 until 32).map(partitionId =>
+      (EventHubNameAndPartition("eh1", partitionId), 1L)).toMap
+    Mockito.when(eventHubClientMock.startSeqOfPartition(retryIfFail = false,
+      ehDStream.eventhubNameAndPartitions.toList)).
+      thenReturn(Some(dummyStartSeqMap))
+    Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = true,
+      ehDStream.eventhubNameAndPartitions.toList)).
+      thenReturn(None)
+    ehDStream.setEventHubClient(eventHubClientMock)
+    ssc.scheduler.start()
+    intercept[IllegalArgumentException] {
+      try {
+        ehDStream.compute(Time(1000))
+      } catch {
+        case e: Exception =>
+          e.printStackTrace()
+          throw e
+      }
     }
   }
 
@@ -224,7 +249,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
       messagesBeforeEmpty = 4,
-      numBatchesBeforeNewData = 5)
+      timestampOfNewData = 4000)
     testProgressTracker(eventhubNamespace,
       OffsetRecord(Time(6000L), Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
         EventHubNameAndPartition("eh1", 1) -> (5L, 5L),

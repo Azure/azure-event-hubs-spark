@@ -22,7 +22,7 @@ import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.eventhubs.{EventHubClient, EventHubNameAndPartition, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.streaming.eventhubs._
 import org.apache.spark.streaming.eventhubs.EventHubsOffsetTypes.EventHubsOffsetType
 
 
@@ -190,17 +190,20 @@ private[eventhubs] object FragileEventHubClient {
 private[eventhubs] class FluctuatedEventHubClient(
     ssc: StreamingContext,
     messagesBeforeEmpty: Long,
-    numBatchesBeforeNewData: Int,
+    timestampOfNewData: Long,
     latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
-
-  private var callIndex = -1
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
     Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    callIndex += 1
-    if (callIndex < numBatchesBeforeNewData) {
+
+    val inputStream = ssc.graph.getInputStreams().find(
+      _.isInstanceOf[EventHubDirectDStream])
+    assert(inputStream.isDefined)
+
+    if (inputStream.get.asInstanceOf[EventHubDirectDStream].currentOffsetsAndSeqNums.timestamp.
+      milliseconds < timestampOfNewData) {
       Some(latestRecords.map{
         case (ehNameAndPartition, _) =>
           (ehNameAndPartition, (messagesBeforeEmpty - 1, messagesBeforeEmpty - 1))

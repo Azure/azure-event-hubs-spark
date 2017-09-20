@@ -147,9 +147,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // query start startSeqs
       val startSeqs = eventHubClient.startSeqOfPartition(retryIfFail = false,
         eventhubNameAndPartitions.toList)
+      require(startSeqs.isDefined, "We cannot get starting seq number of partitions," +
+        " EventHubs endpoint is not available")
       OffsetRecord(math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
         offsetRecord.offsets.map {
-          case (ehNameAndPartition, (offset, seq)) =>
+          case (ehNameAndPartition, (offset, _)) =>
             (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))
         })
     }
@@ -317,29 +319,29 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       ProgressTrackingListener.initInstance(ssc, progressDir)
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
-    val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
-    logInfo(s"highestOffsetOfAllPartitions at $validTime: $highestOffsetOption")
-    if (highestOffsetOption.isEmpty) {
-      val errorMsg = s"EventHub $eventHubNameSpace Rest Endpoint is not responsive, will" +
-        s" stop the application"
-      logError(errorMsg)
-      throw new IllegalStateException(errorMsg)
-    } else {
-      var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
-      while (startPointRecord.timestamp <
-        validTime.milliseconds - ssc.graph.batchDuration.milliseconds) {
-        logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
-          s" ${validTime.milliseconds}")
-        graph.wait()
-        logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
-        startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
-      }
-      logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
-        s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
-      val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
-      initialized = true
-      rdd
+    var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
+    while (startPointRecord.timestamp < validTime.milliseconds -
+      ssc.graph.batchDuration.milliseconds) {
+      logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
+        s" ${validTime.milliseconds}")
+      graph.wait()
+      logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
+      startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
     }
+    // we need to update highest offset after we skip or get out from the while loop, because
+    // 1) when the user pass in filtering params they may have received events whose seq number
+    // is higher than the saved one -> leads to an exception;
+    // 2) when the last batch was delayed, we should catch up by detecting the latest highest
+    // offset
+    val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
+    require(highestOffsetOption.isDefined, "We cannot get starting highest offset of partitions," +
+      " EventHubs endpoint is not available")
+    logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetOption.get}")
+    logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
+      s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
+    val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
+    initialized = true
+    rdd
   }
 
   @throws(classOf[IOException])

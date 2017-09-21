@@ -71,6 +71,7 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     progressListener = null
     EventHubDirectDStream.lastCleanupTime = -1
     ProgressTrackingListener.reset(ssc)
+    fs.delete(progressRootPath, true)
     ssc.stop()
   }
 

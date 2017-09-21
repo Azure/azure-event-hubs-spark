@@ -379,6 +379,5 @@ class ProgressTrackerSuite extends SharedUtils {
     verifyProgressFile("namespace2", "eh11", 0 to 0, 2000L, Seq((1, 2)))
     verifyProgressFile("namespace2", "eh12", 0 to 1, 2000L, Seq((2, 3), (2, 3)))
     verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
-
   }
 }

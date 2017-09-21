@@ -49,6 +49,9 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   override def afterEach(): Unit = {
     reset()
+    // cannot do it in reset() for test like "recover from progress after updating code
+    // (no checkpoint provided) "
+    fs.delete(progressRootPath, true)
   }
 
   def batchDuration: Duration = Seconds(5)
@@ -71,7 +74,6 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
     progressListener = null
     EventHubDirectDStream.lastCleanupTime = -1
     ProgressTrackingListener.reset(ssc)
-    fs.delete(progressRootPath, true)
     ssc.stop()
   }
 

@@ -1,5 +1,12 @@
 ## Change Log
 
+### 2.1.4 (Sept 21st, 2017)
+
+* fix wrong start offset in the first batch [145](https://github.com/hdinsight/spark-eventhubs/pull/145)
+
+* should update highest offset when wake up by notify() [153](https://github.com/hdinsight/spark-eventhubs/pull/153)
+
+
 ### 2.1.3 (Sept 18th, 2017)
 
 * fix wrong start offset in the first batch (#146)

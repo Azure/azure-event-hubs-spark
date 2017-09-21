@@ -53,8 +53,8 @@ private[spark] class DirectDStreamProgressTracker private[spark](
   }
 
   /**
-   * called when ProgressTracker is called for the first time, including recovering from the
-   * checkpoint
+   * called when ProgressTracker is referred for the first time, including recovering from the
+   * Spark Streaming checkpoint
    */
   override def init(): Unit = {
     // recover from partially executed checkpoint commit

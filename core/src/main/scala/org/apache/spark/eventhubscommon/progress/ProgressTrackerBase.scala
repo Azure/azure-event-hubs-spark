@@ -36,9 +36,12 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   protected lazy val progressDirStr: String = PathTools.progressDirPathStr(progressDir, appName)
   protected lazy val progressTempDirStr: String = PathTools.progressTempDirPathStr(progressDir,
     appName)
+  protected lazy val progressMetadataDirStr: String = PathTools.progressMetadataDirPathStr(
+    progressDir, appName)
 
   protected lazy val progressDirPath = new Path(progressDirStr)
   protected lazy val progressTempDirPath = new Path(progressTempDirStr)
+  protected lazy val progressMetadataDirPath = new Path(progressMetadataDirStr)
 
   def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]]
 
@@ -61,13 +64,10 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
-  /**
-   * get the latest progress file saved under directory
-   */
-  protected def getLatestFile(
-      directory: Path, fs: FileSystem, timestamp: Long = Long.MaxValue): Option[Path] = {
-    require(fs.isDirectory(directory), s"$directory is not a directory")
-    val allFiles = fs.listStatus(directory)
+  // no metadata (for backward compatiblity
+  private def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
+      Option[Path] = {
+    val allFiles = fs.listStatus(progressDirPath)
     if (allFiles.length < 1) {
       None
     } else {
@@ -78,15 +78,35 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   /**
+   * get the latest progress file saved under directory
+   */
+  private def getLatestFile(fs: FileSystem, timestamp: Long = Long.MaxValue): Option[Path] = {
+    // first check metadata directory if exists
+    if (fs.exists(progressMetadataDirPath)) {
+      val metadataFiles = fs.listStatus(progressMetadataDirPath).filter(
+        file => file.isFile && file.getPath.getName.toLong <= timestamp)
+      if (metadataFiles.nonEmpty) {
+        // metadata files exists
+        Some(metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
+          f2.getPath.getName.toLong).head.getPath)
+      } else {
+        getLatestFileWithoutMetadata(fs, timestamp)
+      }
+    } else {
+      getLatestFileWithoutMetadata(fs, timestamp)
+    }
+  }
+
+  /**
    * this method is called when ProgressTracker is started for the first time (including recovering
-   * from checkpoint). This method validate the latest progress file by checking whether it
-   * contains progress of all partitions we subscribe to. If not, we will delete the corrupt
-   * progress file
+   * from Spark Streaming checkpoint). This method validate the latest progress file by checking
+   * whether it contains progress of all partitions we subscribe to. If not, we will delete the
+   * corrupt progress file
    * @return (whether the latest file pass the validation, option to the file path,
    *         the latest timestamp)
    */
   protected def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
-    val latestFileOpt = getLatestFile(progressDirPath, fs)
+    val latestFileOpt = getLatestFile(fs)
     val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
     var br: BufferedReader = null
     try {
@@ -200,7 +220,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         if (!fallBack) {
           pinPointProgressFile(fs, timestamp)
         } else {
-          getLatestFile(progressDirPath, fs, timestamp)
+          getLatestFile(fs, timestamp)
         }
       }
       if (progressFileOption.isEmpty) {

@@ -18,10 +18,11 @@
 package org.apache.spark.streaming.eventhubs.checkpoint
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
-import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
 import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressWriter}
@@ -106,6 +107,10 @@ class ProgressTrackerSuite extends SharedUtils {
           }
         })
     }
+  }
+
+  private def createMetadataFile(metadataPath: String, timestamp: Long): Unit = {
+    fs.create(new Path(metadataPath + s"/$timestamp"))
   }
 
   test("incomplete progress would be discarded") {
@@ -379,5 +384,19 @@ class ProgressTrackerSuite extends SharedUtils {
     verifyProgressFile("namespace2", "eh11", 0 to 0, 2000L, Seq((1, 2)))
     verifyProgressFile("namespace2", "eh12", 0 to 1, 2000L, Seq((2, 3), (2, 3)))
     verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
+  }
+
+  test("read progress file correctly and does query metadata when metadata exists") {
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
+      new Configuration())
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
+    val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
+    createMetadataFile(metadataPath, 1000L)
+    verify(progressTracker, never()).getLatestFile(fs)
+    val result = progressTracker.read("namespace1", 1000, fallBack = true)
+    assert(result.timestamp == 1000L)
+    assert(result.offsets == Map(EventHubNameAndPartition("eh1", 0) -> (0, 1)))
   }
 }

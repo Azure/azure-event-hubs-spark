@@ -80,7 +80,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   /**
    * get the latest progress file saved under directory
    */
-  private def getLatestFile(fs: FileSystem, timestamp: Long = Long.MaxValue): Option[Path] = {
+  private[spark] def getLatestFile(fs: FileSystem, timestamp: Long = Long.MaxValue):
+      Option[Path] = {
     // first check metadata directory if exists
     if (fs.exists(progressMetadataDirPath)) {
       val metadataFiles = fs.listStatus(progressMetadataDirPath).filter(

@@ -395,7 +395,7 @@ class ProgressTrackerSuite extends SharedUtils {
     verifyProgressFile("namespace2", "eh13", 0 to 2, 2000L, Seq((3, 4), (3, 4), (3, 4)))
   }
 
-  test("read progress file correctly and does query metadata when metadata exists") {
+  test("read progress file correctly when metadata exists") {
     progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
       appName, new Configuration())
     val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
@@ -407,5 +407,20 @@ class ProgressTrackerSuite extends SharedUtils {
     val result = progressTracker.read("namespace1", 1000, fallBack = true)
     assert(result.timestamp == 1000L)
     assert(result.offsets == Map(EventHubNameAndPartition("eh1", 0) -> (0, 1)))
+  }
+
+  test("ProgressTracker does query metadata when metadata exists") {
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
+      appName, new Configuration())
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1",
+      0 to 0, 0, 1)
+    val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
+    ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 1000L)
+    val (sourceOfLatestFile, result) = progressTracker.getLatestFile(fs)
+    assert(sourceOfLatestFile === 0)
+    assert(result.isDefined)
+    assert(result.get.getName === "progress-1000")
   }
 }

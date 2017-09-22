@@ -52,14 +52,10 @@ private[spark] class DirectDStreamProgressTracker private[spark](
     }.toMap
   }
 
-  /**
-   * called when ProgressTracker is referred for the first time, including recovering from the
-   * Spark Streaming checkpoint
-   */
-  override def init(): Unit = {
-    // recover from partially executed checkpoint commit
-    val fs = progressDirPath.getFileSystem(hadoopConfiguration)
+
+  private def initProgressFileDirectory(): Unit = {
     try {
+      val fs = progressDirPath.getFileSystem(hadoopConfiguration)
       val checkpointDirExisted = fs.exists(progressDirPath)
       if (checkpointDirExisted) {
         val (validationPass, latestFile) = validateProgressFile(fs)
@@ -72,6 +68,16 @@ private[spark] class DirectDStreamProgressTracker private[spark](
       } else {
         fs.mkdirs(progressDirPath)
       }
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
+        throw ex
+    }
+  }
+
+  private def initTempProgressFileDirectory(): Unit = {
+    try {
+      val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
       val checkpointTempDirExisted = fs.exists(progressTempDirPath)
       if (checkpointTempDirExisted) {
         fs.delete(progressTempDirPath, true)
@@ -82,9 +88,31 @@ private[spark] class DirectDStreamProgressTracker private[spark](
       case ex: Exception =>
         ex.printStackTrace()
         throw ex
-    } finally {
-      // EMPTY
     }
+  }
+
+  private def initMetadataDirectory(): Unit = {
+    try {
+      val fs = progressMetadataDirPath.getFileSystem(hadoopConfiguration)
+      val checkpointMetadaDirExisted = fs.exists(progressTempDirPath)
+      if (!checkpointMetadaDirExisted) {
+        fs.mkdirs(progressMetadataDirPath)
+      }
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
+        throw ex
+    }
+  }
+
+  /**
+   * called when ProgressTracker is referred for the first time, including recovering from the
+   * Spark Streaming checkpoint
+   */
+  override def init(): Unit = {
+    initProgressFileDirectory()
+    initTempProgressFileDirectory()
+    initMetadataDirectory()
   }
 
   /**

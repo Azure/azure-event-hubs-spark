@@ -262,15 +262,15 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     OffsetRecord(readTimestamp, recordToReturn)
   }
 
-  // write offsetToCommit to a progress tracking file
-  private def transaction(
-     offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-     fs: FileSystem,
-     commitTime: Long): Unit = {
+  private def createProgressFile(
+      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      fs: FileSystem,
+      commitTime: Long): Boolean = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr +
-        s"/${PathTools.progressFileNamePattern(commitTime)}"), true)
+      // write progress file
+      oos = fs.create(new Path(s"$progressDirStr/${PathTools.progressFileNamePattern(commitTime)}"),
+        true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
@@ -282,10 +282,49 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
               )
           }
       }
+      true
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        false
     } finally {
       if (oos != null) {
         oos.close()
       }
+    }
+  }
+
+  private def createMetadata(fs: FileSystem, commitTime: Long): Boolean = {
+    var oos: FSDataOutputStream = null
+    try {
+      oos = fs.create(new Path(s"$progressMetadataDirStr/$commitTime"), true)
+      true
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        false
+    } finally {
+      if (oos != null) {
+        oos.close()
+      }
+    }
+  }
+
+  // write offsetToCommit to a progress tracking file
+  private def transaction(
+     offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+     fs: FileSystem,
+     commitTime: Long): Unit = {
+    if (createProgressFile(offsetToCommit, fs, commitTime)) {
+      if (!createMetadata(fs, commitTime)) {
+        logError(s"cannot create progress file at $commitTime")
+        throw new IOException(s"cannot create metadata file at $commitTime," +
+          s" check the previous exception for the root cause")
+      }
+    } else {
+      logError(s"cannot create progress file at $commitTime")
+      throw new IOException(s"cannot create progress file at $commitTime," +
+        s" check the previous exception for the root cause")
     }
   }
 

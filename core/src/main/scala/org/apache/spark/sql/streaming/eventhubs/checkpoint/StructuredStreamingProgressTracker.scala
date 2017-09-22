@@ -45,8 +45,21 @@ class StructuredStreamingProgressTracker(
     Map(connector.uid -> connector.connectedInstances)
   }
 
-  override def init(): Unit = {
-    // recover from partially executed checkpoint commit
+  private def initMetadataDirectory(): Unit = {
+    try {
+      val fs = progressMetadataDirPath.getFileSystem(hadoopConfiguration)
+      val checkpointMetadaDirExisted = fs.exists(progressTempDirPath)
+      if (!checkpointMetadaDirExisted) {
+        fs.mkdirs(progressMetadataDirPath)
+      }
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
+        throw ex
+    }
+  }
+
+  private def initProgressFileDirectory(): Unit = {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     try {
       val checkpointDirExisted = fs.exists(progressDirPath)
@@ -55,7 +68,6 @@ class StructuredStreamingProgressTracker(
         if (!validationPass) {
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
-            println(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
             val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp,
               List(StructuredStreamingProgressTracker.registeredConnectors(uid)))
@@ -69,9 +81,12 @@ class StructuredStreamingProgressTracker(
       case ex: Exception =>
         ex.printStackTrace()
         throw ex
-    } finally {
-      // EMPTY
     }
+  }
+
+  override def init(): Unit = {
+    initProgressFileDirectory()
+    initMetadataDirectory()
   }
 }
 

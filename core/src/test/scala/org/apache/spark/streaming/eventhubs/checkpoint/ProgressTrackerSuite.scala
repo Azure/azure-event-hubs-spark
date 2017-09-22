@@ -22,7 +22,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 
-import org.apache.spark.eventhubscommon.{EventHubsConnector, EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
 import org.apache.spark.eventhubscommon.checkpoint.ProgressTrackingCommon
 import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord, ProgressWriter}
 import org.apache.spark.streaming.eventhubs.SharedUtils
@@ -416,12 +416,15 @@ class ProgressTrackerSuite extends SharedUtils {
     fs.mkdirs(new Path(progressPath))
     ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1",
       0 to 0, 0, 1)
+    ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1",
+      0 to 0, 0, 1)
     val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
     ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 1000L)
+    ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 2000L)
     val (sourceOfLatestFile, result) = progressTracker.getLatestFile(fs)
     assert(sourceOfLatestFile === 0)
     assert(result.isDefined)
-    assert(result.get.getName === "progress-1000")
+    assert(result.get.getName === "progress-2000")
   }
 
   test("When metadata presents, we should respect it even the more recent progress file is there") {
@@ -440,6 +443,4 @@ class ProgressTrackerSuite extends SharedUtils {
     assert(result.isDefined)
     assert(result.get.getName === "progress-1000")
   }
-
-
 }

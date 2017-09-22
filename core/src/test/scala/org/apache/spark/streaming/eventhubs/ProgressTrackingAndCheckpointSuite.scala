@@ -432,6 +432,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     // simulate commit fail
     val fs = FileSystem.get(new Configuration())
     fs.delete(new Path(progressRootPath.toString + s"/$appName/progress-3000"), true)
+    fs.delete(new Path(progressRootPath.toString + s"/${appName}_metadata/3000"), true)
 
     ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
       () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))

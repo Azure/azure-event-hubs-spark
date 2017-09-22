@@ -46,6 +46,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   private[spark] def progressDirectoryPath = progressDirPath
   private[spark] def progressTempDirectoryPath = progressTempDirPath
+  private[spark] def progressMetadataDirectoryPath = progressMetadataDirPath
 
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names. The timestamp can be the

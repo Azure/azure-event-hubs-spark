@@ -570,7 +570,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     testStream(sourceQuery)(firstBatch ++ clockMove ++ secondBatch ++ clockMove2 ++ thirdBatch: _*)
   }
 
-  test("Verify expected dataframe can be retrieved when the partial committed results exist") {
+  test("Verify expected dataframe can be retrieved when metadata is not committed") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
@@ -584,7 +584,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
-      StopStream(recoverStreamId = true, commitPartialOffset = true, partialType = "partial"),
+      StopStream(recoverStreamId = true, commitOffset = true),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
         additionalConfs = Map("eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))

@@ -37,10 +37,12 @@ import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 
 import org.apache.spark.DebugFilesystem
+import org.apache.spark.eventhubscommon.EventHubsConnector
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
-import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
+import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder, encoderFor}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
@@ -406,16 +408,20 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
       sources.head
     }
 
-    def createBrokenProgressFile(pathStr: String, timestamp: Long, brokenType: String): Unit = {
-      val path = new Path(pathStr)
-      val fs = path.getFileSystem(new Configuration())
-      if (brokenType == "partial") {
-        val fsos = fs.create(new Path(pathStr + s"/progress-$timestamp"), true)
-        // TODO: separate createBrokenProgressFile from StopStream action
-        fsos.writeBytes(s"$timestamp ns1_eh1_23 eh1 1 499 499")
-        fsos.close()
-      } else if (brokenType == "delete") {
+    def createBrokenProgressFile(
+        progressTracker: ProgressTrackerBase[_ <: EventHubsConnector],
+        timestamp: Long,
+        brokenType: String): Unit = {
+      if (brokenType == "delete") {
+        val pathStr = progressTracker.progressDirectoryPath.toString
+        val path = new Path(pathStr)
+        val fs = path.getFileSystem(new Configuration())
         fs.delete(new Path(pathStr + s"/progress-$timestamp"), true)
+      } else if (brokenType == "deletemetadata") {
+        val pathStr = progressTracker.progressMetadataDirectoryPath.toString
+        val path = new Path(pathStr)
+        val fs = path.getFileSystem(new Configuration())
+        fs.delete(new Path(pathStr + s"/$timestamp"), true)
       } else {
         throw new Exception(s"unrecognizable partial type $brokenType")
       }
@@ -530,7 +536,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               if (commitPartialOffset) {
                 val source = searchCurrentSource()
                 val progressTracker = StructuredStreamingProgressTracker.getInstance(source.uid)
-                createBrokenProgressFile(progressTracker.progressDirectoryPath.toString,
+                createBrokenProgressFile(progressTracker,
                   source.committedOffsetsAndSeqNums.batchId + 1, partialType)
               }
               verify(!currentStream.microBatchThread.isAlive,

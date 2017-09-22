@@ -65,7 +65,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   // no metadata (for backward compatiblity
-  private def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
+  private[spark] def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
       Option[Path] = {
     val allFiles = fs.listStatus(progressDirPath)
     if (allFiles.length < 1) {
@@ -75,6 +75,11 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))
         (0).getPath)
     }
+  }
+
+  private[spark] def getLatestFileWithMetadata(metadataFiles: Array[FileStatus]): Option[Path] = {
+    Some(metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
+      f2.getPath.getName.toLong).head.getPath)
   }
 
   /**
@@ -88,8 +93,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         file => file.isFile && file.getPath.getName.toLong <= timestamp)
       if (metadataFiles.nonEmpty) {
         // metadata files exists
-        Some(metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
-          f2.getPath.getName.toLong).head.getPath)
+        getLatestFileWithMetadata(metadataFiles)
       } else {
         getLatestFileWithoutMetadata(fs, timestamp)
       }

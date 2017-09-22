@@ -17,9 +17,10 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import org.mockito.Matchers.any
 import org.mockito.Mockito
-import org.mockito.Mockito.{never, verify}
+import org.mockito.Mockito.{never, times, verify}
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
@@ -110,9 +111,11 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
     ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 1000L)
     // start stream
-    ssc.scheduler.start()
+    ehDStream.start()
     // validate read is through metadata
-    verify(mockProgressTracker, never()).getLatestFile(fs)
+    verify(mockProgressTracker, times(1)).getLatestFile(any(classOf[FileSystem]))
+    verify(mockProgressTracker, never()).getLatestFileWithoutMetadata(any(classOf[FileSystem]))
+    verify(mockProgressTracker, times(1)).getLatestFileWithMetadata(any(classOf[Array[FileStatus]]))
   }
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {

@@ -113,8 +113,10 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     // start stream
     ehDStream.start()
     // validate read is through metadata
-    verify(mockProgressTracker, times(1)).getLatestFile(any(classOf[FileSystem]))
-    verify(mockProgressTracker, never()).getLatestFileWithoutMetadata(any(classOf[FileSystem]))
+    verify(mockProgressTracker, times(1)).getLatestFile(any(classOf[FileSystem]),
+      any(classOf[Long]))
+    verify(mockProgressTracker, never()).getLatestFileWithoutMetadata(any(classOf[FileSystem]),
+      any(classOf[Long]))
     verify(mockProgressTracker, times(1)).getLatestFileWithMetadata(any(classOf[Array[FileStatus]]))
   }
 

@@ -152,6 +152,11 @@ object DirectDStreamProgressTracker {
 
   def getInstance: ProgressTrackerBase[_ <: EventHubsConnector] = _progressTracker
 
+  // should only be used for testing
+  private[streaming] def setProgressTracker(progressTracker: DirectDStreamProgressTracker): Unit = {
+    _progressTracker = progressTracker
+  }
+
   private[spark] def initInstance(
       progressDirStr: String,
       appName: String,

@@ -17,13 +17,18 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import org.apache.hadoop.fs.Path
 import org.mockito.Mockito
+import org.mockito.Mockito.{never, verify}
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
+import org.apache.spark.eventhubscommon.checkpoint.ProgressTrackingCommon
 import org.apache.spark.eventhubscommon.client.EventHubClient
+import org.apache.spark.eventhubscommon.progress.PathTools
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Duration, Seconds, Time}
+import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 
 class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar with SharedUtils {
 
@@ -77,6 +82,37 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           throw e
       }
     }
+  }
+
+  test("read progress file correctly and does query metadata when metadata exists") {
+    // setup mock objects
+    val mockProgressTracker = mock[DirectDStreamProgressTracker]
+    DirectDStreamProgressTracker.setProgressTracker(mockProgressTracker)
+    val eventHubClientMock = mock[EventHubClient]
+    val dummyStartSeqMap = (0 until 32).map(partitionId =>
+      (EventHubNameAndPartition("eh1", partitionId), 1L)).toMap
+    val dummyHighOffsetSeqMap = (0 until 32).map(partitionId =>
+      (EventHubNameAndPartition("eh1", partitionId), (1L, 1L))).toMap
+    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
+      Map("eh1" -> eventhubParameters))
+    Mockito.when(eventHubClientMock.startSeqOfPartition(retryIfFail = false,
+      ehDStream.connectedInstances)).
+      thenReturn(Some(dummyStartSeqMap))
+    Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = true,
+      ehDStream.connectedInstances)).
+      thenReturn(Some(dummyHighOffsetSeqMap))
+    ehDStream.setEventHubClient(eventHubClientMock)
+    // prepare progress files and metadata
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1",
+      0 to 0, 0, 1)
+    val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
+    ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 1000L)
+    // start stream
+    ssc.scheduler.start()
+    // validate read is through metadata
+    verify(mockProgressTracker, never()).getLatestFile(fs)
   }
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {

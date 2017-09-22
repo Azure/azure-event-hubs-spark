@@ -423,4 +423,23 @@ class ProgressTrackerSuite extends SharedUtils {
     assert(result.isDefined)
     assert(result.get.getName === "progress-1000")
   }
+
+  test("When metadata presents, we should respect it even the more recent progress file is there") {
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
+      appName, new Configuration())
+    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
+    fs.mkdirs(new Path(progressPath))
+    ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1",
+      0 to 0, 0, 1)
+    ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1",
+      0 to 0, 0, 1)
+    val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
+    ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 1000L)
+    val (sourceOfLatestFile, result) = progressTracker.getLatestFile(fs)
+    assert(sourceOfLatestFile === 0)
+    assert(result.isDefined)
+    assert(result.get.getName === "progress-1000")
+  }
+
+
 }

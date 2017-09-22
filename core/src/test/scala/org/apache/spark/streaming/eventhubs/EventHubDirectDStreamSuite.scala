@@ -85,41 +85,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     }
   }
 
-  test("read progress file correctly and does query metadata when metadata exists") {
-    // setup mock objects
-    val mockProgressTracker = mock[DirectDStreamProgressTracker]
-    DirectDStreamProgressTracker.setProgressTracker(mockProgressTracker)
-    val eventHubClientMock = mock[EventHubClient]
-    val dummyStartSeqMap = (0 until 32).map(partitionId =>
-      (EventHubNameAndPartition("eh1", partitionId), 1L)).toMap
-    val dummyHighOffsetSeqMap = (0 until 32).map(partitionId =>
-      (EventHubNameAndPartition("eh1", partitionId), (1L, 1L))).toMap
-    val ehDStream = new EventHubDirectDStream(ssc, eventhubNamespace, progressRootPath.toString,
-      Map("eh1" -> eventhubParameters))
-    Mockito.when(eventHubClientMock.startSeqOfPartition(retryIfFail = false,
-      ehDStream.connectedInstances)).
-      thenReturn(Some(dummyStartSeqMap))
-    Mockito.when(eventHubClientMock.endPointOfPartition(retryIfFail = true,
-      ehDStream.connectedInstances)).
-      thenReturn(Some(dummyHighOffsetSeqMap))
-    ehDStream.setEventHubClient(eventHubClientMock)
-    // prepare progress files and metadata
-    val progressPath = PathTools.progressDirPathStr(progressRootPath.toString, appName)
-    fs.mkdirs(new Path(progressPath))
-    ProgressTrackingCommon.writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1",
-      0 to 0, 0, 1)
-    val metadataPath = PathTools.progressMetadataDirPathStr(progressRootPath.toString, appName)
-    ProgressTrackingCommon.createMetadataFile(fs, metadataPath, 1000L)
-    // start stream
-    ehDStream.start()
-    // validate read is through metadata
-    verify(mockProgressTracker, times(1)).getLatestFile(any(classOf[FileSystem]),
-      any(classOf[Long]))
-    verify(mockProgressTracker, never()).getLatestFileWithoutMetadata(any(classOf[FileSystem]),
-      any(classOf[Long]))
-    verify(mockProgressTracker, times(1)).getLatestFileWithMetadata(any(classOf[Array[FileStatus]]))
-  }
-
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(

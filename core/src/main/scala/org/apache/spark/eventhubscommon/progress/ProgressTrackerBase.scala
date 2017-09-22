@@ -32,7 +32,6 @@ import org.apache.spark.internal.Logging
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String, appName: String, hadoopConfiguration: Configuration) extends Logging {
 
-
   protected lazy val progressDirStr: String = PathTools.progressDirPathStr(progressDir, appName)
   protected lazy val progressTempDirStr: String = PathTools.progressTempDirPathStr(progressDir,
     appName)
@@ -65,7 +64,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   // no metadata (for backward compatiblity
-  private[spark] def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
+  private def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
       Option[Path] = {
     val allFiles = fs.listStatus(progressDirPath)
     if (allFiles.length < 1) {
@@ -77,28 +76,32 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
-  private[spark] def getLatestFileWithMetadata(metadataFiles: Array[FileStatus]): Option[Path] = {
-    Some(metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
-      f2.getPath.getName.toLong).head.getPath)
+  private def getLatestFileWithMetadata(metadataFiles: Array[FileStatus]): Option[Path] = {
+    val latestMetadata = metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
+      f2.getPath.getName.toLong).head
+    logInfo(s"locate latest timestamp in metadata as $latestMetadata")
+    Some(new Path(progressDirStr + "/progress-" + latestMetadata.getPath.getName))
   }
 
   /**
    * get the latest progress file saved under directory
+   *
+   * NOTE: the additional integer in return value is to simplify the test (could be improved)
    */
   private[spark] def getLatestFile(fs: FileSystem, timestamp: Long = Long.MaxValue):
-      Option[Path] = {
+    (Int, Option[Path]) = {
     // first check metadata directory if exists
     if (fs.exists(progressMetadataDirPath)) {
       val metadataFiles = fs.listStatus(progressMetadataDirPath).filter(
         file => file.isFile && file.getPath.getName.toLong <= timestamp)
       if (metadataFiles.nonEmpty) {
         // metadata files exists
-        getLatestFileWithMetadata(metadataFiles)
+        (0, getLatestFileWithMetadata(metadataFiles))
       } else {
-        getLatestFileWithoutMetadata(fs, timestamp)
+        (1, getLatestFileWithoutMetadata(fs, timestamp))
       }
     } else {
-      getLatestFileWithoutMetadata(fs, timestamp)
+      (1, getLatestFileWithoutMetadata(fs, timestamp))
     }
   }
 
@@ -111,7 +114,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
    *         the latest timestamp)
    */
   protected def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
-    val latestFileOpt = getLatestFile(fs)
+    val (_, latestFileOpt) = getLatestFile(fs)
     val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
     var br: BufferedReader = null
     try {
@@ -225,7 +228,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         if (!fallBack) {
           pinPointProgressFile(fs, timestamp)
         } else {
-          getLatestFile(fs, timestamp)
+          getLatestFile(fs, timestamp)._2
         }
       }
       if (progressFileOption.isEmpty) {

@@ -121,7 +121,7 @@ private[spark] class EventHubsSource(
     RateControlUtils.fetchLatestOffset(eventHubClient,
       retryIfFail = retryIfFail,
       if (fetchedHighestOffsetsAndSeqNums == null) {
-        null
+        committedOffsetsAndSeqNums.offsets
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
       }) match {

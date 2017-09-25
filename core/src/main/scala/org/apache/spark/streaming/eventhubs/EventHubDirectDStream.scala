@@ -295,7 +295,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       eventHubClient,
       retryIfFail,
       if (fetchedHighestOffsetsAndSeqNums == null) {
-        null
+        currentOffsetsAndSeqNums.offsets
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
       })

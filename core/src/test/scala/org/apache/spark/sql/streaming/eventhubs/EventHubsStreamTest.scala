@@ -416,9 +416,10 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         val pathStr = progressTracker.progressDirectoryPath.toString
         val path = new Path(pathStr)
         val fs = path.getFileSystem(new Configuration())
-        println(fs.exists(new Path(pathStr + s"/progress-$timestamp")))
+        println(timestamp + "-" + fs.exists(new Path(pathStr + s"/progress-$timestamp")))
         fs.delete(new Path(pathStr + s"/progress-$timestamp"), true)
-        println(fs.exists(new Path(pathStr + s"_metadata/$timestamp")))
+        println(fs.exists(new Path(s"${progressTracker.progressMetadataDirectoryPath.toString}/" +
+          s"$timestamp")))
       } else if (brokenType == "deletemetadata") {
         val pathStr = progressTracker.progressMetadataDirectoryPath.toString
         val path = new Path(pathStr)

@@ -88,6 +88,13 @@ class StructuredStreamingProgressTracker(
     initProgressFileDirectory()
     initMetadataDirectory()
   }
+
+  override def commit(
+      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      commitTime: Long): Unit = {
+    println(s"commit $commitTime")
+    super.commit(offsetToCommit, commitTime)
+  }
 }
 
 object StructuredStreamingProgressTracker {

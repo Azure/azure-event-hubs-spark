@@ -590,7 +590,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
         additionalConfs = Map("eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
-    val thirdBatch = Seq(CheckAnswer(601 to 1000: _*))
+    val thirdBatch = Seq(CheckAnswer(541 to 1000: _*))
     testStream(sourceQuery)(firstBatch ++ clockMove ++ secondBatch ++ clockMove2 ++ thirdBatch: _*)
   }
 

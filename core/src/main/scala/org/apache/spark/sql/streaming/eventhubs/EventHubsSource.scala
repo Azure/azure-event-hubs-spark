@@ -124,8 +124,7 @@ private[spark] class EventHubsSource(
         null
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
-      },
-      committedOffsetsAndSeqNums.offsets) match {
+      }) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = EventHubsOffset(committedOffsetsAndSeqNums.batchId,
           highestOffsets)

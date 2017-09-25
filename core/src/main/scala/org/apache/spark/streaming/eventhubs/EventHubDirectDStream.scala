@@ -298,8 +298,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         null
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
-      },
-      currentOffsetsAndSeqNums.offsets)
+      })
     match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime.milliseconds, highestOffsets)

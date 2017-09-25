@@ -81,6 +81,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     val latestMetadata = metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
       f2.getPath.getName.toLong).head
     logInfo(s"locate latest timestamp in metadata as $latestMetadata")
+    println(s"locate latest timestamp in metadata as $latestMetadata")
     Some(new Path(progressDirStr + "/progress-" + latestMetadata.getPath.getName))
   }
 

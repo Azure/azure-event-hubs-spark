@@ -121,11 +121,10 @@ private[spark] class EventHubsSource(
     RateControlUtils.fetchLatestOffset(eventHubClient,
       retryIfFail = retryIfFail,
       if (fetchedHighestOffsetsAndSeqNums == null) {
-        null
+        committedOffsetsAndSeqNums.offsets
       } else {
         fetchedHighestOffsetsAndSeqNums.offsets
-      },
-      committedOffsetsAndSeqNums.offsets) match {
+      }) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = EventHubsOffset(committedOffsetsAndSeqNums.batchId,
           highestOffsets)

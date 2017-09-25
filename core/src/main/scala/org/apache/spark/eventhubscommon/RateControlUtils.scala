@@ -75,7 +75,8 @@ private[spark] object RateControlUtils extends Logging {
       retryIfFail: Boolean,
       fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)]):
     Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
-    val r = eventHubClient.endPointOfPartition(retryIfFail, fetchedHighestOffsetsAndSeqNums.keySet.toList)
+    val r = eventHubClient.endPointOfPartition(
+      retryIfFail, fetchedHighestOffsetsAndSeqNums.keySet.toList)
     if (r.isDefined) {
       // merge results
       val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {

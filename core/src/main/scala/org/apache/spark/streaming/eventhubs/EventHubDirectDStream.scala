@@ -123,27 +123,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventHubClient.close()
   }
 
-  private def collectPartitionsNeedingLargerProcessingRange(): List[EventHubNameAndPartition] = {
-    val partitionList = new ListBuffer[EventHubNameAndPartition]
-    if (fetchedHighestOffsetsAndSeqNums != null) {
-      for ((ehNameAndPartition, (offset, seqId)) <- fetchedHighestOffsetsAndSeqNums.offsets) {
-        if (currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2 >=
-          fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2) {
-          partitionList += ehNameAndPartition
-        }
-      }
-    } else {
-      partitionList ++= eventhubNameAndPartitions
-    }
-    partitionList.toList
-  }
-
   private def fetchLatestOffset(validTime: Time, retryIfFail: Boolean):
       Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     // check if there is any eventhubs partition which potentially has newly arrived message (
     // the fetched highest message id is within the next batch's processing engine)
-    val demandingEhNameAndPartitions = collectPartitionsNeedingLargerProcessingRange()
-    val r = eventHubClient.endPointOfPartition(retryIfFail, demandingEhNameAndPartitions)
+    val r = eventHubClient.endPointOfPartition(retryIfFail, eventhubNameAndPartitions.toList)
     if (r.isDefined) {
       // merge results
       val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {

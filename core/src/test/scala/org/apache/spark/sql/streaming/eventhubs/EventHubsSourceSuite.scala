@@ -530,7 +530,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
       eventPayloadsAndProperties.take(30 * 10 * 2))
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
-    val manualClock = new StreamManualClock(0)
+    val manualClock = new StreamManualClock
     val firstBatch = Seq(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       AddEventHubsData(eventHubsParameters, 9))

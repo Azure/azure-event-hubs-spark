@@ -62,9 +62,10 @@ class StructuredStreamingProgressTracker(
   private def initProgressFileDirectory(): Unit = {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     try {
-      val checkpointDirExisted = fs.exists(progressDirPath)
-      if (checkpointDirExisted) {
+      val progressDirExist = fs.exists(progressDirPath)
+      if (progressDirExist) {
         val (validationPass, latestFile) = validateProgressFile(fs)
+        println(s"${latestFile}")
         if (!validationPass) {
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
@@ -87,13 +88,6 @@ class StructuredStreamingProgressTracker(
   override def init(): Unit = {
     initProgressFileDirectory()
     initMetadataDirectory()
-  }
-
-  override def commit(
-      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      commitTime: Long): Unit = {
-    println(s"commit $commitTime")
-    super.commit(offsetToCommit, commitTime)
   }
 }
 

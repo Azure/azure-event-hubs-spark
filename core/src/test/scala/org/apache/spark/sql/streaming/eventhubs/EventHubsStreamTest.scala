@@ -42,7 +42,7 @@ import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOff
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{Dataset, Encoder, QueryTest, Row}
-import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder, encoderFor}
+import org.apache.spark.sql.catalyst.encoders.{encoderFor, ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
@@ -413,17 +413,19 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         timestamp: Long,
         brokenType: String): Unit = {
       if (brokenType == "delete") {
-        val pathStr = progressTracker.progressDirectoryPath.toString
-        val path = new Path(pathStr)
+        val progressDir = progressTracker.progressDirectoryPath.toString
+        val metadataDir = progressTracker.progressMetadataDirectoryPath.toString
+        val path = new Path(progressDir)
         val fs = path.getFileSystem(new Configuration())
-        println(timestamp + "-" + fs.exists(new Path(pathStr + s"/progress-$timestamp")))
-        fs.delete(new Path(pathStr + s"/progress-$timestamp"), true)
-        println(fs.exists(new Path(s"${progressTracker.progressMetadataDirectoryPath.toString}/" +
-          s"$timestamp")))
+        println(s"$progressDir/progress-$timestamp")
+        println(s"$metadataDir/$timestamp")
+        fs.delete(new Path(s"$progressDir/progress-$timestamp"), true)
+        fs.delete(new Path(s"$metadataDir/$timestamp"), true)
       } else if (brokenType == "deletemetadata") {
         val pathStr = progressTracker.progressMetadataDirectoryPath.toString
         val path = new Path(pathStr)
         val fs = path.getFileSystem(new Configuration())
+        println(s"$pathStr/$timestamp")
         fs.delete(new Path(pathStr + s"/$timestamp"), true)
       } else {
         throw new Exception(s"unrecognizable partial type $brokenType")
@@ -539,6 +541,8 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
               if (commitPartialOffset) {
                 val source = searchCurrentSource()
                 val progressTracker = StructuredStreamingProgressTracker.getInstance(source.uid)
+                source.collectFinishedBatchOffsetsAndCommit(
+                  source.committedOffsetsAndSeqNums.batchId + 1)
                 createBrokenProgressFile(progressTracker,
                   source.committedOffsetsAndSeqNums.batchId + 1, partialType)
               }

@@ -457,7 +457,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       }
     }
     // do not need to expose internals to users so hardcoded
-    threadPoolForMetadataClean.scheduleAtFixedRate(metadataCleanTask, 0, 30, TimeUnit.SECONDS)
+    // threadPoolForMetadataClean.scheduleAtFixedRate(metadataCleanTask, 0, 30, TimeUnit.SECONDS)
   }
 
   def init(): Unit

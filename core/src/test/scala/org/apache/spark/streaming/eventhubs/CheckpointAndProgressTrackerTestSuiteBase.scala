@@ -200,13 +200,18 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       operation: EventHubDirectDStream => DStream[V],
       expectedOutputBeforeRestart: Seq[Seq[V]],
       expectedOutputAfterRestart: Seq[Seq[V]],
-      useSetFlag: Boolean = false) {
+      useSetFlag: Boolean = false,
+      cleanMetadata: Boolean = false) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
       expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart, useSetFlag = useSetFlag)
+
+    if (cleanMetadata) {
+      fs.delete(progressTracker.progressMetadataDirectoryPath, true)
+    }
 
     // Restart and complete the computation from checkpoint file
     logInfo(

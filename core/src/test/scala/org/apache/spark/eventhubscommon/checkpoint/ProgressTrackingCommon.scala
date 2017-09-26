@@ -21,7 +21,7 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.eventhubscommon.progress.ProgressRecord
+import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressRecord}
 
 private[spark] object ProgressTrackingCommon {
   def writeProgressFile(
@@ -36,10 +36,11 @@ private[spark] object ProgressTrackingCommon {
       seq: Int): Unit = {
     for (partitionId <- partitionRange) {
       Files.write(
-        Paths.get(progressPath + s"/progress-$timestamp"),
+        Paths.get(progressPath + s"/${PathTools.progressFileNamePattern(timestamp)}"),
         (ProgressRecord(timestamp, namespace, ehName, partitionId, offset,
           seq).toString + "\n").getBytes, {
-          if (Files.exists(Paths.get(progressPath + s"/progress-$timestamp"))) {
+          if (Files.exists(Paths.get(progressPath +
+            s"/${PathTools.progressFileNamePattern(timestamp)}"))) {
             StandardOpenOption.APPEND
           } else {
             StandardOpenOption.CREATE

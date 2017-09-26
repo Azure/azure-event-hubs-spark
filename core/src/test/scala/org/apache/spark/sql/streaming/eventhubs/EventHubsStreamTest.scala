@@ -412,24 +412,24 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         progressTracker: ProgressTrackerBase[_ <: EventHubsConnector],
         timestamp: Long,
         brokenType: String): Unit = {
+      val progressDir = progressTracker.progressDirectoryPath.toString
+      val metadataDir = progressTracker.progressMetadataDirectoryPath.toString
+      val progressFilePath = new Path(s"$progressDir/progress-$timestamp")
+      val metadataFilePath = new Path(s"$metadataDir/$timestamp")
+      val fs = progressFilePath.getFileSystem(new Configuration())
       if (brokenType == "delete") {
-        val progressDir = progressTracker.progressDirectoryPath.toString
-        val metadataDir = progressTracker.progressMetadataDirectoryPath.toString
-        val path = new Path(progressDir)
-        val fs = path.getFileSystem(new Configuration())
-        println(s"$progressDir/progress-$timestamp")
-        println(s"$metadataDir/$timestamp")
-        fs.delete(new Path(s"$progressDir/progress-$timestamp"), true)
-        fs.delete(new Path(s"$metadataDir/$timestamp"), true)
+        fs.delete(progressFilePath, true)
+        fs.delete(metadataFilePath, true)
       } else if (brokenType == "deletemetadata") {
-        val pathStr = progressTracker.progressMetadataDirectoryPath.toString
-        val path = new Path(pathStr)
-        val fs = path.getFileSystem(new Configuration())
-        val e = fs.exists(new Path(s"$pathStr/$timestamp"))
-        println(s"$pathStr/$timestamp $e")
-        fs.delete(new Path(pathStr + s"/$timestamp"), true)
+        fs.delete(metadataFilePath, true)
+      } else if (brokenType == "partial" ) {
+        fs.delete(progressFilePath, true)
+        fs.delete(metadataFilePath, true)
+        val fsos = fs.create(progressFilePath)
+        fsos.writeBytes(s"$timestamp ns1_eh1_23 eh1 1 499 499")
+        fsos.close()
       } else {
-        throw new Exception(s"unrecognizable partial type $brokenType")
+        throw new Exception(s"unrecognizable broken type $brokenType")
       }
     }
 

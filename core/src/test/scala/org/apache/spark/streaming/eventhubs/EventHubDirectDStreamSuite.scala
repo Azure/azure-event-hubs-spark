@@ -17,19 +17,13 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
-import org.mockito.Matchers.any
 import org.mockito.Mockito
-import org.mockito.Mockito.{never, times, verify}
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
-import org.apache.spark.eventhubscommon.checkpoint.ProgressTrackingCommon
 import org.apache.spark.eventhubscommon.client.EventHubClient
-import org.apache.spark.eventhubscommon.progress.PathTools
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{Duration, Seconds, Time}
-import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 
 class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar with SharedUtils {
 

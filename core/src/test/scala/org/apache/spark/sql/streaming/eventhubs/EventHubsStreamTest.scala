@@ -428,6 +428,8 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         val fsos = fs.create(progressFilePath)
         fsos.writeBytes(s"$timestamp ns1_eh1_23 eh1 1 499 499")
         fsos.close()
+      } if (brokenType == "metadata") {
+        fs.delete(new Path(metadataDir), true)
       } else {
         throw new Exception(s"unrecognizable broken type $brokenType")
       }

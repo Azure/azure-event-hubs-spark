@@ -596,6 +596,32 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     testStream(sourceQuery)(firstBatch ++ clockMove ++ secondBatch ++ clockMove2 ++ thirdBatch: _*)
   }
 
+  test("Verify expected dataframe can be retrieved when the progress file is partially committed") {
+    import testImplicits._
+    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventPayloadsAndProperties = generateIntKeyedData(1000)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
+      eventPayloadsAndProperties.take(30 * 10 * 2))
+    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val manualClock = new StreamManualClock
+    val firstBatch = Seq(
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      AddEventHubsData(eventHubsParameters, 9))
+    val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
+    val secondBatch = Seq(
+      CheckAnswer(1 to 600: _*),
+      StopStream(recoverStreamId = true, commitPartialOffset = true,
+        partialType = "nometadata"),
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
+        additionalConfs = Map("eventhubs.test.newSink" -> "true")),
+      AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))
+    val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
+    // in structured streaming, even metadata is not committed, we will be able to skip the
+    // processed data, since we will pinpoint progress file with the recovered batch id
+    val thirdBatch = Seq(CheckAnswer(601 to 1000: _*))
+    testStream(sourceQuery)(firstBatch ++ clockMove ++ secondBatch ++ clockMove2 ++ thirdBatch: _*)
+  }
+
   test("Verify expected dataframe can be retrieved when metadata is not committed") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)

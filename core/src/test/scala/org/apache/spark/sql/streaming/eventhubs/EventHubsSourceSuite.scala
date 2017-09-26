@@ -596,7 +596,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     testStream(sourceQuery)(firstBatch ++ clockMove ++ secondBatch ++ clockMove2 ++ thirdBatch: _*)
   }
 
-  test("Verify expected dataframe can be retrieved when the progress file is partially committed") {
+  test("Verify expected dataframe can be retrieved when upgrading from a directory without" +
+    " metadata") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)

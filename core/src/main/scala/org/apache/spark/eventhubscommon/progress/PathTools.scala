@@ -49,6 +49,8 @@ private[spark] object PathTools extends Serializable {
     s"progress-$timestamp"
   }
 
+  def progressMetadataNamePattern(timestamp: Long): String = timestamp.toString
+
   def progressTempFileStr(
       basePath: String,
       streamId: Int,

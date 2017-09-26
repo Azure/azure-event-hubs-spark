@@ -17,7 +17,8 @@
 
 package org.apache.spark.eventhubscommon.progress
 
-import java.io.{BufferedReader, InputStreamReader, IOException}
+import java.io.{BufferedReader, IOException, InputStreamReader}
+import java.util.concurrent.{ScheduledThreadPoolExecutor, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -47,6 +48,15 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private[spark] def progressDirectoryPath = progressDirPath
   private[spark] def progressTempDirectoryPath = progressTempDirPath
   private[spark] def progressMetadataDirectoryPath = progressMetadataDirPath
+
+  // metadata cleaning is different with progress file and temporary file clean up in that, metadata
+  // is developed for fast initialization of progress tracker and it should (can) be independent
+  // with Spark Streaming checkpoint (the others have to be coordinated with Spark Streaming
+  // checkpoint cleanup to ensure that we have enough support for recovery). By cleaning metadata
+  // in progress tracker, we can ensure that the ProgressTracker can still be quickly initialized
+  // even the user does not enable Spark Streaming checkpoint or the cleanup of checkpoint is
+  // lagging behind
+  private val threadPoolForMetadataClean = new ScheduledThreadPoolExecutor(1)
 
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names. The timestamp can be the
@@ -430,6 +440,23 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       }
     }
   }
+
+  private def scheduleMetadataCleanTask(): Unit = {
+    val metadataCleanTask = new Runnable {
+      override def run() = {
+        val fs = progressMetadataDirectoryPath.getFileSystem(new Configuration())
+        val allMetadataFiles = fs.listStatus(progressMetadataDirPath)
+        val sortedMetadataFiles = allMetadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong <
+          f2.getPath.getName.toLong)
+        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map(file =>
+          fs.delete(file.getPath, true))
+      }
+    }
+    // do not need to expose internals to users so hardcoded
+    threadPoolForMetadataClean.scheduleAtFixedRate(metadataCleanTask, 0, 30, TimeUnit.SECONDS)
+  }
+
+  scheduleMetadataCleanTask()
 
   def init(): Unit
 }

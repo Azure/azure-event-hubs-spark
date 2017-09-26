@@ -425,7 +425,8 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         val pathStr = progressTracker.progressMetadataDirectoryPath.toString
         val path = new Path(pathStr)
         val fs = path.getFileSystem(new Configuration())
-        println(s"$pathStr/$timestamp")
+        val e = fs.exists(new Path(s"$pathStr/$timestamp"))
+        println(s"$pathStr/$timestamp $e")
         fs.delete(new Path(pathStr + s"/$timestamp"), true)
       } else {
         throw new Exception(s"unrecognizable partial type $brokenType")
@@ -544,7 +545,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
                 source.collectFinishedBatchOffsetsAndCommit(
                   source.committedOffsetsAndSeqNums.batchId + 1)
                 createBrokenProgressFile(progressTracker,
-                  source.committedOffsetsAndSeqNums.batchId + 1, partialType)
+                  source.committedOffsetsAndSeqNums.batchId, partialType)
               }
               verify(!currentStream.microBatchThread.isAlive,
                 s"microbatch thread not stopped")

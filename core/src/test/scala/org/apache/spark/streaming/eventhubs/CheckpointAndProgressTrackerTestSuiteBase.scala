@@ -201,7 +201,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       expectedOutputBeforeRestart: Seq[Seq[V]],
       expectedOutputAfterRestart: Seq[Seq[V]],
       useSetFlag: Boolean = false,
-      cleanMetadata: Boolean = false) {
+      directoryToClean: Option[Path] = None) {
 
     require(ssc.conf.get("spark.streaming.clock") === classOf[ManualClock].getName,
       "Cannot run test without manual clock in the conf")
@@ -209,8 +209,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     runStopAndRecover(input, eventhubsParams, expectedStartingOffsetsAndSeqs,
       expectedOffsetsAndSeqs, operation, expectedOutputBeforeRestart, useSetFlag = useSetFlag)
 
-    if (cleanMetadata) {
-      fs.delete(progressTracker.progressMetadataDirectoryPath, true)
+    if (directoryToClean.isDefined) {
+      fs.delete(directoryToClean.get, true)
     }
 
     // Restart and complete the computation from checkpoint file

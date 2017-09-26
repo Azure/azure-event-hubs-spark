@@ -283,7 +283,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart,
       expectedOutputAfterRestart,
-      cleanMetadata = true)
+      directoryToClean = Some(progressTracker.progressMetadataDirectoryPath))
   }
 
 

@@ -449,8 +449,11 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         val allMetadataFiles = fs.listStatus(progressMetadataDirPath)
         val sortedMetadataFiles = allMetadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong <
           f2.getPath.getName.toLong)
-        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map(file =>
-          fs.delete(file.getPath, true))
+        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map{
+          file =>
+            println(s"deleting ${file.getPath}")
+            fs.delete(file.getPath, true)
+        }
       }
     }
     // do not need to expose internals to users so hardcoded

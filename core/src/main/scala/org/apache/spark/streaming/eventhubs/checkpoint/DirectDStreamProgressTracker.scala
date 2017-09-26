@@ -175,6 +175,7 @@ object DirectDStreamProgressTracker {
 
   private[spark] def reset(): Unit = {
     registeredConnectors.clear()
+    _progressTracker.metadataCleanupFuture.cancel(true)
     _progressTracker = null
   }
 

@@ -17,8 +17,8 @@
 
 package org.apache.spark.eventhubscommon.progress
 
-import java.io.{BufferedReader, IOException, InputStreamReader}
-import java.util.concurrent.{ScheduledThreadPoolExecutor, TimeUnit}
+import java.io.{BufferedReader, InputStreamReader, IOException}
+import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -57,6 +57,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   // even the user does not enable Spark Streaming checkpoint or the cleanup of checkpoint is
   // lagging behind
   private val threadPoolForMetadataClean = new ScheduledThreadPoolExecutor(1)
+  protected val metadataCleanupFuture: ScheduledFuture[_] = scheduleMetadataCleanTask()
 
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names. The timestamp can be the
@@ -441,7 +442,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
-  private def scheduleMetadataCleanTask(): Unit = {
+  private def scheduleMetadataCleanTask(): ScheduledFuture[_] = {
     val metadataCleanTask = new Runnable {
       override def run() = {
         val fs = progressMetadataDirectoryPath.getFileSystem(new Configuration())
@@ -455,8 +456,6 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     // do not need to expose internals to users so hardcoded
     threadPoolForMetadataClean.scheduleAtFixedRate(metadataCleanTask, 0, 30, TimeUnit.SECONDS)
   }
-
-  scheduleMetadataCleanTask()
 
   def init(): Unit
 }

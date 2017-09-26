@@ -99,6 +99,7 @@ object StructuredStreamingProgressTracker {
 
   private[spark] def reset(): Unit = {
     registeredConnectors.clear()
+    _progressTrackers.values.map(pt => pt.metadataCleanupFuture.cancel(true))
     _progressTrackers.clear()
   }
 

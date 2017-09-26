@@ -322,7 +322,6 @@ private[spark] class EventHubsSource(
     if (latestProgress.offsets.isEmpty && start.isDefined) {
       // we shall not commit when start is empty, otherwise, we will have a duplicate processing
       // of the first batch
-      println(s"recovering $recoveredCommittedBatchId")
       collectFinishedBatchOffsetsAndCommit(recoveredCommittedBatchId)
     } else {
       committedOffsetsAndSeqNums = latestProgress

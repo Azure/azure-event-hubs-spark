@@ -309,7 +309,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private def createMetadata(fs: FileSystem, commitTime: Long): Boolean = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(s"$progressMetadataDirStr/$commitTime"), true)
+      oos = fs.create(new Path(s"$progressMetadataDirStr/" +
+        s"${PathTools.progressMetadataNamePattern(commitTime)}"), true)
       true
     } catch {
       case e: Exception =>
@@ -451,9 +452,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
           f2.getPath.getName.toLong)
         sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map{
           file =>
-            // println(s"deleting ${file.getPath}")
-            // fs.delete(file.getPath, true)
-            file
+            println(s"deleting ${file.getPath}")
+            fs.delete(file.getPath, true)
         }
       }
     }

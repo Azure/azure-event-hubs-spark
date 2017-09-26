@@ -50,6 +50,6 @@ private[spark] object ProgressTrackingCommon {
   }
 
   def createMetadataFile(fs: FileSystem, metadataPath: String, timestamp: Long): Unit = {
-    fs.create(new Path(PathTools.progressMetadataNamePattern(timestamp)))
+    fs.create(new Path(s"$metadataPath/${PathTools.progressMetadataNamePattern(timestamp)}"))
   }
 }

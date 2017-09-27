@@ -18,8 +18,11 @@
 package org.apache.spark.eventhubscommon.client
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+import scala.util.control.NonFatal
 
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, EventHubPartitionRuntimeInformation}
+import com.microsoft.azure.servicebus.amqp.AmqpException
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
@@ -30,34 +33,74 @@ private[client] class AMQPEventHubsClient(
     ehParams: Map[String, Map[String, String]]) extends EventHubClient with Logging {
 
   private val ehNameToClient = new mutable.HashMap[String, AzureEventHubClient]
+  private val maxRetry = 3
 
   init()
 
   private def init(): Unit = {
-    for (ehName <- eventHubsNames) {
-      ehNameToClient += ehName ->
-        new EventHubsClientWrapper().createClient(ehParams(ehName))
+    createLinkToEventHubs(eventHubsNames)
+  }
+
+  private def createLinkToEventHubs(ehNames: List[String]): Unit = {
+    for (ehName <- ehNames) {
+      ehNameToClient += ehName -> new EventHubsClientWrapper().createClient(ehParams(ehName))
     }
   }
 
-  private def getRunTimeInfoOfPartitions(
+  private def getRuntTimeInfoOfPartitionsInner(
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]) = {
-    val results = new mutable.HashMap[EventHubNameAndPartition, EventHubPartitionRuntimeInformation]
-    try {
-      for (ehNameAndPartition <- targetEventHubNameAndPartitions) {
+    val results = new mutable.HashMap[EventHubNameAndPartition,
+      EventHubPartitionRuntimeInformation]()
+    val failedEventHubsPartitionList = new ListBuffer[EventHubNameAndPartition]
+    for (ehNameAndPartition <- targetEventHubNameAndPartitions) {
+      try {
         val ehName = ehNameAndPartition.eventHubName
         val partitionId = ehNameAndPartition.partitionId
         val client = ehNameToClient.get(ehName)
         require(client.isDefined, "cannot find client for EventHubs instance " + ehName)
         val runTimeInfo = client.get.getPartitionRuntimeInformation(partitionId.toString).get()
         results += ehNameAndPartition -> runTimeInfo
+      } catch {
+        case e: AmqpException =>
+          logInfo(s"the connection to ${ehNameAndPartition.eventHubName}" +
+            s" might has been closed by EventHubs, replacing with new link", e)
+          failedEventHubsPartitionList += ehNameAndPartition
+        case NonFatal(e) =>
+          logError(s"Cannot get runtime info for $ehNameAndPartition", e)
+          failedEventHubsPartitionList += ehNameAndPartition
+        case e =>
+          logError("unrecoverable error", e)
+          throw e
       }
-      results.toMap.view
-    } catch {
-      case e: Exception =>
-        e.printStackTrace()
-        throw e
     }
+    (results, failedEventHubsPartitionList)
+  }
+
+  private def getRunTimeInfoOfPartitions(
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
+    Map[EventHubNameAndPartition, EventHubPartitionRuntimeInformation] = {
+    val results = new mutable.HashMap[EventHubNameAndPartition, EventHubPartitionRuntimeInformation]
+    var ehPartitionToTryThisRound = targetEventHubNameAndPartitions
+    for (currentRound <- 0 until maxRetry) {
+      val (resultsInThisRound, ehPartitionToTryNextRound) = getRuntTimeInfoOfPartitionsInner(
+        ehPartitionToTryThisRound)
+      results ++= resultsInThisRound
+      if (ehPartitionToTryNextRound.nonEmpty) {
+        createLinkToEventHubs(ehPartitionToTryNextRound.map(_.eventHubName).distinct.toList)
+        ehPartitionToTryThisRound = ehPartitionToTryNextRound.toList
+        ehPartitionToTryNextRound.clear()
+        logWarning(s"failed to fetch runtime info for $ehPartitionToTryThisRound, has tried" +
+          s" for ${currentRound + 1} times")
+      } else {
+        return results.toMap
+      }
+    }
+    if (results.size < targetEventHubNameAndPartitions.size) {
+      throw new IllegalStateException(s"cannot fetch runtime info for" +
+        s" $ehPartitionToTryThisRound from EventHubs after retrying for $maxRetry times," +
+        s" please check the availability of EventHubs")
+    }
+    results.toMap
   }
 
   /**
@@ -69,16 +112,10 @@ private[client] class AMQPEventHubsClient(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
-    try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
-      Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, (runTimeInfo.getLastEnqueuedOffset.toLong,
-          runTimeInfo.getLastEnqueuedSequenceNumber))}.toMap)
-    } catch {
-      case e: Exception =>
-        e.printStackTrace()
-        throw e
-    }
+    val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
+    Some(runtimeInformation.map { case (ehNameAndPartition, runTimeInfo) =>
+      (ehNameAndPartition, (runTimeInfo.getLastEnqueuedOffset.toLong,
+        runTimeInfo.getLastEnqueuedSequenceNumber))})
   }
 
   /**
@@ -90,15 +127,9 @@ private[client] class AMQPEventHubsClient(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
-    try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
-      Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, runTimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)}.toMap)
-    } catch {
-      case e: Exception =>
-        e.printStackTrace()
-        throw e
-    }
+    val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
+    Some(runtimeInformation.map { case (ehNameAndPartition, runTimeInfo) =>
+      (ehNameAndPartition, runTimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)})
   }
 
   /**
@@ -110,15 +141,9 @@ private[client] class AMQPEventHubsClient(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
     Option[Map[EventHubNameAndPartition, Long]] = {
-    try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
-      Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, runTimeInfo.getBeginSequenceNumber)}.toMap)
-    } catch {
-      case e: Exception =>
-        e.printStackTrace()
-        throw e
-    }
+    val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
+    Some(runtimeInformation.map { case (ehNameAndPartition, runTimeInfo) =>
+      (ehNameAndPartition, runTimeInfo.getBeginSequenceNumber)})
   }
 
   /**
@@ -136,7 +161,7 @@ private[client] class AMQPEventHubsClient(
 private[spark] object AMQPEventHubsClient {
 
   def getInstance(eventHubsNamespace: String, eventhubsParams: Map[String, Map[String, String]]):
-  AMQPEventHubsClient = {
+    AMQPEventHubsClient = {
     new AMQPEventHubsClient(eventHubsNamespace, eventhubsParams.keys.toList, eventhubsParams)
   }
 }

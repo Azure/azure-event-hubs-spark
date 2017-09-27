@@ -208,7 +208,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private[spark] def pinPointProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {
       require(fs.isDirectory(progressDirPath), s"$progressDirPath is not a directory")
-      val targetFilePath = new Path(progressDirPath.toString + s"/progress-$timestamp")
+      val targetFilePath = new Path(s"$progressDirStr/progress-$timestamp")
       val targetFileExists = fs.exists(targetFilePath)
       if (targetFileExists) Some(targetFilePath) else None
     } catch {

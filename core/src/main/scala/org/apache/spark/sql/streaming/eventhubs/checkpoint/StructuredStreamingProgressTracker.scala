@@ -37,23 +37,38 @@ class StructuredStreamingProgressTracker(
     progressDir, appName, uid)
   protected override lazy val progressTempDirStr: String = PathTools.progressTempDirPathStr(
     progressDir, appName, uid)
+  protected override lazy val progressMetadataDirStr: String = PathTools.progressMetadataDirPathStr(
+    progressDir, appName, uid)
 
   override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
     val connector = StructuredStreamingProgressTracker.registeredConnectors(uid)
     Map(connector.uid -> connector.connectedInstances)
   }
 
-  override def init(): Unit = {
-    // recover from partially executed checkpoint commit
+  private def initMetadataDirectory(): Unit = {
+    try {
+      val fs = progressMetadataDirPath.getFileSystem(hadoopConfiguration)
+      val checkpointMetadaDirExisted = fs.exists(progressTempDirPath)
+      if (!checkpointMetadaDirExisted) {
+        fs.mkdirs(progressMetadataDirPath)
+      }
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
+        throw ex
+    }
+  }
+
+  private def initProgressFileDirectory(): Unit = {
     val fs = progressDirPath.getFileSystem(hadoopConfiguration)
     try {
-      val checkpointDirExisted = fs.exists(progressDirPath)
-      if (checkpointDirExisted) {
+      val progressDirExist = fs.exists(progressDirPath)
+      if (progressDirExist) {
         val (validationPass, latestFile) = validateProgressFile(fs)
+        println(s"${latestFile}")
         if (!validationPass) {
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
-            println(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
             val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp,
               List(StructuredStreamingProgressTracker.registeredConnectors(uid)))
@@ -67,9 +82,12 @@ class StructuredStreamingProgressTracker(
       case ex: Exception =>
         ex.printStackTrace()
         throw ex
-    } finally {
-      // EMPTY
     }
+  }
+
+  override def init(): Unit = {
+    initProgressFileDirectory()
+    initMetadataDirectory()
   }
 }
 
@@ -81,6 +99,7 @@ object StructuredStreamingProgressTracker {
 
   private[spark] def reset(): Unit = {
     registeredConnectors.clear()
+    _progressTrackers.values.map(pt => pt.metadataCleanupFuture.cancel(true))
     _progressTrackers.clear()
   }
 

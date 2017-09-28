@@ -49,6 +49,9 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   override def afterEach(): Unit = {
     reset()
+    // cannot do it in reset() for test like "recover from progress after updating code
+    // (no checkpoint provided) "
+    fs.delete(progressRootPath, true)
   }
 
   def batchDuration: Duration = Seconds(5)

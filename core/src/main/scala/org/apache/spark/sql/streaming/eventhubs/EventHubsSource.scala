@@ -295,7 +295,7 @@ private[spark] class EventHubsSource(
     val nextBatchId = batchId + 1
     val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
     if (progress.timestamp == -1 || !validateReadResults(progress)) {
-      // next batch hasn't been committed
+      // next batch hasn't been committed successfully
       val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
       EventHubsOffset(batchId, lastCommittedOffset.offsets)
     } else {

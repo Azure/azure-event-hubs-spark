@@ -252,6 +252,40 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
       expectedOutputAfterRestart)
   }
 
+  test("recover from a progress directory where has no metadata record") {
+    val input = Seq(
+      Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+      Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
+      Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
+    val expectedOutputBeforeRestart = Seq(
+      Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val expectedOutputAfterRestart = Seq(
+      Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq())
+
+    testCheckpointedOperation(
+      input,
+      eventhubsParams = Map[String, Map[String, String]](
+        "eh1" -> Map(
+          "eventhubs.partition.count" -> "3",
+          "eventhubs.maxRate" -> "2",
+          "eventhubs.name" -> "eh1")
+      ),
+      expectedStartingOffsetsAndSeqs = Map(eventhubNamespace ->
+        OffsetRecord(2000L, Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
+          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))
+        )),
+      expectedOffsetsAndSeqs = OffsetRecord(3000L,
+        Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
+          EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
+          EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+      operation = (inputDStream: EventHubDirectDStream) =>
+        inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
+      expectedOutputBeforeRestart,
+      expectedOutputAfterRestart,
+      directoryToClean = Some(progressTracker.progressMetadataDirectoryPath))
+  }
+
 
   test("recover from progress after updating code (no checkpoint provided)") {
     val input = Seq(
@@ -432,6 +466,7 @@ class ProgressTrackingAndCheckpointSuite extends CheckpointAndProgressTrackerTes
     // simulate commit fail
     val fs = FileSystem.get(new Configuration())
     fs.delete(new Path(progressRootPath.toString + s"/$appName/progress-3000"), true)
+    fs.delete(new Path(progressRootPath.toString + s"/${appName}_metadata/3000"), true)
 
     ssc = StreamingContext.getOrCreate(currentCheckpointDirectory,
       () => createContextForCheckpointOperation(batchDuration, checkpointDirectory))

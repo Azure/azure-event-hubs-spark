@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubscommon.progress
 
 import java.io.{BufferedReader, InputStreamReader, IOException}
+import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -32,18 +33,31 @@ import org.apache.spark.internal.Logging
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String, appName: String, hadoopConfiguration: Configuration) extends Logging {
 
-
   protected lazy val progressDirStr: String = PathTools.progressDirPathStr(progressDir, appName)
   protected lazy val progressTempDirStr: String = PathTools.progressTempDirPathStr(progressDir,
     appName)
+  protected lazy val progressMetadataDirStr: String = PathTools.progressMetadataDirPathStr(
+    progressDir, appName)
 
   protected lazy val progressDirPath = new Path(progressDirStr)
   protected lazy val progressTempDirPath = new Path(progressTempDirStr)
+  protected lazy val progressMetadataDirPath = new Path(progressMetadataDirStr)
 
   def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]]
 
   private[spark] def progressDirectoryPath = progressDirPath
   private[spark] def progressTempDirectoryPath = progressTempDirPath
+  private[spark] def progressMetadataDirectoryPath = progressMetadataDirPath
+
+  // metadata cleaning is different with progress file and temporary file clean up in that, metadata
+  // is developed for fast initialization of progress tracker and it should (can) be independent
+  // with Spark Streaming checkpoint (the others have to be coordinated with Spark Streaming
+  // checkpoint cleanup to ensure that we have enough support for recovery). By cleaning metadata
+  // in progress tracker, we can ensure that the ProgressTracker can still be quickly initialized
+  // even the user does not enable Spark Streaming checkpoint or the cleanup of checkpoint is
+  // lagging behind
+  private val threadPoolForMetadataClean = new ScheduledThreadPoolExecutor(1)
+  protected val metadataCleanupFuture: ScheduledFuture[_] = scheduleMetadataCleanTask()
 
   // getModificationTime is not reliable for unit test and some extreme case in distributed
   // file system so that we have to derive timestamp from the file names. The timestamp can be the
@@ -61,13 +75,10 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
-  /**
-   * get the latest progress file saved under directory
-   */
-  protected def getLatestFile(
-      directory: Path, fs: FileSystem, timestamp: Long = Long.MaxValue): Option[Path] = {
-    require(fs.isDirectory(directory), s"$directory is not a directory")
-    val allFiles = fs.listStatus(directory)
+  // no metadata (for backward compatiblity
+  private def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
+      Option[Path] = {
+    val allFiles = fs.listStatus(progressDirPath)
     if (allFiles.length < 1) {
       None
     } else {
@@ -77,16 +88,45 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
+  private def getLatestFileWithMetadata(metadataFiles: Array[FileStatus]): Option[Path] = {
+    val latestMetadata = metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
+      f2.getPath.getName.toLong).head
+    logInfo(s"locate latest timestamp in metadata as ${latestMetadata.getPath.getName}")
+    Some(new Path(progressDirStr + "/progress-" + latestMetadata.getPath.getName))
+  }
+
+  /**
+   * get the latest progress file saved under directory
+   *
+   * NOTE: the additional integer in return value is to simplify the test (could be improved)
+   */
+  private[spark] def getLatestFile(fs: FileSystem, timestamp: Long = Long.MaxValue):
+    (Int, Option[Path]) = {
+    // first check metadata directory if exists
+    if (fs.exists(progressMetadataDirPath)) {
+      val metadataFiles = fs.listStatus(progressMetadataDirPath).filter(
+        file => file.isFile && file.getPath.getName.toLong <= timestamp)
+      if (metadataFiles.nonEmpty) {
+        // metadata files exists
+        (0, getLatestFileWithMetadata(metadataFiles))
+      } else {
+        (1, getLatestFileWithoutMetadata(fs, timestamp))
+      }
+    } else {
+      (1, getLatestFileWithoutMetadata(fs, timestamp))
+    }
+  }
+
   /**
    * this method is called when ProgressTracker is started for the first time (including recovering
-   * from checkpoint). This method validate the latest progress file by checking whether it
-   * contains progress of all partitions we subscribe to. If not, we will delete the corrupt
-   * progress file
+   * from Spark Streaming checkpoint). This method validate the latest progress file by checking
+   * whether it contains progress of all partitions we subscribe to. If not, we will delete the
+   * corrupt progress file
    * @return (whether the latest file pass the validation, option to the file path,
    *         the latest timestamp)
    */
   protected def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
-    val latestFileOpt = getLatestFile(progressDirPath, fs)
+    val (_, latestFileOpt) = getLatestFile(fs)
     val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
     var br: BufferedReader = null
     try {
@@ -168,7 +208,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private[spark] def pinPointProgressFile(fs: FileSystem, timestamp: Long): Option[Path] = {
     try {
       require(fs.isDirectory(progressDirPath), s"$progressDirPath is not a directory")
-      val targetFilePath = new Path(progressDirPath.toString + s"/progress-$timestamp")
+      val targetFilePath = new Path(s"$progressDirStr/progress-$timestamp")
       val targetFileExists = fs.exists(targetFilePath)
       if (targetFileExists) Some(targetFilePath) else None
     } catch {
@@ -200,7 +240,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         if (!fallBack) {
           pinPointProgressFile(fs, timestamp)
         } else {
-          getLatestFile(progressDirPath, fs, timestamp)
+          getLatestFile(fs, timestamp)._2
         }
       }
       if (progressFileOption.isEmpty) {
@@ -234,15 +274,15 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     OffsetRecord(readTimestamp, recordToReturn)
   }
 
-  // write offsetToCommit to a progress tracking file
-  private def transaction(
-     offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-     fs: FileSystem,
-     commitTime: Long): Unit = {
+  private def createProgressFile(
+      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+      fs: FileSystem,
+      commitTime: Long): Boolean = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(progressDirStr +
-        s"/${PathTools.progressFileNamePattern(commitTime)}"), true)
+      // write progress file
+      oos = fs.create(new Path(s"$progressDirStr/${PathTools.progressFileNamePattern(commitTime)}"),
+        true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
@@ -254,10 +294,50 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
               )
           }
       }
+      true
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        false
     } finally {
       if (oos != null) {
         oos.close()
       }
+    }
+  }
+
+  private def createMetadata(fs: FileSystem, commitTime: Long): Boolean = {
+    var oos: FSDataOutputStream = null
+    try {
+      oos = fs.create(new Path(s"$progressMetadataDirStr/" +
+        s"${PathTools.progressMetadataNamePattern(commitTime)}"), true)
+      true
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        false
+    } finally {
+      if (oos != null) {
+        oos.close()
+      }
+    }
+  }
+
+  // write offsetToCommit to a progress tracking file
+  private def transaction(
+     offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+     fs: FileSystem,
+     commitTime: Long): Unit = {
+    if (createProgressFile(offsetToCommit, fs, commitTime)) {
+      if (!createMetadata(fs, commitTime)) {
+        logError(s"cannot create progress file at $commitTime")
+        throw new IOException(s"cannot create metadata file at $commitTime," +
+          s" check the previous exception for the root cause")
+      }
+    } else {
+      logError(s"cannot create progress file at $commitTime")
+      throw new IOException(s"cannot create progress file at $commitTime," +
+        s" check the previous exception for the root cause")
     }
   }
 
@@ -361,6 +441,23 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
           fs.delete(filePath, true)
       }
     }
+  }
+
+  private def scheduleMetadataCleanTask(): ScheduledFuture[_] = {
+    val metadataCleanTask = new Runnable {
+      override def run() = {
+        val fs = progressMetadataDirectoryPath.getFileSystem(new Configuration())
+        val allMetadataFiles = fs.listStatus(progressMetadataDirPath)
+        val sortedMetadataFiles = allMetadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong <
+          f2.getPath.getName.toLong)
+        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map{
+          file =>
+            fs.delete(file.getPath, true)
+        }
+      }
+    }
+    // do not need to expose internals to users so hardcoded
+    threadPoolForMetadataClean.scheduleAtFixedRate(metadataCleanTask, 0, 30, TimeUnit.SECONDS)
   }
 
   def init(): Unit

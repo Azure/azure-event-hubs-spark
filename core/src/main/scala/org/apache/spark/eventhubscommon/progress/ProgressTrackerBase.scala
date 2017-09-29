@@ -276,8 +276,8 @@ abstract class ProgressTrackerBase[T <: EventHubsConnector](
     var oos: FSDataOutputStream = null
     try {
       // write progress file
-      oos = fs.create(new Path(s"$progressDirectoryPath/${PathTools.makeProgressFileName(commitTime)}"),
-        true)
+      oos = fs.create(new Path(
+        s"$progressDirectoryPath/${PathTools.makeProgressFileName(commitTime)}"), true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
@@ -304,7 +304,8 @@ abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private def createMetadata(fs: FileSystem, commitTime: Long): Boolean = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(s"$metadataDirectoryStr/" + s"${PathTools.makeMetadataFileName(commitTime)}"), true)
+      oos = fs.create(new Path(
+        s"$metadataDirectoryStr/" + s"${PathTools.makeMetadataFileName(commitTime)}"), true)
       true
     } catch {
       case e: Exception =>

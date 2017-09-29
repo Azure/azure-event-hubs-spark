@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubscommon.progress
 
 import org.apache.hadoop.fs.Path
+
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
 private[spark] object PathTools extends Serializable {

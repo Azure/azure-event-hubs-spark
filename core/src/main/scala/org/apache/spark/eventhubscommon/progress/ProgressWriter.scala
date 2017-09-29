@@ -34,14 +34,14 @@ private[spark] class ProgressWriter(
      progressDir: String,
      subDirIdentifiers: String*) extends Logging {
 
-  // TODO: Why can't we get this info from one of the ProgressTrackers? This info is available there.
-  // TODO: Come up with better name
+  // TODO: Why can't we get this info from one of the ProgressTrackers?
+  // TODO: Come up with better name for this guy
   private val tempProgressTrackingPointStr =
     PathTools.makeTempDirectoryStr(progressDir, subDirIdentifiers: _*) + "/" +
       PathTools.makeTempFileName(streamId, uid, eventHubNameAndPartition, timestamp)
 
-  // TODO: Why can't we get this info from one of the ProgressTrackers? This info is available there.
-  // TODO: Come up with better name
+  // TODO: Why can't we get this info from one of the ProgressTrackers?
+  // TODO: Come up with better name for this guy
   private[spark] val tempProgressTrackingPointPath = new Path(tempProgressTrackingPointStr)
 
   def write(recordTime: Long, cpOffset: Long, cpSeq: Long): Unit = {

@@ -56,9 +56,11 @@ class ProgressTrackerSuite extends SharedUtils {
       seq: Int): Unit = {
     for (partitionId <- partitionRange) {
       val filePath = Paths.get(progressPath + s"/${PathTools.makeProgressFileName(timestamp)}")
-      val stdOpenOption = if (Files.exists(filePath))
+      val stdOpenOption = if (Files.exists(filePath)) {
         StandardOpenOption.APPEND
-      else StandardOpenOption.CREATE
+      } else {
+        StandardOpenOption.CREATE
+      }
 
       Files.write(filePath,
         s"${ProgressRecord(timestamp, namespace, ehName, partitionId, offset, seq)

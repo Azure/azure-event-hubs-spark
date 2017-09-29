@@ -25,12 +25,16 @@ private[spark] object PathTools extends Serializable {
     subDirs.mkString("/")
   }
 
-  def progressDirPathStr(checkpointDir: String, subDirNames: String*): String = {
-    s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}"
+  def progressDirPathStr(progressDir: String, subDirNames: String*): String = {
+    s"$progressDir/${fromSubDirNamesToString(subDirNames)}"
   }
 
-  def progressTempDirPathStr(checkpointDir: String, subDirNames: String*): String = {
-    s"$checkpointDir/${fromSubDirNamesToString(subDirNames)}_temp"
+  def progressTempDirPathStr(progressDir: String, subDirNames: String*): String = {
+    s"$progressDir/${fromSubDirNamesToString(subDirNames)}_temp"
+  }
+
+  def progressMetadataDirPathStr(progressDir: String, subDirNames: String*): String = {
+    s"$progressDir/${fromSubDirNamesToString(subDirNames)}_metadata"
   }
 
   def progressTempFileNamePattern(
@@ -44,6 +48,8 @@ private[spark] object PathTools extends Serializable {
   def progressFileNamePattern(timestamp: Long): String = {
     s"progress-$timestamp"
   }
+
+  def progressMetadataNamePattern(timestamp: Long): String = timestamp.toString
 
   def progressTempFileStr(
       basePath: String,

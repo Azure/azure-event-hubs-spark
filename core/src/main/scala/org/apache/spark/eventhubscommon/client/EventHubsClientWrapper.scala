@@ -21,7 +21,6 @@ import java.time.Instant
 import scala.collection.JavaConverters._
 
 import EventHubsOffsetTypes.EventHubsOffsetType
-
 import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, _}
 import com.microsoft.azure.servicebus._
 

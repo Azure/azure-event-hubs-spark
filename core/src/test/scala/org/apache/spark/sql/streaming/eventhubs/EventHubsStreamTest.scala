@@ -447,10 +447,8 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
             verify(triggerClock.isInstanceOf[SystemClock]
               || triggerClock.isInstanceOf[StreamManualClock],
               "Use either SystemClock or StreamManualClock to start the stream")
-
-            triggerClock match {
-              case triggerClock: StreamManualClock =>
-                manualClockExpectedTime = triggerClock.getTimeMillis()
+            if (triggerClock.isInstanceOf[StreamManualClock]) {
+              manualClockExpectedTime = triggerClock.asInstanceOf[StreamManualClock].getTimeMillis()
             }
 
             additionalConfs.foreach(pair => {

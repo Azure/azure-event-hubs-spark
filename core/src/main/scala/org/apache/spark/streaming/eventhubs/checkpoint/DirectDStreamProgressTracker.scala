@@ -36,7 +36,8 @@ import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
  * @param appName the name of Spark application
  * @param hadoopConfiguration the hadoop configuration instance
  */
-private[spark] class DirectDStreamProgressTracker private[spark](
+private[spark]
+class DirectDStreamProgressTracker private[spark](
     progressDir: String,
     appName: String,
     hadoopConfiguration: Configuration)
@@ -55,8 +56,8 @@ private[spark] class DirectDStreamProgressTracker private[spark](
 
   private def initProgressFileDirectory(): Unit = {
     try {
-      val fs = progressDirPath.getFileSystem(hadoopConfiguration)
-      val checkpointDirExisted = fs.exists(progressDirPath)
+      val fs = progressDirectoryPath.getFileSystem(hadoopConfiguration)
+      val checkpointDirExisted = fs.exists(progressDirectoryPath)
       if (checkpointDirExisted) {
         val (validationPass, latestFile) = validateProgressFile(fs)
         if (!validationPass) {
@@ -66,7 +67,7 @@ private[spark] class DirectDStreamProgressTracker private[spark](
           }
         }
       } else {
-        fs.mkdirs(progressDirPath)
+        fs.mkdirs(progressDirectoryPath)
       }
     } catch {
       case ex: Exception =>
@@ -77,13 +78,13 @@ private[spark] class DirectDStreamProgressTracker private[spark](
 
   private def initTempProgressFileDirectory(): Unit = {
     try {
-      val fs = progressTempDirPath.getFileSystem(hadoopConfiguration)
-      val checkpointTempDirExisted = fs.exists(progressTempDirPath)
+      val fs = tempDirectoryPath.getFileSystem(hadoopConfiguration)
+      val checkpointTempDirExisted = fs.exists(tempDirectoryPath)
       if (checkpointTempDirExisted) {
-        fs.delete(progressTempDirPath, true)
-        logInfo(s"cleanup temp checkpoint $progressTempDirPath")
+        fs.delete(tempDirectoryPath, true)
+        logInfo(s"cleanup temp checkpoint $tempDirectoryPath")
       }
-      fs.mkdirs(progressTempDirPath)
+      fs.mkdirs(tempDirectoryPath)
     } catch {
       case ex: Exception =>
         ex.printStackTrace()
@@ -93,10 +94,10 @@ private[spark] class DirectDStreamProgressTracker private[spark](
 
   private def initMetadataDirectory(): Unit = {
     try {
-      val fs = progressMetadataDirPath.getFileSystem(hadoopConfiguration)
-      val checkpointMetadaDirExisted = fs.exists(progressTempDirPath)
+      val fs = metadataDirectoryPath.getFileSystem(hadoopConfiguration)
+      val checkpointMetadaDirExisted = fs.exists(tempDirectoryPath)
       if (!checkpointMetadaDirExisted) {
-        fs.mkdirs(progressMetadataDirPath)
+        fs.mkdirs(metadataDirectoryPath)
       }
     } catch {
       case ex: Exception =>
@@ -127,12 +128,12 @@ private[spark] class DirectDStreamProgressTracker private[spark](
 
   // called in EventHubDirectDStream's clearCheckpointData method
   override def cleanProgressFile(timestampToClean: Long): Unit = driverLock.synchronized {
-    val fs = progressDirPath.getFileSystem(hadoopConfiguration)
+    val fs = progressDirectoryPath.getFileSystem(hadoopConfiguration)
     // clean progress directory
     // NOTE: due to SPARK-19280 (https://issues.apache.org/jira/browse/SPARK-19280)
     // we have to disable cleanup thread
     /*
-    val allUselessFiles = fs.listStatus(progressDirPath, new PathFilter {
+    val allUselessFiles = fs.listStatus(progressDirectoryPath, new PathFilter {
       override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= checkpointTime
     }).map(_.getPath)
     val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
@@ -145,7 +146,7 @@ private[spark] class DirectDStreamProgressTracker private[spark](
     }
     */
     // clean temp directory
-    val allUselessTempFiles = fs.listStatus(progressTempDirPath, new PathFilter {
+    val allUselessTempFiles = fs.listStatus(tempDirectoryPath, new PathFilter {
       override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
     }).map(_.getPath)
     if (allUselessTempFiles.nonEmpty) {

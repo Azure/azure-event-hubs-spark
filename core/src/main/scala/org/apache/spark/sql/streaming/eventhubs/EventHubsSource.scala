@@ -221,7 +221,7 @@ private[spark] class EventHubsSource(
   private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
     val filterOffsetAndType = {
       if (committedOffsetsAndSeqNums.batchId == -1) {
-        val startSeqs = eventHubClient.startSeqOfPartition(false, connectedInstances)
+        val startSeqs = eventHubClient.startSeqOfPartition(retryIfFail = false, connectedInstances)
         require(startSeqs.isDefined, s"cannot fetch start seqs for eventhubs $eventHubsName")
         committedOffsetsAndSeqNums = EventHubsOffset(-1, committedOffsetsAndSeqNums.offsets.map {
           case (ehNameAndPartition, (offset, _)) =>

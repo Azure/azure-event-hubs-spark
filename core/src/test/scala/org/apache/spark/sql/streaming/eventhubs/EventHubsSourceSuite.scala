@@ -357,8 +357,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     dataSource.map(x => x.toInt + 1)
   }
 
-  test("Verify input row metric is correct when source" +
-    " is started with initial data") {
+  test("Verify input row metric is correct when source is started with initial data") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
@@ -537,7 +536,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
-      StopStream(recoverStreamId = true, commitPartialOffset = true, partialType = "delete"),
+      StopStream(recoverStreamId = true, commitPartialOffset = true),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
         additionalConfs = Map("eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))

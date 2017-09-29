@@ -38,7 +38,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
   protected def createContextForCheckpointOperation(
       batchDuration: Duration, checkpointDirectory: String): StreamingContext = {
     val conf = new SparkConf().setMaster("local[*]").setAppName(appName)
-    conf.set("spark.streaming.clock", classOf[ManualClock].getName())
+    conf.set("spark.streaming.clock", classOf[ManualClock].getName)
     val ssc = new StreamingContext(SparkContext.getOrCreate(conf), batchDuration)
     ssc.checkpoint(checkpointDirectory)
     ssc

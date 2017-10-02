@@ -155,13 +155,13 @@ class ProgressTrackerSuite extends SharedUtils {
     val dStream =
       createDirectStreams(ssc, "namespace1", progressRootPath.toString,
         Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-            "eh2" -> Map("eventhubs.partition.count" -> "2"),
-            "eh3" -> Map("eventhubs.partition.count" -> "3")))
+          "eh2" -> Map("eventhubs.partition.count" -> "2"),
+          "eh3" -> Map("eventhubs.partition.count" -> "3")))
     val dStream1 =
       createDirectStreams(ssc, "namespace2", progressRootPath.toString,
         Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-            "eh12" -> Map("eventhubs.partition.count" -> "2"),
-            "eh13" -> Map("eventhubs.partition.count" -> "3")))
+          "eh12" -> Map("eventhubs.partition.count" -> "2"),
+          "eh13" -> Map("eventhubs.partition.count" -> "3")))
     dStream.start()
     dStream1.start()
 

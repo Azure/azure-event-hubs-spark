@@ -47,10 +47,9 @@ abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]]
 
-  /* Metadata is maintained for fast ProgressTracker initialization and can cleaned independently
-     from Spark checkpoint files. We'll clean metadata here to ensure it's cleaned whether or not
-     Spark checkpointing is enabled.
-   */
+  // Metadata is maintained for fast ProgressTracker initialization and can cleaned independently
+  // from Spark checkpoint files. We'll clean metadata here to ensure it's cleaned whether or not
+  // Spark checkpointing is enabled.
   private val threadPoolForMetadataClean = new ScheduledThreadPoolExecutor(1)
   protected val metadataCleanupFuture: ScheduledFuture[_] = scheduleMetadataCleanTask()
 

@@ -63,7 +63,6 @@ private[spark] class StructuredStreamingProgressTracker private[spark](
       val progressDirExist = fs.exists(progressDirectoryPath)
       if (progressDirExist) {
         val (validationPass, latestFile) = validateProgressFile(fs)
-        println(s"$latestFile")
         if (!validationPass) {
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")

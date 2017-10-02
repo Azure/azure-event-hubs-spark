@@ -36,8 +36,7 @@ import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
  * @param appName the name of Spark application
  * @param hadoopConfiguration the hadoop configuration instance
  */
-private[spark]
-class DirectDStreamProgressTracker private[spark](
+private[spark] class DirectDStreamProgressTracker private[spark](
     progressDir: String,
     appName: String,
     hadoopConfiguration: Configuration)

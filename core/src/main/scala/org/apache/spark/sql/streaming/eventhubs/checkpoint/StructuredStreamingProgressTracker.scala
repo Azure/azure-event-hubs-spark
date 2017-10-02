@@ -24,8 +24,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
 import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressTrackerBase}
 
-private[spark]
-class StructuredStreamingProgressTracker private[spark](
+private[spark] class StructuredStreamingProgressTracker private[spark](
     uid: String,
     progressDir: String,
     appName: String,

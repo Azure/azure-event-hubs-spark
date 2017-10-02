@@ -31,12 +31,12 @@ private[spark] class StructuredStreamingProgressTracker private[spark](
     hadoopConfiguration: Configuration)
   extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
 
-  private[spark] override lazy val progressDirectoryStr =
-    PathTools.makeProgressDirectoryStr(progressDir, appName, uid)
-  private[spark] override lazy val tempDirectoryStr =
-    PathTools.makeTempDirectoryStr(progressDir, appName, uid)
-  private[spark] override lazy val metadataDirectoryStr =
-    PathTools.makeMetadataDirectoryStr(progressDir, appName, uid)
+  private[spark] override lazy val progressDirectoryStr = PathTools.makeProgressDirectoryStr(
+    progressDir, appName, uid)
+  private[spark] override lazy val tempDirectoryStr = PathTools.makeTempDirectoryStr(progressDir,
+    appName, uid)
+  private[spark] override lazy val metadataDirectoryStr = PathTools.makeMetadataDirectoryStr(
+    progressDir, appName, uid)
 
   override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
     val connector = StructuredStreamingProgressTracker.registeredConnectors(uid)

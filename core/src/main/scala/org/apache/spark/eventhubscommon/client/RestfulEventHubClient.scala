@@ -45,7 +45,7 @@ private[spark] class RestfulEventHubClient(
     eventHubNamespace: String,
     numPartitionsEventHubs: Map[String, Int],
     consumerGroups: Map[String, String],
-    policyKeys: Map[String, String Tuple2 String],
+    policyKeys: Map[String, (String, String)],
     threadNum: Int) extends EventHubClient with Logging {
 
   private val RETRY_INTERVAL_SECONDS = Array(8, 16, 32, 64, 128)
@@ -84,7 +84,7 @@ private[spark] class RestfulEventHubClient(
 
   private def aggregateResults[T](undergoingRequests: List[Future[(EventHubNameAndPartition, T)]]):
       Option[Map[EventHubNameAndPartition, T]] = {
-    Await.ready(Future.sequence(undergoingRequests), 60.seconds).value.get match {
+    Await.ready(Future.sequence(undergoingRequests), 60 seconds).value.get match {
       case Success(queryResponse) =>
         Some(queryResponse.toMap.map {case (eventHubQueryKey, queryResponseString) =>
           (eventHubQueryKey, queryResponseString.asInstanceOf[T])})

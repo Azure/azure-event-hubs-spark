@@ -30,16 +30,14 @@ import org.apache.hadoop.fs._
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
 import org.apache.spark.internal.Logging
 
-private[spark]
-abstract class ProgressTrackerBase[T <: EventHubsConnector](
+private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String, appName: String, hadoopConfiguration: Configuration) extends Logging {
 
-  private[spark] lazy val progressDirectoryStr =
-    PathTools.makeProgressDirectoryStr(progressDir, appName)
-  private[spark] lazy val tempDirectoryStr =
-    PathTools.makeTempDirectoryStr(progressDir, appName)
-  private[spark] lazy val metadataDirectoryStr =
-    PathTools.makeMetadataDirectoryStr(progressDir, appName)
+  private[spark] lazy val progressDirectoryStr = PathTools.makeProgressDirectoryStr(progressDir,
+    appName)
+  private[spark] lazy val tempDirectoryStr = PathTools.makeTempDirectoryStr(progressDir, appName)
+  private[spark] lazy val metadataDirectoryStr = PathTools.makeMetadataDirectoryStr(progressDir,
+    appName)
 
   private[spark] lazy val progressDirectoryPath = new Path(progressDirectoryStr)
   private[spark] lazy val tempDirectoryPath = new Path(tempDirectoryStr)

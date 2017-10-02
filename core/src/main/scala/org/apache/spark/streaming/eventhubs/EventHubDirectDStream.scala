@@ -408,5 +408,5 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
 private[eventhubs] object EventHubDirectDStream {
   val cleanupLock = new Object
-  var lastCleanupTime: Long = -1L
+  var lastCleanupTime = -1L
 }

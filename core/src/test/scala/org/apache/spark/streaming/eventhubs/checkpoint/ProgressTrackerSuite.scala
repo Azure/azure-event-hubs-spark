@@ -167,7 +167,6 @@ class ProgressTrackerSuite extends SharedUtils {
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
-
     progressTracker = DirectDStreamProgressTracker
       .initInstance(progressRootPath.toString, appName, new Configuration())
 
@@ -242,19 +241,15 @@ class ProgressTrackerSuite extends SharedUtils {
     var progressWriter = new ProgressWriter(0, "namespace1", eh1Partition0,
       1000L, new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-
     progressWriter = new ProgressWriter(0, "namespace1", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-
     progressWriter = new ProgressWriter(0, "namespace2", eh1Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 10, 20)
-
     progressWriter = new ProgressWriter(0, "namespace2", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 20, 30)
-
     val s = progressTracker.asInstanceOf[DirectDStreamProgressTracker]
       .collectProgressRecordsForBatch(1000L, List(connector1, connector2))
 
@@ -279,15 +274,12 @@ class ProgressTrackerSuite extends SharedUtils {
     var progressWriter = new ProgressWriter(0, "namespace1", eh1Partition0,
       1000L, new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-
     progressWriter = new ProgressWriter(0, "namespace1", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 1)
-
     progressWriter = new ProgressWriter(0, "namespace2", eh1Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(2000L, 10, 20)
-
     progressWriter = new ProgressWriter(0, "namespace2", eh2Partition0, 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 20, 30)
@@ -305,15 +297,12 @@ class ProgressTrackerSuite extends SharedUtils {
     var progressWriter = new ProgressWriter(0, "namespace1", EventHubNameAndPartition("eh1", 0),
       1000L, new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 0, 0)
-
     progressWriter = new ProgressWriter(0, "namespace1", EventHubNameAndPartition("eh2", 0), 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 1, 1)
-
     progressWriter = new ProgressWriter(0, "namespace2", EventHubNameAndPartition("eh1", 0), 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 2, 2)
-
     progressWriter = new ProgressWriter(0, "namespace2", EventHubNameAndPartition("eh2", 0), 1000L,
       new Configuration(), progressRootPath.toString, appName)
     progressWriter.write(1000L, 3, 3)
@@ -326,17 +315,13 @@ class ProgressTrackerSuite extends SharedUtils {
         EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
         EventHubNameAndPartition("eh2", 4) -> (3L, 3L)))
     progressTracker.asInstanceOf[DirectDStreamProgressTracker].commit(offsetToCommit, 1000L)
-
-    val namespace1Offsets = progressTracker.asInstanceOf[DirectDStreamProgressTracker].
-      read("namespace1", 1000L, fallBack = false)
-
+    val namespace1Offsets = progressTracker.asInstanceOf[DirectDStreamProgressTracker]
+      .read("namespace1", 1000L, fallBack = false)
     assert(namespace1Offsets === OffsetRecord(1000L, Map(
       EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
       EventHubNameAndPartition("eh2", 1) -> (1L, 1L))))
-
-    val namespace2Offsets = progressTracker.asInstanceOf[DirectDStreamProgressTracker].
-      read("namespace2", 1000L, fallBack = false)
-
+    val namespace2Offsets = progressTracker.asInstanceOf[DirectDStreamProgressTracker]
+      .read("namespace2", 1000L, fallBack = false)
     assert(namespace2Offsets === OffsetRecord(1000L, Map(
       EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
       EventHubNameAndPartition("eh2", 4) -> (3L, 3L))))
@@ -413,12 +398,9 @@ class ProgressTrackerSuite extends SharedUtils {
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
-
     writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
-
     val metadataPath = PathTools.makeMetadataDirectoryStr(progressRootPath.toString, appName)
     createMetadataFile(fs, metadataPath, 1000L)
-
     val result = progressTracker.read("namespace1", 1000, fallBack = true)
 
     assert(result.timestamp == 1000L)
@@ -431,15 +413,11 @@ class ProgressTrackerSuite extends SharedUtils {
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
-
     writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
     writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1", 0 to 0, 0, 1)
-
     val metadataPath = PathTools.makeMetadataDirectoryStr(progressRootPath.toString, appName)
-
     createMetadataFile(fs, metadataPath, 1000L)
     createMetadataFile(fs, metadataPath, 2000L)
-
     val (sourceOfLatestFile, result) = progressTracker.getLatestFile(fs)
 
     assert(sourceOfLatestFile === 0)
@@ -455,10 +433,8 @@ class ProgressTrackerSuite extends SharedUtils {
 
     writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
     writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1", 0 to 0, 0, 1)
-
     val metadataPath = PathTools.makeMetadataDirectoryStr(progressRootPath.toString, appName)
     createMetadataFile(fs, metadataPath, 1000L)
-
     val (sourceOfLatestFile, result) = progressTracker.getLatestFile(fs)
 
     assert(sourceOfLatestFile === 0)

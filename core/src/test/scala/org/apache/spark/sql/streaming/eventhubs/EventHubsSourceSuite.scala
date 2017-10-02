@@ -536,7 +536,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
-      StopStream(recoverStreamId = true, commitPartialOffset = true),
+      StopStream(recoverStreamId = true, commitPartialOffset = true, partialType = "delete"),
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock,
         additionalConfs = Map("eventhubs.test.newSink" -> "true")),
       AddEventHubsData(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400)))

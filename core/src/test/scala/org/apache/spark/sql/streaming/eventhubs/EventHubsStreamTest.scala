@@ -93,7 +93,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   }
 
   /** How long to wait for an active stream to catch up when checking a result. */
-  val streamingTimeout: Span = 60.seconds
+  val streamingTimeout = 60 seconds
 
 
   /** A trait for actions that can be performed while testing a streaming DataFrame. */
@@ -280,7 +280,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
       }
     }
 
-    def isStreamWaitingAt(time: Long): Boolean = synchronized {waitStartTime.contains(time)}
+    def isStreamWaitingAt(time: Long): Boolean = synchronized {waitStartTime contains time}
   }
 
 

@@ -104,9 +104,9 @@ private[eventhubs] class EventHubsReceiver(
   private[eventhubs] class EventHubsMessageHandler() extends Runnable {
 
     // The checkpoint interval defaults to 10 seconds if not provided
-    val checkpointInterval: Long =
-      eventhubsParams.getOrElse("eventhubs.checkpoint.interval", "10").toLong * 1000
-    var nextCheckpointTime: Long = System.currentTimeMillis() + checkpointInterval
+    val checkpointInterval = eventhubsParams.getOrElse("eventhubs.checkpoint.interval", "10")
+      .toLong * 1000
+    var nextCheckpointTime = System.currentTimeMillis() + checkpointInterval
 
     def run() {
       logInfo("Begin EventHubsMessageHandler for partition " + partitionId)

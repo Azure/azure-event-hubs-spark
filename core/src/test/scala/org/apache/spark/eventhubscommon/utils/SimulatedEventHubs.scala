@@ -80,7 +80,7 @@ class TestEventHubsReceiver(
     offsetType: EventHubsOffsetType)
   extends EventHubsClientWrapper {
 
-  val eventHubName: String = eventHubParameters("eventhubs.name")
+  val eventHubName = eventHubParameters("eventhubs.name")
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = eventHubParameters("eventhubs.name")
@@ -233,7 +233,7 @@ class FragileEventHubClient private extends EventHubClient {
 // ugly stuff to make things checkpointable in tests
 object FragileEventHubClient {
 
-  var callIndex: Int = -1
+  var callIndex = -1
   var numBatchesBeforeCrashedEndpoint = 0
   var lastBatchWhenEndpointCrashed = 0
   var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()

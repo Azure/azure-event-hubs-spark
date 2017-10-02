@@ -36,7 +36,7 @@ private[eventhubs] class EventHubsReceiver(
     maximumEventRate: Int) extends Receiver[Array[Byte]](storageLevel) with Logging {
 
   // If offset store is empty we construct one using provided parameters
-  var myOffsetStore = offsetStore.getOrElse(new DfsBasedOffsetStore(
+  val myOffsetStore: OffsetStore = offsetStore.getOrElse(new DfsBasedOffsetStore(
     eventhubsParams("eventhubs.checkpoint.dir"),
     eventhubsParams("eventhubs.namespace"),
     eventhubsParams("eventhubs.name"),
@@ -90,7 +90,7 @@ private[eventhubs] class EventHubsReceiver(
   }
 
   def processReceivedMessagesInBatch(eventDataBatch: Iterable[EventData]): Unit = {
-    store(eventDataBatch.map(x => x.getBody).toIterator)
+    store(eventDataBatch.map(x => x.getBytes).toIterator)
     val maximumSequenceNumber: Long = eventDataBatch.map(x =>
       x.getSystemProperties.getSequenceNumber).reduceLeft { (x, y) => if (x > y) x else y }
 
@@ -104,8 +104,8 @@ private[eventhubs] class EventHubsReceiver(
   private[eventhubs] class EventHubsMessageHandler() extends Runnable {
 
     // The checkpoint interval defaults to 10 seconds if not provided
-    val checkpointInterval = eventhubsParams.getOrElse("eventhubs.checkpoint.interval", "10").
-      toInt * 1000
+    val checkpointInterval = eventhubsParams.getOrElse("eventhubs.checkpoint.interval", "10")
+      .toLong * 1000
     var nextCheckpointTime = System.currentTimeMillis() + checkpointInterval
 
     def run() {
@@ -118,7 +118,7 @@ private[eventhubs] class EventHubsReceiver(
         try {
           val receivedEvents = receiverClient.receive()
           if (receivedEvents != null && receivedEvents.nonEmpty) {
-            val eventCount = receivedEvents.count(x => x.getBodyLength > 0)
+            val eventCount = receivedEvents.count(x => x.getBytes.length > 0)
             val sequenceNumbers = receivedEvents.map(x =>
               x.getSystemProperties.getSequenceNumber)
             if (sequenceNumbers != null && sequenceNumbers.nonEmpty) {

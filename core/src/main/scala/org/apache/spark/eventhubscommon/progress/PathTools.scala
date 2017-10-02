@@ -17,46 +17,54 @@
 
 package org.apache.spark.eventhubscommon.progress
 
+import org.apache.hadoop.fs.Path
+
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
 private[spark] object PathTools extends Serializable {
 
-  private def fromSubDirNamesToString(subDirs: Seq[String]): String = {
+  private def combineDirectoryNames(subDirs: Seq[String]): String =
     subDirs.mkString("/")
-  }
 
-  def progressDirPathStr(progressDir: String, subDirNames: String*): String = {
-    s"$progressDir/${fromSubDirNamesToString(subDirNames)}"
-  }
+  private def combineDirectoryNames(dirs: String*)(implicit u: DummyImplicit): String =
+    dirs.mkString("/")
 
-  def progressTempDirPathStr(progressDir: String, subDirNames: String*): String = {
-    s"$progressDir/${fromSubDirNamesToString(subDirNames)}_temp"
-  }
+  def makeProgressDirectoryStr(progressDir: String, subDirNames: String*): String =
+    s"$progressDir/${combineDirectoryNames(subDirNames)}"
 
-  def progressMetadataDirPathStr(progressDir: String, subDirNames: String*): String = {
-    s"$progressDir/${fromSubDirNamesToString(subDirNames)}_metadata"
-  }
+  def makeProgressDirectoryPath(progressDir: String, subDirNames: String*): Path =
+    new Path(s"$progressDir/${combineDirectoryNames(subDirNames)}")
 
-  def progressTempFileNamePattern(
+  def makeTempDirectoryStr(progressDir: String, subDirNames: String*): String =
+    s"$progressDir/${combineDirectoryNames(subDirNames)}_temp"
+
+  def makeTempDirectoryPath(progressDir: String, subDirNames: String*): Path =
+    new Path(s"$progressDir/${combineDirectoryNames(subDirNames)}_temp")
+
+  def makeMetadataDirectoryStr(progressDir: String, subDirNames: String*): String =
+    s"$progressDir/${combineDirectoryNames(subDirNames)}_metadata"
+
+  def makeMetadataDirectoryPath(progressDir: String, subDirNames: String*): Path =
+    new Path(s"$progressDir/${combineDirectoryNames(subDirNames)}_metadata")
+
+  def makeProgressFileName(timestamp: Long): String =
+    s"progress-$timestamp"
+
+  def makeTempFileName(
       streamId: Int,
       uid: String,
       eventHubNameAndPartition: EventHubNameAndPartition,
-      timestamp: Long): String = {
+      timestamp: Long): String =
     s"$streamId-$uid-$eventHubNameAndPartition-$timestamp"
-  }
 
-  def progressFileNamePattern(timestamp: Long): String = {
-    s"progress-$timestamp"
-  }
-
-  def progressMetadataNamePattern(timestamp: Long): String = timestamp.toString
-
-  def progressTempFileStr(
+  def makeTempFilePath(
       basePath: String,
       streamId: Int,
       uid: String,
       eventHubNameAndPartition: EventHubNameAndPartition,
-      timestamp: Long): String = {
-    basePath + "/" + progressTempFileNamePattern(streamId, uid, eventHubNameAndPartition, timestamp)
-  }
+      timestamp: Long): Path =
+    new Path(s"${combineDirectoryNames(
+      basePath, makeTempFileName(streamId, uid, eventHubNameAndPartition, timestamp))}")
+
+  def makeMetadataFileName(timestamp: Long): String = timestamp.toString
 }

@@ -45,7 +45,7 @@ private[spark] class RestfulEventHubClient(
     eventHubNamespace: String,
     numPartitionsEventHubs: Map[String, Int],
     consumerGroups: Map[String, String],
-    policyKeys: Map[String, Tuple2[String, String]],
+    policyKeys: Map[String, (String, String)],
     threadNum: Int) extends EventHubClient with Logging {
 
   private val RETRY_INTERVAL_SECONDS = Array(8, 16, 32, 64, 128)

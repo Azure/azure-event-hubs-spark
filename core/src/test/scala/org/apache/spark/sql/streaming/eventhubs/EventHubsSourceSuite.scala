@@ -357,8 +357,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     dataSource.map(x => x.toInt + 1)
   }
 
-  test("Verify input row metric is correct when source" +
-    " is started with initial data") {
+  test("Verify input row metric is correct when source is started with initial data") {
     import testImplicits._
     val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(6)

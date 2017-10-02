@@ -56,8 +56,6 @@ private[eventhubscommon] object Implicits {
 
   /**
    * Azure EventHub enabled streaming context
-   *
-   * @param ssc
    */
   class SparkEventHubContext(ssc: StreamingContext) {
     // scalastyle:off

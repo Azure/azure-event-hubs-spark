@@ -93,7 +93,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
   }
 
   /** How long to wait for an active stream to catch up when checking a result. */
-  val streamingTimeout = 60.seconds
+  val streamingTimeout = 60 seconds
 
 
   /** A trait for actions that can be performed while testing a streaming DataFrame. */
@@ -131,7 +131,8 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         isSorted = false)
     }
 
-    def apply(rows: Row*): CheckAnswerRows = CheckAnswerRows(rows, false, false)
+    def apply(rows: Row*): CheckAnswerRows =
+      CheckAnswerRows(rows, lastOnly = false, isSorted = false)
 
     def apply[A : Encoder](partial: Boolean, lastOnly: Boolean, rows: A*): CheckAnswerRows = {
       val encoder = encoderFor[A]
@@ -279,7 +280,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
       }
     }
 
-    def isStreamWaitingAt(time: Long): Boolean = synchronized {waitStartTime == Some(time)}
+    def isStreamWaitingAt(time: Long): Boolean = synchronized {waitStartTime contains time}
   }
 
 
@@ -413,7 +414,7 @@ trait EventHubsStreamTest extends QueryTest with BeforeAndAfter
         timestamp: Long,
         brokenType: String): Unit = {
       val progressDir = progressTracker.progressDirectoryPath.toString
-      val metadataDir = progressTracker.progressMetadataDirectoryPath.toString
+      val metadataDir = progressTracker.metadataDirectoryPath.toString
       val progressFilePath = new Path(s"$progressDir/progress-$timestamp")
       val metadataFilePath = new Path(s"$metadataDir/$timestamp")
       val fs = progressFilePath.getFileSystem(new Configuration())

@@ -18,13 +18,11 @@
 package org.apache.spark.eventhubscommon.utils
 
 import java.time.Instant
-import java.util.{Calendar, Date}
-
-import scala.reflect.ClassTag
+import java.util.Date
 
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
-import com.microsoft.azure.servicebus.amqp.AmqpConstants
+import com.microsoft.azure.eventhubs.amqp.AmqpConstants
 import org.powermock.reflect.Whitebox
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition

@@ -79,7 +79,7 @@ class ReliableEventHubsReceiver(
      * It is guaranteed by Eventhubs that the event data with the highest sequence number has the
      * largest offset
      */
-    blockGenerator.addMultipleDataWithCallback(eventDataBatch.map(x => x.getBody).toIterator,
+    blockGenerator.addMultipleDataWithCallback(eventDataBatch.map(x => x.getBytes).toIterator,
       offsetMetadata)
   }
 

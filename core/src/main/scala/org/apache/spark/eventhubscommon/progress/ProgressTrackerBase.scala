@@ -38,6 +38,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private[spark] lazy val tempDirectoryStr = PathTools.makeTempDirectoryStr(progressDir, appName)
   private[spark] lazy val metadataDirectoryStr = PathTools.makeMetadataDirectoryStr(progressDir,
     appName)
+  protected lazy val progressMetadataDirStr: String = PathTools.progressMetadataDirPathStr(
+    progressDir, appName)
 
   private[spark] lazy val progressDirectoryPath = new Path(progressDirectoryStr)
   private[spark] lazy val tempDirectoryPath = new Path(tempDirectoryStr)

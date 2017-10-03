@@ -37,6 +37,8 @@ private[spark] class StructuredStreamingProgressTracker private[spark](
     appName, uid)
   private[spark] override lazy val metadataDirectoryStr = PathTools.makeMetadataDirectoryStr(
     progressDir, appName, uid)
+  protected override lazy val progressMetadataDirStr: String = PathTools.progressMetadataDirPathStr(
+    progressDir, appName, uid)
 
   override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
     val connector = StructuredStreamingProgressTracker.registeredConnectors(uid)
@@ -63,6 +65,7 @@ private[spark] class StructuredStreamingProgressTracker private[spark](
       val progressDirExist = fs.exists(progressDirectoryPath)
       if (progressDirExist) {
         val (validationPass, latestFile) = validateProgressFile(fs)
+        println(s"${latestFile}")
         if (!validationPass) {
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")

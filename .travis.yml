@@ -7,3 +7,7 @@ jdk:
 
 script:
   - ./run_tests.sh
+
+branches:
+  except:
+  - maven-repo

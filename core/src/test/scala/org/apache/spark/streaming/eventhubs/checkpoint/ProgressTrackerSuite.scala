@@ -343,28 +343,46 @@ class ProgressTrackerSuite extends SharedUtils {
     fs.mkdirs(new Path(progressPath))
 
     // 1000
-    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1", 0 to 0, 0, 1)
-    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2", 0 to 1, 0, 2)
-    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3", 0 to 2, 0, 3)
-    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh11", 0 to 0, 1, 2)
-    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh12", 0 to 1, 2, 3)
-    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13", 0 to 2, 3, 4)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh1",
+      0 to 0, 0, 1)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh2",
+      0 to 1, 0, 2)
+    writeProgressFile(progressPath, 0, fs, 1000L, "namespace1", "eh3",
+      0 to 2, 0, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh11",
+      0 to 0, 1, 2)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh12",
+      0 to 1, 2, 3)
+    writeProgressFile(progressPath, 1, fs, 1000L, "namespace2", "eh13",
+      0 to 2, 3, 4)
 
     // 2000
-    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1", 0 to 0, 1, 2)
-    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh2", 0 to 1, 1, 3)
-    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh3", 0 to 2, 1, 4)
-    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh11", 0 to 0, 2, 3)
-    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh12", 0 to 1, 3, 4)
-    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh13", 0 to 2, 4, 5)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh1",
+      0 to 0, 1, 2)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh2",
+      0 to 1, 1, 3)
+    writeProgressFile(progressPath, 0, fs, 2000L, "namespace1", "eh3",
+      0 to 2, 1, 4)
+    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh11",
+      0 to 0, 2, 3)
+    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh12",
+      0 to 1, 3, 4)
+    writeProgressFile(progressPath, 1, fs, 2000L, "namespace2", "eh13",
+      0 to 2, 4, 5)
 
     // 3000
-    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh1", 0 to 0, 2, 3)
-    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh2", 0 to 1, 2, 4)
-    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh3", 0 to 2, 2, 5)
-    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh11", 0 to 0, 3, 4)
-    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh12", 0 to 1, 4, 5)
-    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh13", 0 to 2, 5, 6)
+    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh1",
+      0 to 0, 2, 3)
+    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh2",
+      0 to 1, 2, 4)
+    writeProgressFile(progressPath, 0, fs, 3000L, "namespace1", "eh3",
+      0 to 2, 2, 5)
+    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh11",
+      0 to 0, 3, 4)
+    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh12",
+      0 to 1, 4, 5)
+    writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh13",
+      0 to 2, 5, 6)
 
     // if latest timestamp is earlier than the specified timestamp,
     // then we shall return the latest offsets

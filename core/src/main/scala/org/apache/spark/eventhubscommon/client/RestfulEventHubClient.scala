@@ -26,7 +26,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import scala.xml.XML
 
-import com.microsoft.azure.servicebus.SharedAccessSignatureTokenProvider
+import com.microsoft.azure.eventhubs.SharedAccessSignatureTokenProvider
 import scalaj.http.{Http, HttpResponse}
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition

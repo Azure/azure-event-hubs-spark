@@ -100,7 +100,7 @@
               <branch>refs/heads/maven-repo</branch>
               <includes><include>**/*</include></includes>
               <repositoryName>spark-eventhubs</repositoryName>
-              <repositoryOwner>hdinsight</repositoryOwner>
+              <repositoryOwner>sabeegrewal</repositoryOwner>
               <merge>true</merge>
             </configuration>
             <executions>
@@ -173,14 +173,14 @@
     </profile>
   </profiles>
   <scm>
-    <connection>scm:git:git:/github.com/hdinsight/spark-eventhubs.git</connection>
-    <developerConnection>scm:git:ssh://github.com/hdinsight/spark-eventhubs.git</developerConnection>
-    <url>https://github.com/hdinsight/spark-eventhubs/tree/master</url>
+    <connection>scm:git:git:/github.com/sabeegrewal/spark-eventhubs.git</connection>
+    <developerConnection>scm:git:ssh://github.com/sabeegrewal/spark-eventhubs.git</developerConnection>
+    <url>https://github.com/sabeegrewal/spark-eventhubs/tree/master</url>
   </scm>
   <packaging>pom</packaging>
   <name>${project.groupId}:${project.artifactId}</name>
   <description>Azure Eventhubs Connector for Spark Streaming Applications</description>
-  <url>https://github.com/hdinsight/spark-eventhubs</url>
+  <url>https://github.com/sabeegrewal/spark-eventhubs</url>
   <dependencies>
     <dependency>
       <groupId>org.apache.spark</groupId>

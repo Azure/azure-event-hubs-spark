@@ -20,10 +20,9 @@ import scala.collection.mutable.ArrayBuffer
 
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
-import com.microsoft.azure.servicebus.amqp.AmqpConstants
+import com.microsoft.azure.eventhubs.amqp.AmqpConstants
 import org.mockito.Mockito._
 import org.mockito.internal.util.reflection.Whitebox
-import org.scalatest.Ignore
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper

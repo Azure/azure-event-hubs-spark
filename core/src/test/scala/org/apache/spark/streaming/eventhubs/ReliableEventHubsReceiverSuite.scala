@@ -23,7 +23,7 @@ import scala.concurrent.duration._
 
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
-import com.microsoft.azure.servicebus.amqp.AmqpConstants
+import com.microsoft.azure.eventhubs.amqp.AmqpConstants
 import org.mockito.internal.util.reflection.Whitebox
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 import org.scalatest.concurrent.Eventually
@@ -47,7 +47,7 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
   private var streamingContext: StreamingContext = _
   private var ehClientWrapperMock: EventHubsClientWrapper = _
   private var offsetStoreMock: OffsetStore = _
-  private var tempDirectory: File = null
+  private var tempDirectory: File = _
 
   private val eventhubParameters = Map[String, String] (
     "eventhubs.policyname" -> "policyname",
@@ -147,10 +147,10 @@ class ReliableEventHubsReceiverSuite extends FunSuite with BeforeAndAfter with B
 class MyMockedEventHubsClientWrapper(
     emitCount: Int,
     exceptionCount: Int) extends EventHubsClientWrapper with MockitoSugar {
-  var offset = -1
+  var offset: Int = -1
   var count = 0
   var partition = "0"
-  var myExceptionCount = exceptionCount
+  var myExceptionCount: Int = exceptionCount
 
   override def createReceiverInternal(
       connectionString: String,

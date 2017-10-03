@@ -46,7 +46,7 @@ import scala.concurrent.duration._
 val streamingQuery = inputStream.writeStream.
   format("parquet").
   outputMode(OutputMode.Append).
-  trigger(Trigger.ProcessingTime(10.seconds)).
+  trigger(Trigger.ProcessingTime(10 seconds)).
   option("checkpointLocation", checkpointLocation).
   option("path", outputPath + "/ETL").
   partitionBy("creationTime").

@@ -31,7 +31,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
 
   override def batchDuration: Duration = Seconds(1)
 
-  val eventhubParameters = Map[String, String] (
+  val eventhubParameters: Map[String, String] = Map(
     "eventhubs.policyname" -> "policyName",
     "eventhubs.policykey" -> "policykey",
     "eventhubs.namespace" -> "eventhubs",

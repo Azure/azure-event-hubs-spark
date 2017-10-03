@@ -17,9 +17,9 @@
 
 package com.microsoft.spark.sql.examples
 
-import org.apache.spark.sql.streaming.ProcessingTime
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.streaming.ProcessingTime
 
 object EventHubsStructuredStreamingExample {
 

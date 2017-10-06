@@ -122,7 +122,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   override def stop(): Unit = {
-    logInfo("DStream.stop: stopping EventHubDirectDStream")
+    logInfo("stop: stopping EventHubDirectDStream")
     eventHubClient.close()
   }
 

@@ -55,4 +55,5 @@ In addition to what has been mentioned, it's important to mention tests! If you 
 - Test code should not contain hard coded values for resource names or similar values
 - Test should not use App.config files for settings
 
-##### We've mentioned it a few times, but, just once more, please feel free to contact us :) Thanks for your interest in the connector! 
+
+#### We've mentioned it a few times, but, just once more, please feel free to contact us :) Thanks for your interest in the connector! 

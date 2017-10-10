@@ -1,5 +1,4 @@
-# Contributor's Guide:
-# Azure Event Hubs + Apache Spark Connector 
+# Contributor's Guide:<br>Azure Event Hubs + Apache Spark Connector 
 
 ## Table of Contents
 

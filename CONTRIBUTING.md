@@ -1,4 +1,5 @@
-# Contributor's Guide for Azure Event Hubs + Apache Spark Connector 
+# Contributor's Guide:
+# Azure Event Hubs + Apache Spark Connector 
 
 ## Table of Contents
 
@@ -19,7 +20,7 @@ This library is relatively easy to build. To build and test this locally, make s
 - Java 1.8 SDK is installed
 - Maven 3.x is installed
 - Scala 2.11.8 is installed
-- A supported version of Apache Spark is installed (see [Latest Releases](../README.md#latest-releases) for supported versions). 
+- A supported version of Apache Spark is installed (see [Latest Releases](/README.md#latest-releases) for supported versions). 
 
 After that, clone the code, import it into a Maven project in your favorite IDE. If the above tools are installed, everything should be build. If that's not the case for you OR you need additional help, just contact us by opening an issue in this repo! 
  
@@ -27,11 +28,13 @@ After that, clone the code, import it into a Maven project in your favorite IDE.
 
 You can find all of the issues that have been filed in the [Issues](https://github.com/Azure/spark-eventhubs/issues) section of the repository.
 
-If you encounter any bugs, would like to request a feature, or have general questions/concerns/comments, feel free to file an issue [here](https://github.com/Azure/azure-event-hubs-java/issues/new). **Don't hesitate to reach out!**
+If you encounter any bugs, would like to request a feature, or have general questions/concerns/comments, feel free to file an issue [here](https://github.com/Azure/spark-eventhubs/issues/new). **Don't hesitate to reach out!**
 
 ## Pull Requests
 
-If you would like to make changes to this library, **break up the change into small, logical, testable chunks, and organize your pull requests accordingly**. This makes for a cleaner, less error-prone development process. If you'd like to get involved, and want some guidance on what needs attention, just reach out to us by opening an issue! All contributions are welcome :) 
+If you would like to make changes to this library, **break up the change into small, logical, testable chunks, and organize your pull requests accordingly**. This makes for a cleaner, less error-prone development process. 
+
+If you'd like to get involved, but don't know what to work on, then just reach out to us by opening an issue! All contributions/efforts are welcome :) 
 
 You can find all of the pull requests that have been opened in the [Pull Request](https://github.com/Azure/azure-event-hubs-java/pulls) section of the repository.
 

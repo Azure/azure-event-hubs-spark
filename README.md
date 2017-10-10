@@ -14,7 +14,7 @@ This is the source code for the Azure Event Hubs and Apache Spark Connector.
 
 Azure Event Hubs is a highly scalable publish-subscribe service that can ingest millions of events per second and stream them into multiple applications. Spark Streaming and Structured Streaming are scalable and fault-tolerant stream processing engines that allow users to process huge amounts of data using complex algorithms expressed with high-level functions like ```map```, ```reduce```, ```join```, and ```window```. This data can then be pushed to filesystems, databases, or even back to Event Hubs.  
 
-By making Event Hubs and Spark easier to use together, this connector hopes to make building scalable, fault-tolerant applications easier for our users. 
+By making Event Hubs and Spark easier to use together, we hope this connector makes building scalable, fault-tolerant applications easier for our users. 
 
 ## Latest Releases
 |Spark Version|Package Name|Package Version|
@@ -26,24 +26,24 @@ By making Event Hubs and Spark easier to use together, this connector hopes to m
 [Change Log](docs/change_log.md)
 
 ## Overview
-The best place to start when using this library is to make sure you're acquainted with Azure Event Hubs and Apache Spark. You can read Azure Event Hubs documentation [here](), documentation for Spark Streaming [here](), and, last but not least, Structured Streaming [here](). 
+The best place to start when using this library is to **make sure you're acquainted with Azure Event Hubs and Apache Spark**. You can read Azure Event Hubs documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, last but not least, Structured Streaming [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 
 
 #### Using the Connector 
-Documentation for our connector can be found [here](docs/README.md) which includes a Getting Started guide. Additionally, there're examples using this library [here](https://github.com/hdinsight/spark-eventhubs/examples). 
+Documentation for our connector can be found [here](docs/README.md) which **includes a Getting Started guide**. Additionally, there're examples using this library [here](https://github.com/hdinsight/spark-eventhubs/examples). 
 
 #### Further Assistance 
-If you need additional assistance, please don't hesitate to ask! Just open an issue, and one of the repo owners will get back to you ASAP. :) 
+If you need additional assistance, please don't hesitate to ask! Just open an issue, and one of the repo owners will get back to you ASAP. :) Feedback, feature requests, bug reports, etc are all welcomed!
 
 ## Using the library
-In general, you should not need to build this library yourself. If you'd like to help contribute (we'd love to have your help :) ), then building the source and running tests is certainly necessary. You can go to our [Contributor's Guide](/CONTRIBUTING.md) for all of that information and more. 
+In general, you should not need to build this library yourself. If you'd like to help contribute (we'd love to have your help :) ), then building the source and running tests is certainly necessary. You can go to our [Contributor's Guide](/CONTRIBUTING.md) for that information and more. 
 
-This library is available for use in Maven projects from the Maven Central Repository, and can be referenced using the following dependency declaration. Be sure to see the [Latest Releases](#latest-releases) above to find the package name and package version that works with your version of Apache Spark!
+This library is available for use in Maven projects from the Maven Central Repository, and can be referenced using the following dependency declaration. Be sure to see the [Latest Releases](#latest-releases) to find the package name and package version that works with your version of Apache Spark!
 
 ```XML
     <dependency>
         <groupId>com.microsoft.azure</groupId>
-        <artifactId>spark-streaming-eventhubs_2.XX</artifactId>
-        <version>LATEST</version>
+        <artifactId>spark-streaming-eventhubs_[2.XX]</artifactId>
+        <version>[LATEST]</version>
     </dependency>
 	
 	<!--- The correct artifactId and version can be found
@@ -54,7 +54,7 @@ This library is available for use in Maven projects from the Maven Central Repos
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
     libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_[2.XX]" % "[LATEST]"
 
-### Getting Staging Version
+### Getting the Staging Version
 We also publish a staging version of the Spark-EventHubs connector in GitHub. To use the staging version of Spark-EventHubs, two things needed to be added to your pom.xml. First add a new repository like so:
 
 ```XML
@@ -84,11 +84,13 @@ Then add the following dependency declaration:
 
 ## Build Prerequisites
 
-In order to build and run the examples, you need to have:
+In order to use the connector, you need to have:
 
 1. Java 1.8 SDK.
 2. Maven 3.x
 3. Scala 2.11
+
+More details on building from source and running tests can be found in our [Contributor's Guide](CONTRIBUTING.md). 
 
 ## Build Command
     mvn clean

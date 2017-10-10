@@ -4,7 +4,7 @@
 
 # Azure EventHubs + Apache Spark Connector 
 
-|Build|Status|
+|Branch|Status|
 |------|-------------|
 |master|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=master)](https://travis-ci.org/Azure/spark-eventhubs)|
 |2.1.x|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=2.1.x)](https://travis-ci.org/Azure/spark-eventhubs)|
@@ -29,10 +29,10 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 The best place to start when using this library is to **make sure you're acquainted with Azure Event Hubs and Apache Spark**. You can read Azure Event Hubs documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, last but not least, Structured Streaming [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 
 
 #### Using the Connector 
-Documentation for our connector can be found [here](docs/README.md) which **includes a Getting Started guide**. Additionally, there're examples using this library [here](https://github.com/hdinsight/spark-eventhubs/examples). 
+Documentation for our connector can be found [here](docs/) which **includes a Getting Started guide**. Additionally, there're examples using this library [here](https://github.com/hdinsight/spark-eventhubs/examples). 
 
 #### Further Assistance 
-If you need additional assistance, please don't hesitate to ask! Just open an issue, and one of the repo owners will get back to you ASAP. :) Feedback, feature requests, bug reports, etc are all welcomed!
+**If you need additional assistance, please don't hesitate to ask!** Just open an issue, and one of the repo owners will get back to you ASAP. :) Feedback, feature requests, bug reports, etc are all welcomed!
 
 ## Using the library
 In general, you should not need to build this library yourself. If you'd like to help contribute (we'd love to have your help :) ), then building the source and running tests is certainly necessary. You can go to our [Contributor's Guide](/CONTRIBUTING.md) for that information and more. 

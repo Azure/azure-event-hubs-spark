@@ -35,7 +35,7 @@ Documentation for our connector can be found [here](docs/) which **includes a Ge
 **If you need additional assistance, please don't hesitate to ask!** Just open an issue, and one of the repo owners will get back to you ASAP. :) Feedback, feature requests, bug reports, etc are all welcomed!
 
 ## Using the library
-In general, you should not need to build this library yourself. If you'd like to help contribute (we'd love to have your help :) ), then building the source and running tests is certainly necessary. You can go to our [Contributor's Guide](/CONTRIBUTING.md) for that information and more. 
+In general, you should not need to build this library yourself. If you'd like to help contribute (we'd love to have your help :) ), then building the source and running tests is certainly necessary. You can go to our [Contributor's Guide](/.github/CONTRIBUTING.md) for that information and more. 
 
 This library is available for use in Maven projects from the Maven Central Repository, and can be referenced using the following dependency declaration. Be sure to see the [Latest Releases](#latest-releases) to find the package name and package version that works with your version of Apache Spark!
 
@@ -90,7 +90,7 @@ In order to use the connector, you need to have:
 2. Maven 3.x
 3. Scala 2.11
 
-More details on building from source and running tests can be found in our [Contributor's Guide](CONTRIBUTING.md). 
+More details on building from source and running tests can be found in our [Contributor's Guide](/.github/CONTRIBUTING.md). 
 
 ## Build Command
     mvn clean

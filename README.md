@@ -1,4 +1,4 @@
-# spark-eventhubs [![Build Status](https://travis-ci.org/sabeegrewal/spark-eventhubs.svg?branch=master)](https://travis-ci.org/sabeegrewal/spark-eventhubs)
+# spark-eventhubs [![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=master)](https://travis-ci.org/Azure/spark-eventhubs)
 This is the source code of EventHubsReceiver for Spark Streaming.
 
 [Here](https://github.com/hdinsight/spark-eventhubs/tree/master/examples) are the examples that use this library to process streaming data from Azure Eventhubs.
@@ -39,7 +39,7 @@ We will also publish the staging version of Spark-EventHubs in GitHub. To use th
 ```xml
 <repository>
       <id>spark-eventhubs</id>
-      <url>https://raw.github.com/sabeegrewal/spark-eventhubs/maven-repo/</url>
+      <url>https://raw.github.com/Azure/spark-eventhubs/maven-repo/</url>
       <snapshots>
         <enabled>true</enabled>
         <updatePolicy>always</updatePolicy>

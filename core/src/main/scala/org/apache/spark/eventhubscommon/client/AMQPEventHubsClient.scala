@@ -125,6 +125,7 @@ private[client] class AMQPEventHubsClient(
    * close this client
    */
   override def close(): Unit = {
+    logInfo("close: Closing AMQPEventHubClient.")
     for ((_, ehClient) <- ehNameToClient) {
       ehClient.closeSync()
     }

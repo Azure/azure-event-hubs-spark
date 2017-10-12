@@ -173,14 +173,14 @@
     </profile>
   </profiles>
   <scm>
-    <connection>scm:git:git:/github.com/sabeegrewal/spark-eventhubs.git</connection>
-    <developerConnection>scm:git:ssh://github.com/sabeegrewal/spark-eventhubs.git</developerConnection>
-    <url>https://github.com/sabeegrewal/spark-eventhubs/tree/master</url>
+    <connection>scm:git:git:/github.com/Azure/spark-eventhubs.git</connection>
+    <developerConnection>scm:git:ssh://github.com/Azure/spark-eventhubs.git</developerConnection>
+    <url>https://github.com/Azure/spark-eventhubs/tree/master</url>
   </scm>
   <packaging>pom</packaging>
   <name>${project.groupId}:${project.artifactId}</name>
   <description>Azure Eventhubs Connector for Spark Streaming Applications</description>
-  <url>https://github.com/sabeegrewal/spark-eventhubs</url>
+  <url>https://github.com/Azure/spark-eventhubs</url>
   <dependencies>
     <dependency>
       <groupId>org.apache.spark</groupId>
@@ -196,7 +196,7 @@
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
-      <version>0.15.0</version>
+      <version>0.15.1</version>
     </dependency>
     <dependency>
       <groupId>org.scalaj</groupId>

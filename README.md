@@ -29,7 +29,7 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 The best place to start when using this library is to **make sure you're acquainted with Azure Event Hubs and Apache Spark**. You can read Azure Event Hubs documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, last but not least, Structured Streaming [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 
 
 #### Using the Connector 
-Documentation for our connector can be found [here](docs/) which **includes a Getting Started guide**. Additionally, there're examples using this library [here](https://github.com/hdinsight/spark-eventhubs/examples). 
+Documentation for our connector can be found [here](docs/) which **includes a Getting Started guide**. Additionally, there're examples using this library [here](/examples). 
 
 #### Further Assistance 
 **If you need additional assistance, please don't hesitate to ask!** Just open an issue, and one of the repo owners will get back to you ASAP. :) Feedback, feature requests, bug reports, etc are all welcomed!

@@ -31,8 +31,8 @@
   </licenses>
   <developers>
     <developer>
-      <name>Arijit Tarafdar</name>
-      <email>arijitt@microsoft.com</email>
+      <name>Sabee Grewal</name>
+      <email>sagrewal@microsoft.com</email>
       <organization>Microsoft Corporation</organization>
       <organizationUrl>http://www.microsoft.com</organizationUrl>
     </developer>
@@ -100,7 +100,7 @@
               <branch>refs/heads/maven-repo</branch>
               <includes><include>**/*</include></includes>
               <repositoryName>spark-eventhubs</repositoryName>
-              <repositoryOwner>sabeegrewal</repositoryOwner>
+              <repositoryOwner>Azure</repositoryOwner>
               <merge>true</merge>
             </configuration>
             <executions>

@@ -73,23 +73,21 @@ class SimulatedEventHubs(
 }
 
 class TestEventHubsReceiver(
-    eventHubParameters: Map[String, String],
+    ehParams: Map[String, String],
     eventHubs: SimulatedEventHubs,
     partitionId: Int,
     startOffset: Long,
     offsetType: EventHubsOffsetType)
-  extends EventHubsClientWrapper {
-
-  val eventHubName = eventHubParameters("eventhubs.name")
+  extends EventHubsClientWrapper(Map(ehParams.get("eventhubs.name").toString -> ehParams)) {
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val eventHubName = eventHubParameters("eventhubs.name")
+    val eventHubName = ehParams("eventhubs.name")
     if (offsetType != EventHubsOffsetTypes.InputTimeOffset) {
       eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
         expectedEventNum)
     } else {
       eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
-        eventHubParameters("eventhubs.filter.enqueuetime").toLong, expectedEventNum)
+        ehParams("eventhubs.filter.enqueuetime").toLong, expectedEventNum)
     }
   }
 }

@@ -307,32 +307,6 @@
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
       <plugin>
-        <groupId>org.lucidchart</groupId>
-        <artifactId>scalafmt-api</artifactId>
-        <version>1.12</version>
-        <configuration>
-          <verbose>false</verbose>
-          <failOnViolation>true</failOnViolation>
-          <includeTestSourceDirectory>true</includeTestSourceDirectory>
-          <failOnWarning>false</failOnWarning>
-          <sourceDirectories>
-            <dir>${basedir}/core/src/main/scala</dir>
-            <dir>${basedir}/examples/src/main/scala</dir>
-          </sourceDirectories>
-          <testSourceDirectory>${basedir}/core/src/test/scala</testSourceDirectory>
-          <configLocation>.scalafmt.conf</configLocation>
-          <outputFile>${project.basedir}/scalafmt-output.xml</outputFile>
-          <outputEncoding>UTF-8</outputEncoding>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
         <version>2.15.2</version>

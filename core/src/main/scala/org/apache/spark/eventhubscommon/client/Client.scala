@@ -22,34 +22,31 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 private[spark] trait Client extends Serializable {
 
   /**
-    * return the start seq number of each partition
-    * @return a map from eventhubName-partition to seq
-    */
-  def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List())
+   * return the start seq number of each partition
+   * @return a map from eventhubName-partition to seq
+   */
+  def startSeqOfPartition(retryIfFail: Boolean,
+                          targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List())
     : Option[Map[EventHubNameAndPartition, Long]]
 
   /**
-    * return the end point of each partition
-    * @return a map from eventhubName-partition to (offset, seq)
-    */
-  def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List())
+   * return the end point of each partition
+   * @return a map from eventhubName-partition to (offset, seq)
+   */
+  def endPointOfPartition(retryIfFail: Boolean,
+                          targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List())
     : Option[Map[EventHubNameAndPartition, (Long, Long)]]
 
   /**
-    * return the last enqueueTime of each partition
-    * @return a map from eventHubsNamePartition to EnqueueTime
-    */
-  def lastEnqueueTimeOfPartitions(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+   * return the last enqueueTime of each partition
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  def lastEnqueueTimeOfPartitions(retryIfFail: Boolean,
+                                  targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
     : Option[Map[EventHubNameAndPartition, Long]]
 
   /**
-    * close this client
-    */
+   * close this client
+   */
   def close(): Unit
 }

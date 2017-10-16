@@ -26,8 +26,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**
-  * Wraps a raw EventHubReceiver to make it easier for unit tests
-  */
+ * Wraps a raw EventHubReceiver to make it easier for unit tests
+ */
 @SerialVersionUID(1L)
 private[spark] class EventHubsClientWrapper(
     ehParams: Map[String, Map[String, String]]
@@ -45,13 +45,10 @@ private[spark] class EventHubsClientWrapper(
   private val ehPolicyName = ehParams("eventhubs.policyname").toString
   private val ehPolicy = ehParams("eventhubs.policykey").toString
 
-  private val connectionString = new ConnectionStringBuilder(ehNamespace,
-                                                             ehName,
-                                                             ehPolicyName,
-                                                             ehPolicy).toString
+  private val connectionString =
+    new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
   private val consumerGroup = ehParams
-    .getOrElse("eventhubs.consumergroup",
-               EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
+    .getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
     .toString
   private val receiverEpoch = ehParams
     .getOrElse("eventhubs.epoch", DEFAULT_RECEIVER_EPOCH.toString)
@@ -61,9 +58,8 @@ private[spark] class EventHubsClientWrapper(
   var eventhubsClient: EventHubClient = _
   private var eventhubsReceiver: PartitionReceiver = _
 
-  private def configureStartOffset(
-      eventhubsParams: Predef.Map[String, String],
-      offsetStore: OffsetStore): (EventHubsOffsetType, String) = {
+  private def configureStartOffset(eventhubsParams: Predef.Map[String, String],
+                                   offsetStore: OffsetStore): (EventHubsOffsetType, String) = {
     // Determine the offset to start receiving data
     val previousOffset = offsetStore.read()
     EventHubsClientWrapper.configureStartOffset(previousOffset, eventhubsParams)
@@ -82,10 +78,10 @@ private[spark] class EventHubsClientWrapper(
   }
 
   /**
-    * create a client without initializing receivers
-    *
-    * the major purpose of this API is for creating AMQP management client
-    */
+   * create a client without initializing receivers
+   *
+   * the major purpose of this API is for creating AMQP management client
+   */
   def createClient(eventhubsParams: Map[String, String]): EventHubClient =
     EventHubClient.createFromConnectionStringSync(connectionString.toString)
 
@@ -94,9 +90,7 @@ private[spark] class EventHubsClientWrapper(
                      offsetType: EventHubsOffsetType,
                      maximumEventRate: Int): Unit = {
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
-    createReceiverInternal(partitionId,
-                           offsetType,
-                           startOffset)
+    createReceiverInternal(partitionId, offsetType, startOffset)
   }
 
   def createReceiver(ehParams: Map[String, String],
@@ -105,19 +99,15 @@ private[spark] class EventHubsClientWrapper(
                      maximumEventRate: Int): Unit = {
     val (offsetType, currentOffset) =
       configureStartOffset(ehParams, offsetStore)
-    logInfo(
-      s"start a receiver for partition $partitionId with the start offset $currentOffset")
+    logInfo(s"start a receiver for partition $partitionId with the start offset $currentOffset")
     MAXIMUM_EVENT_RATE = configureMaxEventRate(maximumEventRate)
-    createReceiverInternal(partitionId,
-                           offsetType,
-                           currentOffset)
+    createReceiverInternal(partitionId, offsetType, currentOffset)
   }
 
   private[spark] def createReceiverInternal(partitionId: String,
                                             offsetType: EventHubsOffsetType,
                                             currentOffset: String): Unit = {
-    eventhubsClient =
-      EventHubClient.createFromConnectionStringSync(connectionString)
+    eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
 
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint |
@@ -128,22 +118,18 @@ private[spark] class EventHubsClientWrapper(
                                                   currentOffset,
                                                   receiverEpoch)
         } else {
-          eventhubsClient.createReceiverSync(consumerGroup,
-                                             partitionId,
-                                             currentOffset)
+          eventhubsClient.createReceiverSync(consumerGroup, partitionId, currentOffset)
         }
       case EventHubsOffsetTypes.InputTimeOffset =>
         if (receiverEpoch > DEFAULT_RECEIVER_EPOCH) {
-          eventhubsClient.createEpochReceiverSync(
-            consumerGroup,
-            partitionId,
-            Instant.ofEpochSecond(currentOffset.toLong),
-            receiverEpoch)
+          eventhubsClient.createEpochReceiverSync(consumerGroup,
+                                                  partitionId,
+                                                  Instant.ofEpochSecond(currentOffset.toLong),
+                                                  receiverEpoch)
         } else {
-          eventhubsClient.createReceiverSync(
-            consumerGroup,
-            partitionId,
-            Instant.ofEpochSecond(currentOffset.toLong))
+          eventhubsClient.createReceiverSync(consumerGroup,
+                                             partitionId,
+                                             Instant.ofEpochSecond(currentOffset.toLong))
         }
     }
 
@@ -151,9 +137,9 @@ private[spark] class EventHubsClientWrapper(
   }
 
   /**
-    * starting from EventHubs client 0.13.1, returning a null from receiver means that there is
-    * no message in server end
-    */
+   * starting from EventHubs client 0.13.1, returning a null from receiver means that there is
+   * no message in server end
+   */
   def receive(expectedEventNum: Int): Iterable[EventData] = {
     val events = eventhubsReceiver
       .receive(math.min(expectedEventNum, eventhubsReceiver.getPrefetchCount))
@@ -170,9 +156,8 @@ private[spark] class EventHubsClientWrapper(
     eventhubsReceiver.closeSync()
   }
 
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubsNameAndPartitions: List[EventHubNameAndPartition])
+  override def endPointOfPartition(retryIfFail: Boolean,
+                                   targetEventHubsNameAndPartitions: List[EventHubNameAndPartition])
     : Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     throw new UnsupportedOperationException(
       "endPointOfPartition is not supported by this client" +
@@ -180,10 +165,10 @@ private[spark] class EventHubsClientWrapper(
   }
 
   /**
-    * return the last enqueueTime of each partition
-    *
-    * @return a map from eventHubsNamePartition to EnqueueTime
-    */
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
   override def lastEnqueueTimeOfPartitions(
       retryIfFail: Boolean,
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
@@ -194,13 +179,12 @@ private[spark] class EventHubsClientWrapper(
   }
 
   /**
-    * return the start seq number of each partition
-    *
-    * @return a map from eventhubName-partition to seq
-    */
-  override def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+   * return the start seq number of each partition
+   *
+   * @return a map from eventhubName-partition to seq
+   */
+  override def startSeqOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
     : Option[Predef.Map[EventHubNameAndPartition, Long]] = {
     throw new UnsupportedOperationException(
       "startSeqOfPartition is not supported by this client" +
@@ -211,16 +195,13 @@ private[spark] class EventHubsClientWrapper(
 private[spark] object EventHubsClientWrapper {
   private[eventhubscommon] def configureStartOffset(
       previousOffset: String,
-      eventhubsParams: Predef.Map[String, String])
-    : (EventHubsOffsetType, String) = {
+      eventhubsParams: Predef.Map[String, String]): (EventHubsOffsetType, String) = {
     if (previousOffset != "-1" && previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
     } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset,
-       eventhubsParams("eventhubs.filter.offset"))
+      (EventHubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
     } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
-      (EventHubsOffsetTypes.InputTimeOffset,
-       eventhubsParams("eventhubs.filter.enqueuetime"))
+      (EventHubsOffsetTypes.InputTimeOffset, eventhubsParams("eventhubs.filter.enqueuetime"))
     } else {
       (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
     }
@@ -234,9 +215,9 @@ private[spark] object EventHubsClientWrapper {
     val ehName = ehParams.get("eventhubs.name").toString
     val eventHubClientWrapperInstance = new EventHubsClientWrapper(Map(ehName -> ehParams))
     eventHubClientWrapperInstance.createReceiver(partitionId.toString,
-                                                startOffset.toString,
-                                                offsetType,
-                                                maximumEventRate)
+                                                 startOffset.toString,
+                                                 offsetType,
+                                                 maximumEventRate)
     eventHubClientWrapperInstance
   }
 }

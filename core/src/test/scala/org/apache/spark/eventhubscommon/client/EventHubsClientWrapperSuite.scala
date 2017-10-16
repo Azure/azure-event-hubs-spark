@@ -16,21 +16,18 @@
  */
 package org.apache.spark.eventhubscommon.client
 
-import org.mockito.{Matchers, Mockito}
+import org.mockito.{ Matchers, Mockito }
 import org.mockito.Mockito._
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.{ BeforeAndAfter, FunSuite }
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**
-  * Test suite for EventHubsClientWrapper
-  */
-class EventHubsClientWrapperSuite
-    extends FunSuite
-    with BeforeAndAfter
-    with MockitoSugar {
+ * Test suite for EventHubsClientWrapper
+ */
+class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
   var ehClientWrapperMock: EventHubsClientWrapper = _
   var offsetStoreMock: OffsetStore = _
   val ehParams: Map[String, String] = Map(
@@ -44,21 +41,19 @@ class EventHubsClientWrapperSuite
   )
 
   before {
-    ehClientWrapperMock =
-      spy(new EventHubsClientWrapper(Map("name" -> ehParams)))
+    ehClientWrapperMock = spy(new EventHubsClientWrapper(Map("name" -> ehParams)))
     offsetStoreMock = mock[OffsetStore]
   }
 
-  test(
-    "EventHubsClientWrapper converts parameters correctly when offset was previously saved") {
+  test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {
     Mockito.when(offsetStoreMock.read()).thenReturn("2147483647")
     Mockito
       .doNothing()
       .when(ehClientWrapperMock)
-      .createReceiverInternal(Matchers.anyString,
-                              Matchers.eq[EventHubsOffsetType](
-                                EventHubsOffsetTypes.PreviousCheckpoint),
-                              Matchers.anyString)
+      .createReceiverInternal(
+        Matchers.anyString,
+        Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.PreviousCheckpoint),
+        Matchers.anyString)
 
     ehClientWrapperMock.createReceiver(ehParams, "4", offsetStoreMock, 999)
 

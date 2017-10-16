@@ -19,48 +19,44 @@ package org.apache.spark.streaming.eventhubs
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{Client, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
 object EventHubsUtils {
 
   /**
-    * Return an initialized SparkConf that registered
-    * Azure Eventhubs client's internal classes with Kryo serializer
-    *
-    * @return SparkConf
-    */
+   * Return an initialized SparkConf that registered
+   * Azure Eventhubs client's internal classes with Kryo serializer
+   *
+   * @return SparkConf
+   */
   def initializeSparkStreamingConfigurations: SparkConf = {
     new SparkConf().registerKryoClasses(Array(classOf[EventData]))
   }
 
   /**
-    * create direct stream based on eventhubs
-    * @param ssc the streaming context this stream belongs to
-    * @param eventHubNamespace the namespace of eventhubs
-    * @param progressDir the checkpoint directory path (we only support HDFS-based checkpoint
-    *                      storage for now, so you have to prefix your path with hdfs://clustername/
-    * @param eventParams the parameters of your eventhub instances, format:
-    *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
-    */
+   * create direct stream based on eventhubs
+   * @param ssc the streaming context this stream belongs to
+   * @param eventHubNamespace the namespace of eventhubs
+   * @param progressDir the checkpoint directory path (we only support HDFS-based checkpoint
+   *                      storage for now, so you have to prefix your path with hdfs://clustername/
+   * @param eventParams the parameters of your eventhub instances, format:
+   *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
+   */
   def createDirectStreams(
       ssc: StreamingContext,
       eventHubNamespace: String,
       progressDir: String,
-      eventParams: Predef.Map[String, Predef.Map[String, String]])
-    : EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc,
-                                              eventHubNamespace,
-                                              progressDir,
-                                              eventParams)
+      eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
+    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
     newStream
   }
 
   /**
-    * internal API to test, by default, we do not allow user to change eventhubsReceiverCreator and
-    * eventHubsClientCreator
-    */
+   * internal API to test, by default, we do not allow user to change eventhubsReceiverCreator and
+   * eventHubsClientCreator
+   */
   private[eventhubs] def createDirectStreams(
       ssc: StreamingContext,
       eventHubNamespace: String,
@@ -72,9 +68,7 @@ object EventHubsUtils {
                                  EventHubsOffsetType,
                                  Int) => EventHubsClientWrapper =
         EventHubsClientWrapper.getEventHubReceiver,
-      eventHubsClientCreator: (
-          String,
-          Predef.Map[String, Predef.Map[String, String]]) => Client)
+      eventHubsClientCreator: (String, Predef.Map[String, Predef.Map[String, String]]) => Client)
     : EventHubDirectDStream = {
     val newStream = new EventHubDirectDStream(ssc,
                                               eventHubNamespace,

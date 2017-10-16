@@ -17,7 +17,6 @@
 
 package org.apache.spark.eventhubscommon.rdd
 
-// scalastyle:off
 import scala.collection.mutable.ListBuffer
 
 import com.microsoft.azure.eventhubs.EventData
@@ -30,7 +29,6 @@ import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOff
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, SparkContext, TaskContext}
-// scalastyle:on
 
 private class EventHubRDDPartition(
     val sparkPartitionId: Int,

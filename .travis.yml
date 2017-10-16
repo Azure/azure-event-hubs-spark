@@ -1,13 +1,17 @@
 language: scala
 scala:
-   - 2.11.8
+    - 2.11.8
 
 jdk:
-  - oraclejdk8
+    - oraclejdk8
 
 script:
-  - ./run_tests.sh
+    - ./run_tests.sh
 
 branches:
-  except:
-  - maven-repo
+    only:
+        - master
+        - 2.1.x
+        - 2.0.x
+    except:
+        - maven-repo

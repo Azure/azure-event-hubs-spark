@@ -16,7 +16,6 @@
  */
 package org.apache.spark.eventhubscommon.client
 
-import com.microsoft.azure.eventhubs._
 import org.mockito.{Matchers, Mockito}
 import org.mockito.Mockito._
 import org.scalatest.{BeforeAndAfter, FunSuite}

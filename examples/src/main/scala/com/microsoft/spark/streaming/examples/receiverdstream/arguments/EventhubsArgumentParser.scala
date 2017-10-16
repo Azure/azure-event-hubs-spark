@@ -42,7 +42,6 @@ object EventhubsArgumentParser {
     val timeoutInMinutes: Long = -1
 
     println()
-    // scalastyle:off
     println(s"Usage [EventhubsEventCount]: spark-submit --master yarn-cluster ..." +
       s" --class com.microsoft.spark.streaming.examples.EventHubsEventCount" +
       s" /home/hdiuser/spark/SparkStreamingDataPersistence.jar --eventhubs-namespace \'$eventhubsNamespace\'" +
@@ -128,8 +127,6 @@ object EventhubsArgumentParser {
         sys.exit(1)
     }
   }
-
-  // scalastyle:on
 
   def verifyEventhubsEventCountArguments(argumentMap : ArgumentMap): Unit = {
 

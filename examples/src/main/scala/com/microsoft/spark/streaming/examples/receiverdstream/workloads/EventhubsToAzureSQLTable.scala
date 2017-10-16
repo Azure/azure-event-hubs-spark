@@ -32,7 +32,6 @@ object EventhubsToAzureSQLTable {
 
   def createStreamingContext(inputOptions: ArgumentMap): StreamingContext = {
 
-    // scalastyle:off
     val eventHubsParameters = Map[String, String](
       "eventhubs.namespace" -> inputOptions(Symbol(EventhubsArgumentKeys.EventhubsNamespace)).asInstanceOf[String],
       "eventhubs.name" -> inputOptions(Symbol(EventhubsArgumentKeys.EventhubsName)).asInstanceOf[String],
@@ -45,7 +44,6 @@ object EventhubsToAzureSQLTable {
       .asInstanceOf[Int].toString,
       "eventhubs.checkpoint.dir" -> inputOptions(Symbol(EventhubsArgumentKeys.CheckpointDirectory)).asInstanceOf[String]
     )
-    // scalastyle:on
 
     val sqlDatabaseConnectionString : String = StreamUtilities.getSqlJdbcConnectionString(
       inputOptions(Symbol(EventhubsArgumentKeys.SQLServerFQDN)).asInstanceOf[String],

@@ -26,10 +26,8 @@ import org.apache.spark.streaming.scheduler.OutputOperationInfo
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 
-// scalastyle:off
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.scheduler.{BatchInfo, StreamInputInfo, StreamingListenerBatchCompleted}
-// scalastyle:on
 
 class ProgressTrackingListenerSuite extends SharedUtils {
 

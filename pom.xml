@@ -307,9 +307,9 @@
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
       <plugin>
-        <groupId>org.scalastyle</groupId>
-        <artifactId>scalastyle-maven-plugin</artifactId>
-        <version>0.8.0</version>
+        <groupId>org.lucidchart</groupId>
+        <artifactId>scalafmt-api</artifactId>
+        <version>1.12</version>
         <configuration>
           <verbose>false</verbose>
           <failOnViolation>true</failOnViolation>
@@ -320,8 +320,8 @@
             <dir>${basedir}/examples/src/main/scala</dir>
           </sourceDirectories>
           <testSourceDirectory>${basedir}/core/src/test/scala</testSourceDirectory>
-          <configLocation>scalastyle-config.xml</configLocation>
-          <outputFile>${project.basedir}/scalastyle-output.xml</outputFile>
+          <configLocation>.scalafmt.conf</configLocation>
+          <outputFile>${project.basedir}/scalafmt-output.xml</outputFile>
           <outputEncoding>UTF-8</outputEncoding>
         </configuration>
         <executions>

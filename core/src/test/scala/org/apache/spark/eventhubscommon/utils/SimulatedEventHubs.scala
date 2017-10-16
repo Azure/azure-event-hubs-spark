@@ -22,7 +22,7 @@ import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{Client, EventHubsClientWrapper, EventHubsOffsetTypes}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
@@ -95,7 +95,7 @@ class TestEventHubsReceiver(
 }
 
 class SimulatedEventHubsRestClient(
-    eventHubs: SimulatedEventHubs) extends EventHubClient {
+    eventHubs: SimulatedEventHubs) extends Client {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -141,7 +141,7 @@ class SimulatedEventHubsRestClient(
 
 class TestRestEventHubClient(
     latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
-  extends EventHubClient {
+  extends Client {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -183,7 +183,7 @@ class TestRestEventHubClient(
   }
 }
 
-class FragileEventHubClient private extends EventHubClient {
+class FragileEventHubClient private extends Client {
 
   override def endPointOfPartition(
       retryIfFail: Boolean,
@@ -249,7 +249,7 @@ class FluctuatedEventHubClient(
     ssc: StreamingContext,
     messagesBeforeEmpty: Long,
     numBatchesBeforeNewData: Int,
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends Client {
 
   private var callIndex = -1
 

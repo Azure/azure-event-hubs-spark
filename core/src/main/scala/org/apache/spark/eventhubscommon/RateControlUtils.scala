@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubscommon
 
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{Client, EventHubsClientWrapper, EventHubsOffsetTypes}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
@@ -71,9 +71,9 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def fetchLatestOffset(
-      eventHubClient: EventHubClient,
-      retryIfFail: Boolean,
-      fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)]):
+                                        eventHubClient: Client,
+                                        retryIfFail: Boolean,
+                                        fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)]):
     Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     val r = eventHubClient.endPointOfPartition(
       retryIfFail, fetchedHighestOffsetsAndSeqNums.keySet.toList)
@@ -91,9 +91,10 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def validateFilteringParams(
-      eventHubsClient: EventHubClient,
+      eventHubsClient: Client,
       eventhubsParams: Map[String, _],
       ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
+
     // first check if the parameters are valid
     val latestEnqueueTimeOfPartitions = eventHubsClient.lastEnqueueTimeOfPartitions(
       retryIfFail = true, ehNameAndPartitions)
@@ -119,7 +120,8 @@ private[spark] object RateControlUtils extends Logging {
   private[spark] def composeFromOffsetWithFilteringParams(
       eventhubsParams: Map[String, _],
       fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)]):
-    Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
+  Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
+
     fetchedStartOffsetsInNextBatch.map {
       case (ehNameAndPartition, (offset, seq)) =>
         val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(

@@ -19,7 +19,7 @@ package org.apache.spark.eventhubscommon.client
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 
-private[spark] trait EventHubClient extends Serializable {
+private[spark] trait Client extends Serializable {
 
   /**
    * return the start seq number of each partition

@@ -18,38 +18,34 @@
 package org.apache.spark.eventhubscommon.client
 
 import scala.collection.mutable
-
-import com.microsoft.azure.eventhubs.{EventHubClient => AzureEventHubClient, EventHubPartitionRuntimeInformation}
-
+import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubPartitionRuntimeInformation }
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 private[client] class AMQPEventHubsClient(
-    eventHubNamespace: String,
-    eventHubsNames: List[String],
-    ehParams: Map[String, Map[String, String]]) extends EventHubClient with Logging {
+    ehNames: List[String],
+    ehParams: Map[String, Map[String, String]])
+    extends Client
+    with Logging {
 
-  private val ehNameToClient = new mutable.HashMap[String, AzureEventHubClient]
-
-  init()
-
-  private def init(): Unit = {
-    for (ehName <- eventHubsNames) {
-      ehNameToClient += ehName ->
-        new EventHubsClientWrapper().createClient(ehParams(ehName))
-    }
-  }
+  private val nameToClient = new mutable.HashMap[String, EventHubClient]
+  for (ehName <- ehNames)
+    nameToClient += ehName -> new EventHubsClientWrapper()
+      .createClient(ehParams(ehName))
 
   private def getRunTimeInfoOfPartitions(
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]) = {
-    val results = new mutable.HashMap[EventHubNameAndPartition, EventHubPartitionRuntimeInformation]
+    val results = new mutable.HashMap[EventHubNameAndPartition,
+                                      EventHubPartitionRuntimeInformation]
     try {
       for (ehNameAndPartition <- targetEventHubNameAndPartitions) {
         val ehName = ehNameAndPartition.eventHubName
         val partitionId = ehNameAndPartition.partitionId
-        val client = ehNameToClient.get(ehName)
-        require(client.isDefined, "cannot find client for EventHubs instance " + ehName)
-        val runTimeInfo = client.get.getPartitionRuntimeInformation(partitionId.toString).get()
+        val client = nameToClient.get(ehName)
+        require(client.isDefined,
+                "cannot find client for EventHubs instance " + ehName)
+        val runTimeInfo =
+          client.get.getPartitionRuntimeInformation(partitionId.toString).get()
         results += ehNameAndPartition -> runTimeInfo
       }
       results.toMap.view
@@ -61,19 +57,23 @@ private[client] class AMQPEventHubsClient(
   }
 
   /**
-   * return the end point of each partition
-   *
-   * @return a map from eventhubName-partition to (offset, seq)
-   */
+    * return the end point of each partition
+    *
+    * @return a map from eventhubName-partition to (offset, seq)
+    */
   override def endPointOfPartition(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
-      Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, (runTimeInfo.getLastEnqueuedOffset.toLong,
-          runTimeInfo.getLastEnqueuedSequenceNumber))}.toMap)
+      val runtimeInformation = getRunTimeInfoOfPartitions(
+        targetEventHubNameAndPartitions)
+      Some(runtimeInformation.map {
+        case (ehNameAndPartition, runTimeInfo) =>
+          (ehNameAndPartition,
+           (runTimeInfo.getLastEnqueuedOffset.toLong,
+            runTimeInfo.getLastEnqueuedSequenceNumber))
+      }.toMap)
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -82,18 +82,22 @@ private[client] class AMQPEventHubsClient(
   }
 
   /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
+    * return the last enqueueTime of each partition
+    *
+    * @return a map from eventHubsNamePartition to EnqueueTime
+    */
   override def lastEnqueueTimeOfPartitions(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
     try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
-      Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, runTimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)}.toMap)
+      val runtimeInformation = getRunTimeInfoOfPartitions(
+        targetEventHubNameAndPartitions)
+      Some(runtimeInformation.map {
+        case (ehNameAndPartition, runTimeInfo) =>
+          (ehNameAndPartition,
+           runTimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)
+      }.toMap)
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -102,18 +106,21 @@ private[client] class AMQPEventHubsClient(
   }
 
   /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
+    * return the start seq number of each partition
+    *
+    * @return a map from eventhubName-partition to seq
+    */
   override def startSeqOfPartition(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
     try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(targetEventHubNameAndPartitions)
-      Some(runtimeInformation.map{case (ehNameAndPartition, runTimeInfo) =>
-        (ehNameAndPartition, runTimeInfo.getBeginSequenceNumber)}.toMap)
+      val runtimeInformation = getRunTimeInfoOfPartitions(
+        targetEventHubNameAndPartitions)
+      Some(runtimeInformation.map {
+        case (ehNameAndPartition, runTimeInfo) =>
+          (ehNameAndPartition, runTimeInfo.getBeginSequenceNumber)
+      }.toMap)
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -122,22 +129,20 @@ private[client] class AMQPEventHubsClient(
   }
 
   /**
-   * close this client
-   */
+    * close this client
+    */
   override def close(): Unit = {
     logInfo("close: Closing AMQPEventHubClient.")
-    for ((_, ehClient) <- ehNameToClient) {
+    for ((_, ehClient) <- nameToClient) {
       ehClient.closeSync()
     }
   }
-
-
 }
 
 private[spark] object AMQPEventHubsClient {
-
-  def getInstance(eventHubsNamespace: String, eventhubsParams: Map[String, Map[String, String]]):
-  AMQPEventHubsClient = {
-    new AMQPEventHubsClient(eventHubsNamespace, eventhubsParams.keys.toList, eventhubsParams)
+  def getInstance(eventHubsNamespace: String,
+                  eventhubsParams: Map[String, Map[String, String]])
+    : AMQPEventHubsClient = {
+    new AMQPEventHubsClient(eventhubsParams.keys.toList, eventhubsParams)
   }
 }

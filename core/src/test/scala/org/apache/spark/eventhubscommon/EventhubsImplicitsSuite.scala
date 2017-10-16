@@ -19,7 +19,6 @@ package org.apache.spark.eventhubscommon
 
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.streaming.{StreamingContext, TestSuiteBase}
 
 class EventhubsImplicitsSuite
@@ -40,8 +39,8 @@ class EventhubsImplicitsSuite
 
     import org.apache.spark.eventhubscommon.Implicits._
 
-    val stream = ssc.unionedEventHubStream(ehParams)
-    val stream2 = ssc.eventHubStream(ehParams, "0")
+    ssc.unionedEventHubStream(ehParams)
+    ssc.eventHubStream(ehParams, "0")
     ssc.stop()
   }
 }

@@ -19,13 +19,12 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
-import org.apache.spark.{SparkConf, SparkContext}
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
-import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, OffsetRecord}
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
+import org.apache.spark.streaming.{Seconds, StreamingContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 // scalastyle:off
 import org.apache.spark.streaming.Time

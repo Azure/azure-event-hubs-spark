@@ -17,16 +17,15 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import scala.reflect.ClassTag
-
 import org.apache.hadoop.fs.{Path, PathFilter}
-
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.eventhubscommon.OffsetRecord
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 import org.apache.spark.util.ManualClock
+import org.apache.spark.{SparkConf, SparkContext}
+
+import scala.reflect.ClassTag
 
 /**
  * A trait of that can be mixed in to get methods for testing DStream operations under

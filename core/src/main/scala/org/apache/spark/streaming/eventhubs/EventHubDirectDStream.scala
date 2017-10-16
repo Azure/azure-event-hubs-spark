@@ -24,7 +24,7 @@ import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, Client, EventHubsClientWrapper}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -52,7 +52,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = AMQPEventHubsClient.getInstance)
+      Client = AMQPEventHubsClient.getInstance)
   extends InputDStream[EventData](_ssc) with EventHubsConnector with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
@@ -90,12 +90,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     */
   }
 
-  @transient private var _eventHubClient: EventHubClient = _
+  @transient private var _eventHubClient: Client = _
 
   private def progressTracker = DirectDStreamProgressTracker.getInstance.
     asInstanceOf[DirectDStreamProgressTracker]
 
-  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
+  private[eventhubs] def setEventHubClient(eventHubClient: Client):
       EventHubDirectDStream = {
     _eventHubClient = eventHubClient
     this
@@ -123,7 +123,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   override def stop(): Unit = {
     logInfo("stop: stopping EventHubDirectDStream")
-    eventHubClient.close()
   }
 
   /**

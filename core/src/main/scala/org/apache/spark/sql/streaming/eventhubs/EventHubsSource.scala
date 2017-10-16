@@ -24,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord, RateControlUtils}
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper, RestfulEventHubClient}
+import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, Client, EventHubsClientWrapper}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
 import org.apache.spark.internal.Logging
@@ -39,7 +39,7 @@ private[spark] class EventHubsSource(
     eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
       EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = AMQPEventHubsClient.getInstance)
+      Client = AMQPEventHubsClient.getInstance)
   extends Source with EventHubsConnector with Logging {
 
   case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
@@ -53,7 +53,7 @@ private[spark] class EventHubsSource(
   require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
   require(eventHubsName != null, "eventhubs.name is not defined")
 
-  private var _eventHubsClient: EventHubClient = _
+  private var _eventHubsClient: Client = _
 
   private var _eventHubsReceiver: (Map[String, String], Int, Long, EventHubsOffsetType, Int)
     => EventHubsClientWrapper = _
@@ -91,7 +91,7 @@ private[spark] class EventHubsSource(
     uid, eventHubsParams("eventhubs.progressTrackingDir"), sqlContext.sparkContext.appName,
     sqlContext.sparkContext.hadoopConfiguration)
 
-  private[spark] def setEventHubClient(eventHubClient: EventHubClient): EventHubsSource = {
+  private[spark] def setEventHubClient(eventHubClient: Client): EventHubsSource = {
     _eventHubsClient = eventHubClient
     this
   }

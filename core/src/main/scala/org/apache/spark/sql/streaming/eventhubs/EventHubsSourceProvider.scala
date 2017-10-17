@@ -20,28 +20,28 @@ package org.apache.spark.sql.streaming.eventhubs
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source
-import org.apache.spark.sql.sources.{DataSourceRegister, StreamSourceProvider}
+import org.apache.spark.sql.sources.{ DataSourceRegister, StreamSourceProvider }
 import org.apache.spark.sql.types._
 
-private[sql] class EventHubsSourceProvider extends DataSourceRegister
-  with StreamSourceProvider with Logging {
+private[sql] class EventHubsSourceProvider
+    extends DataSourceRegister
+    with StreamSourceProvider
+    with Logging {
 
   override def shortName(): String = "eventhubs"
 
-  override def sourceSchema(
-      sqlContext: SQLContext,
-      schema: Option[StructType],
-      providerName: String,
-      parameters: Map[String, String]): (String, StructType) = {
+  override def sourceSchema(sqlContext: SQLContext,
+                            schema: Option[StructType],
+                            providerName: String,
+                            parameters: Map[String, String]): (String, StructType) = {
     (shortName(), EventHubsSourceProvider.sourceSchema(parameters))
   }
 
-  override def createSource(
-      sqlContext: SQLContext,
-      metadataPath: String,
-      schema: Option[StructType],
-      providerName: String,
-      parameters: Map[String, String]): Source = {
+  override def createSource(sqlContext: SQLContext,
+                            metadataPath: String,
+                            schema: Option[StructType],
+                            providerName: String,
+                            parameters: Map[String, String]): Source = {
     // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
     // eventhubClientCreator
     new EventHubsSource(sqlContext, parameters)
@@ -50,10 +50,10 @@ private[sql] class EventHubsSourceProvider extends DataSourceRegister
 
 private[sql] object EventHubsSourceProvider extends Serializable {
 
-  private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(parameters: Map[String, String]):
-  (Boolean, Seq[String]) = {
-    val containsProperties = parameters.getOrElse("eventhubs.sql.containsProperties",
-      "false").toBoolean
+  private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(
+      parameters: Map[String, String]): (Boolean, Seq[String]) = {
+    val containsProperties =
+      parameters.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
     val userDefinedKeys = {
       if (parameters.contains("eventhubs.sql.userDefinedKeys")) {
         parameters("eventhubs.sql.userDefinedKeys").split(",").toSeq
@@ -66,21 +66,25 @@ private[sql] object EventHubsSourceProvider extends Serializable {
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
     val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
-    StructType(Seq(
-      StructField("body", BinaryType),
-      StructField("offset", LongType),
-      StructField("seqNumber", LongType),
-      StructField("enqueuedTime", LongType),
-      StructField("publisher", StringType),
-      StructField("partitionKey", StringType)
-    ) ++ {if (containsProperties) {
-      if (userDefinedKeys.nonEmpty) {
-        userDefinedKeys.map(key => StructField(key, StringType))
-      } else {
-        Seq(StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
-      }
-    } else {
-      Seq()
-    }})
+    StructType(
+      Seq(
+        StructField("body", BinaryType),
+        StructField("offset", LongType),
+        StructField("seqNumber", LongType),
+        StructField("enqueuedTime", LongType),
+        StructField("publisher", StringType),
+        StructField("partitionKey", StringType)
+      ) ++ {
+        if (containsProperties) {
+          if (userDefinedKeys.nonEmpty) {
+            userDefinedKeys.map(key => StructField(key, StringType))
+          } else {
+            Seq(
+              StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
+          }
+        } else {
+          Seq()
+        }
+      })
   }
 }

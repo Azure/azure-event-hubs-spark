@@ -22,7 +22,11 @@ import scala.collection.mutable.ListBuffer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
+import org.apache.spark.eventhubscommon.{
+  EventHubNameAndPartition,
+  EventHubsConnector,
+  OffsetRecord
+}
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 
 /**
@@ -36,22 +40,21 @@ import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
  * @param appName the name of Spark application
  * @param hadoopConfiguration the hadoop configuration instance
  */
-private[spark] class DirectDStreamProgressTracker private[spark](
+private[spark] class DirectDStreamProgressTracker private[spark] (
     progressDir: String,
     appName: String,
     hadoopConfiguration: Configuration)
-  extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
+    extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
 
   // the lock synchronizing the read and committing operations, since they are executed in driver
   // and listener thread respectively.
   private val driverLock = new Object
 
   override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
-    DirectDStreamProgressTracker.registeredConnectors.map {
-      connector => (connector.uid, connector.connectedInstances)
+    DirectDStreamProgressTracker.registeredConnectors.map { connector =>
+      (connector.uid, connector.connectedInstances)
     }.toMap
   }
-
 
   private def initProgressFileDirectory(): Unit = {
     try {
@@ -118,10 +121,10 @@ private[spark] class DirectDStreamProgressTracker private[spark](
   /**
    * read the progress record for the specified namespace, streamId and timestamp
    */
-  override def read(namespace: String, timestamp: Long, fallBack: Boolean):
-      OffsetRecord = driverLock.synchronized {
-    super.read(namespace, timestamp, fallBack)
-  }
+  override def read(namespace: String, timestamp: Long, fallBack: Boolean): OffsetRecord =
+    driverLock.synchronized {
+      super.read(namespace, timestamp, fallBack)
+    }
 
   def close(): Unit = {}
 
@@ -143,26 +146,32 @@ private[spark] class DirectDStreamProgressTracker private[spark](
         fs.delete(filePath, true)
       }
     }
-    */
+     */
     // clean temp directory
-    val allUselessTempFiles = fs.listStatus(tempDirectoryPath, new PathFilter {
-      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
-    }).map(_.getPath)
+    val allUselessTempFiles = fs
+      .listStatus(tempDirectoryPath, new PathFilter {
+        override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
+      })
+      .map(_.getPath)
     if (allUselessTempFiles.nonEmpty) {
-      allUselessTempFiles.groupBy(fromPathToTimestamp).toList.sortWith((p1, p2) => p1._1 > p2._1).
-        tail.flatMap(_._2).foreach {
-        filePath => logInfo(s"delete $filePath")
-        fs.delete(filePath, true)
-      }
+      allUselessTempFiles
+        .groupBy(fromPathToTimestamp)
+        .toList
+        .sortWith((p1, p2) => p1._1 > p2._1)
+        .tail
+        .flatMap(_._2)
+        .foreach { filePath =>
+          logInfo(s"delete $filePath")
+          fs.delete(filePath, true)
+        }
     }
   }
 
   /**
    * commit offsetToCommit to a new progress tracking file
    */
-  override def commit(
-      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      commitTime: Long): Unit = driverLock.synchronized {
+  override def commit(offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+                      commitTime: Long): Unit = driverLock.synchronized {
     super.commit(offsetToCommit, commitTime)
   }
 }
@@ -193,9 +202,8 @@ object DirectDStreamProgressTracker {
     this.synchronized {
       // DirectDStream shall have singleton progress tracker
       if (_progressTracker == null) {
-        _progressTracker = new DirectDStreamProgressTracker(progressDirStr,
-          appName,
-          hadoopConfiguration)
+        _progressTracker =
+          new DirectDStreamProgressTracker(progressDirStr, appName, hadoopConfiguration)
       }
       _progressTracker.init()
     }

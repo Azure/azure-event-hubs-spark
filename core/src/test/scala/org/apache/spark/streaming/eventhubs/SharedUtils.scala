@@ -20,14 +20,17 @@ package org.apache.spark.streaming.eventhubs
 import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.scalatest.{BeforeAndAfterEach, FunSuite}
+import org.apache.hadoop.fs.{ FileSystem, Path }
+import org.scalatest.{ BeforeAndAfterEach, FunSuite }
 
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{ SparkConf, SparkContext }
 import org.apache.spark.eventhubscommon.EventHubsConnector
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
-import org.apache.spark.streaming.{Duration, Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.checkpoint.{DirectDStreamProgressTracker, ProgressTrackingListener}
+import org.apache.spark.streaming.{ Duration, Seconds, StreamingContext }
+import org.apache.spark.streaming.eventhubs.checkpoint.{
+  DirectDStreamProgressTracker,
+  ProgressTrackingListener
+}
 
 private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
@@ -59,13 +62,17 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
   protected def init(): Unit = {
     progressRootPath = new Path(Files.createTempDirectory("progress_root").toString)
     fs = progressRootPath.getFileSystem(new Configuration())
-    val sparkContext = new SparkContext(new SparkConf().setAppName(appName).
-      setMaster("local[*]").set("spark.streaming.clock", streamingClock))
+    val sparkContext = new SparkContext(
+      new SparkConf()
+        .setAppName(appName)
+        .setMaster("local[*]")
+        .set("spark.streaming.clock", streamingClock))
     sparkContext.setLogLevel("INFO")
     ssc = new StreamingContext(sparkContext, batchDuration)
     progressListener = ProgressTrackingListener.initInstance(ssc, progressRootPath.toString)
-    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString, appName,
-      new Configuration())
+    progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
+                                                                appName,
+                                                                new Configuration())
   }
 
   protected def reset(): Unit = {

@@ -26,7 +26,7 @@ import org.apache.spark.sql.execution.streaming._
 trait StreamAction
 
 case class EventHubsAddDataMemory[A](source: MemoryStream[A], data: Seq[A])
-  extends EventHubsAddData {
+    extends EventHubsAddData {
   override def toString: String = s"AddData to $source: ${data.mkString(",")}"
 
   override def addData(query: Option[StreamExecution]): (Source, Offset) = {
@@ -45,6 +45,7 @@ object EventHubsAddData {
 
 /** A trait that can be extended when testing a source. */
 trait EventHubsAddData extends StreamAction with Serializable {
+
   /**
    * Called to adding the data to a source. It should find the source to add data to from
    * the active query, and then return the source object the data was added, as well as the
@@ -53,11 +54,11 @@ trait EventHubsAddData extends StreamAction with Serializable {
   def addData(query: Option[StreamExecution]): (Source, Offset)
 }
 
-case class AddEventHubsData[T: ClassTag, U: ClassTag](
-     eventHubsParameters: Map[String, String],
-     highestBatchId: Long = 0,
-     eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])])
-  extends EventHubsAddData {
+case class AddEventHubsData[T: ClassTag, U: ClassTag](eventHubsParameters: Map[String, String],
+                                                      highestBatchId: Long = 0,
+                                                      eventPayloadsAndProperties: Seq[(T, Seq[U])] =
+                                                        Seq.empty[(T, Seq[U])])
+    extends EventHubsAddData {
 
   override def addData(query: Option[StreamExecution]): (Source, Offset) = {
     val sources = query.get.logicalPlan.collect {
@@ -76,8 +77,9 @@ case class AddEventHubsData[T: ClassTag, U: ClassTag](
     val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(eventHubsParameters)
     EventHubsTestUtilities.addEventsToEventHubs(eventHubs, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
-    val targetOffsetPerPartition = highestOffsetPerPartition.map{
-      case (ehNameAndPartition, (offset, _, _)) => (ehNameAndPartition, offset)}
+    val targetOffsetPerPartition = highestOffsetPerPartition.map {
+      case (ehNameAndPartition, (offset, _, _)) => (ehNameAndPartition, offset)
+    }
     val eventHubsBatchRecord = EventHubsBatchRecord(highestBatchId, targetOffsetPerPartition)
     (eventHubsSource, eventHubsBatchRecord)
   }

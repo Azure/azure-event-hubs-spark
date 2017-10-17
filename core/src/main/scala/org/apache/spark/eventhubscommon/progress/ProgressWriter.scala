@@ -20,19 +20,19 @@ package org.apache.spark.eventhubscommon.progress
 import java.io.IOException
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FSDataOutputStream, Path}
+import org.apache.hadoop.fs.{ FSDataOutputStream, Path }
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
-private[spark] class ProgressWriter(
-     streamId: Int,
-     uid: String,
-     eventHubNameAndPartition: EventHubNameAndPartition,
-     timestamp: Long,
-     hadoopConfiguration: Configuration,
-     progressDir: String,
-     subDirIdentifiers: String*) extends Logging {
+private[spark] class ProgressWriter(streamId: Int,
+                                    uid: String,
+                                    eventHubNameAndPartition: EventHubNameAndPartition,
+                                    timestamp: Long,
+                                    hadoopConfiguration: Configuration,
+                                    progressDir: String,
+                                    subDirIdentifiers: String*)
+    extends Logging {
 
   // TODO: Why can't we get this info from one of the ProgressTrackers?
   // TODO: Come up with better name for this guy
@@ -51,9 +51,12 @@ private[spark] class ProgressWriter(
       // it would be safe to overwrite checkpoint, since we will not start a new job when
       // checkpoint hasn't been committed
       cpFileStream = fs.create(tempProgressTrackingPointPath, true)
-      val record = ProgressRecord(recordTime, uid,
-        eventHubNameAndPartition.eventHubName, eventHubNameAndPartition.partitionId, cpOffset,
-        cpSeq)
+      val record = ProgressRecord(recordTime,
+                                  uid,
+                                  eventHubNameAndPartition.eventHubName,
+                                  eventHubNameAndPartition.partitionId,
+                                  cpOffset,
+                                  cpSeq)
       cpFileStream.writeBytes(s"$record")
     } catch {
       case ioe: IOException =>
@@ -66,5 +69,3 @@ private[spark] class ProgressWriter(
     }
   }
 }
-
-

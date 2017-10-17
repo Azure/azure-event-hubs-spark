@@ -28,13 +28,12 @@ package org.apache.spark.eventhubscommon.progress
  * BatchID
  *
  */
-private[spark] case class ProgressRecord(
-    timestamp: Long,
-    uid: String,
-    eventHubName: String,
-    partitionId: Int,
-    offset: Long,
-    seqId: Long) {
+private[spark] case class ProgressRecord(timestamp: Long,
+                                         uid: String,
+                                         eventHubName: String,
+                                         partitionId: Int,
+                                         offset: Long,
+                                         seqId: Long) {
   override def toString: String = {
     s"$timestamp $uid $eventHubName $partitionId $offset $seqId"
   }
@@ -44,10 +43,15 @@ private[spark] object ProgressRecord {
 
   def parse(line: String): Option[ProgressRecord] = {
     try {
-      val Array(timestampStr, namespace, eventHubName, partitionIdStr, offsetStr,
-        seqStr) = line.split(" ")
-      Some(ProgressRecord(timestampStr.toLong, namespace, eventHubName,
-        partitionIdStr.toInt, offsetStr.toLong, seqStr.toLong))
+      val Array(timestampStr, namespace, eventHubName, partitionIdStr, offsetStr, seqStr) =
+        line.split(" ")
+      Some(
+        ProgressRecord(timestampStr.toLong,
+                       namespace,
+                       eventHubName,
+                       partitionIdStr.toInt,
+                       offsetStr.toLong,
+                       seqStr.toLong))
     } catch {
       case m: RuntimeException =>
         m.printStackTrace()

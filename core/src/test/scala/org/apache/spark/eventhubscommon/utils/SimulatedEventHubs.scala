@@ -22,23 +22,26 @@ import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.{EventHubClient, EventHubsClientWrapper, EventHubsOffsetTypes}
+import org.apache.spark.eventhubscommon.client.{
+  Client,
+  EventHubsClientWrapper,
+  EventHubsOffsetTypes
+}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
-class SimulatedEventHubs(
-    eventHubsNamespace: String,
-    initialData: Map[EventHubNameAndPartition, Array[EventData]]) extends Serializable {
+class SimulatedEventHubs(eventHubsNamespace: String,
+                         initialData: Map[EventHubNameAndPartition, Array[EventData]])
+    extends Serializable {
 
   assert(initialData != null)
 
   var messageStore: Map[EventHubNameAndPartition, Array[EventData]] = initialData
   val eventHubsNamedPartitions: Seq[EventHubNameAndPartition] = initialData.keys.toSeq
 
-  def searchWithTime(
-      eventHubsNamedPartition: EventHubNameAndPartition,
-      enqueueTime: Long,
-      eventCount: Int): List[EventData] = {
+  def searchWithTime(eventHubsNamedPartition: EventHubNameAndPartition,
+                     enqueueTime: Long,
+                     eventCount: Int): List[EventData] = {
     val resultData = new ListBuffer[EventData]
     for (msg <- messageStore(eventHubsNamedPartition)) {
       if (resultData.length >= eventCount) {
@@ -51,8 +54,9 @@ class SimulatedEventHubs(
     resultData.toList
   }
 
-  def search(eventHubsNamedPartition: EventHubNameAndPartition, eventOffset: Int, eventCount: Int):
-      List[EventData] = {
+  def search(eventHubsNamedPartition: EventHubNameAndPartition,
+             eventOffset: Int,
+             eventCount: Int): List[EventData] = {
     val resultData = new ListBuffer[EventData]
     for (i <- 0 until eventCount) {
       // as in eventhub, offset is exclusive
@@ -66,43 +70,43 @@ class SimulatedEventHubs(
 
   def send(newData: Map[EventHubNameAndPartition, Array[EventData]]): Unit = {
     val combinedData: Map[EventHubNameAndPartition, Array[EventData]] =
-      (messageStore.toSeq ++ newData.toSeq).groupBy(_._1)
-        .map{case (k, v) => (k, v.flatMap(_._2).toArray)}
+      (messageStore.toSeq ++ newData.toSeq)
+        .groupBy(_._1)
+        .map { case (k, v) => (k, v.flatMap(_._2).toArray) }
     messageStore = combinedData
   }
 }
 
-class TestEventHubsReceiver(
-    eventHubParameters: Map[String, String],
-    eventHubs: SimulatedEventHubs,
-    partitionId: Int,
-    startOffset: Long,
-    offsetType: EventHubsOffsetType)
-  extends EventHubsClientWrapper {
-
-  val eventHubName = eventHubParameters("eventhubs.name")
+class TestEventHubsReceiver(ehParams: Map[String, String],
+                            eventHubs: SimulatedEventHubs,
+                            partitionId: Int,
+                            startOffset: Long,
+                            offsetType: EventHubsOffsetType)
+    extends EventHubsClientWrapper(ehParams) {
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val eventHubName = eventHubParameters("eventhubs.name")
+    val eventHubName = ehParams("eventhubs.name")
     if (offsetType != EventHubsOffsetTypes.InputTimeOffset) {
-      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId), startOffset.toInt,
-        expectedEventNum)
+      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId),
+                       startOffset.toInt,
+                       expectedEventNum)
     } else {
       eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
-        eventHubParameters("eventhubs.filter.enqueuetime").toLong, expectedEventNum)
+                               ehParams("eventhubs.filter.enqueuetime").toLong,
+                               expectedEventNum)
     }
   }
 }
 
-class SimulatedEventHubsRestClient(
-    eventHubs: SimulatedEventHubs) extends EventHubClient {
+class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends Client {
 
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    Some(eventHubs.messageStore
-      .map(x => x._1 -> (x._2.length.toLong - 1, x._2.length.toLong - 1)))
+  override def endPointOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
+                                     List())
+    : Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+    Some(
+      eventHubs.messageStore
+        .map(x => x._1 -> (x._2.length.toLong - 1, x._2.length.toLong - 1)))
   }
 
   override def close(): Unit = {}
@@ -114,13 +118,16 @@ class SimulatedEventHubsRestClient(
    */
   override def lastEnqueueTimeOfPartitions(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    Some(targetEventHubNameAndPartitions.map{
-      ehNameAndPartition =>
-        (ehNameAndPartition,
-          eventHubs.messageStore(ehNameAndPartition).last.getSystemProperties.getEnqueuedTime.
-            toEpochMilli)
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map { ehNameAndPartition =>
+      (ehNameAndPartition,
+       eventHubs
+         .messageStore(ehNameAndPartition)
+         .last
+         .getSystemProperties
+         .getEnqueuedTime
+         .toEpochMilli)
     }.toMap)
   }
 
@@ -129,26 +136,26 @@ class SimulatedEventHubsRestClient(
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    Some(targetEventHubNameAndPartitions.map {
-      ehNameAndPartition =>
-        (ehNameAndPartition, -1L)}.toMap)
+  override def startSeqOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map { ehNameAndPartition =>
+      (ehNameAndPartition, -1L)
+    }.toMap)
   }
 }
 
-class TestRestEventHubClient(
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
-  extends EventHubClient {
+class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
+    extends Client {
 
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
-    Some(latestRecords.map{case (ehNameAndPartition, (offset, seq, _)) =>
-      (ehNameAndPartition, (offset, seq))})
+  override def endPointOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
+                                     List())
+    : Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+    Some(latestRecords.map {
+      case (ehNameAndPartition, (offset, seq, _)) =>
+        (ehNameAndPartition, (offset, seq))
+    })
   }
 
   /**
@@ -158,11 +165,10 @@ class TestRestEventHubClient(
    */
   override def lastEnqueueTimeOfPartitions(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    Some(targetEventHubNameAndPartitions.map{
-      ehNameAndPartition =>
-        (ehNameAndPartition, latestRecords(ehNameAndPartition)._3)
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map { ehNameAndPartition =>
+      (ehNameAndPartition, latestRecords(ehNameAndPartition)._3)
     }.toMap)
   }
 
@@ -173,22 +179,21 @@ class TestRestEventHubClient(
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    Some(targetEventHubNameAndPartitions.map {
-      ehNameAndPartition =>
-        (ehNameAndPartition, -1L)}.toMap)
+  override def startSeqOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map { ehNameAndPartition =>
+      (ehNameAndPartition, -1L)
+    }.toMap)
   }
 }
 
-class FragileEventHubClient private extends EventHubClient {
+class FragileEventHubClient private extends Client {
 
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
+                                     List())
+    : Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     import FragileEventHubClient._
 
     callIndex += 1
@@ -208,8 +213,8 @@ class FragileEventHubClient private extends EventHubClient {
    */
   override def lastEnqueueTimeOfPartitions(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
     Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 
@@ -220,13 +225,12 @@ class FragileEventHubClient private extends EventHubClient {
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    Some(targetEventHubNameAndPartitions.map {
-      ehNameAndPartition =>
-        (ehNameAndPartition, -1L)}.toMap)
+  override def startSeqOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map { ehNameAndPartition =>
+      (ehNameAndPartition, -1L)
+    }.toMap)
   }
 }
 
@@ -238,28 +242,27 @@ object FragileEventHubClient {
   var lastBatchWhenEndpointCrashed = 0
   var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()
 
-  def getInstance(eventHubNameSpace: String, eventhubsParams: Map[String, Map[String, String]]):
-    FragileEventHubClient = {
+  def getInstance(eventHubNameSpace: String,
+                  eventhubsParams: Map[String, Map[String, String]]): FragileEventHubClient = {
     new FragileEventHubClient()
   }
 }
 
-
-class FluctuatedEventHubClient(
-    ssc: StreamingContext,
-    messagesBeforeEmpty: Long,
-    numBatchesBeforeNewData: Int,
-    latestRecords: Map[EventHubNameAndPartition, (Long, Long)]) extends EventHubClient {
+class FluctuatedEventHubClient(ssc: StreamingContext,
+                               messagesBeforeEmpty: Long,
+                               numBatchesBeforeNewData: Int,
+                               latestRecords: Map[EventHubNameAndPartition, (Long, Long)])
+    extends Client {
 
   private var callIndex = -1
 
-  override def endPointOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List()):
-    Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
+                                     List())
+    : Option[Predef.Map[EventHubNameAndPartition, (Long, Long)]] = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
-      Some(latestRecords.map{
+      Some(latestRecords.map {
         case (ehNameAndPartition, _) =>
           (ehNameAndPartition, (messagesBeforeEmpty - 1, messagesBeforeEmpty - 1))
       })
@@ -277,8 +280,8 @@ class FluctuatedEventHubClient(
    */
   override def lastEnqueueTimeOfPartitions(
       retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
     Some(targetEventHubNameAndPartitions.map((_, Long.MaxValue)).toMap)
   }
 
@@ -287,13 +290,11 @@ class FluctuatedEventHubClient(
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def startSeqOfPartition(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition]):
-    Option[Map[EventHubNameAndPartition, Long]] = {
-    Some(targetEventHubNameAndPartitions.map {
-      ehNameAndPartition =>
-        (ehNameAndPartition, -1L)}.toMap)
+  override def startSeqOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = {
+    Some(targetEventHubNameAndPartitions.map { ehNameAndPartition =>
+      (ehNameAndPartition, -1L)
+    }.toMap)
   }
 }
-

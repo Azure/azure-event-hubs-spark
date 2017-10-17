@@ -16,10 +16,9 @@
  */
 package org.apache.spark.eventhubscommon.client
 
-import com.microsoft.azure.eventhubs._
-import org.mockito.{Matchers, Mockito}
+import org.mockito.{ Matchers, Mockito }
 import org.mockito.Mockito._
-import org.scalatest.{BeforeAndAfter, FunSuite}
+import org.scalatest.{ BeforeAndAfter, FunSuite }
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
@@ -42,83 +41,65 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
   )
 
   before {
-    ehClientWrapperMock = spy(new EventHubsClientWrapper)
+    ehClientWrapperMock = spy(new EventHubsClientWrapper(ehParams))
     offsetStoreMock = mock[OffsetStore]
   }
 
   test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {
     Mockito.when(offsetStoreMock.read()).thenReturn("2147483647")
-    Mockito.doNothing().when(ehClientWrapperMock).createReceiverInternal(
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.PreviousCheckpoint),
-      Matchers.anyString,
-      Matchers.anyLong)
+    Mockito
+      .doNothing()
+      .when(ehClientWrapperMock)
+      .createReceiverInternal(
+        Matchers.anyString,
+        Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.PreviousCheckpoint),
+        Matchers.anyString)
 
     ehClientWrapperMock.createReceiver(ehParams, "4", offsetStoreMock, 999)
 
     verify(ehClientWrapperMock, times(1)).createReceiverInternal(
-      Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;" +
-        "SharedAccessKeyName=policyname;" +
-        "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
-      Matchers.anyString,
-      Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
       Matchers.eq("4"),
       Matchers.eq(EventHubsOffsetTypes.PreviousCheckpoint),
-      Matchers.eq("2147483647"),
-      Matchers.eq(-1L))
+      Matchers.eq("2147483647"))
   }
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {
     var ehParams2 = ehParams
     ehParams2 += "eventhubs.consumergroup" -> "$consumergroup"
     when(offsetStoreMock.read()).thenReturn("-1")
-    doNothing().when(ehClientWrapperMock).createReceiverInternal(Matchers.anyString,
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.None),
-      Matchers.anyString,
-      Matchers.anyLong)
+    doNothing()
+      .when(ehClientWrapperMock)
+      .createReceiverInternal(
+        Matchers.anyString,
+        Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.None),
+        Matchers.anyString
+      )
     ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
     verify(ehClientWrapperMock, times(1)).createReceiverInternal(
-      Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;" +
-        "SharedAccessKeyName=policyname;" +
-        "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
-      Matchers.anyString,
-      Matchers.eq("$consumergroup"),
       Matchers.eq("4"),
       Matchers.eq(EventHubsOffsetTypes.None),
-      Matchers.eq("-1"),
-      Matchers.eq(-1L))
+      Matchers.eq("-1")
+    )
   }
 
   test("EventHubsClientWrapper converts parameters for enqueuetime filter") {
     var ehParams2 = ehParams
     ehParams2 += "eventhubs.filter.enqueuetime" -> "1433887583"
     when(offsetStoreMock.read()).thenReturn("-1")
-    doNothing().when(ehClientWrapperMock).createReceiverInternal(
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.anyString,
-      Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.InputTimeOffset),
-      Matchers.anyString,
-      Matchers.anyLong)
+    doNothing()
+      .when(ehClientWrapperMock)
+      .createReceiverInternal(
+        Matchers.anyString,
+        Matchers.eq[EventHubsOffsetType](EventHubsOffsetTypes.InputTimeOffset),
+        Matchers.anyString
+      )
 
     ehClientWrapperMock.createReceiver(ehParams2, "4", offsetStoreMock, 999)
 
     verify(ehClientWrapperMock, times(1)).createReceiverInternal(
-      Matchers.eq("Endpoint=amqps://namespace.servicebus.windows.net;EntityPath=name;" +
-        "SharedAccessKeyName=policyname;" +
-        "SharedAccessKey=policykey;OperationTimeout=PT1M;RetryPolicy=Default"),
-      Matchers.anyString,
-      Matchers.eq(EventHubClient.DEFAULT_CONSUMER_GROUP_NAME),
       Matchers.eq("4"),
       Matchers.eq(EventHubsOffsetTypes.InputTimeOffset),
-      Matchers.eq("1433887583"),
-      Matchers.eq(-1L))
+      Matchers.eq("1433887583")
+    )
   }
 }

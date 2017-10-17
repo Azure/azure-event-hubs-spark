@@ -17,8 +17,8 @@
 
 package org.apache.spark.eventhubscommon.progress
 
-import java.io.{BufferedReader, InputStreamReader, IOException}
-import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
+import java.io.{ BufferedReader, InputStreamReader, IOException }
+import java.util.concurrent.{ ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit }
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -27,17 +27,24 @@ import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
+import org.apache.spark.eventhubscommon.{
+  EventHubNameAndPartition,
+  EventHubsConnector,
+  OffsetRecord
+}
 import org.apache.spark.internal.Logging
 
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
-    progressDir: String, appName: String, hadoopConfiguration: Configuration) extends Logging {
+    progressDir: String,
+    appName: String,
+    hadoopConfiguration: Configuration)
+    extends Logging {
 
-  private[spark] lazy val progressDirectoryStr = PathTools.makeProgressDirectoryStr(progressDir,
-    appName)
+  private[spark] lazy val progressDirectoryStr =
+    PathTools.makeProgressDirectoryStr(progressDir, appName)
   private[spark] lazy val tempDirectoryStr = PathTools.makeTempDirectoryStr(progressDir, appName)
-  private[spark] lazy val metadataDirectoryStr = PathTools.makeMetadataDirectoryStr(progressDir,
-    appName)
+  private[spark] lazy val metadataDirectoryStr =
+    PathTools.makeMetadataDirectoryStr(progressDir, appName)
 
   private[spark] lazy val progressDirectoryPath = new Path(progressDirectoryStr)
   private[spark] lazy val tempDirectoryPath = new Path(tempDirectoryStr)
@@ -57,10 +64,9 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private[spark] def fromPathToTimestamp(path: Path): Long =
     path.getName.split("-").last.toLong
 
-
   protected def allEventNameAndPartitionExist(
       candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
-    eventHubNameAndPartitions.forall{
+    eventHubNameAndPartitions.forall {
       case (uid, ehNameAndPartitions) =>
         candidateEhNameAndPartitions.contains(uid) &&
           ehNameAndPartitions.forall(candidateEhNameAndPartitions(uid).contains)
@@ -68,21 +74,28 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   // no metadata (for backward compatibility)
-  private def getLatestFileWithoutMetadata(fs: FileSystem, timestamp: Long = Long.MaxValue):
-      Option[Path] = {
+  private def getLatestFileWithoutMetadata(fs: FileSystem,
+                                           timestamp: Long = Long.MaxValue): Option[Path] = {
     val allFiles = fs.listStatus(progressDirectoryPath)
     if (allFiles.length < 1) {
       None
     } else {
-      Some(allFiles.filter(fsStatus => fromPathToTimestamp(fsStatus.getPath) <= timestamp).
-        sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))
-        (0).getPath)
+      Some(
+        allFiles
+          .filter(fsStatus => fromPathToTimestamp(fsStatus.getPath) <= timestamp)
+          .sortWith((f1, f2) => fromPathToTimestamp(f1.getPath) > fromPathToTimestamp(f2.getPath))(
+            0)
+          .getPath)
     }
   }
 
   private def getLatestFileWithMetadata(metadataFiles: Array[FileStatus]): Option[Path] = {
-    val latestMetadata = metadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong >
-      f2.getPath.getName.toLong).head
+    val latestMetadata = metadataFiles
+      .sortWith(
+        (f1, f2) =>
+          f1.getPath.getName.toLong >
+            f2.getPath.getName.toLong)
+      .head
     logInfo(s"locate latest timestamp in metadata as ${latestMetadata.getPath.getName}")
     Some(new Path(progressDirectoryStr + "/progress-" + latestMetadata.getPath.getName))
   }
@@ -92,12 +105,13 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
    *
    * NOTE: the additional integer in return value is to simplify the test (could be improved)
    */
-  private[spark] def getLatestFile(fs: FileSystem, timestamp: Long = Long.MaxValue):
-    (Int, Option[Path]) = {
+  private[spark] def getLatestFile(fs: FileSystem,
+                                   timestamp: Long = Long.MaxValue): (Int, Option[Path]) = {
     // first check metadata directory if exists
     if (fs.exists(metadataDirectoryPath)) {
-      val metadataFiles = fs.listStatus(metadataDirectoryPath).filter(
-        file => file.isFile && file.getPath.getName.toLong <= timestamp)
+      val metadataFiles = fs
+        .listStatus(metadataDirectoryPath)
+        .filter(file => file.isFile && file.getPath.getName.toLong <= timestamp)
       if (metadataFiles.nonEmpty) {
         // metadata files exists
         (0, getLatestFileWithMetadata(metadataFiles))
@@ -136,7 +150,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         }
         val progressRecord = progressRecordOpt.get
         val newList = allProgressFiles.getOrElseUpdate(progressRecord.uid,
-          List[EventHubNameAndPartition]()) :+
+                                                       List[EventHubNameAndPartition]()) :+
           EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
         allProgressFiles(progressRecord.uid) = newList
         if (timestamp == -1L) {
@@ -161,10 +175,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     (allEventNameAndPartitionExist(allProgressFiles.toMap), latestFileOpt)
   }
 
-
-  protected def readProgressRecordLines(
-      progressFilePath: Path,
-      fs: FileSystem): List[ProgressRecord] = {
+  protected def readProgressRecordLines(progressFilePath: Path,
+                                        fs: FileSystem): List[ProgressRecord] = {
     val ret = new ListBuffer[ProgressRecord]
     var ins: FSDataInputStream = null
     var br: BufferedReader = null
@@ -175,8 +187,9 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       while (line != null) {
         val progressRecordOpt = ProgressRecord.parse(line)
         if (progressRecordOpt.isEmpty) {
-          throw new IllegalStateException(s"detect corrupt progress tracking file at $line" +
-            s" it might be a bug in the implementation of underlying file system")
+          throw new IllegalStateException(
+            s"detect corrupt progress tracking file at $line" +
+              s" it might be a bug in the implementation of underlying file system")
         }
         val progressRecord = progressRecordOpt.get
         ret += progressRecord
@@ -238,24 +251,28 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       if (progressFileOption.isEmpty) {
         // if no progress file, then start from the beginning of the streams
         val connectedEventHubs = eventHubNameAndPartitions.find {
-          case (connectorUID, _) => connectorUID == targetConnectorUID}
-        require(connectedEventHubs.isDefined, s"cannot find $targetConnectorUID in" +
-          s" $eventHubNameAndPartitions")
+          case (connectorUID, _) => connectorUID == targetConnectorUID
+        }
+        require(connectedEventHubs.isDefined,
+                s"cannot find $targetConnectorUID in" +
+                  s" $eventHubNameAndPartitions")
         // it's hacky to take timestamp -1 as the start of streams
         readTimestamp = -1
-        recordToReturn = connectedEventHubs.get._2.map(
-          (_, (PartitionReceiver.START_OF_STREAM.toLong, -1L))).toMap
+        recordToReturn =
+          connectedEventHubs.get._2.map((_, (PartitionReceiver.START_OF_STREAM.toLong, -1L))).toMap
       } else {
         val expectedTimestamp = fromPathToTimestamp(progressFileOption.get)
         val progressFilePath = progressFileOption.get
         val recordLines = readProgressRecordLines(progressFilePath, fs)
-        require(recordLines.count(_.timestamp != expectedTimestamp) == 0, "detected inconsistent" +
-          s" progress record, expected timestamp $expectedTimestamp")
+        require(recordLines.count(_.timestamp != expectedTimestamp) == 0,
+                "detected inconsistent" +
+                  s" progress record, expected timestamp $expectedTimestamp")
         readTimestamp = expectedTimestamp
-        recordToReturn = recordLines.filter(
-          progressRecord => progressRecord.uid == targetConnectorUID).map(
-          progressRecord => EventHubNameAndPartition(progressRecord.eventHubName,
-            progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId)).toMap
+        recordToReturn = recordLines
+          .filter(progressRecord => progressRecord.uid == targetConnectorUID)
+          .map(progressRecord =>
+            EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId))
+          .toMap
       }
     } catch {
       case ias: IllegalArgumentException =>
@@ -273,16 +290,20 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     var oos: FSDataOutputStream = null
     try {
       // write progress file
-      oos = fs.create(new Path(s"$progressDirectoryPath/${PathTools.makeProgressFileName(
-        commitTime)}"), true)
+      oos = fs.create(
+        new Path(s"$progressDirectoryPath/${PathTools.makeProgressFileName(commitTime)}"),
+        true)
       offsetToCommit.foreach {
         case (namespace, ehNameAndPartitionToOffsetAndSeq) =>
           ehNameAndPartitionToOffsetAndSeq.foreach {
             case (nameAndPartitionId, (offset, seq)) =>
               oos.writeBytes(
-                ProgressRecord(commitTime, namespace,
-                  nameAndPartitionId.eventHubName, nameAndPartitionId.partitionId, offset,
-                  seq).toString + "\n"
+                ProgressRecord(commitTime,
+                               namespace,
+                               nameAndPartitionId.eventHubName,
+                               nameAndPartitionId.partitionId,
+                               offset,
+                               seq).toString + "\n"
               )
           }
       }
@@ -301,8 +322,9 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private def createMetadata(fs: FileSystem, commitTime: Long): Boolean = {
     var oos: FSDataOutputStream = null
     try {
-      oos = fs.create(new Path(s"$metadataDirectoryStr/" + s"${PathTools.makeMetadataFileName(
-        commitTime)}"), true)
+      oos = fs.create(
+        new Path(s"$metadataDirectoryStr/" + s"${PathTools.makeMetadataFileName(commitTime)}"),
+        true)
       true
     } catch {
       case e: Exception =>
@@ -316,29 +338,29 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   // write offsetToCommit to a progress tracking file
-  private def transaction(
-     offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-     fs: FileSystem,
-     commitTime: Long): Unit = {
+  private def transaction(offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+                          fs: FileSystem,
+                          commitTime: Long): Unit = {
     if (createProgressFile(offsetToCommit, fs, commitTime)) {
       if (!createMetadata(fs, commitTime)) {
         logError(s"cannot create progress file at $commitTime")
-        throw new IOException(s"cannot create metadata file at $commitTime," +
-          s" check the previous exception for the root cause")
+        throw new IOException(
+          s"cannot create metadata file at $commitTime," +
+            s" check the previous exception for the root cause")
       }
     } else {
       logError(s"cannot create progress file at $commitTime")
-      throw new IOException(s"cannot create progress file at $commitTime," +
-        s" check the previous exception for the root cause")
+      throw new IOException(
+        s"cannot create progress file at $commitTime," +
+          s" check the previous exception for the root cause")
     }
   }
 
   /**
    * commit offsetToCommit to a new progress tracking file
    */
-  def commit(
-      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      commitTime: Long): Unit = {
+  def commit(offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+             commitTime: Long): Unit = {
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     try {
       transaction(offsetToCommit, fs, commitTime)
@@ -352,25 +374,28 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     }
   }
 
-  private def allProgressRecords(
-      timestamp: Long,
-      ehConnectors: List[EventHubsConnector]): List[Path] = {
+  private def allProgressRecords(timestamp: Long,
+                                 ehConnectors: List[EventHubsConnector]): List[Path] = {
     val fs = tempDirectoryPath.getFileSystem(hadoopConfiguration)
-    ehConnectors.flatMap { ehConnector =>
-      ehConnector.connectedInstances.map(ehNameAndPartition =>
-        PathTools.makeTempFilePath(
-          tempDirectoryStr, ehConnector.streamId, ehConnector.uid, ehNameAndPartition, timestamp))
-    }.filter(fs.exists)
+    ehConnectors
+      .flatMap { ehConnector =>
+        ehConnector.connectedInstances.map(
+          ehNameAndPartition =>
+            PathTools.makeTempFilePath(tempDirectoryStr,
+                                       ehConnector.streamId,
+                                       ehConnector.uid,
+                                       ehNameAndPartition,
+                                       timestamp))
+      }
+      .filter(fs.exists)
   }
 
   /**
    * read progress records from temp directories
    * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
    */
-  def collectProgressRecordsForBatch(
-      timestamp: Long,
-      ehConnectors: List[EventHubsConnector]):
-    Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
+  def collectProgressRecordsForBatch(timestamp: Long, ehConnectors: List[EventHubsConnector])
+    : Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
     val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
     try {
@@ -384,10 +409,11 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       // check timestamp consistency
       records.foreach(progressRecord =>
         if (timestamp != progressRecord.timestamp) {
-          throw new IllegalStateException(s"detect inconsistent progress tracking file at" +
-            s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
-            s" implementation of underlying file system")
-        })
+          throw new IllegalStateException(
+            s"detect inconsistent progress tracking file at" +
+              s" $progressRecord, expected timestamp: $timestamp, it might be a bug in the" +
+              s" implementation of underlying file system")
+      })
     } catch {
       case ioe: IOException =>
         logError(s"error: ${ioe.getMessage}")
@@ -410,11 +436,15 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   def cleanProgressFile(timestampToClean: Long): Unit = {
     val fs = progressDirectoryPath.getFileSystem(hadoopConfiguration)
-    val allUselessFiles = fs.listStatus(progressDirectoryPath, new PathFilter {
-      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
-    }).map(_.getPath)
-    val sortedFileList = allUselessFiles.sortWith((p1, p2) => fromPathToTimestamp(p1) >
-      fromPathToTimestamp(p2))
+    val allUselessFiles = fs
+      .listStatus(progressDirectoryPath, new PathFilter {
+        override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
+      })
+      .map(_.getPath)
+    val sortedFileList = allUselessFiles.sortWith(
+      (p1, p2) =>
+        fromPathToTimestamp(p1) >
+          fromPathToTimestamp(p2))
     if (sortedFileList.nonEmpty) {
       sortedFileList.tail.foreach { filePath =>
         logInfo(s"delete $filePath")
@@ -422,15 +452,22 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       }
     }
     // clean temp directory
-    val allUselessTempFiles = fs.listStatus(tempDirectoryPath, new PathFilter {
-      override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
-    }).map(_.getPath)
+    val allUselessTempFiles = fs
+      .listStatus(tempDirectoryPath, new PathFilter {
+        override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
+      })
+      .map(_.getPath)
     if (allUselessTempFiles.nonEmpty) {
-      allUselessTempFiles.groupBy(fromPathToTimestamp).toList.sortWith((p1, p2) => p1._1 > p2._1).
-        tail.flatMap(_._2).foreach {
-        filePath => logInfo(s"delete $filePath")
+      allUselessTempFiles
+        .groupBy(fromPathToTimestamp)
+        .toList
+        .sortWith((p1, p2) => p1._1 > p2._1)
+        .tail
+        .flatMap(_._2)
+        .foreach { filePath =>
+          logInfo(s"delete $filePath")
           fs.delete(filePath, true)
-      }
+        }
     }
   }
 
@@ -439,11 +476,12 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       override def run(): Unit = {
         val fs = metadataDirectoryPath.getFileSystem(new Configuration())
         val allMetadataFiles = fs.listStatus(metadataDirectoryPath)
-        val sortedMetadataFiles = allMetadataFiles.sortWith((f1, f2) => f1.getPath.getName.toLong <
-          f2.getPath.getName.toLong)
-        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map{
-          file =>
-            fs.delete(file.getPath, true)
+        val sortedMetadataFiles = allMetadataFiles.sortWith(
+          (f1, f2) =>
+            f1.getPath.getName.toLong <
+              f2.getPath.getName.toLong)
+        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map { file =>
+          fs.delete(file.getPath, true)
         }
       }
     }

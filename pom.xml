@@ -31,8 +31,8 @@
   </licenses>
   <developers>
     <developer>
-      <name>Arijit Tarafdar</name>
-      <email>arijitt@microsoft.com</email>
+      <name>Sabee Grewal</name>
+      <email>sagrewal@microsoft.com</email>
       <organization>Microsoft Corporation</organization>
       <organizationUrl>http://www.microsoft.com</organizationUrl>
     </developer>
@@ -100,7 +100,7 @@
               <branch>refs/heads/maven-repo</branch>
               <includes><include>**/*</include></includes>
               <repositoryName>spark-eventhubs</repositoryName>
-              <repositoryOwner>sabeegrewal</repositoryOwner>
+              <repositoryOwner>Azure</repositoryOwner>
               <merge>true</merge>
             </configuration>
             <executions>
@@ -306,32 +306,6 @@
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
-      <plugin>
-        <groupId>org.scalastyle</groupId>
-        <artifactId>scalastyle-maven-plugin</artifactId>
-        <version>0.8.0</version>
-        <configuration>
-          <verbose>false</verbose>
-          <failOnViolation>true</failOnViolation>
-          <includeTestSourceDirectory>true</includeTestSourceDirectory>
-          <failOnWarning>false</failOnWarning>
-          <sourceDirectories>
-            <dir>${basedir}/core/src/main/scala</dir>
-            <dir>${basedir}/examples/src/main/scala</dir>
-          </sourceDirectories>
-          <testSourceDirectory>${basedir}/core/src/test/scala</testSourceDirectory>
-          <configLocation>scalastyle-config.xml</configLocation>
-          <outputFile>${project.basedir}/scalastyle-output.xml</outputFile>
-          <outputEncoding>UTF-8</outputEncoding>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>

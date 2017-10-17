@@ -21,22 +21,22 @@ import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector}
-import org.apache.spark.eventhubscommon.progress.{PathTools, ProgressTrackerBase}
+import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, EventHubsConnector }
+import org.apache.spark.eventhubscommon.progress.{ PathTools, ProgressTrackerBase }
 
-private[spark] class StructuredStreamingProgressTracker private[spark](
+private[spark] class StructuredStreamingProgressTracker private[spark] (
     uid: String,
     progressDir: String,
     appName: String,
     hadoopConfiguration: Configuration)
-  extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
+    extends ProgressTrackerBase(progressDir, appName, hadoopConfiguration) {
 
-  private[spark] override lazy val progressDirectoryStr = PathTools.makeProgressDirectoryStr(
-    progressDir, appName, uid)
-  private[spark] override lazy val tempDirectoryStr = PathTools.makeTempDirectoryStr(progressDir,
-    appName, uid)
-  private[spark] override lazy val metadataDirectoryStr = PathTools.makeMetadataDirectoryStr(
-    progressDir, appName, uid)
+  private[spark] override lazy val progressDirectoryStr =
+    PathTools.makeProgressDirectoryStr(progressDir, appName, uid)
+  private[spark] override lazy val tempDirectoryStr =
+    PathTools.makeTempDirectoryStr(progressDir, appName, uid)
+  private[spark] override lazy val metadataDirectoryStr =
+    PathTools.makeMetadataDirectoryStr(progressDir, appName, uid)
 
   override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
     val connector = StructuredStreamingProgressTracker.registeredConnectors(uid)
@@ -67,7 +67,8 @@ private[spark] class StructuredStreamingProgressTracker private[spark](
           if (latestFile.isDefined) {
             logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
             val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
-            val progressRecords = collectProgressRecordsForBatch(latestFileTimestamp,
+            val progressRecords = collectProgressRecordsForBatch(
+              latestFileTimestamp,
               List(StructuredStreamingProgressTracker.registeredConnectors(uid)))
             commit(progressRecords, latestFileTimestamp)
           }
@@ -111,9 +112,10 @@ object StructuredStreamingProgressTracker {
     this.synchronized {
       // DirectDStream shall have singleton progress tracker
       if (_progressTrackers.get(uid).isEmpty) {
-        _progressTrackers += uid -> new StructuredStreamingProgressTracker(uid, progressDirStr,
-          appName,
-          hadoopConfiguration)
+        _progressTrackers += uid -> new StructuredStreamingProgressTracker(uid,
+                                                                           progressDirStr,
+                                                                           appName,
+                                                                           hadoopConfiguration)
       }
       _progressTrackers(uid).init()
     }

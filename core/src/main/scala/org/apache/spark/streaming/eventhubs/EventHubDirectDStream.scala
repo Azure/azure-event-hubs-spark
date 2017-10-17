@@ -17,22 +17,26 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.io.{IOException, ObjectInputStream}
+import java.io.{ IOException, ObjectInputStream }
 
 import scala.collection.mutable
 
 import com.microsoft.azure.eventhubs.EventData
 
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{AMQPEventHubsClient, EventHubClient, EventHubsClientWrapper}
+import org.apache.spark.eventhubscommon.client.{
+  AMQPEventHubsClient,
+  Client,
+  EventHubsClientWrapper
+}
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.rdd.{EventHubsRDD, OffsetRange, OffsetStoreParams}
+import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.streaming.{StreamingContext, Time}
-import org.apache.spark.streaming.dstream.{DStreamCheckpointData, InputDStream}
+import org.apache.spark.streaming.{ StreamingContext, Time }
+import org.apache.spark.streaming.dstream.{ DStreamCheckpointData, InputDStream }
 import org.apache.spark.streaming.eventhubs.checkpoint._
-import org.apache.spark.streaming.scheduler.{RateController, StreamInputInfo}
+import org.apache.spark.streaming.scheduler.{ RateController, StreamInputInfo }
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
 import org.apache.spark.util.Utils
 
@@ -49,11 +53,17 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     private[eventhubs] val eventHubNameSpace: String,
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
-    eventhubReceiverCreator: (Map[String, String], Int, Long, EventHubsOffsetType, Int) =>
-      EventHubsClientWrapper = EventHubsClientWrapper.getEventHubReceiver,
-    eventhubClientCreator: (String, Map[String, Map[String, String]]) =>
-      EventHubClient = AMQPEventHubsClient.getInstance)
-  extends InputDStream[EventData](_ssc) with EventHubsConnector with Logging {
+    eventhubReceiverCreator: (Map[String, String],
+                              Int,
+                              Long,
+                              EventHubsOffsetType,
+                              Int) => EventHubsClientWrapper =
+      EventHubsClientWrapper.getEventHubReceiver,
+    eventhubClientCreator: (String, Map[String, Map[String, String]]) => Client =
+      AMQPEventHubsClient.getInstance)
+    extends InputDStream[EventData](_ssc)
+    with EventHubsConnector
+    with Logging {
 
   private[streaming] override def name: String = s"EventHub direct stream [$id]"
 
@@ -67,8 +77,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private val eventhubNameAndPartitions = {
     for (eventHubName <- eventhubsParams.keySet;
-         partitionId <- 0 until eventhubsParams(eventHubName)(
-      "eventhubs.partition.count").toInt) yield EventHubNameAndPartition(eventHubName, partitionId)
+         partitionId <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
+      yield EventHubNameAndPartition(eventHubName, partitionId)
   }
 
   // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
@@ -87,16 +97,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     } else {
       None
     }
-    */
+   */
   }
 
-  @transient private var _eventHubClient: EventHubClient = _
+  @transient private var _eventHubClient: Client = _
 
-  private def progressTracker = DirectDStreamProgressTracker.getInstance.
-    asInstanceOf[DirectDStreamProgressTracker]
+  private def progressTracker =
+    DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
 
-  private[eventhubs] def setEventHubClient(eventHubClient: EventHubClient):
-      EventHubDirectDStream = {
+  private[eventhubs] def setEventHubClient(eventHubClient: Client): EventHubDirectDStream = {
     _eventHubClient = eventHubClient
     this
   }
@@ -108,22 +117,26 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _eventHubClient
   }
 
-  private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L,
-    {eventhubNameAndPartitions.map{ehNameAndSpace => (ehNameAndSpace, (-1L, -1L))}.toMap})
+  private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
+    eventhubNameAndPartitions.map { ehNameAndSpace =>
+      (ehNameAndSpace, (-1L, -1L))
+    }.toMap
+  })
   private[eventhubs] var fetchedHighestOffsetsAndSeqNums: OffsetRecord = _
 
   override def start(): Unit = {
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
-    require(concurrentJobs == 1,
+    require(
+      concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
     DirectDStreamProgressTracker.initInstance(progressDir,
-      context.sparkContext.appName, context.sparkContext.hadoopConfiguration)
+                                              context.sparkContext.appName,
+                                              context.sparkContext.hadoopConfiguration)
     ProgressTrackingListener.initInstance(ssc, progressDir)
   }
 
   override def stop(): Unit = {
     logInfo("stop: stopping EventHubDirectDStream")
-    eventHubClient.close()
   }
 
   /**
@@ -139,44 +152,50 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
     val offsetRecord = progressTracker.read(
-      eventHubNameSpace, validTime.milliseconds - ssc.graph.batchDuration.milliseconds, fallBack)
+      eventHubNameSpace,
+      validTime.milliseconds - ssc.graph.batchDuration.milliseconds,
+      fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
     if (offsetRecord.timestamp != -1) {
       OffsetRecord(math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
-        offsetRecord.offsets)
+                   offsetRecord.offsets)
     } else {
       // query start startSeqs
-      val startSeqs = eventHubClient.startSeqOfPartition(retryIfFail = false,
-        eventhubNameAndPartitions.toList)
-      require(startSeqs.isDefined, "We cannot get starting seq number of partitions," +
-        " EventHubs endpoint is not available")
-      OffsetRecord(math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
+      val startSeqs =
+        eventHubClient.startSeqOfPartition(retryIfFail = false, eventhubNameAndPartitions.toList)
+      require(startSeqs.isDefined,
+              "We cannot get starting seq number of partitions," +
+                " EventHubs endpoint is not available")
+      OffsetRecord(
+        math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
         offsetRecord.offsets.map {
           case (ehNameAndPartition, (offset, _)) =>
             (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))
-        })
+        }
+      )
     }
   }
 
   private def reportInputInto(validTime: Time,
-                              offsetRanges: List[OffsetRange], inputSize: Int): Unit = {
+                              offsetRanges: List[OffsetRange],
+                              inputSize: Int): Unit = {
     require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
-    val description = offsetRanges.map { offsetRange =>
-      s"eventhub: ${offsetRange.eventHubNameAndPartition}\t" +
-        s"starting offsets: ${offsetRange.fromOffset}" +
-        s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
-    }.mkString("\n")
+    val description = offsetRanges
+      .map { offsetRange =>
+        s"eventhub: ${offsetRange.eventHubNameAndPartition}\t" +
+          s"starting offsets: ${offsetRange.fromOffset}" +
+          s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
+      }
+      .mkString("\n")
     // Copy offsetRanges to immutable.List to prevent from being modified by the user
-    val metadata = Map(
-      "offsets" -> offsetRanges,
-      StreamInputInfo.METADATA_KEY_DESCRIPTION -> description)
+    val metadata =
+      Map("offsets" -> offsetRanges, StreamInputInfo.METADATA_KEY_DESCRIPTION -> description)
     val inputInfo = StreamInputInfo(id, inputSize, metadata)
     ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
   }
 
-  private def validatePartitions(
-      validTime: Time,
-      calculatedPartitions: List[EventHubNameAndPartition]): Unit = {
+  private def validatePartitions(validTime: Time,
+                                 calculatedPartitions: List[EventHubNameAndPartition]): Unit = {
     if (currentOffsetsAndSeqNums != null) {
       val currentPartitions = currentOffsetsAndSeqNums.offsets.keys.toList
       val diff = currentPartitions.diff(calculatedPartitions)
@@ -187,24 +206,26 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)]):
-      Map[EventHubNameAndPartition, Long] = {
+  private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)])
+    : Map[EventHubNameAndPartition, Long] = {
     if (rateController.isEmpty) {
       RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
-        fetchedHighestOffsetsAndSeqNums.offsets, eventhubsParams)
+                             fetchedHighestOffsetsAndSeqNums.offsets,
+                             eventhubsParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
       estimateRateLimit.filter(_ > 0) match {
         case None =>
-          highestEndpoints.map{case (ehNameAndPartition, _) =>
-            (ehNameAndPartition, currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2)
+          highestEndpoints.map {
+            case (ehNameAndPartition, _) =>
+              (ehNameAndPartition, currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2)
           }
         case Some(allowedRate) =>
           val lagPerPartition = highestEndpoints.map {
             case (eventHubNameAndPartition, (_, latestSeq)) =>
               eventHubNameAndPartition ->
                 math.max(latestSeq - currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
-                  0)
+                         0)
           }
           val totalLag = lagPerPartition.values.sum
           lagPerPartition.map {
@@ -229,31 +250,36 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(eventHubClient, eventhubsParams,
-          eventhubNameAndPartitions.toList)
+        RateControlUtils.validateFilteringParams(eventHubClient,
+                                                 eventhubsParams,
+                                                 eventhubNameAndPartitions.toList)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
-          startOffsetInNextBatch.offsets)
+                                                              startOffsetInNextBatch.offsets)
       } else {
         Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
       }
     }
     highestOffsets.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
-        val (offsetType, offset) = RateControlUtils.calculateStartOffset(eventHubNameAndPartition,
-          filteringOffsetAndType, startOffsetInNextBatch.offsets)
-        OffsetRange(eventHubNameAndPartition,
+        val (offsetType, offset) =
+          RateControlUtils.calculateStartOffset(eventHubNameAndPartition,
+                                                filteringOffsetAndType,
+                                                startOffsetInNextBatch.offsets)
+        OffsetRange(
+          eventHubNameAndPartition,
           fromOffset = offset,
           fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
           untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum),
-          offsetType = offsetType)
+          offsetType = offsetType
+        )
     }.toList
   }
 
   private def proceedWithNonEmptyRDD(
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
-      highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)]):
-    Option[EventHubsRDD] = {
+      highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)])
+    : Option[EventHubsRDD] = {
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch
@@ -264,11 +290,15 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       eventhubsParams,
       offsetRanges,
       validTime.milliseconds,
-      OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
-        subDirs = ssc.sparkContext.appName),
-      eventhubReceiverCreator)
-    reportInputInto(validTime, offsetRanges,
-      offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
+      OffsetStoreParams(progressDir,
+                        streamId,
+                        uid = eventHubNameSpace,
+                        subDirs = ssc.sparkContext.appName),
+      eventhubReceiverCreator
+    )
+    reportInputInto(validTime,
+                    offsetRanges,
+                    offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
     Some(eventHubRDD)
   }
 
@@ -288,19 +318,18 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
    * to prevent we die too much, we shall retry with 2-power interval in this case
    */
-  private def failAppIfRestEndpointFail = fetchedHighestOffsetsAndSeqNums == null ||
-    currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
+  private def failAppIfRestEndpointFail =
+    fetchedHighestOffsetsAndSeqNums == null ||
+      currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
   private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
-    RateControlUtils.fetchLatestOffset(
-      eventHubClient,
-      retryIfFail,
-      if (fetchedHighestOffsetsAndSeqNums == null) {
-        currentOffsetsAndSeqNums.offsets
-      } else {
-        fetchedHighestOffsetsAndSeqNums.offsets
-      })
-    match {
+    RateControlUtils.fetchLatestOffset(eventHubClient,
+                                       retryIfFail,
+                                       if (fetchedHighestOffsetsAndSeqNums == null) {
+                                         currentOffsetsAndSeqNums.offsets
+                                       } else {
+                                         fetchedHighestOffsetsAndSeqNums.offsets
+                                       }) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime.milliseconds, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)
@@ -321,9 +350,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
     var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
     while (startPointRecord.timestamp < validTime.milliseconds -
-      ssc.graph.batchDuration.milliseconds) {
-      logInfo(s"wait for ProgressTrackingListener to commit offsets at Batch" +
-        s" ${validTime.milliseconds}")
+             ssc.graph.batchDuration.milliseconds) {
+      logInfo(
+        s"wait for ProgressTrackingListener to commit offsets at Batch" +
+          s" ${validTime.milliseconds}")
       graph.wait()
       logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
       startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
@@ -334,11 +364,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     // 2) when the last batch was delayed, we should catch up by detecting the latest highest
     // offset
     val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
-    require(highestOffsetOption.isDefined, "We cannot get starting highest offset of partitions," +
-      " EventHubs endpoint is not available")
+    require(highestOffsetOption.isDefined,
+            "We cannot get starting highest offset of partitions," +
+              " EventHubs endpoint is not available")
     logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetOption.get}")
-    logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
-      s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
+    logInfo(
+      s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
+        s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
     val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
     initialized = true
     rdd
@@ -352,11 +384,14 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private[eventhubs] class EventHubDirectDStreamCheckpointData(
-      eventHubDirectDStream: EventHubDirectDStream) extends DStreamCheckpointData(this) {
+      eventHubDirectDStream: EventHubDirectDStream)
+      extends DStreamCheckpointData(this) {
 
-    def batchForTime: mutable.HashMap[Time, Array[(EventHubNameAndPartition, Long, Long, Long,
-      EventHubsOffsetType)]] = {
-      data.asInstanceOf[mutable.HashMap[Time,
+    def batchForTime: mutable.HashMap[
+      Time,
+      Array[(EventHubNameAndPartition, Long, Long, Long, EventHubsOffsetType)]] = {
+      data.asInstanceOf[mutable.HashMap[
+        Time,
         Array[(EventHubNameAndPartition, Long, Long, Long, EventHubsOffsetType)]]]
     }
 
@@ -372,32 +407,36 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       }
     }
 
-    override def cleanup(time: Time): Unit = { }
+    override def cleanup(time: Time): Unit = {}
 
     override def restore(): Unit = {
       // we have to initialize here, otherwise there is a race condition when recovering from spark
       // checkpoint
       logInfo("initialized ProgressTracker")
       val appName = context.sparkContext.appName
-      DirectDStreamProgressTracker.initInstance(progressDir, appName,
-        context.sparkContext.hadoopConfiguration)
-      batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach { case (t, b) =>
-        logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
-        generatedRDDs += t -> new EventHubsRDD(
-          context.sparkContext,
-          eventhubsParams,
-          b.map {case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
-            OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)}.toList,
-          t.milliseconds,
-          OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace,
-            subDirs = appName),
-          eventhubReceiverCreator)
+      DirectDStreamProgressTracker.initInstance(progressDir,
+                                                appName,
+                                                context.sparkContext.hadoopConfiguration)
+      batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach {
+        case (t, b) =>
+          logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
+          generatedRDDs += t -> new EventHubsRDD(
+            context.sparkContext,
+            eventhubsParams,
+            b.map {
+              case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
+                OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)
+            }.toList,
+            t.milliseconds,
+            OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace, subDirs = appName),
+            eventhubReceiverCreator
+          )
       }
     }
   }
 
   private[eventhubs] class EventHubDirectDStreamRateController(id: Int, estimator: RateEstimator)
-    extends RateController(id, estimator) {
+      extends RateController(id, estimator) {
     override protected def publish(rate: Long): Unit = {
       // publish nothing as there is no receiver
     }

@@ -50,21 +50,19 @@ private[spark] object PathTools extends Serializable {
   def makeProgressFileName(timestamp: Long): String =
     s"progress-$timestamp"
 
-  def makeTempFileName(
-      streamId: Int,
-      uid: String,
-      eventHubNameAndPartition: EventHubNameAndPartition,
-      timestamp: Long): String =
+  def makeTempFileName(streamId: Int,
+                       uid: String,
+                       eventHubNameAndPartition: EventHubNameAndPartition,
+                       timestamp: Long): String =
     s"$streamId-$uid-$eventHubNameAndPartition-$timestamp"
 
-  def makeTempFilePath(
-      basePath: String,
-      streamId: Int,
-      uid: String,
-      eventHubNameAndPartition: EventHubNameAndPartition,
-      timestamp: Long): Path =
-    new Path(s"${combineDirectoryNames(
-      basePath, makeTempFileName(streamId, uid, eventHubNameAndPartition, timestamp))}")
+  def makeTempFilePath(basePath: String,
+                       streamId: Int,
+                       uid: String,
+                       eventHubNameAndPartition: EventHubNameAndPartition,
+                       timestamp: Long): Path =
+    new Path(
+      s"${combineDirectoryNames(basePath, makeTempFileName(streamId, uid, eventHubNameAndPartition, timestamp))}")
 
   def makeMetadataFileName(timestamp: Long): String = timestamp.toString
 }

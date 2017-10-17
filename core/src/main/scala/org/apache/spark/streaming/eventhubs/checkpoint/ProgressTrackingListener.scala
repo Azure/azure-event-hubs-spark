@@ -20,39 +20,46 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
-import org.apache.spark.streaming.scheduler.{StreamingListener, StreamingListenerBatchCompleted}
+import org.apache.spark.streaming.scheduler.{ StreamingListener, StreamingListenerBatchCompleted }
 
 /**
  * The listener asynchronously commits the temp checkpoint to the path which is read by DStream
  * driver. It monitors the input size to prevent those empty batches from committing checkpoints
  */
-private[eventhubs] class ProgressTrackingListener private (
-    ssc: StreamingContext, progressDirectory: String) extends StreamingListener with Logging {
+private[eventhubs] class ProgressTrackingListener private (ssc: StreamingContext,
+                                                           progressDirectory: String)
+    extends StreamingListener
+    with Logging {
 
   override def onBatchCompleted(batchCompleted: StreamingListenerBatchCompleted): Unit = {
     logInfo(s"Batch ${batchCompleted.batchInfo.batchTime} completed")
     val batchTime = batchCompleted.batchInfo.batchTime.milliseconds
     try {
       if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
-        val progressTracker = DirectDStreamProgressTracker.getInstance.
-          asInstanceOf[DirectDStreamProgressTracker]
+        val progressTracker =
+          DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
         // build current offsets
         val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
         // merge with the temp directory
         val startTime = System.currentTimeMillis()
-        val progressInLastBatch = progressTracker.collectProgressRecordsForBatch(
-          batchTime, allEventDStreams.toList)
+        val progressInLastBatch =
+          progressTracker.collectProgressRecordsForBatch(batchTime, allEventDStreams.toList)
         logInfo(s"progressInLastBatch $progressInLastBatch")
         if (progressInLastBatch.nonEmpty) {
-          val contentToCommit = allEventDStreams.map {
-            case dstream: EventHubDirectDStream =>
-              (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
-          }.toMap.map { case (namespace, currentOffsets) =>
-            (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
-          }
+          val contentToCommit = allEventDStreams
+            .map {
+              case dstream: EventHubDirectDStream =>
+                (dstream.eventHubNameSpace, dstream.currentOffsetsAndSeqNums.offsets)
+            }
+            .toMap
+            .map {
+              case (namespace, currentOffsets) =>
+                (namespace, currentOffsets ++ progressInLastBatch.getOrElse(namespace, Map()))
+            }
           progressTracker.commit(contentToCommit, batchTime)
-          logInfo(s"commit ending offset of Batch $batchTime $contentToCommit time cost:" +
-            s" ${System.currentTimeMillis() - startTime}")
+          logInfo(
+            s"commit ending offset of Batch $batchTime $contentToCommit time cost:" +
+              s" ${System.currentTimeMillis() - startTime}")
         } else {
           logInfo(s"read RDD data from Checkpoint at $batchTime, skip commits")
         }
@@ -73,9 +80,8 @@ private[eventhubs] object ProgressTrackingListener {
 
   private var _progressTrackerListener: ProgressTrackingListener = _
 
-  private def getOrCreateProgressTrackerListener(
-      ssc: StreamingContext,
-      progressDirectory: String) = {
+  private def getOrCreateProgressTrackerListener(ssc: StreamingContext,
+                                                 progressDirectory: String) = {
     if (_progressTrackerListener == null) {
       _progressTrackerListener = new ProgressTrackingListener(ssc, progressDirectory)
       ssc.scheduler.listenerBus.listeners.add(0, _progressTrackerListener)
@@ -88,10 +94,8 @@ private[eventhubs] object ProgressTrackingListener {
     _progressTrackerListener = null
   }
 
-  def initInstance(
-      ssc: StreamingContext,
-      progressDirectory: String): ProgressTrackingListener = this.synchronized {
-    getOrCreateProgressTrackerListener(ssc, progressDirectory)
-  }
+  def initInstance(ssc: StreamingContext, progressDirectory: String): ProgressTrackingListener =
+    this.synchronized {
+      getOrCreateProgressTrackerListener(ssc, progressDirectory)
+    }
 }
-

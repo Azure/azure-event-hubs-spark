@@ -20,12 +20,11 @@ package org.apache.spark.eventhubscommon.rdd
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 
-private[spark] case class OffsetRange(
-    eventHubNameAndPartition: EventHubNameAndPartition,
-    fromOffset: Long,
-    fromSeq: Long,
-    untilSeq: Long,
-    offsetType: EventHubsOffsetType) {
+private[spark] case class OffsetRange(eventHubNameAndPartition: EventHubNameAndPartition,
+                                      fromOffset: Long,
+                                      fromSeq: Long,
+                                      untilSeq: Long,
+                                      offsetType: EventHubsOffsetType) {
 
   private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq, offsetType)
 }

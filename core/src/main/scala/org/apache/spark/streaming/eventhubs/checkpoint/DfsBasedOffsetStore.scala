@@ -17,7 +17,7 @@
 package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.{ FileSystem, Path }
 
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
@@ -26,15 +26,13 @@ import org.apache.spark.internal.Logging
  * A DFS based OffsetStore implementation
  */
 @SerialVersionUID(1L)
-class DfsBasedOffsetStore(
-    directory: String,
-    namespace: String,
-    name: String,
-    partition: String) extends OffsetStore with Logging {
+class DfsBasedOffsetStore(directory: String, namespace: String, name: String, partition: String)
+    extends OffsetStore
+    with Logging {
 
   if (!SparkContext.getOrCreate().isLocal) {
     require(directory.startsWith("hdfs://") || directory.startsWith("adl://"),
-      "we only support to store offset in HDFS/ADLS when running Spark in non-local mode ")
+            "we only support to store offset in HDFS/ADLS when running Spark in non-local mode ")
   }
 
   var path: Path = _
@@ -45,7 +43,6 @@ class DfsBasedOffsetStore(
   /**
    * Open two files, the actual checkpoint file and the backup checkpoint file
    */
-
   override def open(): Unit = {
     if (checkpointFile == null) {
       path = new Path(directory + "/" + namespace + "/" + name + "/" + partition)
@@ -183,4 +180,3 @@ class DfsBasedOffsetStore(
     // pass
   }
 }
-

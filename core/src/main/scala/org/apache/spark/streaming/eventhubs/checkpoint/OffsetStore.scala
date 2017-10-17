@@ -23,10 +23,6 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 trait OffsetStore extends Serializable {
   def open(): Unit
   def write(offset: String): Unit
-  def read() : String
+  def read(): String
   def close(): Unit
 }
-
-
-
-

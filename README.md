@@ -7,6 +7,7 @@
 |Branch|Status|
 |------|-------------|
 |master|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=master)](https://travis-ci.org/Azure/spark-eventhubs)|
+|dev|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=dev)](https://travis-ci.org/Azure/spark-eventhubs)|
 |2.1.x|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=2.1.x)](https://travis-ci.org/Azure/spark-eventhubs)|
 |2.0.x|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=2.0.x)](https://travis-ci.org/Azure/spark-eventhubs)|
 

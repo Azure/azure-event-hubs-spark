@@ -41,7 +41,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
   )
 
   before {
-    ehClientWrapperMock = spy(new EventHubsClientWrapper(Map("name" -> ehParams)))
+    ehClientWrapperMock = spy(new EventHubsClientWrapper(ehParams))
     offsetStoreMock = mock[OffsetStore]
   }
 

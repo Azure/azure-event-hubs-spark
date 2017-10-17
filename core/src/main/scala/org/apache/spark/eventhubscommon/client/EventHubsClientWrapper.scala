@@ -30,7 +30,7 @@ import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
  */
 @SerialVersionUID(1L)
 private[spark] class EventHubsClientWrapper(
-    ehParams: Map[String, Map[String, String]]
+    ehParams: Map[String, String]
 ) extends Serializable
     with Client
     with Logging {
@@ -213,7 +213,7 @@ private[spark] object EventHubsClientWrapper {
                           offsetType: EventHubsOffsetType,
                           maximumEventRate: Int): EventHubsClientWrapper = {
     val ehName = ehParams.get("eventhubs.name").toString
-    val eventHubClientWrapperInstance = new EventHubsClientWrapper(Map(ehName -> ehParams))
+    val eventHubClientWrapperInstance = new EventHubsClientWrapper(ehParams)
     eventHubClientWrapperInstance.createReceiver(partitionId.toString,
                                                  startOffset.toString,
                                                  offsetType,

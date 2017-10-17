@@ -82,7 +82,7 @@ class TestEventHubsReceiver(ehParams: Map[String, String],
                             partitionId: Int,
                             startOffset: Long,
                             offsetType: EventHubsOffsetType)
-    extends EventHubsClientWrapper(Map(ehParams.get("eventhubs.name").toString -> ehParams)) {
+    extends EventHubsClientWrapper(ehParams) {
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = ehParams("eventhubs.name")

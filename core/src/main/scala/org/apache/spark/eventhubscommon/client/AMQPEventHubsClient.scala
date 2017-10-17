@@ -29,7 +29,7 @@ private[client] class AMQPEventHubsClient(ehNames: List[String],
 
   private val nameToClient = new mutable.HashMap[String, EventHubClient]
   for (ehName <- ehNames)
-    nameToClient += ehName -> new EventHubsClientWrapper(ehParams)
+    nameToClient += ehName -> new EventHubsClientWrapper(ehParams(ehName))
       .createClient(ehParams(ehName))
 
   private def getRunTimeInfoOfPartitions(

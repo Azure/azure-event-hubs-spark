@@ -17,10 +17,8 @@
 package org.apache.spark.streaming.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-
 import org.apache.spark.SparkConf
 import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
 object EventHubsUtils {
@@ -48,8 +46,12 @@ object EventHubsUtils {
       ssc: StreamingContext,
       eventHubNamespace: String,
       progressDir: String,
-      eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
+      eventParams: Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
+    val newStream = new EventHubDirectDStream(ssc,
+                                              eventHubNamespace,
+                                              progressDir,
+                                              eventParams,
+                                              EventHubsClientWrapper.apply)
     newStream
   }
 
@@ -62,19 +64,13 @@ object EventHubsUtils {
       eventHubNamespace: String,
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]],
-      eventHubsReceiverCreator: (Predef.Map[String, String],
-                                 Int,
-                                 Long,
-                                 EventHubsOffsetType,
-                                 Int) => EventHubsClientWrapper =
-        EventHubsClientWrapper.getEventHubReceiver,
       eventHubsClientCreator: (String, Predef.Map[String, Predef.Map[String, String]]) => Client)
     : EventHubDirectDStream = {
     val newStream = new EventHubDirectDStream(ssc,
                                               eventHubNamespace,
                                               progressDir,
                                               eventParams,
-                                              eventHubsReceiverCreator,
+                                              EventHubsClientWrapper.apply,
                                               eventHubsClientCreator)
     newStream
   }

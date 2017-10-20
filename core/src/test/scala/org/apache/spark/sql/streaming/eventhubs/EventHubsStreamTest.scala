@@ -513,16 +513,8 @@ trait EventHubsStreamTest
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(
-              (eventHubsParameters: Map[String, String],
-               partitionId: Int,
-               startOffset: Long,
-               offsetType: EventHubsOffsetType,
-               _: Int) =>
-                new TestEventHubsReceiver(eventHubsParameters,
-                                          eventHubs,
-                                          partitionId,
-                                          startOffset,
-                                          offsetType)
+              (eventHubsParameters: Map[String, String]) =>
+                new TestEventHubsReceiver(eventHubsParameters, eventHubs)
             )
             currentStream.start()
 

@@ -45,12 +45,7 @@ import org.apache.spark.sql.types._
 private[spark] class EventHubsSource(
     sqlContext: SQLContext,
     eventHubsParams: Map[String, String],
-    eventhubReceiverCreator: (Map[String, String],
-                              Int,
-                              Long,
-                              EventHubsOffsetType,
-                              Int) => EventHubsClientWrapper =
-      EventHubsClientWrapper.getEventHubReceiver,
+    receiverFactory: (Map[String, String]) => Client,
     eventhubClientCreator: (String, Map[String, Map[String, String]]) => Client =
       AMQPEventHubsClient.getInstance)
     extends Source
@@ -70,8 +65,7 @@ private[spark] class EventHubsSource(
 
   private var _eventHubsClient: Client = _
 
-  private var _eventHubsReceiver
-    : (Map[String, String], Int, Long, EventHubsOffsetType, Int) => EventHubsClientWrapper = _
+  private var _eventHubsReceiver: (Map[String, String]) => Client = _
 
   private[eventhubs] def eventHubClient = {
     if (_eventHubsClient == null) {
@@ -83,7 +77,7 @@ private[spark] class EventHubsSource(
 
   private[eventhubs] def eventHubsReceiver = {
     if (_eventHubsReceiver == null) {
-      _eventHubsReceiver = eventhubReceiverCreator
+      _eventHubsReceiver = receiverFactory
     }
     _eventHubsReceiver
   }
@@ -114,11 +108,7 @@ private[spark] class EventHubsSource(
   }
 
   private[spark] def setEventHubsReceiver(
-      eventhubReceiverCreator: (Map[String, String],
-                                Int,
-                                Long,
-                                EventHubsOffsetType,
-                                Int) => EventHubsClientWrapper): EventHubsSource = {
+      eventhubReceiverCreator: (Map[String, String]) => Client): EventHubsSource = {
     _eventHubsReceiver = eventhubReceiverCreator
     this
   }

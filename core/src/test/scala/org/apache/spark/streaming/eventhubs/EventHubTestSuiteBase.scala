@@ -109,16 +109,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace,
       progressRootPath.toString,
       eventhubsParams,
-      (eventHubParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubParams,
-                                  simulatedEventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (ehParams: Map[String, String]) => new TestEventHubsReceiver(ehParams, simulatedEventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         FragileEventHubClient.getInstance("", Map())
     )
@@ -165,16 +156,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace,
       progressRootPath.toString,
       eventhubsParams,
-      (eventHubParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubParams,
-                                  simulatedEventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (ehParams: Map[String, String]) => new TestEventHubsReceiver(ehParams, simulatedEventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(maxOffsetForEachEventHub)
     )
@@ -354,16 +336,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       namespace,
       progressRootPath.toString,
       eventhubsParams,
-      (eventHubParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubParams,
-                                  simulatedEventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (ehParams: Map[String, String]) => new TestEventHubsReceiver(ehParams, simulatedEventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new FluctuatedEventHubClient(ssc,
                                      messagesBeforeEmpty,

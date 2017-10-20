@@ -18,19 +18,34 @@
 package org.apache.spark.eventhubscommon.client
 
 import scala.collection.mutable
-import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubPartitionRuntimeInformation }
+import com.microsoft.azure.eventhubs.{ EventData, EventHubPartitionRuntimeInformation }
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
 private[client] class AMQPEventHubsClient(ehNames: List[String],
                                           ehParams: Map[String, Map[String, String]])
-    extends Client
+    extends Serializable
+    with Client
     with Logging {
 
-  private val nameToClient = new mutable.HashMap[String, EventHubClient]
+  // TODO: these methods will be gone after client re-write is done.
+  override def initClient(): Unit = {}
+
+  override def initReceiver(partitionId: String,
+                            offsetType: EventHubsOffsetType,
+                            currentOffset: String): Unit = {}
+
+  override def receive(expectedEvents: Int): Iterable[EventData] = {
+    Iterable[EventData]()
+  }
+
+  private val nameToClient = new mutable.HashMap[String, EventHubsClientWrapper]
   for (ehName <- ehNames)
-    nameToClient += ehName -> new EventHubsClientWrapper(ehParams(ehName))
-      .createClient(ehParams(ehName))
+    nameToClient += ehName -> EventHubsClientWrapper(ehParams(ehName))
+
+  for ((_, client) <- nameToClient)
+    client.initClient()
 
   private def getRunTimeInfoOfPartitions(
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]) = {
@@ -39,10 +54,9 @@ private[client] class AMQPEventHubsClient(ehNames: List[String],
       for (ehNameAndPartition <- targetEventHubNameAndPartitions) {
         val ehName = ehNameAndPartition.eventHubName
         val partitionId = ehNameAndPartition.partitionId
-        val client = nameToClient.get(ehName)
-        require(client.isDefined, "cannot find client for EventHubs instance " + ehName)
+        val client = nameToClient.get(ehName).asInstanceOf[EventHubsClientWrapper].client
         val runTimeInfo =
-          client.get.getPartitionRuntimeInformation(partitionId.toString).get()
+          client.getPartitionRuntimeInformation(partitionId.toString).get()
         results += ehNameAndPartition -> runTimeInfo
       }
       results.toMap.view
@@ -124,7 +138,7 @@ private[client] class AMQPEventHubsClient(ehNames: List[String],
   override def close(): Unit = {
     logInfo("close: Closing AMQPEventHubClient.")
     for ((_, ehClient) <- nameToClient) {
-      ehClient.closeSync()
+      ehClient.close()
     }
   }
 }

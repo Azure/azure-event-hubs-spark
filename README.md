@@ -75,13 +75,13 @@ Then add the following dependency declaration:
     <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>spark-streaming-eventhubs_[2.XX]</artifactId>
-        <version>2.1.5-SNAPSHOT</version>
+        <version>2.1.6-SNAPSHOT</version>
     </dependency>
 ```
 
 #### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.1.5-SNAPSHOT"
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.1.6-SNAPSHOT"
 
 ## Build Prerequisites
 

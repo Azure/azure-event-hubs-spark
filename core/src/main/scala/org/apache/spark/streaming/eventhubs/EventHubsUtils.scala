@@ -18,7 +18,11 @@ package org.apache.spark.streaming.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
+import org.apache.spark.eventhubscommon.client.{
+  AMQPEventHubsClient,
+  Client,
+  EventHubsClientWrapper
+}
 import org.apache.spark.streaming.StreamingContext
 
 object EventHubsUtils {
@@ -51,7 +55,8 @@ object EventHubsUtils {
                                               eventHubNamespace,
                                               progressDir,
                                               eventParams,
-                                              EventHubsClientWrapper.apply)
+                                              EventHubsClientWrapper.apply,
+                                              AMQPEventHubsClient.apply)
     newStream
   }
 
@@ -64,8 +69,7 @@ object EventHubsUtils {
       eventHubNamespace: String,
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]],
-      eventHubsClientCreator: (String, Predef.Map[String, Predef.Map[String, String]]) => Client)
-    : EventHubDirectDStream = {
+      eventHubsClientCreator: (Map[String, String]) => Client): EventHubDirectDStream = {
     val newStream = new EventHubDirectDStream(ssc,
                                               eventHubNamespace,
                                               progressDir,

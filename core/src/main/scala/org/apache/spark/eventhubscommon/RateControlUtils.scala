@@ -25,6 +25,8 @@ import org.apache.spark.eventhubscommon.client.{
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
+import scala.collection.mutable
+
 private[spark] object RateControlUtils extends Logging {
 
   private def maxRateLimitPerPartition(eventHubName: String,
@@ -78,37 +80,42 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def fetchLatestOffset(
-      eventHubClient: Client,
-      retryIfFail: Boolean,
+      eventHubClient: Map[String, Client],
       fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)])
     : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
-    val r =
-      eventHubClient.endPointOfPartition(retryIfFail, fetchedHighestOffsetsAndSeqNums.keySet.toList)
-    if (r.isDefined) {
-      // merge results
-      val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {
-        fetchedHighestOffsetsAndSeqNums ++ r.get
-      } else {
-        r.get
-      }
-      Some(mergedOffsets)
-    } else {
-      r
+
+    val r = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)].empty
+    for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
+      val name = nameAndPartition.eventHubName
+      val endPoint = eventHubClient(name).endPointOfPartition(nameAndPartition)
+      require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
+
+      r += nameAndPartition -> endPoint.get
     }
+
+    val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {
+      fetchedHighestOffsetsAndSeqNums ++ r
+    } else {
+      r.toMap
+    }
+    Option(mergedOffsets)
   }
 
   private[spark] def validateFilteringParams(
-      eventHubsClient: Client,
+      eventHubsClient: Map[String, Client],
       eventhubsParams: Map[String, _],
       ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
 
     // first check if the parameters are valid
-    val latestEnqueueTimeOfPartitions =
-      eventHubsClient.lastEnqueueTimeOfPartitions(retryIfFail = true, ehNameAndPartitions)
-    require(latestEnqueueTimeOfPartitions.isDefined,
-            "cannot get latest enqueue time from Event" +
-              " Hubs Rest Endpoint")
-    latestEnqueueTimeOfPartitions.get.foreach {
+    val latestEnqueueTimeOfPartitions = new mutable.HashMap[EventHubNameAndPartition, Long].empty
+    for (nameAndPartition <- ehNameAndPartitions) {
+      val name = nameAndPartition.eventHubName
+      val lastEnqueueTime = eventHubsClient(name).lastEnqueueTimeOfPartitions(nameAndPartition).get
+
+      latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
+    }
+
+    latestEnqueueTimeOfPartitions.toMap.foreach {
       case (ehNameAndPartition, latestEnqueueTime) =>
         val passInEnqueueTime = eventhubsParams.get(ehNameAndPartition.eventHubName) match {
           case Some(ehParams) =>

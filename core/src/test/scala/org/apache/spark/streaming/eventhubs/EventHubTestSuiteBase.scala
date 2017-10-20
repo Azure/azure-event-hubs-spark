@@ -110,8 +110,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       progressRootPath.toString,
       eventhubsParams,
       (ehParams: Map[String, String]) => new TestEventHubsReceiver(ehParams, simulatedEventHubs),
-      (_: String, _: Map[String, Map[String, String]]) =>
-        FragileEventHubClient.getInstance("", Map())
+      (_: Map[String, String]) => FragileEventHubClient.getInstance("", Map())
     )
   }
 
@@ -157,8 +156,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       progressRootPath.toString,
       eventhubsParams,
       (ehParams: Map[String, String]) => new TestEventHubsReceiver(ehParams, simulatedEventHubs),
-      (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(maxOffsetForEachEventHub)
+      (_: Map[String, String]) => new TestRestEventHubClient(maxOffsetForEachEventHub)
     )
   }
 
@@ -337,7 +335,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       progressRootPath.toString,
       eventhubsParams,
       (ehParams: Map[String, String]) => new TestEventHubsReceiver(ehParams, simulatedEventHubs),
-      (_: String, _: Map[String, Map[String, String]]) =>
+      (_: Map[String, String]) =>
         new FluctuatedEventHubClient(ssc,
                                      messagesBeforeEmpty,
                                      numBatchesBeforeNewData,

@@ -21,23 +21,22 @@ import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{ Dataset, SparkSession }
 import org.apache.spark.sql.streaming.{ OutputMode, ProcessingTime }
-import org.apache.spark.sql.types.{ LongType, TimestampType }
+import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.util.Utils
+import org.scalatest.mock.MockitoSugar
 
-class EventHubsSourceSuite extends EventHubsStreamTest {
+class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
 
-  private def buildEventHubsParamters(namespace: String,
-                                      name: String,
-                                      partitionCount: Int,
-                                      maxRate: Int,
-                                      containsProperties: Boolean = false,
-                                      userDefinedKeys: Option[String] = None,
-                                      enqueueTime: Option[Long] = None): Map[String, String] = {
+  private def buildEventHubsParameters(namespace: String,
+                                       name: String,
+                                       partitionCount: Int,
+                                       maxRate: Int,
+                                       containsProperties: Boolean = false,
+                                       userDefinedKeys: Option[String] = None,
+                                       enqueueTime: Option[Long] = None): Map[String, String] = {
     Map[String, String](
       "eventhubs.policyname" -> "policyName",
       "eventhubs.policykey" -> "policyKey",
@@ -68,7 +67,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected offsets are correct when rate is less than the available data") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 2)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 2)
     val eventPayloadsAndProperties = generateIntKeyedData(6).map {
       case (body, properties) =>
         (body.asInstanceOf[Int], properties)
@@ -79,16 +78,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -98,7 +88,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected offsets are correct when rate is more than the available data") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 10)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -106,16 +96,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       offsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  EventHubsOffsetTypes.PreviousCheckpoint),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -125,26 +106,17 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test(
-    "Verify expected offsets are correct when in subsequent fetch when rate is less than the" +
-      " available data") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    "Verify expected offsets are correct when in subsequent fetch when rate is less than the available data") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(10)
     val eventHubs =
-      EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+      EventHubsTestUtilities.simulateEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
+
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      ehParams,
+      (_: Map[String, String]) => new TestEventHubsReceiver(ehParams, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -165,7 +137,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected dataframe size is correct when the rate is less than the available data") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 2)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 2)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -173,16 +145,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -194,7 +157,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected dataframe size is correct when the rate is more than the available data") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 10)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -202,16 +165,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -225,7 +179,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   test(
     "Verify expected dataframe size is correct in subsequent fetch when the rate is" +
       " less than the available data") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(10)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -233,16 +187,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -264,7 +209,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify all user-defined keys show up in dataframe schema if not specify" +
       " userDefinedKeys") {
     val eventHubsParameters =
-      buildEventHubsParamters("ns1", "eh1", 2, 10, containsProperties = true)
+      buildEventHubsParameters("ns1", "eh1", 2, 10, containsProperties = true)
     val eventPayloadsAndProperties = Seq(
       1 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),
       3 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),
@@ -279,16 +224,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -311,12 +247,12 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify user-defined keys show up in dataframe schema if specify userDefinedKey") {
     val eventHubsParameters =
-      buildEventHubsParamters("ns1",
-                              "eh1",
-                              2,
-                              10,
-                              containsProperties = true,
-                              userDefinedKeys = Some("otherUserDefinedKey,"))
+      buildEventHubsParameters("ns1",
+                               "eh1",
+                               2,
+                               10,
+                               containsProperties = true,
+                               userDefinedKeys = Some("otherUserDefinedKey,"))
     val eventPayloadsAndProperties = Seq(
       1 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),
       3 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),
@@ -331,16 +267,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       ehOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  ehOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -354,7 +281,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify null references in user-defined keys are handled correctly") {
     val eventHubsParameters =
-      buildEventHubsParamters("ns1", "eh1", 2, 10, containsProperties = true)
+      buildEventHubsParameters("ns1", "eh1", 2, 10, containsProperties = true)
     val eventPayloadsAndProperties = generateKeyedDataWithNullValue(6)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -362,16 +289,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -390,7 +308,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify dataframe body is correct for String type") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 10)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateStringKeyedData(6)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -398,16 +316,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -426,7 +335,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify dataframe body is correct for Int type") {
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 10)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
       EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
@@ -434,16 +343,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (eventHubsParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubsParams,
-                                  eventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
+      (_: Map[String, String]) => new TestEventHubsReceiver(eventHubsParameters, eventHubs),
       (_: String, _: Map[String, Map[String, String]]) =>
         new TestRestEventHubClient(highestOffsetPerPartition)
     )
@@ -475,7 +375,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify input row metric is correct when source is started with initial data") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
@@ -492,7 +392,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify expected dataframe can be retrieved after data addition to source") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
@@ -511,7 +411,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved after data added to source in excess" +
       " of the rate") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(15)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
@@ -532,7 +432,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved when more data is added to" +
       " source after stream has started") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties1 = generateIntKeyedData(6)
     val eventPayloadsAndProperties2 = generateIntKeyedData(6, offset = 2)
     val eventPayloadsAndProperties3 = generateIntKeyedData(6, offset = 3)
@@ -561,7 +461,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved with data added to source after the stream" +
       " has started") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties1 = generateIntKeyedData(6)
     val eventPayloadsAndProperties2 = generateIntKeyedData(6, offset = 2)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters)
@@ -588,7 +488,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved from different" +
       " sources with same event hubs on different streams on different queries at same rate") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery1 = generateInputQuery(eventHubsParameters, spark)
@@ -609,8 +509,8 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved from different " +
       "sources with same event hubs on different streams on different queries at different rates") {
     import testImplicits._
-    val eventHubsParameters1 = buildEventHubsParamters("ns1", "eh1", 2, 30)
-    val eventHubsParameters2 = buildEventHubsParamters("ns1", "eh1", 2, 10)
+    val eventHubsParameters1 = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val eventHubsParameters2 = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters1, eventPayloadsAndProperties)
     val sourceQuery1 = generateInputQuery(eventHubsParameters1, spark)
@@ -631,7 +531,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved from same " +
       "source on different queries") {
     import testImplicits._
-    val eventHubsParameters1 = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters1 = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters1, eventPayloadsAndProperties)
     val sourceQuery = generateInputQuery(eventHubsParameters1, spark)
@@ -651,7 +551,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved when the stream is stopped before the last" +
       " batch's offset is committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
                                              eventPayloadsAndProperties.take(30 * 10 * 2))
@@ -677,7 +577,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved when the stream is stopped after the last" +
       " batch's offset is committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
                                              eventPayloadsAndProperties.take(30 * 10 * 2))
@@ -701,7 +601,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify expected dataframe can be retrieved when the progress file is partially committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
                                              eventPayloadsAndProperties.take(30 * 10 * 2))
@@ -729,7 +629,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe can be retrieved when upgrading from a directory without" +
       " metadata") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
                                              eventPayloadsAndProperties.take(30 * 10 * 2))
@@ -755,7 +655,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Verify expected dataframe can be retrieved when metadata is not committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 30)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters,
                                              eventPayloadsAndProperties.take(30 * 10 * 2))
@@ -785,7 +685,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
     "Verify expected dataframe is retrieved from starting offset" +
       " on different streams on the same query") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3)
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties1 = generateIntKeyedData(6)
     val eventPayloadsAndProperties2 = generateIntKeyedData(12)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties1)
@@ -823,12 +723,12 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected dataframe is retrieved with windowing operation") {
-    val eventHubsParameters = buildEventHubsParamters("ns1",
-                                                      "eh1",
-                                                      2,
-                                                      40,
-                                                      containsProperties = true,
-                                                      userDefinedKeys = Some("creationTime"))
+    val eventHubsParameters = buildEventHubsParameters("ns1",
+                                                       "eh1",
+                                                       2,
+                                                       40,
+                                                       containsProperties = true,
+                                                       userDefinedKeys = Some("creationTime"))
     val eventPayloadsAndProperties = {
       for (time <- Range(0, 10))
         yield testDataForWindowingOperation(100, time)
@@ -869,12 +769,12 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
   }
 
   test("Verify expected dataframe is retrieved with watermarks") {
-    val eventHubsParameters = buildEventHubsParamters("ns1",
-                                                      "eh1",
-                                                      1,
-                                                      1,
-                                                      containsProperties = true,
-                                                      userDefinedKeys = Some("creationTime"))
+    val eventHubsParameters = buildEventHubsParameters("ns1",
+                                                       "eh1",
+                                                       1,
+                                                       1,
+                                                       containsProperties = true,
+                                                       userDefinedKeys = Some("creationTime"))
     val eventPayloadsAndProperties = testDataForWatermark(2)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery = spark.readStream.format("eventhubs").options(eventHubsParameters).load()
@@ -898,7 +798,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Filter enqueuetime correctly in structured streaming") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParamters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
+    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
     val eventPayloadsAndProperties = generateIntKeyedData(15)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)
@@ -923,7 +823,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest {
 
   test("Users cannot submit enqueueTime which is later than the latest in the queue") {
     val eventHubsParameters =
-      buildEventHubsParamters("ns1", "eh1", 2, 3, enqueueTime = Some(Long.MaxValue))
+      buildEventHubsParameters("ns1", "eh1", 2, 3, enqueueTime = Some(Long.MaxValue))
     val eventPayloadsAndProperties = generateIntKeyedData(15)
     EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     val sourceQuery = generateInputQuery(eventHubsParameters, spark)

@@ -17,9 +17,22 @@
 
 package org.apache.spark.eventhubscommon.client
 
+import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 
 private[spark] trait Client extends Serializable {
+
+  private[spark] var client: EventHubClient = _
+
+  // TODO can we get rid of EventData with type parameters?
+  def receive(expectedEvents: Int): Iterable[EventData]
+
+  private[spark] def initClient(): Unit
+
+  private[spark] def initReceiver(partitionId: String,
+                                  offsetType: EventHubsOffsetType,
+                                  currentOffset: String): Unit
 
   /**
    * return the start seq number of each partition

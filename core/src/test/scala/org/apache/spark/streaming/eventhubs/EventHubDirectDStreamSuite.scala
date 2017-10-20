@@ -19,9 +19,8 @@ package org.apache.spark.streaming.eventhubs
 
 import org.mockito.Mockito
 import org.scalatest.mock.MockitoSugar
-
 import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
-import org.apache.spark.eventhubscommon.client.Client
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ Duration, Seconds, Time }
 
@@ -44,7 +43,8 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val ehDStream = new EventHubDirectDStream(ssc,
                                               eventhubNamespace,
                                               progressRootPath.toString,
-                                              Map("eh1" -> eventhubParameters))
+                                              Map("eh1" -> eventhubParameters),
+                                              EventHubsClientWrapper.apply)
     val eventHubClientMock = mock[Client]
     Mockito
       .when(
@@ -61,7 +61,8 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val ehDStream = new EventHubDirectDStream(ssc,
                                               eventhubNamespace,
                                               progressRootPath.toString,
-                                              Map("eh1" -> eventhubParameters))
+                                              Map("eh1" -> eventhubParameters),
+                                              EventHubsClientWrapper.apply)
     val eventHubClientMock = mock[Client]
     val dummyStartSeqMap =
       (0 until 32).map(partitionId => (EventHubNameAndPartition("eh1", partitionId), 1L)).toMap

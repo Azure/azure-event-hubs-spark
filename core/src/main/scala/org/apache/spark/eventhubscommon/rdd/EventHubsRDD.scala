@@ -18,12 +18,10 @@
 package org.apache.spark.eventhubscommon.rdd
 
 import scala.collection.mutable.ListBuffer
-
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressWriter
@@ -46,11 +44,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
                                   val offsetRanges: List[OffsetRange],
                                   batchTime: Long,
                                   offsetParams: OffsetStoreParams,
-                                  eventHubReceiverCreator: (Map[String, String],
-                                                            Int,
-                                                            Long,
-                                                            EventHubsOffsetType,
-                                                            Int) => EventHubsClientWrapper)
+                                  receiverFactory: (Map[String, String]) => Client)
     extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
@@ -66,7 +60,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   }
 
   private def wrappingReceive(eventHubNameAndPartition: EventHubNameAndPartition,
-                              eventHubClient: EventHubsClientWrapper,
+                              eventHubClient: Client,
                               expectedEventNumber: Int,
                               expectedHighestSeqNum: Long): List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
@@ -110,14 +104,14 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   }
 
   private def extractOffsetAndSeqToWrite(receivedEvents: List[EventData],
-                                         eventHubReceiver: EventHubsClientWrapper,
+                                         eventHubReceiver: Client,
                                          ehRDDPartition: EventHubRDDPartition): (Long, Long) = {
     if (receivedEvents.nonEmpty) {
       val lastEvent = receivedEvents.last
       (lastEvent.getSystemProperties.getOffset.toLong,
        lastEvent.getSystemProperties.getSequenceNumber)
     } else {
-      val partitionInfo = eventHubReceiver.eventhubsClient
+      val partitionInfo = eventHubReceiver.client
         .getPartitionRuntimeInformation(
           ehRDDPartition.eventHubNameAndPartitionID.partitionId.toString)
         .get()
@@ -136,16 +130,16 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       s"${ehRDDPartition.eventHubNameAndPartitionID}" +
         s" expected rate $maxRate, fromSeq $fromSeq (exclusive) untilSeq" +
         s" $untilSeq (inclusive) at $batchTime")
-    var eventHubReceiver: EventHubsClientWrapper = null
+    var eventHubReceiver: Client = null
     try {
       val eventHubParameters = eventHubsParamsMap(
         ehRDDPartition.eventHubNameAndPartitionID.eventHubName)
-      eventHubReceiver = eventHubReceiverCreator(
-        eventHubParameters,
-        ehRDDPartition.eventHubNameAndPartitionID.partitionId,
-        fromOffset,
-        ehRDDPartition.offsetType,
-        maxRate)
+
+      eventHubReceiver = receiverFactory(eventHubParameters)
+      eventHubReceiver.initReceiver(ehRDDPartition.eventHubNameAndPartitionID.partitionId.toString,
+                                    ehRDDPartition.offsetType,
+                                    fromOffset.toString)
+
       val receivedEvents = wrappingReceive(ehRDDPartition.eventHubNameAndPartitionID,
                                            eventHubReceiver,
                                            maxRate,

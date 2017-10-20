@@ -18,15 +18,9 @@
 package org.apache.spark.eventhubscommon.utils
 
 import scala.collection.mutable.ListBuffer
-
 import com.microsoft.azure.eventhubs.EventData
-
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.{
-  Client,
-  EventHubsClientWrapper,
-  EventHubsOffsetTypes
-}
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
@@ -77,18 +71,44 @@ class SimulatedEventHubs(eventHubsNamespace: String,
   }
 }
 
-class TestEventHubsReceiver(ehParams: Map[String, String],
-                            eventHubs: SimulatedEventHubs,
-                            partitionId: Int,
-                            startOffset: Long,
-                            offsetType: EventHubsOffsetType)
-    extends EventHubsClientWrapper(ehParams) {
+// TODO: consolidate these to one mock object/companion
+class TestEventHubsReceiver(ehParams: Map[String, String], eventHubs: SimulatedEventHubs)
+    extends Client {
+
+  private var partitionId: Int = _
+  private var offsetType: EventHubsOffsetType = _
+  private var currentOffset: String = _
+
+  override def close(): Unit = {}
+
+  override def endPointOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, (Long, Long)]] = Option.empty
+
+  override def lastEnqueueTimeOfPartitions(
+      retryIfFail: Boolean,
+      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = Option.empty
+
+  override def startSeqOfPartition(retryIfFail: Boolean,
+                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
+    : Option[Map[EventHubNameAndPartition, Long]] = Option.empty
+
+  override def initClient(): Unit = {}
+
+  override def initReceiver(partitionId: String,
+                            offsetType: EventHubsOffsetType,
+                            currentOffset: String): Unit = {
+    this.partitionId = partitionId.toInt
+    this.offsetType = offsetType
+    this.currentOffset = currentOffset
+  }
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = ehParams("eventhubs.name")
-    if (offsetType != EventHubsOffsetTypes.InputTimeOffset) {
+    if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
       eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId),
-                       startOffset.toInt,
+                       currentOffset.toInt,
                        expectedEventNum)
     } else {
       eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
@@ -99,6 +119,14 @@ class TestEventHubsReceiver(ehParams: Map[String, String],
 }
 
 class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends Client {
+
+  override private[spark] def initClient() = {}
+
+  override private[spark] def initReceiver(partitionId: String,
+                                           offsetType: EventHubsOffsetType,
+                                           currentOffset: String) = {}
+
+  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
   override def endPointOfPartition(retryIfFail: Boolean,
                                    targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
@@ -148,6 +176,14 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends Client
 class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
     extends Client {
 
+  override private[spark] def initClient() = {}
+
+  override private[spark] def initReceiver(partitionId: String,
+                                           offsetType: EventHubsOffsetType,
+                                           currentOffset: String) = {}
+
+  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
+
   override def endPointOfPartition(retryIfFail: Boolean,
                                    targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
                                      List())
@@ -189,6 +225,14 @@ class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long,
 }
 
 class FragileEventHubClient private extends Client {
+
+  override private[spark] def initClient() = {}
+
+  override private[spark] def initReceiver(partitionId: String,
+                                           offsetType: EventHubsOffsetType,
+                                           currentOffset: String) = {}
+
+  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
   override def endPointOfPartition(retryIfFail: Boolean,
                                    targetEventHubNameAndPartitions: List[EventHubNameAndPartition] =
@@ -253,6 +297,14 @@ class FluctuatedEventHubClient(ssc: StreamingContext,
                                numBatchesBeforeNewData: Int,
                                latestRecords: Map[EventHubNameAndPartition, (Long, Long)])
     extends Client {
+
+  override private[spark] def initClient() = {}
+
+  override private[spark] def initReceiver(partitionId: String,
+                                           offsetType: EventHubsOffsetType,
+                                           currentOffset: String) = {}
+
+  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
   private var callIndex = -1
 

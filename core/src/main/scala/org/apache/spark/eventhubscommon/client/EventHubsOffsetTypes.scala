@@ -21,5 +21,6 @@ private[spark] object EventHubsOffsetTypes extends Enumeration {
 
   type EventHubsOffsetType = Value
 
-  val None, PreviousCheckpoint, InputByteOffset, InputTimeOffset = Value
+  val None, PreviousCheckpoint, InputByteOffset, EnqueueTime = Value
+
 }

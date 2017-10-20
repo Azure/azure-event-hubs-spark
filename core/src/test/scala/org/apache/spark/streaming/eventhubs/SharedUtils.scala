@@ -22,9 +22,9 @@ import java.nio.file.Files
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
 import org.scalatest.{ BeforeAndAfterEach, FunSuite }
-
 import org.apache.spark.{ SparkConf, SparkContext }
 import org.apache.spark.eventhubscommon.EventHubsConnector
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{ Duration, Seconds, StreamingContext }
 import org.apache.spark.streaming.eventhubs.checkpoint.{
@@ -89,7 +89,11 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
       eventHubNamespace: String,
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
+    val newStream = new EventHubDirectDStream(ssc,
+                                              eventHubNamespace,
+                                              progressDir,
+                                              eventParams,
+                                              EventHubsClientWrapper.apply)
     newStream
   }
 }

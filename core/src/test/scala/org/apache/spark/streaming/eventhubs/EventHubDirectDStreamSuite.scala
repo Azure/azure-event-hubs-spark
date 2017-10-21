@@ -51,7 +51,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
                                               progressRootPath.toString,
                                               Map("eh1" -> eventhubParameters),
                                               EventHubsClientWrapper.apply,
-                                              AMQPEventHubsClient.apply)
+                                              EventHubsClientWrapper.apply)
     val eventHubClientMock = mock[Client]
     val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
 
@@ -71,7 +71,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
                                               progressRootPath.toString,
                                               Map("eh1" -> eventhubParameters),
                                               EventHubsClientWrapper.apply,
-                                              AMQPEventHubsClient.apply)
+                                              EventHubsClientWrapper.apply)
     val eventHubClientMock = mock[Client]
     val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
 

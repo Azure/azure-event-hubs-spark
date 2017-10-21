@@ -48,7 +48,7 @@ private[sql] class EventHubsSourceProvider
     new EventHubsSource(sqlContext,
                         parameters,
                         EventHubsClientWrapper.apply,
-                        AMQPEventHubsClient.apply)
+                        EventHubsClientWrapper.apply)
   }
 }
 

@@ -94,7 +94,7 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
                                               progressDir,
                                               eventParams,
                                               EventHubsClientWrapper.apply,
-                                              AMQPEventHubsClient.apply)
+                                              EventHubsClientWrapper.apply)
     newStream
   }
 }

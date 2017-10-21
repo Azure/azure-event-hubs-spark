@@ -56,7 +56,7 @@ object EventHubsUtils {
                                               progressDir,
                                               eventParams,
                                               EventHubsClientWrapper.apply,
-                                              AMQPEventHubsClient.apply)
+                                              EventHubsClientWrapper.apply)
     newStream
   }
 

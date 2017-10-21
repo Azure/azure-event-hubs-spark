@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubscommon.utils
 
 import scala.collection.mutable.ListBuffer
-import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
+import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
@@ -73,25 +73,12 @@ class SimulatedEventHubs(eventHubsNamespace: String,
 
 // TODO: consolidate these to one mock object/companion
 class TestEventHubsReceiver(ehParams: Map[String, String], eventHubs: SimulatedEventHubs)
-    extends Client {
+    extends Client
+    with TestClientSugar {
 
-  override private[spark] var client: EventHubClient = _
   private var partitionId: Int = _
   private var offsetType: EventHubsOffsetType = _
   private var currentOffset: String = _
-
-  override def close(): Unit = {}
-
-  override def endPointOfPartition(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = Option.empty
-
-  override def lastEnqueueTimeOfPartitions(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = Option.empty
-
-  override def startSeqOfPartition(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = Option.empty
-
-  override def initClient(): Unit = {}
 
   override def initReceiver(partitionId: String,
                             offsetType: EventHubsOffsetType,
@@ -115,25 +102,15 @@ class TestEventHubsReceiver(ehParams: Map[String, String], eventHubs: SimulatedE
   }
 }
 
-class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends Client {
-
-  override private[spark] var client: EventHubClient = _
-
-  override private[spark] def initClient() = {}
-
-  override private[spark] def initReceiver(partitionId: String,
-                                           offsetType: EventHubsOffsetType,
-                                           currentOffset: String) = {}
-
-  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
+class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
+    extends Client
+    with TestClientSugar {
 
   override def endPointOfPartition(
       targetEventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
     Some((x, x))
   }
-
-  override def close(): Unit = {}
 
   /**
    * return the last enqueueTime of each partition
@@ -162,17 +139,8 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs) extends Client
 }
 
 class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
-    extends Client {
-
-  override private[spark] var client: EventHubClient = _
-
-  override private[spark] def initClient() = {}
-
-  override private[spark] def initReceiver(partitionId: String,
-                                           offsetType: EventHubsOffsetType,
-                                           currentOffset: String) = {}
-
-  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
+    extends Client
+    with TestClientSugar {
 
   override def endPointOfPartition(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
@@ -190,8 +158,6 @@ class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long,
     Some(latestRecords(nameAndPartition)._3)
   }
 
-  override def close(): Unit = {}
-
   /**
    * return the start seq number of each partition
    *
@@ -202,17 +168,7 @@ class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long,
   }
 }
 
-class FragileEventHubClient private extends Client {
-
-  override private[spark] var client: EventHubClient = _
-
-  override private[spark] def initClient() = {}
-
-  override private[spark] def initReceiver(partitionId: String,
-                                           offsetType: EventHubsOffsetType,
-                                           currentOffset: String) = {}
-
-  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
+class FragileEventHubClient private extends Client with TestClientSugar {
 
   override def endPointOfPartition(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
@@ -268,18 +224,9 @@ class FluctuatedEventHubClient(ssc: StreamingContext,
                                messagesBeforeEmpty: Long,
                                numBatchesBeforeNewData: Int,
                                latestRecords: Map[EventHubNameAndPartition, (Long, Long)])
-    extends Client {
+    extends Client
+    with TestClientSugar {
   private var callIndex = -1
-
-  override private[spark] var client: EventHubClient = _
-
-  override private[spark] def initClient() = {}
-
-  override private[spark] def initReceiver(partitionId: String,
-                                           offsetType: EventHubsOffsetType,
-                                           currentOffset: String) = {}
-
-  override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
   override def endPointOfPartition(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
@@ -290,8 +237,6 @@ class FluctuatedEventHubClient(ssc: StreamingContext,
       Some(latestRecords(nameAndPartition))
     }
   }
-
-  override def close(): Unit = {}
 
   /**
    * return the last enqueueTime of each partition

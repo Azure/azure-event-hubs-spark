@@ -22,7 +22,7 @@ import java.io.{ IOException, ObjectInputStream }
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{ AMQPEventHubsClient, Client }
+import org.apache.spark.eventhubscommon.client.Client
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.internal.Logging
@@ -33,8 +33,6 @@ import org.apache.spark.streaming.eventhubs.checkpoint._
 import org.apache.spark.streaming.scheduler.{ RateController, StreamInputInfo }
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
 import org.apache.spark.util.Utils
-
-import scala.collection.mutable.ListBuffer
 
 /**
  * implementation of EventHub-based direct stream
@@ -90,7 +88,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   }
 
-  @transient private var _eventHubClients = new mutable.HashMap[String, Client].empty
+  @transient private var _eventHubClients: mutable.HashMap[String, Client] = _
 
   private def progressTracker =
     DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
@@ -102,7 +100,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private[eventhubs] def eventHubClient = {
-    if (_eventHubClients.isEmpty) {
+    if (_eventHubClients == null) {
+      _eventHubClients = new mutable.HashMap[String, Client].empty
       for (name <- eventhubsParams.keys)
         _eventHubClients += name -> clientFactory(eventhubsParams(name))
     }

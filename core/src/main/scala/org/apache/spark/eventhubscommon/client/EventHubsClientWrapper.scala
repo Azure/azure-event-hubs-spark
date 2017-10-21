@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.spark.eventhubscommon.client
 
 import java.time.Instant
@@ -33,9 +34,6 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
     with Client
     with Logging {
 
-  // AMQPClient stuff
-
-  // EventHubsClientWrapper stuff
   override private[spark] var client: EventHubClient = _
   private[spark] var partitionReceiver: PartitionReceiver = _
 
@@ -81,28 +79,16 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
     if (events != null) events.asScala else null
   }
 
-  override def close(): Unit = {
-    if (partitionReceiver != null) partitionReceiver.closeSync()
-    if (client != null) client.closeSync()
-  }
-
-  override def endPointOfPartition(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
-    throw new UnsupportedOperationException(
-      "endPointOfPartition is not supported by this client" +
-        " yet, please use AMQPEventHubsClient")
-  }
-
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
-    throw new UnsupportedOperationException(
-      "lastEnqueueTimeOfPartitions is not supported by this" +
-        " client yet, please use AMQPEventHubsClient")
+  // Note: the EventHubs Java Client will retry this API call on failure
+  private def getRunTimeInfoOfPartitions(ehNameAndPartition: EventHubNameAndPartition) = {
+    try {
+      val partitionId = ehNameAndPartition.partitionId
+      client.getPartitionRuntimeInformation(partitionId.toString).get
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
+    }
   }
 
   /**
@@ -112,10 +98,56 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    */
   override def startSeqOfPartition(
       eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
-    throw new UnsupportedOperationException(
-      "startSeqOfPartition is not supported by this client" +
-        " yet, please use AMQPEventHubsClient")
+    try {
+      val runtimeInformation = getRunTimeInfoOfPartitions(eventHubNameAndPartition)
+      Some(runtimeInformation.getBeginSequenceNumber)
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
+    }
   }
+
+  /**
+   * return the end point of each partition
+   *
+   * @return a map from eventhubName-partition to (offset, seq)
+   */
+  override def endPointOfPartition(
+      eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+    try {
+      val runtimeInfo = getRunTimeInfoOfPartitions(eventHubNameAndPartition)
+      Some((runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber))
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
+    }
+  }
+
+  /**
+   * return the last enqueueTime of each partition
+   *
+   * @return a map from eventHubsNamePartition to EnqueueTime
+   */
+  override def lastEnqueueTimeOfPartitions(
+      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
+    try {
+      val runtimeInfo = getRunTimeInfoOfPartitions(eventHubNameAndPartition)
+      Some(runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
+    }
+  }
+
+  override def close(): Unit = {
+    logInfo("close: Closing EventHubsClientWrapper.")
+    if (partitionReceiver != null) partitionReceiver.closeSync()
+    if (client != null) client.closeSync()
+  }
+
 }
 
 private[spark] object EventHubsClientWrapper {

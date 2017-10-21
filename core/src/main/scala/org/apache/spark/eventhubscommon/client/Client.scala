@@ -25,13 +25,13 @@ private[spark] trait Client extends Serializable {
 
   private[spark] var client: EventHubClient
 
-  def receive(expectedEvents: Int): Iterable[EventData]
-
   private[spark] def initClient(): Unit
 
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,
                                   currentOffset: String): Unit
+
+  def receive(expectedEvents: Int): Iterable[EventData]
 
   /**
    * return the start seq number of each partition

@@ -24,7 +24,7 @@ import org.apache.hadoop.fs.{ FileSystem, Path }
 import org.scalatest.{ BeforeAndAfterEach, FunSuite }
 import org.apache.spark.{ SparkConf, SparkContext }
 import org.apache.spark.eventhubscommon.EventHubsConnector
-import org.apache.spark.eventhubscommon.client.{ AMQPEventHubsClient, EventHubsClientWrapper }
+import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{ Duration, Seconds, StreamingContext }
 import org.apache.spark.streaming.eventhubs.checkpoint.{

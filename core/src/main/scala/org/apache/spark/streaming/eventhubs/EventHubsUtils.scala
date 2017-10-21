@@ -18,11 +18,7 @@ package org.apache.spark.streaming.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubscommon.client.{
-  AMQPEventHubsClient,
-  Client,
-  EventHubsClientWrapper
-}
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.streaming.StreamingContext
 
 object EventHubsUtils {

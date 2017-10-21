@@ -23,9 +23,8 @@ import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOff
 
 private[spark] trait Client extends Serializable {
 
-  private[spark] var client: EventHubClient = _
+  private[spark] var client: EventHubClient
 
-  // TODO can we get rid of EventData with type parameters?
   def receive(expectedEvents: Int): Iterable[EventData]
 
   private[spark] def initClient(): Unit
@@ -38,25 +37,19 @@ private[spark] trait Client extends Serializable {
    * return the start seq number of each partition
    * @return a map from eventhubName-partition to seq
    */
-  def startSeqOfPartition(retryIfFail: Boolean,
-                          targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List())
-    : Option[Map[EventHubNameAndPartition, Long]]
+  def startSeqOfPartition(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
 
   /**
    * return the end point of each partition
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  def endPointOfPartition(retryIfFail: Boolean,
-                          targetEventHubNameAndPartitions: List[EventHubNameAndPartition] = List())
-    : Option[Map[EventHubNameAndPartition, (Long, Long)]]
+  def endPointOfPartition(eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)]
 
   /**
    * return the last enqueueTime of each partition
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  def lastEnqueueTimeOfPartitions(retryIfFail: Boolean,
-                                  targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
-    : Option[Map[EventHubNameAndPartition, Long]]
+  def lastEnqueueTimeOfPartitions(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
 
   /**
    * close this client

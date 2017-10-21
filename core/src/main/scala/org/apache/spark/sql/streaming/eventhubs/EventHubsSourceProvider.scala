@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubscommon.client.{ AMQPEventHubsClient, EventHubsClientWrapper }
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source
@@ -45,7 +45,10 @@ private[sql] class EventHubsSourceProvider
                             parameters: Map[String, String]): Source = {
     // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
     // eventhubClientCreator
-    new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply)
+    new EventHubsSource(sqlContext,
+                        parameters,
+                        EventHubsClientWrapper.apply,
+                        AMQPEventHubsClient.apply)
   }
 }
 

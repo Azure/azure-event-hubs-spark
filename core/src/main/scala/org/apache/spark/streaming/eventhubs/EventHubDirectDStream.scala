@@ -20,15 +20,9 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{ IOException, ObjectInputStream }
 
 import scala.collection.mutable
-
 import com.microsoft.azure.eventhubs.EventData
-
 import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.{
-  AMQPEventHubsClient,
-  Client,
-  EventHubsClientWrapper
-}
+import org.apache.spark.eventhubscommon.client.{ AMQPEventHubsClient, Client }
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.internal.Logging
@@ -39,6 +33,8 @@ import org.apache.spark.streaming.eventhubs.checkpoint._
 import org.apache.spark.streaming.scheduler.{ RateController, StreamInputInfo }
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
 import org.apache.spark.util.Utils
+
+import scala.collection.mutable.ListBuffer
 
 /**
  * implementation of EventHub-based direct stream
@@ -54,8 +50,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
     receiverFactory: (Map[String, String]) => Client,
-    eventhubClientCreator: (String, Map[String, Map[String, String]]) => Client =
-      AMQPEventHubsClient.getInstance)
+    clientFactory: (Map[String, String]) => Client)
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
     with Logging {
@@ -70,7 +65,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
-  private val eventhubNameAndPartitions = {
+  private val eventhubNameAndPartitions: Set[EventHubNameAndPartition] = {
     for (eventHubName <- eventhubsParams.keySet;
          partitionId <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
       yield EventHubNameAndPartition(eventHubName, partitionId)
@@ -95,21 +90,24 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   }
 
-  @transient private var _eventHubClient: Client = _
+  @transient private var _eventHubClients = new mutable.HashMap[String, Client].empty
 
   private def progressTracker =
     DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
 
-  private[eventhubs] def setEventHubClient(eventHubClient: Client): EventHubDirectDStream = {
-    _eventHubClient = eventHubClient
+  private[eventhubs] def setEventHubClient(
+      eventHubClient: mutable.HashMap[String, Client]): EventHubDirectDStream = {
+    _eventHubClients = eventHubClient
     this
   }
 
   private[eventhubs] def eventHubClient = {
-    if (_eventHubClient == null) {
-      _eventHubClient = eventhubClientCreator(eventHubNameSpace, eventhubsParams)
+    if (_eventHubClients.isEmpty) {
+      for (name <- eventhubsParams.keys)
+        _eventHubClients += name -> clientFactory(eventhubsParams(name))
     }
-    _eventHubClient
+
+    _eventHubClients
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
@@ -156,16 +154,20 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                    offsetRecord.offsets)
     } else {
       // query start startSeqs
-      val startSeqs =
-        eventHubClient.startSeqOfPartition(retryIfFail = false, eventhubNameAndPartitions.toList)
-      require(startSeqs.isDefined,
-              "We cannot get starting seq number of partitions," +
-                " EventHubs endpoint is not available")
+      val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
+      for (nameAndPartition <- eventhubNameAndPartitions) {
+        val name = nameAndPartition.eventHubName
+        val seqNo = eventHubClient(name).startSeqOfPartition(nameAndPartition)
+        require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
+
+        startSeqs += nameAndPartition -> seqNo.get
+      }
+
       OffsetRecord(
         math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
         offsetRecord.offsets.map {
           case (ehNameAndPartition, (offset, _)) =>
-            (ehNameAndPartition, (offset, startSeqs.get(ehNameAndPartition)))
+            (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
         }
       )
     }
@@ -245,7 +247,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(eventHubClient,
+        RateControlUtils.validateFilteringParams(eventHubClient.toMap,
                                                  eventhubsParams,
                                                  eventhubNameAndPartitions.toList)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
@@ -318,13 +320,14 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
 
   private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
-    RateControlUtils.fetchLatestOffset(eventHubClient,
-                                       retryIfFail,
-                                       if (fetchedHighestOffsetsAndSeqNums == null) {
-                                         currentOffsetsAndSeqNums.offsets
-                                       } else {
-                                         fetchedHighestOffsetsAndSeqNums.offsets
-                                       }) match {
+    RateControlUtils.fetchLatestOffset(
+      eventHubClient.toMap,
+      if (fetchedHighestOffsetsAndSeqNums == null) {
+        currentOffsetsAndSeqNums.offsets
+      } else {
+        fetchedHighestOffsetsAndSeqNums.offsets
+      }
+    ) match {
       case Some(highestOffsets) =>
         fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime.milliseconds, highestOffsets)
         Some(fetchedHighestOffsetsAndSeqNums.offsets)

@@ -33,6 +33,10 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
     with Client
     with Logging {
 
+  // AMQPClient stuff
+
+  // EventHubsClientWrapper stuff
+  override private[spark] var client: EventHubClient = _
   private[spark] var partitionReceiver: PartitionReceiver = _
 
   /* Extract relevant info from ehParams */
@@ -82,9 +86,8 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
     if (client != null) client.closeSync()
   }
 
-  override def endPointOfPartition(retryIfFail: Boolean,
-                                   targetEventHubsNameAndPartitions: List[EventHubNameAndPartition])
-    : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+  override def endPointOfPartition(
+      eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     throw new UnsupportedOperationException(
       "endPointOfPartition is not supported by this client" +
         " yet, please use AMQPEventHubsClient")
@@ -96,9 +99,7 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
   override def lastEnqueueTimeOfPartitions(
-      retryIfFail: Boolean,
-      targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
-    : Option[Map[EventHubNameAndPartition, Long]] = {
+      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
     throw new UnsupportedOperationException(
       "lastEnqueueTimeOfPartitions is not supported by this" +
         " client yet, please use AMQPEventHubsClient")
@@ -109,9 +110,8 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def startSeqOfPartition(retryIfFail: Boolean,
-                                   targetEventHubNameAndPartitions: List[EventHubNameAndPartition])
-    : Option[Map[EventHubNameAndPartition, Long]] = {
+  override def startSeqOfPartition(
+      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
     throw new UnsupportedOperationException(
       "startSeqOfPartition is not supported by this client" +
         " yet, please use AMQPEventHubsClient")

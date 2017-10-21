@@ -93,7 +93,6 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
                                               eventHubNamespace,
                                               progressDir,
                                               eventParams,
-                                              EventHubsClientWrapper.apply,
                                               EventHubsClientWrapper.apply)
     newStream
   }

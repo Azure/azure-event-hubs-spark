@@ -51,7 +51,6 @@ object EventHubsUtils {
                                               eventHubNamespace,
                                               progressDir,
                                               eventParams,
-                                              EventHubsClientWrapper.apply,
                                               EventHubsClientWrapper.apply)
     newStream
   }
@@ -70,7 +69,6 @@ object EventHubsUtils {
                                               eventHubNamespace,
                                               progressDir,
                                               eventParams,
-                                              EventHubsClientWrapper.apply,
                                               eventHubsClientCreator)
     newStream
   }

@@ -47,7 +47,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     private[eventhubs] val eventHubNameSpace: String,
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
-    receiverFactory: (Map[String, String]) => Client,
     clientFactory: (Map[String, String]) => Client)
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
@@ -290,7 +289,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                         streamId,
                         uid = eventHubNameSpace,
                         subDirs = ssc.sparkContext.appName),
-      receiverFactory
+      clientFactory
     )
     reportInputInto(validTime,
                     offsetRanges,
@@ -426,7 +425,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
             }.toList,
             t.milliseconds,
             OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace, subDirs = appName),
-            receiverFactory
+            clientFactory
           )
       }
     }

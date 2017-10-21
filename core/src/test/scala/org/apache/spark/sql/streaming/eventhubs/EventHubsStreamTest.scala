@@ -514,7 +514,7 @@ trait EventHubsStreamTest
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(
               (eventHubsParameters: Map[String, String]) =>
-                new TestEventHubsReceiver(eventHubsParameters, eventHubs)
+                new TestRestEventHubClient(eventHubsParameters, eventHubs, null)
             )
             currentStream.start()
 

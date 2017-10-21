@@ -42,7 +42,6 @@ import scala.collection.mutable
 private[spark] class EventHubsSource private[eventhubs] (
     sqlContext: SQLContext,
     eventHubsParams: Map[String, String],
-    receiverFactory: (Map[String, String]) => Client,
     clientFactory: (Map[String, String]) => Client)
     extends Source
     with EventHubsConnector
@@ -72,7 +71,7 @@ private[spark] class EventHubsSource private[eventhubs] (
 
   private[eventhubs] def eventHubsReceiver = {
     if (_eventHubsReceiver == null) {
-      _eventHubsReceiver = receiverFactory
+      _eventHubsReceiver = clientFactory
     }
     _eventHubsReceiver
   }

@@ -246,7 +246,7 @@ private[spark] class EventHubsSource private[eventhubs] (
         val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
         for (nameAndPartition <- connectedInstances) {
           val name = nameAndPartition.eventHubName
-          val seqNo = eventHubClient.startSeqOfPartition(nameAndPartition).get
+          val seqNo = eventHubClient.beginSeqNo(nameAndPartition).get
 
           startSeqs += nameAndPartition -> seqNo
         }

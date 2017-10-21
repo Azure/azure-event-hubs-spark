@@ -51,7 +51,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
 
     Mockito
-      .when(eventHubClientMock.startSeqOfPartition(Matchers.any[EventHubNameAndPartition]))
+      .when(eventHubClientMock.beginSeqNo(Matchers.any[EventHubNameAndPartition]))
       .thenReturn(None)
     ehDStream.setEventHubClient(ehNameToClient)
     ssc.scheduler.start()
@@ -70,10 +70,10 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
 
     Mockito
-      .when(eventHubClientMock.startSeqOfPartition(Matchers.any[EventHubNameAndPartition]))
+      .when(eventHubClientMock.beginSeqNo(Matchers.any[EventHubNameAndPartition]))
       .thenReturn(Some(1L))
     Mockito
-      .when(eventHubClientMock.endPointOfPartition(Matchers.any[EventHubNameAndPartition]))
+      .when(eventHubClientMock.lastSeqAndOffset(Matchers.any[EventHubNameAndPartition]))
       .thenReturn(None)
 
     ehDStream.setEventHubClient(ehNameToClient)

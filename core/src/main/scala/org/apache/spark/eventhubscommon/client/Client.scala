@@ -25,8 +25,6 @@ private[spark] trait Client extends Serializable {
 
   private[spark] var client: EventHubClient
 
-  private[spark] def initClient(): Unit
-
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,
                                   currentOffset: String): Unit
@@ -37,19 +35,19 @@ private[spark] trait Client extends Serializable {
    * return the start seq number of each partition
    * @return a map from eventhubName-partition to seq
    */
-  def startSeqOfPartition(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
+  def beginSeqNo(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
 
   /**
    * return the end point of each partition
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  def endPointOfPartition(eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)]
+  def lastSeqAndOffset(eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)]
 
   /**
    * return the last enqueueTime of each partition
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  def lastEnqueueTimeOfPartitions(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
+  def lastEnqueuedTime(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
 
   /**
    * close this client

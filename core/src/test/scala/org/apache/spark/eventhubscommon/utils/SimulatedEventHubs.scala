@@ -77,19 +77,13 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
     extends Client
     with TestClientSugar {
 
-  override def endPointOfPartition(
+  override def lastSeqAndOffset(
       targetEventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
     Some((x, x))
   }
 
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
     Some(
       eventHubs
         .messageStore(nameAndPartition)
@@ -99,12 +93,7 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
         .toEpochMilli)
   }
 
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def beginSeqNo(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
     Some(-1L)
   }
 }
@@ -139,17 +128,16 @@ class TestEventHubsClient(ehParams: Map[String, String],
     }
   }
 
-  override def endPointOfPartition(
+  override def lastSeqAndOffset(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     val (offset, seq, _) = latestRecords(nameAndPartition)
     Some(offset, seq)
   }
 
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] =
+  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] =
     Some(latestRecords(nameAndPartition)._3)
 
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] =
+  override def beginSeqNo(nameAndPartition: EventHubNameAndPartition): Option[Long] =
     Some(-1L)
 }
 
@@ -187,7 +175,7 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
     }
   }
 
-  override def endPointOfPartition(
+  override def lastSeqAndOffset(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
@@ -197,22 +185,11 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
     }
   }
 
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
     Some(Long.MaxValue)
   }
 
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def beginSeqNo(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
     Some(-1L)
   }
 }

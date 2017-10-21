@@ -155,7 +155,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
       for (nameAndPartition <- eventhubNameAndPartitions) {
         val name = nameAndPartition.eventHubName
-        val seqNo = eventHubClient(name).startSeqOfPartition(nameAndPartition)
+        val seqNo = eventHubClient(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
         startSeqs += nameAndPartition -> seqNo.get

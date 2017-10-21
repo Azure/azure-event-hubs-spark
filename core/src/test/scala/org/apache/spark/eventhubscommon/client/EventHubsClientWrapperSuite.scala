@@ -16,11 +16,9 @@
  */
 package org.apache.spark.eventhubscommon.client
 
-import org.mockito.{ Matchers, Mockito }
 import org.scalatest.{ BeforeAndAfter, FunSuite }
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
 /**

@@ -47,16 +47,13 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
     .toString
   private val connectionString =
     new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
-
-  private[spark] def initClient() =
-    client = EventHubClient.createFromConnectionStringSync(connectionString)
+  client = EventHubClient.createFromConnectionStringSync(connectionString)
 
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,
                                   currentOffset: String): Unit = {
     logInfo(
       s"createReceiverInternal: Starting a receiver for partitionId $partitionId with start offset $currentOffset")
-    client = EventHubClient.createFromConnectionStringSync(connectionString)
     partitionReceiver = offsetType match {
       case EventHubsOffsetTypes.EnqueueTime =>
         client.createReceiverSync(consumerGroup,
@@ -67,10 +64,6 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
     }
   }
 
-  /**
-   * starting from EventHubs client 0.13.1, returning a null from receiver means that there is
-   * no message in server end
-   */
   def receive(expectedEventNum: Int): Iterable[EventData] = {
     // TODO: revisit this method after refactoring the RDD. We should not need to call min like this.
     val events = partitionReceiver
@@ -82,8 +75,8 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
   // Note: the EventHubs Java Client will retry this API call on failure
   private def getRunTimeInfoOfPartitions(ehNameAndPartition: EventHubNameAndPartition) = {
     try {
-      val partitionId = ehNameAndPartition.partitionId
-      client.getPartitionRuntimeInformation(partitionId.toString).get
+      val partitionId = ehNameAndPartition.partitionId.toString
+      client.getPartitionRuntimeInformation(partitionId).get
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -96,10 +89,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def startSeqOfPartition(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def beginSeqNo(ehNameAndPartition: EventHubNameAndPartition): Option[Long] = {
     try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(eventHubNameAndPartition)
+      val runtimeInformation = getRunTimeInfoOfPartitions(ehNameAndPartition)
       Some(runtimeInformation.getBeginSequenceNumber)
     } catch {
       case e: Exception =>
@@ -113,10 +105,10 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  override def endPointOfPartition(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+  override def lastSeqAndOffset(
+      ehNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     try {
-      val runtimeInfo = getRunTimeInfoOfPartitions(eventHubNameAndPartition)
+      val runtimeInfo = getRunTimeInfoOfPartitions(ehNameAndPartition)
       Some((runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber))
     } catch {
       case e: Exception =>
@@ -130,10 +122,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  override def lastEnqueueTimeOfPartitions(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(ehNameAndPartition: EventHubNameAndPartition): Option[Long] = {
     try {
-      val runtimeInfo = getRunTimeInfoOfPartitions(eventHubNameAndPartition)
+      val runtimeInfo = getRunTimeInfoOfPartitions(ehNameAndPartition)
       Some(runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)
     } catch {
       case e: Exception =>
@@ -151,6 +142,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
 }
 
 private[spark] object EventHubsClientWrapper {
+  private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
+    new EventHubsClientWrapper(ehParams)
+
   private[eventhubscommon] def configureStartOffset(
       previousOffset: String,
       eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
@@ -164,19 +158,4 @@ private[spark] object EventHubsClientWrapper {
       (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
     }
   }
-
-  private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
-    new EventHubsClientWrapper(ehParams)
-
-  // TODO: This will be re-introduced in the next phase of re-write
-  /*
-  private[spark] def apply(ehParams: Map[String, String],
-                           partitionId: String,
-                           offsetType: EventHubsOffsetType,
-                           currentOffset: String): EventHubsClientWrapper = {
-    val client = new EventHubsClientWrapper(ehParams)
-    client.createReceiver(partitionId, offsetType, currentOffset)
-    client
-  }
- */
 }

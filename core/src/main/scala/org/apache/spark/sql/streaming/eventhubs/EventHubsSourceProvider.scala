@@ -45,10 +45,7 @@ private[sql] class EventHubsSourceProvider
                             parameters: Map[String, String]): Source = {
     // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
     // eventhubClientCreator
-    new EventHubsSource(sqlContext,
-                        parameters,
-                        EventHubsClientWrapper.apply,
-                        EventHubsClientWrapper.apply)
+    new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply)
   }
 }
 

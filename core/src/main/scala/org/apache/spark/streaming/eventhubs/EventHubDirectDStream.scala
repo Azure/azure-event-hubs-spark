@@ -47,7 +47,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     private[eventhubs] val eventHubNameSpace: String,
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
-    receiverFactory: (Map[String, String]) => Client,
     clientFactory: (Map[String, String]) => Client)
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
@@ -156,7 +155,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
       for (nameAndPartition <- eventhubNameAndPartitions) {
         val name = nameAndPartition.eventHubName
-        val seqNo = eventHubClient(name).startSeqOfPartition(nameAndPartition)
+        val seqNo = eventHubClient(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
         startSeqs += nameAndPartition -> seqNo.get
@@ -290,7 +289,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                         streamId,
                         uid = eventHubNameSpace,
                         subDirs = ssc.sparkContext.appName),
-      receiverFactory
+      clientFactory
     )
     reportInputInto(validTime,
                     offsetRanges,
@@ -373,13 +372,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     rdd
   }
 
-  @throws(classOf[IOException])
-  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
-    ois.defaultReadObject()
-    DirectDStreamProgressTracker.registeredConnectors += this
-    initialized = false
-  }
-
   private[eventhubs] class EventHubDirectDStreamCheckpointData(
       eventHubDirectDStream: EventHubDirectDStream)
       extends DStreamCheckpointData(this) {
@@ -426,7 +418,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
             }.toList,
             t.milliseconds,
             OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace, subDirs = appName),
-            receiverFactory
+            clientFactory
           )
       }
     }
@@ -445,5 +437,5 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
 private[eventhubs] object EventHubDirectDStream {
   val cleanupLock = new Object
-  var lastCleanupTime = -1L
+  private[eventhubs] var lastCleanupTime = -1L
 }

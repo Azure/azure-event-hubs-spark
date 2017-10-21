@@ -31,20 +31,18 @@ trait TestClientSugar extends Client {
 
   override def close(): Unit = {}
 
-  override def endPointOfPartition(
+  override def lastSeqAndOffset(
       eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = Option.empty
-
-  override private[spark] def initClient() = {}
 
   override private[spark] def initReceiver(partitionId: String,
                                            offsetType: EventHubsOffsetType,
                                            currentOffset: String) = {}
 
-  override def lastEnqueueTimeOfPartitions(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = Option.empty
+  override def lastEnqueuedTime(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] =
+    Option.empty
 
   override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
-  override def startSeqOfPartition(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] = Option.empty
+  override def beginSeqNo(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] =
+    Option.empty
 }

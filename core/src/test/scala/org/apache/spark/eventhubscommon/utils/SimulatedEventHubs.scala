@@ -17,12 +17,13 @@
 
 package org.apache.spark.eventhubscommon.utils
 
-import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.streaming.StreamingContext
+
+import scala.collection.mutable.ListBuffer
 
 class SimulatedEventHubs(eventHubsNamespace: String,
                          initialData: Map[EventHubNameAndPartition, Array[EventData]])
@@ -72,10 +73,36 @@ class SimulatedEventHubs(eventHubsNamespace: String,
 }
 
 // TODO: consolidate these to one mock object/companion
-class TestEventHubsReceiver(ehParams: Map[String, String], eventHubs: SimulatedEventHubs)
+class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
     extends Client
     with TestClientSugar {
 
+  override def lastSeqAndOffset(
+      targetEventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+    val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
+    Some((x, x))
+  }
+
+  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+    Some(
+      eventHubs
+        .messageStore(nameAndPartition)
+        .last
+        .getSystemProperties
+        .getEnqueuedTime
+        .toEpochMilli)
+  }
+
+  override def beginSeqNo(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+    Some(-1L)
+  }
+}
+
+class TestEventHubsClient(ehParams: Map[String, String],
+                          eventHubs: SimulatedEventHubs,
+                          latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
+    extends Client
+    with TestClientSugar {
   private var partitionId: Int = _
   private var offsetType: EventHubsOffsetType = _
   private var currentOffset: String = _
@@ -100,135 +127,55 @@ class TestEventHubsReceiver(ehParams: Map[String, String], eventHubs: SimulatedE
                                expectedEventNum)
     }
   }
-}
 
-class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
-    extends Client
-    with TestClientSugar {
-
-  override def endPointOfPartition(
-      targetEventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
-    val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
-    Some((x, x))
-  }
-
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] = {
-    Some(
-      eventHubs
-        .messageStore(nameAndPartition)
-        .last
-        .getSystemProperties
-        .getEnqueuedTime
-        .toEpochMilli)
-  }
-
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
-    Some(-1L)
-  }
-}
-
-class TestRestEventHubClient(latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
-    extends Client
-    with TestClientSugar {
-
-  override def endPointOfPartition(
+  override def lastSeqAndOffset(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     val (offset, seq, _) = latestRecords(nameAndPartition)
     Some(offset, seq)
   }
 
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] =
     Some(latestRecords(nameAndPartition)._3)
-  }
 
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def beginSeqNo(nameAndPartition: EventHubNameAndPartition): Option[Long] =
     Some(-1L)
-  }
 }
 
-class FragileEventHubClient private extends Client with TestClientSugar {
-
-  override def endPointOfPartition(
-      nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
-    import FragileEventHubClient._
-
-    callIndex += 1
-    if (callIndex < numBatchesBeforeCrashedEndpoint) {
-      Some(latestRecords(nameAndPartition))
-    } else if (callIndex < lastBatchWhenEndpointCrashed) {
-      None
-    } else {
-      Some(latestRecords(nameAndPartition))
-    }
-  }
-
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] = {
-    Some(Long.MaxValue)
-  }
-
-  override def close(): Unit = {}
-
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
-    Some(-1L)
-  }
-}
-
-// ugly stuff to make things checkpointable in tests
-object FragileEventHubClient {
-
-  var callIndex = -1
-  var numBatchesBeforeCrashedEndpoint = 0
-  var lastBatchWhenEndpointCrashed = 0
-  var latestRecords: Map[EventHubNameAndPartition, (Long, Long)] = Map()
-
-  def getInstance(eventHubNameSpace: String,
-                  eventhubsParams: Map[String, Map[String, String]]): FragileEventHubClient = {
-    new FragileEventHubClient()
-  }
-}
-
-class FluctuatedEventHubClient(ssc: StreamingContext,
+class FluctuatedEventHubClient(ehParams: Map[String, String],
+                               eventHubs: SimulatedEventHubs,
+                               ssc: StreamingContext,
                                messagesBeforeEmpty: Long,
                                numBatchesBeforeNewData: Int,
                                latestRecords: Map[EventHubNameAndPartition, (Long, Long)])
     extends Client
     with TestClientSugar {
   private var callIndex = -1
+  private var partitionId: Int = _
+  private var offsetType: EventHubsOffsetType = _
+  private var currentOffset: String = _
 
-  override def endPointOfPartition(
+  override def initReceiver(partitionId: String,
+                            offsetType: EventHubsOffsetType,
+                            currentOffset: String): Unit = {
+    this.partitionId = partitionId.toInt
+    this.offsetType = offsetType
+    this.currentOffset = currentOffset
+  }
+
+  override def receive(expectedEventNum: Int): Iterable[EventData] = {
+    val eventHubName = ehParams("eventhubs.name")
+    if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
+      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId),
+                       currentOffset.toInt,
+                       expectedEventNum)
+    } else {
+      eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
+                               ehParams("eventhubs.filter.enqueuetime").toLong,
+                               expectedEventNum)
+    }
+  }
+
+  override def lastSeqAndOffset(
       nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
@@ -238,22 +185,11 @@ class FluctuatedEventHubClient(ssc: StreamingContext,
     }
   }
 
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueueTimeOfPartitions(
-      nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
     Some(Long.MaxValue)
   }
 
-  /**
-   * return the start seq number of each partition
-   *
-   * @return a map from eventhubName-partition to seq
-   */
-  override def startSeqOfPartition(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def beginSeqNo(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
     Some(-1L)
   }
 }

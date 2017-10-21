@@ -87,7 +87,7 @@ private[spark] object RateControlUtils extends Logging {
     val r = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
       val name = nameAndPartition.eventHubName
-      val endPoint = eventHubClient(name).endPointOfPartition(nameAndPartition)
+      val endPoint = eventHubClient(name).lastSeqAndOffset(nameAndPartition)
       require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
 
       r += nameAndPartition -> endPoint.get
@@ -110,7 +110,7 @@ private[spark] object RateControlUtils extends Logging {
     val latestEnqueueTimeOfPartitions = new mutable.HashMap[EventHubNameAndPartition, Long].empty
     for (nameAndPartition <- ehNameAndPartitions) {
       val name = nameAndPartition.eventHubName
-      val lastEnqueueTime = eventHubsClient(name).lastEnqueueTimeOfPartitions(nameAndPartition).get
+      val lastEnqueueTime = eventHubsClient(name).lastEnqueuedTime(nameAndPartition).get
 
       latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
     }
@@ -144,7 +144,7 @@ private[spark] object RateControlUtils extends Logging {
     : Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
 
     fetchedStartOffsetsInNextBatch.map {
-      case (ehNameAndPartition, (offset, seq)) =>
+      case (ehNameAndPartition, (offset, _)) =>
         val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
           offset.toString,
           eventhubsParams.get(ehNameAndPartition.eventHubName) match {

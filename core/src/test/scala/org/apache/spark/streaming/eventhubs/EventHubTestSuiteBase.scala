@@ -17,13 +17,11 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import java.io.{ IOException, ObjectInputStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import scala.reflect.ClassTag
 
 import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
@@ -38,20 +36,12 @@ private[eventhubs] class TestEventHubOutputStream[T: ClassTag](
     extends ForEachDStream[T](
       parent, { (rdd: RDD[T], t: Time) =>
         val rddOpToApply =
-          rddOperation.getOrElse((rdd: RDD[T], t: Time) => rdd.glom().collect().map(_.toSeq))
+          rddOperation.getOrElse((rdd: RDD[T], _: Time) => rdd.glom().collect().map(_.toSeq))
         val resultsInABatch = rddOpToApply(rdd, t)
         output.add(resultsInABatch)
       },
       false
-    ) {
-
-  // This is to clear the output buffer every it is read from a checkpoint
-  @throws(classOf[IOException])
-  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
-    ois.defaultReadObject()
-    output.clear()
-  }
-}
+    ) {}
 
 private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
@@ -113,7 +103,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       progressRootPath.toString,
       eventhubsParams,
       (ehParams: Map[String, String]) =>
-        new TestRestEventHubClient(ehParams, simulatedEventHubs, maxOffsetForEachEventHub)
+        new TestEventHubsClient(ehParams, simulatedEventHubs, maxOffsetForEachEventHub)
     )
   }
 
@@ -160,7 +150,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       val clock = ssc.scheduler.clock.asInstanceOf[ManualClock]
       logInfo("Manual clock before advancing = " + clock.getTimeMillis())
       if (actuallyWait) {
-        for (i <- 1 to numBatches) {
+        for (_ <- 1 to numBatches) {
           logInfo("Actually waiting for " + batchDuration)
           clock.advance(batchDuration.milliseconds)
           Thread.sleep(batchDuration.milliseconds)

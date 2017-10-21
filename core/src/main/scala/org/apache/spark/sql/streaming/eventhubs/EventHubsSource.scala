@@ -20,24 +20,24 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success }
+import org.apache.spark.eventhubscommon.client.Client
+import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.eventhubscommon.{
   EventHubNameAndPartition,
   EventHubsConnector,
   OffsetRecord,
   RateControlUtils
 }
-import org.apache.spark.eventhubscommon.client.Client
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{ DataFrame, Row, SQLContext }
 import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset, Source }
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{ DataFrame, Row, SQLContext }
 
 import scala.collection.mutable
+import scala.concurrent.{ ExecutionContext, Future }
+import scala.util.{ Failure, Success }
 
 private[spark] class EventHubsSource private[eventhubs] (
     sqlContext: SQLContext,
@@ -157,7 +157,7 @@ private[spark] class EventHubsSource private[eventhubs] (
     Future {
       progressTracker.cleanProgressFile(batchIdToClean)
     }.onComplete {
-      case Success(r) =>
+      case Success(_) =>
         logInfo(s"finished cleanup for batch $batchIdToClean")
       case Failure(exception) =>
         logWarning(

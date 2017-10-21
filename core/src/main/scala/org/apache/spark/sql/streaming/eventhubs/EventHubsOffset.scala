@@ -17,14 +17,13 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import scala.collection.mutable
-import scala.util.control.NonFatal
-
+import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.sql.execution.streaming.Offset
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.sql.execution.streaming.Offset
+import scala.collection.mutable
+import scala.util.control.NonFatal
 
 // the descriptor of EventHubsBatchRecord to communicate with StreamExecution
 private[streaming] case class EventHubsBatchRecord(
@@ -55,7 +54,7 @@ private object JsonUtils {
           (EventHubNameAndPartition.fromString(ehNameAndPartitionStr), seqNum)
       })
     } catch {
-      case NonFatal(x) =>
+      case NonFatal(_) =>
         throw new IllegalArgumentException(s"failed to parse $jsonStr")
     }
   }

@@ -17,12 +17,13 @@
 
 package org.apache.spark.eventhubscommon.utils
 
-import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.streaming.StreamingContext
+
+import scala.collection.mutable.ListBuffer
 
 class SimulatedEventHubs(eventHubsNamespace: String,
                          initialData: Map[EventHubNameAndPartition, Array[EventData]])
@@ -108,9 +109,9 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
   }
 }
 
-class TestRestEventHubClient(ehParams: Map[String, String],
-                             eventHubs: SimulatedEventHubs,
-                             latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
+class TestEventHubsClient(ehParams: Map[String, String],
+                          eventHubs: SimulatedEventHubs,
+                          latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
     extends Client
     with TestClientSugar {
   private var partitionId: Int = _

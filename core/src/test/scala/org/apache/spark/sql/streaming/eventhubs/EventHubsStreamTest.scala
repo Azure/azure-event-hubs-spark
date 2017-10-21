@@ -97,7 +97,7 @@ trait EventHubsStreamTest
   }
 
   /** How long to wait for an active stream to catch up when checking a result. */
-  val streamingTimeout = 60 seconds
+  protected val streamingTimeout = 60 seconds
 
   /** A trait for actions that can be performed while testing a streaming DataFrame. */
   // trait StreamAction
@@ -514,7 +514,7 @@ trait EventHubsStreamTest
             eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
             eventHubsSource.setEventHubsReceiver(
               (eventHubsParameters: Map[String, String]) =>
-                new TestRestEventHubClient(eventHubsParameters, eventHubs, null)
+                new TestEventHubsClient(eventHubsParameters, eventHubs, null)
             )
             currentStream.start()
 
@@ -726,7 +726,7 @@ trait EventHubsStreamTest
   def runStressTest(ds: Dataset[Int],
                     addData: Seq[Int] => StreamAction,
                     iterations: Int = 100): Unit = {
-    runStressTest(ds, Seq.empty, (data, running) => addData(data), iterations)
+    runStressTest(ds, Seq.empty, (data, _) => addData(data), iterations)
   }
 
   /**
@@ -759,7 +759,7 @@ trait EventHubsStreamTest
       actions += addData(data, running)
     }
 
-    (1 to iterations).foreach { i =>
+    (1 to iterations).foreach { _ =>
       val rand = Random.nextDouble()
       if (!running) {
         rand match {

@@ -372,13 +372,6 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     rdd
   }
 
-  @throws(classOf[IOException])
-  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
-    ois.defaultReadObject()
-    DirectDStreamProgressTracker.registeredConnectors += this
-    initialized = false
-  }
-
   private[eventhubs] class EventHubDirectDStreamCheckpointData(
       eventHubDirectDStream: EventHubDirectDStream)
       extends DStreamCheckpointData(this) {
@@ -444,5 +437,5 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
 private[eventhubs] object EventHubDirectDStream {
   val cleanupLock = new Object
-  var lastCleanupTime = -1L
+  private[eventhubs] var lastCleanupTime = -1L
 }

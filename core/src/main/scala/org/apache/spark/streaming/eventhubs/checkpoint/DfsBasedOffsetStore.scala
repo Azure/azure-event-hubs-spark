@@ -162,7 +162,7 @@ class DfsBasedOffsetStore(directory: String, namespace: String, name: String, pa
           offset = backupStream.readUTF()
           readSuccessful = true
         } catch {
-          case e: Exception =>
+          case _: Exception =>
             logError(s"Failed to read offset from backup checkpoint file $backupPath.")
         } finally {
           backupStream.close()

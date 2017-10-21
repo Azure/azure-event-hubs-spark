@@ -17,10 +17,10 @@
 
 package org.apache.spark.streaming.eventhubs
 
+import java.io.{ IOException, ObjectInputStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
 import scala.reflect.ClassTag
-
 import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.rdd.RDD
@@ -41,7 +41,15 @@ private[eventhubs] class TestEventHubOutputStream[T: ClassTag](
         output.add(resultsInABatch)
       },
       false
-    ) {}
+    ) {
+
+  // This is to clear the output buffer every it is read from a checkpoint
+  @throws(classOf[IOException])
+  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
+    ois.defaultReadObject()
+    output.clear()
+  }
+}
 
 private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 

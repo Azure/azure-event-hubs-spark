@@ -51,28 +51,22 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
     with Logging {
-
-  private[streaming] override def name: String = s"EventHub direct stream [$id]"
-
-  private var latestCheckpointTime: Time = _
-
-  private var initialized = false
-
-  DirectDStreamProgressTracker.registeredConnectors += this
-
+  // This uniquely identifies entities on the EventHubs side
+  override def uid: String = eventHubNameSpace
+  private[streaming] override def name: String = s"EventHub Direct DStream [$id]"
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
-  private val eventhubNameAndPartitions: Set[EventHubNameAndPartition] = {
+  // the list of eventhubs partitions connecting with this connector
+  override def connectedInstances: List[EventHubNameAndPartition] = {
     for (eventHubName <- eventhubsParams.keySet;
          partitionId <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
       yield EventHubNameAndPartition(eventHubName, partitionId)
-  }
+  }.toList
 
-  // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
-  override def uid: String = eventHubNameSpace
+  private var latestCheckpointTime: Time = _
+  private var initialized = false
 
-  // the list of eventhubs partitions connecting with this connector
-  override def connectedInstances: List[EventHubNameAndPartition] = eventhubNameAndPartitions.toList
+  DirectDStreamProgressTracker.registeredConnectors += this
 
   override protected[streaming] val rateController: Option[RateController] = {
     None
@@ -109,7 +103,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
-    eventhubNameAndPartitions.map { ehNameAndSpace =>
+    connectedInstances.map { ehNameAndSpace =>
       (ehNameAndSpace, (-1L, -1L))
     }.toMap
   })
@@ -153,7 +147,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     } else {
       // query start startSeqs
       val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
-      for (nameAndPartition <- eventhubNameAndPartitions) {
+      for (nameAndPartition <- connectedInstances) {
         val name = nameAndPartition.eventHubName
         val seqNo = eventHubClient(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
@@ -247,7 +241,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         // first check if the parameters are valid
         RateControlUtils.validateFilteringParams(eventHubClient.toMap,
                                                  eventhubsParams,
-                                                 eventhubNameAndPartitions.toList)
+                                                 connectedInstances)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
                                                               startOffsetInNextBatch.offsets)
       } else {
@@ -370,6 +364,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
     initialized = true
     rdd
+  }
+
+  @throws(classOf[IOException])
+  private def readObject(ois: ObjectInputStream): Unit = Utils.tryOrIOException {
+    ois.defaultReadObject()
+    DirectDStreamProgressTracker.registeredConnectors += this
+    initialized = false
   }
 
   private[eventhubs] class EventHubDirectDStreamCheckpointData(

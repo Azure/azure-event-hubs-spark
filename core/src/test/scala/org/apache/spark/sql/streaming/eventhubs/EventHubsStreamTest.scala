@@ -511,8 +511,8 @@ trait EventHubsStreamTest
 
             val eventHubsSource = searchCurrentSource()
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
-            eventHubsSource.eventHubClient = new SimulatedEventHubsRestClient(eventHubs)
-            eventHubsSource.eventHubsReceiver = (eventHubsParameters: Map[String, String]) =>
+            eventHubsSource.ehClient = new SimulatedEventHubsRestClient(eventHubs)
+            eventHubsSource.receiverFactory = (eventHubsParameters: Map[String, String]) =>
               new TestEventHubsClient(eventHubsParameters, eventHubs, null)
             currentStream.start()
 

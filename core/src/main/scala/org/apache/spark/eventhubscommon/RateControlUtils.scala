@@ -29,9 +29,8 @@ import scala.collection.mutable
 
 private[spark] object RateControlUtils extends Logging {
 
-  private def maxRateLimitPerPartition(eventHubName: String,
-                                       eventhubsParams: Map[String, _]): Int = {
-    val maxRate = eventhubsParams.get(eventHubName) match {
+  private def maxRateLimitPerPartition(eventHubName: String, ehParams: Map[String, _]): Int = {
+    val maxRate = ehParams.get(eventHubName) match {
       case Some(eventHubsConfigEntries) =>
         // this part shall be called by direct dstream where the parameters are indexed by eventhubs
         // names
@@ -40,9 +39,9 @@ private[spark] object RateControlUtils extends Logging {
           .getOrElse("eventhubs.maxRate", "10000")
           .toInt
       case None =>
-        // this is called by structured streaming where eventhubsParams only contains the parameters
+        // this is called by structured streaming where ehParams only contains the parameters
         // for a single eventhubs instance
-        eventhubsParams
+        ehParams
           .asInstanceOf[Map[String, String]]
           .getOrElse("eventhubs.maxRate", "10000")
           .toInt
@@ -61,11 +60,11 @@ private[spark] object RateControlUtils extends Logging {
   private def defaultRateControl(
       currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
       highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-      eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+      ehParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
     highestEndpoints.map {
       case (eventHubNameAndPar, (_, latestSeq)) =>
         val maximumAllowedMessageCnt =
-          maxRateLimitPerPartition(eventHubNameAndPar.eventHubName, eventhubsParams)
+          maxRateLimitPerPartition(eventHubNameAndPar.eventHubName, ehParams)
         val endSeq =
           math.min(latestSeq,
                    maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2)
@@ -75,19 +74,19 @@ private[spark] object RateControlUtils extends Logging {
 
   private[spark] def clamp(currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
                            highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-                           eventhubsParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
-    defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, eventhubsParams)
+                           ehParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+    defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, ehParams)
   }
 
   private[spark] def fetchLatestOffset(
-      eventHubClient: Map[String, Client],
+      eventHubClients: Map[String, Client],
       fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)])
     : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
 
     val r = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
       val name = nameAndPartition.eventHubName
-      val endPoint = eventHubClient(name).lastSeqAndOffset(nameAndPartition)
+      val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
       require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
 
       r += nameAndPartition -> endPoint.get
@@ -102,29 +101,29 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def validateFilteringParams(
-      eventHubsClient: Map[String, Client],
-      eventhubsParams: Map[String, _],
+      eventHubsClients: Map[String, Client],
+      ehParams: Map[String, _],
       ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
 
     // first check if the parameters are valid
     val latestEnqueueTimeOfPartitions = new mutable.HashMap[EventHubNameAndPartition, Long].empty
     for (nameAndPartition <- ehNameAndPartitions) {
       val name = nameAndPartition.eventHubName
-      val lastEnqueueTime = eventHubsClient(name).lastEnqueuedTime(nameAndPartition).get
+      val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
 
       latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
     }
 
     latestEnqueueTimeOfPartitions.toMap.foreach {
       case (ehNameAndPartition, latestEnqueueTime) =>
-        val passInEnqueueTime = eventhubsParams.get(ehNameAndPartition.eventHubName) match {
+        val passInEnqueueTime = ehParams.get(ehNameAndPartition.eventHubName) match {
           case Some(ehParams) =>
             ehParams
               .asInstanceOf[Map[String, String]]
               .getOrElse("eventhubs.filter.enqueuetime", Long.MinValue.toString)
               .toLong
           case None =>
-            eventhubsParams
+            ehParams
               .asInstanceOf[Map[String, String]]
               .getOrElse("eventhubs.filter.enqueuetime", Long.MinValue.toString)
               .toLong
@@ -139,7 +138,7 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def composeFromOffsetWithFilteringParams(
-      eventhubsParams: Map[String, _],
+      ehParams: Map[String, _],
       fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)])
     : Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
 
@@ -147,11 +146,11 @@ private[spark] object RateControlUtils extends Logging {
       case (ehNameAndPartition, (offset, _)) =>
         val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
           offset.toString,
-          eventhubsParams.get(ehNameAndPartition.eventHubName) match {
+          ehParams.get(ehNameAndPartition.eventHubName) match {
             case Some(ehConfig) =>
               ehConfig.asInstanceOf[Map[String, String]]
             case None =>
-              eventhubsParams.asInstanceOf[Map[String, String]]
+              ehParams.asInstanceOf[Map[String, String]]
           }
         )
         (ehNameAndPartition, (offsetType, offsetStr.toLong))

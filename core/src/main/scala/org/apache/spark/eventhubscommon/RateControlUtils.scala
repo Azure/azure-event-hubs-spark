@@ -40,7 +40,7 @@ private[spark] object RateControlUtils extends Logging {
           .getOrElse("eventhubs.maxRate", "10000")
           .toInt
       case None =>
-        // this is called by structured streaming where eventhubsParams only contains the parameters
+        // this is called by structured streaming where ehParams only contains the parameters
         // for a single eventhubs instance
         eventhubsParams
           .asInstanceOf[Map[String, String]]

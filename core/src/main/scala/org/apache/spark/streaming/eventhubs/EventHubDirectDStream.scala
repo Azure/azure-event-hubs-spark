@@ -44,7 +44,7 @@ import org.apache.spark.util.Utils
  */
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _ssc: StreamingContext,
-    private[eventhubs] val eventHubNameSpace: String,
+    val eventHubNameSpace: String,
     progressDir: String,
     eventhubsParams: Map[String, Map[String, String]],
     clientFactory: (Map[String, String]) => Client)

@@ -38,7 +38,6 @@ import org.scalatest.time.SpanSugar._
 
 import org.apache.spark.DebugFilesystem
 import org.apache.spark.eventhubscommon.EventHubsConnector
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
 import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.sql.{ Dataset, Encoder, QueryTest, Row }

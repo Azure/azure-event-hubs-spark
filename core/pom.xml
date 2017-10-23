@@ -28,6 +28,7 @@
   </parent>
   <artifactId>spark-streaming-eventhubs_2.11</artifactId>
   <packaging>jar</packaging>
+
   <dependencies>
     <dependency>
         <groupId>org.apache.spark</groupId>
@@ -36,13 +37,8 @@
         <type>test-jar</type>
         <scope>test</scope>
     </dependency>
-    <dependency>
-        <groupId>org.scalamock</groupId>
-        <artifactId>scalamock-scalatest-support_2.11</artifactId>
-        <version>3.2.2</version>
-        <scope>test</scope>
-    </dependency>
   </dependencies>
+
   <build>
     <plugins>
       <plugin>

@@ -53,7 +53,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     Mockito
       .when(eventHubClientMock.beginSeqNo(Matchers.any[EventHubNameAndPartition]))
       .thenReturn(None)
-    ehDStream.setEventHubClient(ehNameToClient)
+    ehDStream.eventHubClients = ehNameToClient
     ssc.scheduler.start()
     intercept[IllegalArgumentException] {
       ehDStream.compute(Time(1000))
@@ -76,7 +76,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       .when(eventHubClientMock.lastSeqAndOffset(Matchers.any[EventHubNameAndPartition]))
       .thenReturn(None)
 
-    ehDStream.setEventHubClient(ehNameToClient)
+    ehDStream.eventHubClients = ehNameToClient
     ssc.scheduler.start()
     intercept[IllegalArgumentException] {
       try {

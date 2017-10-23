@@ -145,15 +145,16 @@ private[spark] object EventHubsClientWrapper {
   private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
     new EventHubsClientWrapper(ehParams)
 
+  //TODO revisit after RateControlUtils re-write
   private[eventhubscommon] def configureStartOffset(
       previousOffset: String,
-      eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
-    if (previousOffset != "-1" && previousOffset != null) {
+      ehParams: Map[String, String]): (EventHubsOffsetType, String) = {
+    if (previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
-    } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
-    } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
-      (EventHubsOffsetTypes.EnqueueTime, eventhubsParams("eventhubs.filter.enqueuetime"))
+    } else if (ehParams.contains("eventhubs.filter.offset")) {
+      (EventHubsOffsetTypes.InputByteOffset, ehParams("eventhubs.filter.offset"))
+    } else if (ehParams.contains("eventhubs.filter.enqueuetime")) {
+      (EventHubsOffsetTypes.EnqueueTime, ehParams("eventhubs.filter.enqueuetime"))
     } else {
       (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
     }

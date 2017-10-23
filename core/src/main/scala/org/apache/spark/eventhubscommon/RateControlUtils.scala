@@ -40,7 +40,7 @@ private[spark] object RateControlUtils extends Logging {
           .getOrElse("eventhubs.maxRate", "10000")
           .toInt
       case None =>
-        // this is called by structured streaming where eventhubsParams only contains the parameters
+        // this is called by structured streaming where ehParams only contains the parameters
         // for a single eventhubs instance
         eventhubsParams
           .asInstanceOf[Map[String, String]]
@@ -80,14 +80,14 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def fetchLatestOffset(
-      eventHubClient: Map[String, Client],
+      eventHubClients: Map[String, Client],
       fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)])
     : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
 
     val r = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
       val name = nameAndPartition.eventHubName
-      val endPoint = eventHubClient(name).lastSeqAndOffset(nameAndPartition)
+      val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
       require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
 
       r += nameAndPartition -> endPoint.get
@@ -102,7 +102,7 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def validateFilteringParams(
-      eventHubsClient: Map[String, Client],
+      eventHubsClients: Map[String, Client],
       eventhubsParams: Map[String, _],
       ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
 
@@ -110,7 +110,7 @@ private[spark] object RateControlUtils extends Logging {
     val latestEnqueueTimeOfPartitions = new mutable.HashMap[EventHubNameAndPartition, Long].empty
     for (nameAndPartition <- ehNameAndPartitions) {
       val name = nameAndPartition.eventHubName
-      val lastEnqueueTime = eventHubsClient(name).lastEnqueuedTime(nameAndPartition).get
+      val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
 
       latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
     }

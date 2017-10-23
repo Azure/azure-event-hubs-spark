@@ -90,7 +90,7 @@ class ProgressTrackingAndCheckpointSuite
                          EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
                          EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
     assert(DirectDStreamProgressTracker.getInstance != null)
-    assert(eventHubDirectDStream.eventHubClient != null)
+    assert(eventHubDirectDStream.eventHubClients != null)
   }
 
   test("test integration of spark checkpoint and progress tracking (single stream)") {

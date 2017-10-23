@@ -81,25 +81,23 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   }
 
-  @transient private var _eventHubClients: mutable.HashMap[String, Client] = _
-
   private def progressTracker =
     DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
 
-  private[eventhubs] def setEventHubClient(
-      eventHubClient: mutable.HashMap[String, Client]): EventHubDirectDStream = {
-    _eventHubClients = eventHubClient
-    this
-  }
+  @transient private var _eventHubClients: mutable.HashMap[String, Client] = _
 
-  private[eventhubs] def eventHubClient = {
+  private[eventhubs] def eventHubClients = {
     if (_eventHubClients == null) {
       _eventHubClients = new mutable.HashMap[String, Client].empty
       for (name <- eventhubsParams.keys)
         _eventHubClients += name -> clientFactory(eventhubsParams(name))
     }
-
     _eventHubClients
+  }
+
+  private[eventhubs] def eventHubClients_=(client: mutable.HashMap[String, Client]) = {
+    _eventHubClients = client
+    this
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
@@ -149,7 +147,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
       for (nameAndPartition <- connectedInstances) {
         val name = nameAndPartition.eventHubName
-        val seqNo = eventHubClient(name).beginSeqNo(nameAndPartition)
+        val seqNo = eventHubClients(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
         startSeqs += nameAndPartition -> seqNo.get
@@ -239,7 +237,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(eventHubClient.toMap,
+        RateControlUtils.validateFilteringParams(eventHubClients.toMap,
                                                  eventhubsParams,
                                                  connectedInstances)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
@@ -313,7 +311,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
     RateControlUtils.fetchLatestOffset(
-      eventHubClient.toMap,
+      eventHubClients.toMap,
       if (fetchedHighestOffsetsAndSeqNums == null) {
         currentOffsetsAndSeqNums.offsets
       } else {

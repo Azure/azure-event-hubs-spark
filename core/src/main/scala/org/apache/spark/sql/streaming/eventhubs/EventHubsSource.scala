@@ -59,21 +59,27 @@ private[spark] class EventHubsSource private[eventhubs] (
   require(eventHubsName != null, "eventhubs.name is not defined")
 
   private var _eventHubsClient: Client = _
-
-  private var _eventHubsReceiver: (Map[String, String]) => Client = _
-
   private[eventhubs] def eventHubClient = {
     if (_eventHubsClient == null) {
       _eventHubsClient = clientFactory(eventHubsParams)
     }
     _eventHubsClient
   }
+  private[spark] def eventHubClient_=(eventHubClient: Client) = {
+    _eventHubsClient = eventHubClient
+    this
+  }
 
+  private var _eventHubsReceiver: (Map[String, String]) => Client = _
   private[eventhubs] def eventHubsReceiver = {
     if (_eventHubsReceiver == null) {
       _eventHubsReceiver = clientFactory
     }
     _eventHubsReceiver
+  }
+  private[spark] def eventHubsReceiver_=(f: (Map[String, String]) => Client) = {
+    _eventHubsReceiver = f
+    this
   }
 
   private val ehNameAndPartitions = {
@@ -95,17 +101,6 @@ private[spark] class EventHubsSource private[eventhubs] (
     eventHubsParams("eventhubs.progressTrackingDir"),
     sqlContext.sparkContext.appName,
     sqlContext.sparkContext.hadoopConfiguration)
-
-  private[spark] def setEventHubClient(eventHubClient: Client): EventHubsSource = {
-    _eventHubsClient = eventHubClient
-    this
-  }
-
-  private[spark] def setEventHubsReceiver(
-      eventhubReceiverCreator: (Map[String, String]) => Client): EventHubsSource = {
-    _eventHubsReceiver = eventhubReceiverCreator
-    this
-  }
 
   // the flag to avoid committing in the first batch
   private[spark] var firstBatch = true

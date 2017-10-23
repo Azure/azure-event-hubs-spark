@@ -511,11 +511,9 @@ trait EventHubsStreamTest
 
             val eventHubsSource = searchCurrentSource()
             val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
-            eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
-            eventHubsSource.setEventHubsReceiver(
-              (eventHubsParameters: Map[String, String]) =>
-                new TestEventHubsClient(eventHubsParameters, eventHubs, null)
-            )
+            eventHubsSource.eventHubClient = new SimulatedEventHubsRestClient(eventHubs)
+            eventHubsSource.eventHubsReceiver = (eventHubsParameters: Map[String, String]) =>
+              new TestEventHubsClient(eventHubsParameters, eventHubs, null)
             currentStream.start()
 
           case AdvanceManualClock(timeToAdd) =>

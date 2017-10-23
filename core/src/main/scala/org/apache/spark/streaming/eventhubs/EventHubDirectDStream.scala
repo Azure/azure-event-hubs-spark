@@ -53,7 +53,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     with Logging {
   // This uniquely identifies entities on the EventHubs side
   override def uid: String = eventHubNameSpace
-  private[streaming] override def name: String = s"EventHub Direct DStream [$id]"
+
+  private[streaming] override def name: String = s"EventHubs Direct DStream [$id]"
+
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
   // the list of eventhubs partitions connecting with this connector
@@ -69,37 +71,35 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   DirectDStreamProgressTracker.registeredConnectors += this
 
   override protected[streaming] val rateController: Option[RateController] = {
-    None
     // TODO: performance evaluation of rate controller
-    /*
     if (RateController.isBackPressureEnabled(ssc.sparkContext.conf)) {
-      Some(new EventHubDirectDStreamRateController(id, RateEstimator.create(ssc.sparkContext.conf,
-        graph.batchDuration)))
+      logInfo("back pressure is not currently supported")
+      None
+      /*Some(
+        new EventHubDirectDStreamRateController(
+          id,
+          RateEstimator.create(ssc.sparkContext.conf, graph.batchDuration)))*/
     } else {
       None
     }
-   */
   }
-
-  @transient private var _eventHubClients: mutable.HashMap[String, Client] = _
 
   private def progressTracker =
     DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
 
-  private[eventhubs] def setEventHubClient(
-      eventHubClient: mutable.HashMap[String, Client]): EventHubDirectDStream = {
-    _eventHubClients = eventHubClient
-    this
+  @transient private var _clients: mutable.HashMap[String, Client] = _
+  private[eventhubs] def ehClients = {
+    if (_clients == null) {
+      _clients = new mutable.HashMap[String, Client].empty
+      for (name <- eventhubsParams.keys)
+        _clients += name -> clientFactory(eventhubsParams(name))
+    }
+    _clients
   }
 
-  private[eventhubs] def eventHubClient = {
-    if (_eventHubClients == null) {
-      _eventHubClients = new mutable.HashMap[String, Client].empty
-      for (name <- eventhubsParams.keys)
-        _eventHubClients += name -> clientFactory(eventhubsParams(name))
-    }
-
-    _eventHubClients
+  private[eventhubs] def ehClients_=(client: mutable.HashMap[String, Client]) = {
+    _clients = client
+    this
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
@@ -149,7 +149,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
       for (nameAndPartition <- connectedInstances) {
         val name = nameAndPartition.eventHubName
-        val seqNo = eventHubClient(name).beginSeqNo(nameAndPartition)
+        val seqNo = ehClients(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
         startSeqs += nameAndPartition -> seqNo.get
@@ -239,7 +239,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(eventHubClient.toMap,
+        RateControlUtils.validateFilteringParams(ehClients.toMap,
                                                  eventhubsParams,
                                                  connectedInstances)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
@@ -313,7 +313,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
     RateControlUtils.fetchLatestOffset(
-      eventHubClient.toMap,
+      ehClients.toMap,
       if (fetchedHighestOffsetsAndSeqNums == null) {
         currentOffsetsAndSeqNums.offsets
       } else {

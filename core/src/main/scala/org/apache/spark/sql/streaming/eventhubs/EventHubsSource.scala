@@ -58,22 +58,28 @@ private[spark] class EventHubsSource private[eventhubs] (
   require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
   require(eventHubsName != null, "eventhubs.name is not defined")
 
-  private var _eventHubsClient: Client = _
-
-  private var _eventHubsReceiver: (Map[String, String]) => Client = _
-
-  private[eventhubs] def eventHubClient = {
-    if (_eventHubsClient == null) {
-      _eventHubsClient = clientFactory(eventHubsParams)
+  private var _client: Client = _
+  private[eventhubs] def ehClient = {
+    if (_client == null) {
+      _client = clientFactory(eventHubsParams)
     }
-    _eventHubsClient
+    _client
+  }
+  private[spark] def ehClient_=(eventHubClient: Client) = {
+    _client = eventHubClient
+    this
   }
 
-  private[eventhubs] def eventHubsReceiver = {
-    if (_eventHubsReceiver == null) {
-      _eventHubsReceiver = clientFactory
+  private var _receiver: (Map[String, String]) => Client = _
+  private[eventhubs] def receiverFactory = {
+    if (_receiver == null) {
+      _receiver = clientFactory
     }
-    _eventHubsReceiver
+    _receiver
+  }
+  private[spark] def receiverFactory_=(f: (Map[String, String]) => Client) = {
+    _receiver = f
+    this
   }
 
   private val ehNameAndPartitions = {
@@ -96,17 +102,6 @@ private[spark] class EventHubsSource private[eventhubs] (
     sqlContext.sparkContext.appName,
     sqlContext.sparkContext.hadoopConfiguration)
 
-  private[spark] def setEventHubClient(eventHubClient: Client): EventHubsSource = {
-    _eventHubsClient = eventHubClient
-    this
-  }
-
-  private[spark] def setEventHubsReceiver(
-      eventhubReceiverCreator: (Map[String, String]) => Client): EventHubsSource = {
-    _eventHubsReceiver = eventhubReceiverCreator
-    this
-  }
-
   // the flag to avoid committing in the first batch
   private[spark] var firstBatch = true
   // the offsets which have been to the self-managed offset store
@@ -123,7 +118,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   private[spark] def composeHighestOffset(
       retryIfFail: Boolean): Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
     RateControlUtils.fetchLatestOffset(
-      Map(eventHubsName -> eventHubClient),
+      Map(eventHubsName -> ehClient),
       if (fetchedHighestOffsetsAndSeqNums == null) {
         committedOffsetsAndSeqNums.offsets
       } else {
@@ -246,7 +241,7 @@ private[spark] class EventHubsSource private[eventhubs] (
         val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
         for (nameAndPartition <- connectedInstances) {
           val name = nameAndPartition.eventHubName
-          val seqNo = eventHubClient.beginSeqNo(nameAndPartition).get
+          val seqNo = ehClient.beginSeqNo(nameAndPartition).get
 
           startSeqs += nameAndPartition -> seqNo
         }
@@ -256,7 +251,7 @@ private[spark] class EventHubsSource private[eventhubs] (
             (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
         })
 
-        RateControlUtils.validateFilteringParams(Map(eventHubsName -> eventHubClient),
+        RateControlUtils.validateFilteringParams(Map(eventHubsName -> ehClient),
                                                  eventHubsParams,
                                                  ehNameAndPartitions)
 
@@ -292,7 +287,7 @@ private[spark] class EventHubsSource private[eventhubs] (
                         uid = uid,
                         subDirs = sqlContext.sparkContext.appName,
                         uid),
-      eventHubsReceiver
+      receiverFactory
     )
   }
 

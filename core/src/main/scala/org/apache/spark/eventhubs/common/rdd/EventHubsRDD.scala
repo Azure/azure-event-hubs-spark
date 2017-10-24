@@ -15,16 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.rdd
+package org.apache.spark.eventhubs.common.rdd
 
 import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.progress.ProgressWriter
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.progress.ProgressWriter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 

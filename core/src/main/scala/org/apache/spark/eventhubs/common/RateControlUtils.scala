@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubs.common
 
-import org.apache.spark.eventhubscommon.client.{
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.client.{
   Client,
   EventHubsClientWrapper,
   EventHubsOffsetTypes
 }
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.internal.Logging
 
 import scala.collection.mutable

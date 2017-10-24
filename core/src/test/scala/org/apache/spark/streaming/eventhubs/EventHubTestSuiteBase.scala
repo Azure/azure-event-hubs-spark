@@ -20,9 +20,15 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{ IOException, ObjectInputStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
+import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.utils.{
+  EventHubsTestUtilities,
+  FluctuatedEventHubClient,
+  SimulatedEventHubs,
+  TestEventHubsClient
+}
+
 import scala.reflect.ClassTag
-import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
-import org.apache.spark.eventhubscommon.utils._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{ DStream, ForEachDStream }

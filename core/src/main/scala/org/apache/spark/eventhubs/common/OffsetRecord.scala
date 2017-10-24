@@ -15,16 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubs.common
 
-private[spark] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
-
-  override def toString: String = s"$eventHubName-partition-$partitionId"
-}
-
-private[spark] object EventHubNameAndPartition {
-  def fromString(str: String): EventHubNameAndPartition = {
-    val Array(name, partition) = str.split("-partition-")
-    EventHubNameAndPartition(name, partition.toInt)
-  }
-}
+/**
+ * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
+ */
+private[spark] case class OffsetRecord(timestamp: Long,
+                                       offsets: Map[EventHubNameAndPartition, (Long, Long)])

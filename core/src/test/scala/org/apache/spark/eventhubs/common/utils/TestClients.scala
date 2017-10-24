@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.utils
+package org.apache.spark.eventhubs.common.utils
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.{ Client, EventHubsOffsetTypes }
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.client.{ Client, EventHubsOffsetTypes }
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
 /**

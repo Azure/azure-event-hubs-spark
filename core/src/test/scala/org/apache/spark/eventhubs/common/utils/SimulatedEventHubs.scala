@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.utils
+package org.apache.spark.eventhubs.common.utils
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
 
 import scala.collection.mutable.ListBuffer
 

@@ -15,19 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.progress
+package org.apache.spark.eventhubs.common.progress
 
-import java.io.{ BufferedReader, InputStreamReader, IOException }
+import java.io.{ BufferedReader, IOException, InputStreamReader }
 import java.util.concurrent.{ ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit }
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-
-import org.apache.spark.eventhubscommon.{
+import org.apache.spark.eventhubs.common.{
   EventHubNameAndPartition,
   EventHubsConnector,
   OffsetRecord

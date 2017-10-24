@@ -20,10 +20,10 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubscommon.client.Client
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
-import org.apache.spark.eventhubscommon.{
+import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
+import org.apache.spark.eventhubs.common.{
   EventHubNameAndPartition,
   EventHubsConnector,
   OffsetRecord,

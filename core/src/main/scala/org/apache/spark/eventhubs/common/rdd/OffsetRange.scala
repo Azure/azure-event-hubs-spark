@@ -15,10 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubs.common.rdd
 
-/**
- * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
- */
-private[spark] case class OffsetRecord(timestamp: Long,
-                                       offsets: Map[EventHubNameAndPartition, (Long, Long)])
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+
+private[spark] case class OffsetRange(eventHubNameAndPartition: EventHubNameAndPartition,
+                                      fromOffset: Long,
+                                      fromSeq: Long,
+                                      untilSeq: Long,
+                                      offsetType: EventHubsOffsetType) {
+
+  private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq, offsetType)
+}

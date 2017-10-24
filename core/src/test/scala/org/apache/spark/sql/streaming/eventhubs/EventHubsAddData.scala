@@ -19,7 +19,7 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import scala.reflect.ClassTag
 
-import org.apache.spark.eventhubscommon.utils.EventHubsTestUtilities
+import org.apache.spark.eventhubs.common.utils.EventHubsTestUtilities
 import org.apache.spark.sql.execution.streaming._
 
 /** A trait for actions that can be performed while testing a streaming DataFrame. */

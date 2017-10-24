@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubscommon._
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
 import org.apache.spark.sql.streaming.OffsetSuite
 import org.apache.spark.sql.test.SharedSQLContext
 

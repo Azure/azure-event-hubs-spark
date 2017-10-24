@@ -15,10 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.client
+package org.apache.spark.eventhubs.common
 
-private[spark] object EventHubsOffsetTypes extends Enumeration {
-  type EventHubsOffsetType = Value
+private[spark] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
 
-  val None, PreviousCheckpoint, InputByteOffset, EnqueueTime = Value
+  override def toString: String = s"$eventHubName-partition-$partitionId"
+}
+
+private[spark] object EventHubNameAndPartition {
+  def fromString(str: String): EventHubNameAndPartition = {
+    val Array(name, partition) = str.split("-partition-")
+    EventHubNameAndPartition(name, partition.toInt)
+  }
 }

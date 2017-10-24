@@ -44,14 +44,14 @@ import org.apache.spark.util.Utils
  * @param _ssc the streaming context this stream belongs to
  * @param eventHubNameSpace the namespace of evenhub instances
  * @param progressDir the path of directory saving the progress file
- * @param eventhubsParams the parameters of your eventhub instances, format:
+ * @param ehParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _ssc: StreamingContext,
     val eventHubNameSpace: String,
     progressDir: String,
-    eventhubsParams: Map[String, Map[String, String]],
+    ehParams: Map[String, Map[String, String]],
     clientFactory: (Map[String, String]) => Client)
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
@@ -65,8 +65,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = {
-    for (eventHubName <- eventhubsParams.keySet;
-         partitionId <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
+    for (eventHubName <- ehParams.keySet;
+         partitionId <- 0 until ehParams(eventHubName)("eventhubs.partition.count").toInt)
       yield EventHubNameAndPartition(eventHubName, partitionId)
   }.toList
 
@@ -96,8 +96,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private[eventhubs] def ehClients = {
     if (_clients == null) {
       _clients = new mutable.HashMap[String, Client].empty
-      for (name <- eventhubsParams.keys)
-        _clients += name -> clientFactory(eventhubsParams(name))
+      for (name <- ehParams.keys)
+        _clients += name -> clientFactory(ehParams(name))
     }
     _clients
   }
@@ -205,7 +205,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     if (rateController.isEmpty) {
       RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
                              fetchedHighestOffsetsAndSeqNums.offsets,
-                             eventhubsParams)
+                             ehParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
       estimateRateLimit.filter(_ > 0) match {
@@ -244,10 +244,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(ehClients.toMap,
-                                                 eventhubsParams,
-                                                 connectedInstances)
-        RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
+        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, connectedInstances)
+        RateControlUtils.composeFromOffsetWithFilteringParams(ehParams,
                                                               startOffsetInNextBatch.offsets)
       } else {
         Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
@@ -281,7 +279,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val offsetRanges = composeOffsetRange(startOffsetInNextBatch, highestOffsetOfAllPartitions)
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
-      eventhubsParams,
+      ehParams,
       offsetRanges,
       validTime.milliseconds,
       OffsetStoreParams(progressDir,
@@ -417,7 +415,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
           generatedRDDs += t -> new EventHubsRDD(
             context.sparkContext,
-            eventhubsParams,
+            ehParams,
             b.map {
               case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
                 OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)

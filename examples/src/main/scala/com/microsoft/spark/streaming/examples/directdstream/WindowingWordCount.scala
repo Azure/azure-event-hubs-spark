@@ -34,7 +34,6 @@ object WindowingWordCount {
     ssc.checkpoint(sparkCheckpointDir)
     val inputDirectStream = EventHubsUtils.createDirectStreams(
       ssc,
-      namespace,
       progressDir,
       Map(eventHunName -> eventhubParams))
 

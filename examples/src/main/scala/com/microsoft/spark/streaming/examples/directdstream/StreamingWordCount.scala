@@ -54,7 +54,6 @@ object StreamingWordCount {
 
     val inputDirectStream = EventHubsUtils.createDirectStreams(
       ssc,
-      eventHubNamespace,
       progressDir,
       Map(eventHubName -> eventhubParameters))
 

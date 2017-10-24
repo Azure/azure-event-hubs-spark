@@ -31,5 +31,5 @@ private[spark] trait EventHubsConnector {
   def uid: String
 
   // the list of eventhubs partitions connecting with this connector
-  def connectedInstances: List[NameAndPartition]
+  def namesAndPartitions: List[NameAndPartition]
 }

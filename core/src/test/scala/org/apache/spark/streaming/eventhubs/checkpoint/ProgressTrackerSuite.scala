@@ -33,7 +33,7 @@ class ProgressTrackerSuite extends SharedUtils {
 
     override def uid: String = uniqueId
 
-    override def connectedInstances: List[NameAndPartition] = connedInstances
+    override def namesAndPartitions: List[NameAndPartition] = connedInstances
   }
 
   override def beforeEach(): Unit = {

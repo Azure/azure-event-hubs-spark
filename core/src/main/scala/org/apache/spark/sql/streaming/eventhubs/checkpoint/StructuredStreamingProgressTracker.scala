@@ -39,7 +39,7 @@ private[spark] class StructuredStreamingProgressTracker private[spark] (
 
   override def eventHubNameAndPartitions: Map[String, List[NameAndPartition]] = {
     val connector = StructuredStreamingProgressTracker.registeredConnectors(uid)
-    Map(connector.uid -> connector.connectedInstances)
+    Map(connector.uid -> connector.namesAndPartitions)
   }
 
   private def initMetadataDirectory(): Unit = {

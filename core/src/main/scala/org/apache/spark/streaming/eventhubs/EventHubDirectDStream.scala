@@ -46,7 +46,7 @@ import org.apache.spark.util.Utils
  * @param ehParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
-private[eventhubs] class EventHubDirectDStream private[eventhubs] (
+private[spark] class EventHubDirectDStream private[spark] (
     _ssc: StreamingContext,
     progressDir: String,
     ehParams: Map[String, Map[String, String]],
@@ -68,7 +68,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
   // the list of eventhubs partitions connecting with this connector
-  override def connectedInstances: List[NameAndPartition] = {
+  override def namesAndPartitions: List[NameAndPartition] = {
     for (eventHubName <- ehParams.keySet;
          partitionId <- 0 until ehParams(eventHubName)("eventhubs.partition.count").toInt)
       yield NameAndPartition(eventHubName, partitionId)
@@ -112,7 +112,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
-    connectedInstances.map { ehNameAndSpace =>
+    namesAndPartitions.map { ehNameAndSpace =>
       (ehNameAndSpace, (-1L, -1L))
     }.toMap
   })
@@ -156,7 +156,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     } else {
       // query start startSeqs
       val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
-      for (nameAndPartition <- connectedInstances) {
+      for (nameAndPartition <- namesAndPartitions) {
         val name = nameAndPartition.ehName
         val seqNo = ehClients(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
@@ -248,7 +248,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, connectedInstances)
+        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
         RateControlUtils.composeFromOffsetWithFilteringParams(ehParams,
                                                               startOffsetInNextBatch.offsets)
       } else {
@@ -308,16 +308,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  /**
-   * when we have reached the end of the message queue in the remote end or we haven't get any
-   * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
-   * to prevent we die too much, we shall retry with 2-power interval in this case
-   */
-  private def failAppIfRestEndpointFail =
-    fetchedHighestOffsetsAndSeqNums == null ||
-      currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
-
-  private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
+  private[spark] def composeHighestOffset(validTime: Time) = {
     RateControlUtils.fetchLatestOffset(
       ehClients.toMap,
       if (fetchedHighestOffsetsAndSeqNums == null) {
@@ -331,11 +322,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         Some(fetchedHighestOffsetsAndSeqNums.offsets)
       case _ =>
         logWarning(s"failed to fetch highest offset at $validTime")
-        if (retryIfFail) {
-          None
-        } else {
-          Some(fetchedHighestOffsetsAndSeqNums.offsets)
-        }
+        None
     }
   }
 
@@ -359,7 +346,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     // is higher than the saved one -> leads to an exception;
     // 2) when the last batch was delayed, we should catch up by detecting the latest highest
     // offset
-    val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
+    val highestOffsetOption = composeHighestOffset(validTime)
     require(highestOffsetOption.isDefined,
             "We cannot get starting highest offset of partitions," +
               " EventHubs endpoint is not available")

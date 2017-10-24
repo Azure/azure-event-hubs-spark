@@ -239,7 +239,7 @@ private[spark] class EventHubsSource private[eventhubs] (
     val filterOffsetAndType = {
       if (committedOffsetsAndSeqNums.batchId == -1) {
         val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
-        for (nameAndPartition <- connectedInstances) {
+        for (nameAndPartition <- namesAndPartitions) {
           val name = nameAndPartition.ehName
           val seqNo = ehClient.beginSeqNo(nameAndPartition).get
 
@@ -324,7 +324,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   }
 
   private def validateReadResults(readProgress: OffsetRecord): Boolean = {
-    readProgress.offsets.keySet == connectedInstances.toSet
+    readProgress.offsets.keySet == namesAndPartitions.toSet
   }
 
   private def readProgress(batchId: Long): EventHubsOffset = {
@@ -392,7 +392,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   override def uid: String = s"${eventHubsNamespace}_${eventHubsName}_$streamId"
 
   // the list of eventhubs partitions connecting with this connector
-  override def connectedInstances: List[NameAndPartition] = ehNameAndPartitions
+  override def namesAndPartitions: List[NameAndPartition] = ehNameAndPartitions
 
 }
 

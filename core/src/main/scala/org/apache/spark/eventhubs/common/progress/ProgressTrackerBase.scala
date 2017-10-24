@@ -371,7 +371,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     val fs = tempDirectoryPath.getFileSystem(hadoopConfiguration)
     ehConnectors
       .flatMap { ehConnector =>
-        ehConnector.connectedInstances.map(
+        ehConnector.namesAndPartitions.map(
           ehNameAndPartition =>
             PathTools.makeTempFilePath(tempDirectoryStr,
                                        ehConnector.streamId,

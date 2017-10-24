@@ -46,7 +46,7 @@ private[spark] class DirectDStreamProgressTracker private[spark] (
 
   override def eventHubNameAndPartitions: Map[String, List[NameAndPartition]] = {
     DirectDStreamProgressTracker.registeredConnectors.map { connector =>
-      (connector.uid, connector.connectedInstances)
+      (connector.uid, connector.namesAndPartitions)
     }.toMap
   }
 

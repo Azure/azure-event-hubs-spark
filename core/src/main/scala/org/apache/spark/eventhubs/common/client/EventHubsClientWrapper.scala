@@ -143,18 +143,4 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
 private[spark] object EventHubsClientWrapper {
   private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
     new EventHubsClientWrapper(ehParams)
-
-  private[eventhubs] def configureStartOffset(
-      previousOffset: String,
-      ehParams: Map[String, String]): (EventHubsOffsetType, String) = {
-    if (previousOffset != "-1" && previousOffset != null) {
-      (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
-    } else if (ehParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset, ehParams("eventhubs.filter.offset"))
-    } else if (ehParams.contains("eventhubs.filter.enqueuetime")) {
-      (EventHubsOffsetTypes.EnqueueTime, ehParams("eventhubs.filter.enqueuetime"))
-    } else {
-      (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
-    }
-  }
 }

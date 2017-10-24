@@ -57,7 +57,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     with EventHubsConnector
     with Logging {
   // This uniquely identifies entities on the EventHubs side
-  override def uid: String = eventHubNameSpace
+  val ehNamespace: String = ehParams(ehParams.keySet.head)("eventhubs.namespace")
+  override def uid: String = ehNamespace
 
   private[streaming] override def name: String = s"EventHubs Direct DStream [$id]"
 

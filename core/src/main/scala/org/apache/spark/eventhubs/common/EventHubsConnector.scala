@@ -15,16 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.rdd
+package org.apache.spark.eventhubs.common
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+/**
+ * interface representing the bridge between EventHubs and Spark-side processing engine
+ * (Direct DStream or Structured Streaming)
+ */
+private[spark] trait EventHubsConnector {
 
-private[spark] case class OffsetRange(eventHubNameAndPartition: EventHubNameAndPartition,
-                                      fromOffset: Long,
-                                      fromSeq: Long,
-                                      untilSeq: Long,
-                                      offsetType: EventHubsOffsetType) {
+  // the id of the stream which is mapped from eventhubs instance
+  def streamId: Int
 
-  private[spark] def toTuple = (eventHubNameAndPartition, fromOffset, fromSeq, untilSeq, offsetType)
+  // uniquely identify the entities in eventhubs side, it can be the EventHubs namespace or the
+  // combination of namespace and eventhubs name and streamId
+  def uid: String
+
+  // the list of eventhubs partitions connecting with this connector
+  def connectedInstances: List[EventHubNameAndPartition]
 }

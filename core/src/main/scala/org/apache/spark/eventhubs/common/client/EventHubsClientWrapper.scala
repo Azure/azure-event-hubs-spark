@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.client
+package org.apache.spark.eventhubs.common.client
 
 import java.time.Instant
 
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 /**
@@ -145,7 +145,7 @@ private[spark] object EventHubsClientWrapper {
   private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
     new EventHubsClientWrapper(ehParams)
 
-  private[eventhubscommon] def configureStartOffset(
+  private[eventhubs] def configureStartOffset(
       previousOffset: String,
       eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
     if (previousOffset != "-1" && previousOffset != null) {

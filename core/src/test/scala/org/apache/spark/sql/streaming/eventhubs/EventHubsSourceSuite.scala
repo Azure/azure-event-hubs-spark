@@ -20,8 +20,8 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.utils._
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.{ Dataset, SparkSession }
 import org.apache.spark.sql.streaming.{ OutputMode, ProcessingTime }
 import org.apache.spark.sql.types.TimestampType

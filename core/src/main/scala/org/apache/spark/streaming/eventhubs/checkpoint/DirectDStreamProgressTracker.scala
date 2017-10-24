@@ -18,16 +18,14 @@
 package org.apache.spark.streaming.eventhubs.checkpoint
 
 import scala.collection.mutable.ListBuffer
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-
-import org.apache.spark.eventhubscommon.{
+import org.apache.spark.eventhubs.common.{
   EventHubNameAndPartition,
   EventHubsConnector,
   OffsetRecord
 }
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubs.common.progress.ProgressTrackerBase
 
 /**
  * EventHub uses offset to indicates the startpoint of each receiver, and uses the number of

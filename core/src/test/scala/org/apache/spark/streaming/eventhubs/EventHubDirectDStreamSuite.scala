@@ -17,8 +17,8 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import org.apache.spark.eventhubscommon.client.{ Client, EventHubsClientWrapper }
-import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ Duration, Seconds, Time }
 import org.mockito.{ Matchers, Mockito }

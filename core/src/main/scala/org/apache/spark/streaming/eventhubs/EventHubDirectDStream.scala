@@ -21,10 +21,15 @@ import java.io.{ IOException, ObjectInputStream }
 
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubscommon._
-import org.apache.spark.eventhubscommon.client.Client
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
+import org.apache.spark.eventhubs.common.{
+  EventHubNameAndPartition,
+  EventHubsConnector,
+  OffsetRecord,
+  RateControlUtils
+}
+import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ StreamingContext, Time }

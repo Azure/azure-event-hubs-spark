@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.progress
+package org.apache.spark.eventhubs.common.progress
 
 /**
  * this class represent the record written by ProgressWriter and read by ProgressTracker

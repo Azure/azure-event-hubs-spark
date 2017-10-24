@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.utils
+package org.apache.spark.eventhubs.common.utils
 
 import java.time.Instant
 import java.util.Date
@@ -23,9 +23,8 @@ import java.util.Date
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.eventhubs.amqp.AmqpConstants
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
 import org.powermock.reflect.Whitebox
-
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 
 private[spark] object EventHubsTestUtilities extends Logging {

@@ -15,11 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.client
+package org.apache.spark.eventhubs.common.client
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 
 private[spark] trait Client extends Serializable {
 

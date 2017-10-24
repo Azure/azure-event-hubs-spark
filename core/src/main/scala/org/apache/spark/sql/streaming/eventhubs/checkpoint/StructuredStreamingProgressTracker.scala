@@ -18,11 +18,10 @@
 package org.apache.spark.sql.streaming.eventhubs.checkpoint
 
 import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
-
-import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, EventHubsConnector }
-import org.apache.spark.eventhubscommon.progress.{ PathTools, ProgressTrackerBase }
+import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, EventHubsConnector }
+import org.apache.spark.eventhubs.common.EventHubsConnector
+import org.apache.spark.eventhubs.common.progress.{ PathTools, ProgressTrackerBase }
 
 private[spark] class StructuredStreamingProgressTracker private[spark] (
     uid: String,

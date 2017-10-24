@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source

@@ -15,11 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.progress
+package org.apache.spark.eventhubs.common.progress
 
 import org.apache.hadoop.fs.Path
-
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.EventHubNameAndPartition
 
 private[spark] object PathTools extends Serializable {
 

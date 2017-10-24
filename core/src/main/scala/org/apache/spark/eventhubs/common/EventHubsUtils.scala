@@ -14,14 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.streaming.eventhubs
+package org.apache.spark.eventhubs.common
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.SparkConf
-import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
+import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
 import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 
 object EventHubsUtils {
+
+  // Will place constants here for now.
+  val DefaultMaxRate = "10000"
 
   /**
    * Return an initialized SparkConf that registered

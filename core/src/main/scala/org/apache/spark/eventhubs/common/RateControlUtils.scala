@@ -29,25 +29,23 @@ import scala.collection.mutable
 
 private[spark] object RateControlUtils extends Logging {
 
-  private def maxRateLimitPerPartition(eventHubName: String, ehParams: Map[String, _]): Int = {
-    val maxRate = ehParams.get(eventHubName) match {
-      case Some(eventHubsConfigEntries) =>
-        // this part shall be called by direct dstream where the parameters are indexed by eventhubs
-        // names
-        eventHubsConfigEntries
+  private def maxRateLimitPerPartition(ehName: String, ehParams: Map[String, _]): Int = {
+    val maxRate = ehParams.get(ehName) match {
+      case Some(params) =>
+        // Must be DirectDStream
+        params
           .asInstanceOf[Map[String, String]]
           .getOrElse("eventhubs.maxRate", "10000")
           .toInt
       case None =>
-        // this is called by structured streaming where ehParams only contains the parameters
-        // for a single eventhubs instance
+        // Must be Structured Stream
         ehParams
           .asInstanceOf[Map[String, String]]
           .getOrElse("eventhubs.maxRate", "10000")
           .toInt
     }
     require(maxRate > 0,
-            s"eventhubs.maxRate has to be larger than zero, violated by $eventHubName ($maxRate)")
+            s"eventhubs.maxRate has to be larger than zero, violated by $ehName ($maxRate)")
     maxRate
   }
 

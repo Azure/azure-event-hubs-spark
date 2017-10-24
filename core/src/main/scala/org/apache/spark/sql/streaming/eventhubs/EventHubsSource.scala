@@ -230,7 +230,7 @@ private[spark] class EventHubsSource private[eventhubs] (
           }
           .values
           .head
-          .filter(_._1.eventHubName == eventHubsParams("eventhubs.name"))
+          .filter(_._1.ehName == eventHubsParams("eventhubs.name"))
       )
     }
   }
@@ -240,7 +240,7 @@ private[spark] class EventHubsSource private[eventhubs] (
       if (committedOffsetsAndSeqNums.batchId == -1) {
         val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
         for (nameAndPartition <- connectedInstances) {
-          val name = nameAndPartition.eventHubName
+          val name = nameAndPartition.ehName
           val seqNo = ehClient.beginSeqNo(nameAndPartition).get
 
           startSeqs += nameAndPartition -> seqNo

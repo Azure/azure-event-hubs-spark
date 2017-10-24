@@ -52,7 +52,7 @@ private[spark] class ProgressWriter(streamId: Int,
       cpFileStream = fs.create(tempProgressTrackingPointPath, true)
       val record = ProgressRecord(recordTime,
                                   uid,
-                                  eventHubNameAndPartition.eventHubName,
+                                  eventHubNameAndPartition.ehName,
                                   eventHubNameAndPartition.partitionId,
                                   cpOffset,
                                   cpSeq)

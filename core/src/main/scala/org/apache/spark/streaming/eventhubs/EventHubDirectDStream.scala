@@ -157,7 +157,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       // query start startSeqs
       val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
       for (nameAndPartition <- connectedInstances) {
-        val name = nameAndPartition.eventHubName
+        val name = nameAndPartition.ehName
         val seqNo = ehClients(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
@@ -180,7 +180,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
     val description = offsetRanges
       .map { offsetRange =>
-        s"eventhub: ${offsetRange.eventHubNameAndPartition}\t" +
+        s"eventhub: ${offsetRange.nameAndPartition}\t" +
           s"starting offsets: ${offsetRange.fromOffset}" +
           s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
       }

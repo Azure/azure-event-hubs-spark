@@ -51,7 +51,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     offsetRanges.zipWithIndex.map {
       case (offsetRange, index) =>
         new EventHubRDDPartition(index,
-                                 offsetRange.eventHubNameAndPartition,
+                                 offsetRange.nameAndPartition,
                                  offsetRange.fromOffset,
                                  offsetRange.fromSeq,
                                  offsetRange.untilSeq,
@@ -131,7 +131,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
         s" $untilSeq (inclusive) at $batchTime")
     var eventHubReceiver: Client = null
     try {
-      val eventHubParameters = ehParams(ehRDDPartition.nameAndPartition.eventHubName)
+      val eventHubParameters = ehParams(ehRDDPartition.nameAndPartition.ehName)
 
       eventHubReceiver = receiverFactory(eventHubParameters)
       eventHubReceiver.initReceiver(ehRDDPartition.nameAndPartition.partitionId.toString,

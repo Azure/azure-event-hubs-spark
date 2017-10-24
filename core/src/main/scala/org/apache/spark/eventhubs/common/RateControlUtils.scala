@@ -63,7 +63,7 @@ private[spark] object RateControlUtils extends Logging {
     highestEndpoints.map {
       case (eventHubNameAndPar, (_, latestSeq)) =>
         val maximumAllowedMessageCnt =
-          maxRateLimitPerPartition(eventHubNameAndPar.eventHubName, ehParams)
+          maxRateLimitPerPartition(eventHubNameAndPar.ehName, ehParams)
         val endSeq =
           math.min(latestSeq,
                    maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2)
@@ -84,7 +84,7 @@ private[spark] object RateControlUtils extends Logging {
 
     val r = new mutable.HashMap[NameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
-      val name = nameAndPartition.eventHubName
+      val name = nameAndPartition.ehName
       val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
       require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
 
@@ -106,7 +106,7 @@ private[spark] object RateControlUtils extends Logging {
     // first check if the parameters are valid
     val latestEnqueueTimeOfPartitions = new mutable.HashMap[NameAndPartition, Long].empty
     for (nameAndPartition <- ehNameAndPartitions) {
-      val name = nameAndPartition.eventHubName
+      val name = nameAndPartition.ehName
       val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
 
       latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
@@ -114,7 +114,7 @@ private[spark] object RateControlUtils extends Logging {
 
     latestEnqueueTimeOfPartitions.toMap.foreach {
       case (ehNameAndPartition, latestEnqueueTime) =>
-        val passInEnqueueTime = ehParams.get(ehNameAndPartition.eventHubName) match {
+        val passInEnqueueTime = ehParams.get(ehNameAndPartition.ehName) match {
           case Some(ehParams) =>
             ehParams
               .asInstanceOf[Map[String, String]]
@@ -144,7 +144,7 @@ private[spark] object RateControlUtils extends Logging {
       case (ehNameAndPartition, (offset, _)) =>
         val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
           offset.toString,
-          ehParams.get(ehNameAndPartition.eventHubName) match {
+          ehParams.get(ehNameAndPartition.ehName) match {
             case Some(ehConfig) =>
               ehConfig.asInstanceOf[Map[String, String]]
             case None =>

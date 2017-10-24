@@ -292,7 +292,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
               oos.writeBytes(
                 ProgressRecord(commitTime,
                                namespace,
-                               nameAndPartitionId.eventHubName,
+                               nameAndPartitionId.ehName,
                                nameAndPartitionId.partitionId,
                                offset,
                                seq).toString + "\n"

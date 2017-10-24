@@ -86,14 +86,8 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   protected def createDirectStreams(
       ssc: StreamingContext,
-      eventHubNamespace: String,
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc,
-                                              eventHubNamespace,
-                                              progressDir,
-                                              eventParams,
-                                              EventHubsClientWrapper.apply)
-    newStream
+    new EventHubDirectDStream(ssc, progressDir, eventParams, EventHubsClientWrapper.apply)
   }
 }

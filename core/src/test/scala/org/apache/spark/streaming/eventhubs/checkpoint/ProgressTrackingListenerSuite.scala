@@ -44,10 +44,10 @@ class ProgressTrackingListenerSuite extends SharedUtils {
         None,
         Map(1 -> OutputOperationInfo(Time(1000L), 1, "output", "", None, None, None))
       ))
-    val dstream = createDirectStreams(ssc,
-                                      eventhubNamespace,
-                                      progressRootPath.toString,
-                                      Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
+    val dstream = createDirectStreams(
+      ssc,
+      progressRootPath.toString,
+      Map("eh1" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "eventhubs")))
     dstream.start()
     val progressWriter = new ProgressWriter(streamId,
                                             eventhubNamespace,
@@ -114,19 +114,21 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       Seconds(5))
     createDirectStreams(
       ssc,
-      "namespace1",
       progressRootPath.toString,
-      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3"))
+      Map(
+        "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
+      )
     ).start()
     createDirectStreams(
       ssc,
-      "namespace2",
       progressRootPath.toString,
-      Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-          "eh12" -> Map("eventhubs.partition.count" -> "2"),
-          "eh13" -> Map("eventhubs.partition.count" -> "3"))
+      Map(
+        "eh11" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace2"),
+        "eh12" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace2"),
+        "eh13" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace2")
+      )
     ).start()
     import scala.collection.JavaConverters._
     assert(

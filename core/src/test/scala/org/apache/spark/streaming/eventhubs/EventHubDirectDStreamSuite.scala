@@ -43,7 +43,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
 
   test("skip the batch when EH endpoint is unavailable for starting seq number query") {
     val ehDStream = new EventHubDirectDStream(ssc,
-                                              eventhubNamespace,
                                               progressRootPath.toString,
                                               Map("eh1" -> eventhubParameters),
                                               EventHubsClientWrapper.apply)
@@ -62,7 +61,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
 
   test("skip the batch when EH endpoint is unavailable for highest offset query") {
     val ehDStream = new EventHubDirectDStream(ssc,
-                                              eventhubNamespace,
                                               progressRootPath.toString,
                                               Map("eh1" -> eventhubParameters),
                                               EventHubsClientWrapper.apply)

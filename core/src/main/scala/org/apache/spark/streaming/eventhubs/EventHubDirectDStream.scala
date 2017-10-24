@@ -42,14 +42,12 @@ import org.apache.spark.util.Utils
 /**
  * implementation of EventHub-based direct stream
  * @param _ssc the streaming context this stream belongs to
- * @param eventHubNameSpace the namespace of evenhub instances
  * @param progressDir the path of directory saving the progress file
  * @param ehParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _ssc: StreamingContext,
-    val eventHubNameSpace: String,
     progressDir: String,
     ehParams: Map[String, Map[String, String]],
     clientFactory: (Map[String, String]) => Client)
@@ -143,7 +141,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
     val offsetRecord = progressTracker.read(
-      eventHubNameSpace,
+      ehNamespace,
       validTime.milliseconds - ssc.graph.batchDuration.milliseconds,
       fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
@@ -285,7 +283,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       validTime.milliseconds,
       OffsetStoreParams(progressDir,
                         streamId,
-                        uid = eventHubNameSpace,
+                        uid = ehNamespace,
                         subDirs = ssc.sparkContext.appName),
       clientFactory
     )
@@ -422,7 +420,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                 OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)
             }.toList,
             t.milliseconds,
-            OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace, subDirs = appName),
+            OffsetStoreParams(progressDir, streamId, uid = ehNamespace, subDirs = appName),
             clientFactory
           )
       }

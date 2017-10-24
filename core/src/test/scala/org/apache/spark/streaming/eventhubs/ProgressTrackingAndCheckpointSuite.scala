@@ -59,7 +59,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -109,7 +109,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -171,7 +171,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -218,7 +218,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -301,7 +301,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "3",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "namespace1",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -311,7 +311,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "3",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "namespace2",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -354,7 +354,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -392,7 +392,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -430,7 +430,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -474,7 +474,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -554,7 +554,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -639,7 +639,7 @@ class ProgressTrackingAndCheckpointSuite
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
           "eventhubs.filter.enqueuetime" -> "2000",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )

@@ -46,33 +46,29 @@ object EventHubsUtils {
    * Pass that Map (of type Map[String, Map[String, String]]) and we'll consume from all EventHubs listed
    *
    * @param ssc the StreamingContext this DStream belongs to
-   * @param ehNamespace the Event Hubs namespace
    * @param progressDir progress directory path to store EventHubs specific information(we only support HDFS-based checkpoint
    *                      storage for now, so you have to prefix your path with hdfs://clustername/
    * @param ehParams the parameters of your EventHubs instances
    * @return An EventHubsDirectDStream
    */
   def createDirectStreams(ssc: StreamingContext,
-                          ehNamespace: String,
                           progressDir: String,
                           ehParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
-    new EventHubDirectDStream(ssc, ehNamespace, progressDir, ehParams, EventHubsClientWrapper.apply)
+    new EventHubDirectDStream(ssc, progressDir, ehParams, EventHubsClientWrapper.apply)
   }
 
   /**
    * Creates a Direct DStream that consumes from a single Event Hubs instance.
    *
    * @param ssc the StreamingContext this DStream belongs to
-   * @param ehNamespace the Event Hubs namespace
    * @param progressDir progress directory path to store EventHubs specific information
    * @param ehParams the parameters of your EventHubs instance
    * @return An EventHubsDirectDStream
    */
   def createDirectStream(ssc: StreamingContext,
-                         ehNamespace: String,
                          progressDir: String,
                          ehParams: Map[String, String]): EventHubDirectDStream = {
     val ehName = ehParams("eventhubs.name")
-    createDirectStreams(ssc, ehNamespace, progressDir, Map(ehName -> ehParams))
+    createDirectStreams(ssc, progressDir, Map(ehName -> ehParams))
   }
 }

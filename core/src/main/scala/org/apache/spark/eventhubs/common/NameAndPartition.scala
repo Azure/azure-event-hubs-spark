@@ -17,14 +17,13 @@
 
 package org.apache.spark.eventhubs.common
 
-private[spark] case class EventHubNameAndPartition(eventHubName: String, partitionId: Int) {
-
-  override def toString: String = s"$eventHubName-partition-$partitionId"
+private[spark] case class NameAndPartition(ehName: String, partitionId: Int) {
+  override def toString: String = s"$ehName-partition-$partitionId"
 }
 
-private[spark] object EventHubNameAndPartition {
-  def fromString(str: String): EventHubNameAndPartition = {
+private[spark] object NameAndPartition {
+  def fromString(str: String): NameAndPartition = {
     val Array(name, partition) = str.split("-partition-")
-    EventHubNameAndPartition(name, partition.toInt)
+    NameAndPartition(name, partition.toInt)
   }
 }

@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubs.common.client
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 
 private[spark] trait Client extends Serializable {
@@ -35,19 +35,19 @@ private[spark] trait Client extends Serializable {
    * return the start seq number of each partition
    * @return a map from eventhubName-partition to seq
    */
-  def beginSeqNo(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
+  def beginSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long]
 
   /**
    * return the end point of each partition
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  def lastSeqAndOffset(eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)]
+  def lastSeqAndOffset(eventHubNameAndPartition: NameAndPartition): Option[(Long, Long)]
 
   /**
    * return the last enqueueTime of each partition
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  def lastEnqueuedTime(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long]
+  def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): Option[Long]
 
   /**
    * close this client

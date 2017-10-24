@@ -18,20 +18,20 @@
 package org.apache.spark.eventhubs.common.utils
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 
 import scala.collection.mutable.ListBuffer
 
 class SimulatedEventHubs(eventHubsNamespace: String,
-                         initialData: Map[EventHubNameAndPartition, Array[EventData]])
+                         initialData: Map[NameAndPartition, Array[EventData]])
     extends Serializable {
 
   assert(initialData != null)
 
-  var messageStore: Map[EventHubNameAndPartition, Array[EventData]] = initialData
-  val eventHubsNamedPartitions: Seq[EventHubNameAndPartition] = initialData.keys.toSeq
+  var messageStore: Map[NameAndPartition, Array[EventData]] = initialData
+  val eventHubsNamedPartitions: Seq[NameAndPartition] = initialData.keys.toSeq
 
-  def searchWithTime(eventHubsNamedPartition: EventHubNameAndPartition,
+  def searchWithTime(eventHubsNamedPartition: NameAndPartition,
                      enqueueTime: Long,
                      eventCount: Int): List[EventData] = {
     val resultData = new ListBuffer[EventData]
@@ -46,7 +46,7 @@ class SimulatedEventHubs(eventHubsNamespace: String,
     resultData.toList
   }
 
-  def search(eventHubsNamedPartition: EventHubNameAndPartition,
+  def search(eventHubsNamedPartition: NameAndPartition,
              eventOffset: Int,
              eventCount: Int): List[EventData] = {
     val resultData = new ListBuffer[EventData]
@@ -60,8 +60,8 @@ class SimulatedEventHubs(eventHubsNamespace: String,
     resultData.toList
   }
 
-  def send(newData: Map[EventHubNameAndPartition, Array[EventData]]): Unit = {
-    val combinedData: Map[EventHubNameAndPartition, Array[EventData]] =
+  def send(newData: Map[NameAndPartition, Array[EventData]]): Unit = {
+    val combinedData: Map[NameAndPartition, Array[EventData]] =
       (messageStore.toSeq ++ newData.toSeq)
         .groupBy(_._1)
         .map { case (k, v) => (k, v.flatMap(_._2).toArray) }

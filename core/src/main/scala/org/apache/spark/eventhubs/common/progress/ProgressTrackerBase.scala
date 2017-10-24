@@ -25,11 +25,7 @@ import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-import org.apache.spark.eventhubs.common.{
-  EventHubNameAndPartition,
-  EventHubsConnector,
-  OffsetRecord
-}
+import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, OffsetRecord }
 import org.apache.spark.internal.Logging
 
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
@@ -48,7 +44,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private[spark] lazy val tempDirectoryPath = new Path(tempDirectoryStr)
   private[spark] lazy val metadataDirectoryPath = new Path(metadataDirectoryStr)
 
-  def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]]
+  def eventHubNameAndPartitions: Map[String, List[NameAndPartition]]
 
   // Metadata is maintained for fast ProgressTracker initialization and can cleaned independently
   // from Spark checkpoint files. We'll clean metadata here to ensure it's cleaned whether or not
@@ -63,7 +59,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     path.getName.split("-").last.toLong
 
   protected def allEventNameAndPartitionExist(
-      candidateEhNameAndPartitions: Map[String, List[EventHubNameAndPartition]]): Boolean = {
+      candidateEhNameAndPartitions: Map[String, List[NameAndPartition]]): Boolean = {
     eventHubNameAndPartitions.forall {
       case (uid, ehNameAndPartitions) =>
         candidateEhNameAndPartitions.contains(uid) &&
@@ -131,7 +127,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
    */
   protected def validateProgressFile(fs: FileSystem): (Boolean, Option[Path]) = {
     val (_, latestFileOpt) = getLatestFile(fs)
-    val allProgressFiles = new mutable.HashMap[String, List[EventHubNameAndPartition]]
+    val allProgressFiles = new mutable.HashMap[String, List[NameAndPartition]]
     var br: BufferedReader = null
     try {
       if (latestFileOpt.isEmpty) {
@@ -147,9 +143,8 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
           return (false, latestFileOpt)
         }
         val progressRecord = progressRecordOpt.get
-        val newList = allProgressFiles.getOrElseUpdate(progressRecord.uid,
-                                                       List[EventHubNameAndPartition]()) :+
-          EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
+        val newList = allProgressFiles.getOrElseUpdate(progressRecord.uid, List[NameAndPartition]()) :+
+          NameAndPartition(progressRecord.eventHubName, progressRecord.partitionId)
         allProgressFiles(progressRecord.uid) = newList
         if (timestamp == -1L) {
           timestamp = progressRecord.timestamp
@@ -235,7 +230,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
    */
   def read(targetConnectorUID: String, timestamp: Long, fallBack: Boolean): OffsetRecord = {
     val fs = progressDirectoryPath.getFileSystem(hadoopConfiguration)
-    var recordToReturn = Map[EventHubNameAndPartition, (Long, Long)]()
+    var recordToReturn = Map[NameAndPartition, (Long, Long)]()
     var readTimestamp: Long = 0
     var progressFileOption: Option[Path] = null
     try {
@@ -269,7 +264,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
         recordToReturn = recordLines
           .filter(progressRecord => progressRecord.uid == targetConnectorUID)
           .map(progressRecord =>
-            EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId))
+            NameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) -> (progressRecord.offset, progressRecord.seqId))
           .toMap
       }
     } catch {
@@ -281,10 +276,9 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     OffsetRecord(readTimestamp, recordToReturn)
   }
 
-  private def createProgressFile(
-      offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
-      fs: FileSystem,
-      commitTime: Long): Boolean = {
+  private def createProgressFile(offsetToCommit: Map[String, Map[NameAndPartition, (Long, Long)]],
+                                 fs: FileSystem,
+                                 commitTime: Long): Boolean = {
     var oos: FSDataOutputStream = null
     try {
       // write progress file
@@ -336,7 +330,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   }
 
   // write offsetToCommit to a progress tracking file
-  private def transaction(offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+  private def transaction(offsetToCommit: Map[String, Map[NameAndPartition, (Long, Long)]],
                           fs: FileSystem,
                           commitTime: Long): Unit = {
     if (createProgressFile(offsetToCommit, fs, commitTime)) {
@@ -357,7 +351,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   /**
    * commit offsetToCommit to a new progress tracking file
    */
-  def commit(offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+  def commit(offsetToCommit: Map[String, Map[NameAndPartition, (Long, Long)]],
              commitTime: Long): Unit = {
     val fs = new Path(progressDir).getFileSystem(hadoopConfiguration)
     try {
@@ -390,12 +384,13 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
 
   /**
    * read progress records from temp directories
-   * @return Map(Namespace -> Map(EventHubNameAndPartition -> (Offset, Seq))
+   * @return Map(Namespace -> Map(NameAndPartition -> (Offset, Seq))
    */
-  def collectProgressRecordsForBatch(timestamp: Long, ehConnectors: List[EventHubsConnector])
-    : Map[String, Map[EventHubNameAndPartition, (Long, Long)]] = {
+  def collectProgressRecordsForBatch(
+      timestamp: Long,
+      ehConnectors: List[EventHubsConnector]): Map[String, Map[NameAndPartition, (Long, Long)]] = {
     val records = new ListBuffer[ProgressRecord]
-    val ret = new mutable.HashMap[String, Map[EventHubNameAndPartition, (Long, Long)]]
+    val ret = new mutable.HashMap[String, Map[NameAndPartition, (Long, Long)]]
     try {
       val fs = tempDirectoryPath.getFileSystem(hadoopConfiguration)
       val files = allProgressRecords(timestamp, ehConnectors).iterator
@@ -425,7 +420,7 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     // produce the return value
     records.foreach { progressRecord =>
       val newMap = ret.getOrElseUpdate(progressRecord.uid, Map()) +
-        (EventHubNameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) ->
+        (NameAndPartition(progressRecord.eventHubName, progressRecord.partitionId) ->
           (progressRecord.offset, progressRecord.seqId))
       ret(progressRecord.uid) = newMap
     }

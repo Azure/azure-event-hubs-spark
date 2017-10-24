@@ -57,10 +57,9 @@ private[spark] object RateControlUtils extends Logging {
    *
    * @param highestEndpoints the latest offset/seq of each partition
    */
-  private def defaultRateControl(
-      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
-      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-      ehParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+  private def defaultRateControl(currentOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)],
+                                 highestEndpoints: Map[NameAndPartition, (Long, Long)],
+                                 ehParams: Map[String, _]): Map[NameAndPartition, Long] = {
     highestEndpoints.map {
       case (eventHubNameAndPar, (_, latestSeq)) =>
         val maximumAllowedMessageCnt =
@@ -72,18 +71,18 @@ private[spark] object RateControlUtils extends Logging {
     }
   }
 
-  private[spark] def clamp(currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
-                           highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-                           ehParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+  private[spark] def clamp(currentOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)],
+                           highestEndpoints: Map[NameAndPartition, (Long, Long)],
+                           ehParams: Map[String, _]): Map[NameAndPartition, Long] = {
     defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, ehParams)
   }
 
   private[spark] def fetchLatestOffset(
       eventHubClients: Map[String, Client],
-      fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)])
-    : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+      fetchedHighestOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)])
+    : Option[Map[NameAndPartition, (Long, Long)]] = {
 
-    val r = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)].empty
+    val r = new mutable.HashMap[NameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
       val name = nameAndPartition.eventHubName
       val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
@@ -100,13 +99,12 @@ private[spark] object RateControlUtils extends Logging {
     Option(mergedOffsets)
   }
 
-  private[spark] def validateFilteringParams(
-      eventHubsClients: Map[String, Client],
-      ehParams: Map[String, _],
-      ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
+  private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],
+                                             ehParams: Map[String, _],
+                                             ehNameAndPartitions: List[NameAndPartition]): Unit = {
 
     // first check if the parameters are valid
-    val latestEnqueueTimeOfPartitions = new mutable.HashMap[EventHubNameAndPartition, Long].empty
+    val latestEnqueueTimeOfPartitions = new mutable.HashMap[NameAndPartition, Long].empty
     for (nameAndPartition <- ehNameAndPartitions) {
       val name = nameAndPartition.eventHubName
       val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
@@ -139,8 +137,8 @@ private[spark] object RateControlUtils extends Logging {
 
   private[spark] def composeFromOffsetWithFilteringParams(
       ehParams: Map[String, _],
-      fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)])
-    : Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
+      fetchedStartOffsetsInNextBatch: Map[NameAndPartition, (Long, Long)])
+    : Map[NameAndPartition, (EventHubsOffsetType, Long)] = {
 
     fetchedStartOffsetsInNextBatch.map {
       case (ehNameAndPartition, (offset, _)) =>
@@ -158,10 +156,9 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def calculateStartOffset(
-      ehNameAndPartition: EventHubNameAndPartition,
-      filteringOffsetAndType: Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)],
-      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)])
-    : (EventHubsOffsetType, Long) = {
+      ehNameAndPartition: NameAndPartition,
+      filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)],
+      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
     filteringOffsetAndType.getOrElse(
       ehNameAndPartition,
       (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(ehNameAndPartition)._1)

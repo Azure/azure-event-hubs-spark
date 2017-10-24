@@ -22,7 +22,7 @@ import java.nio.file.Files
 import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
-import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{
   DirectDStreamProgressTracker,
@@ -67,13 +67,13 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart
@@ -86,9 +86,9 @@ class ProgressTrackingAndCheckpointSuite
     assert(
       eventHubDirectDStream.currentOffsetsAndSeqNums ===
         OffsetRecord(2000L,
-                     Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                         EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                         EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
+                     Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                         NameAndPartition("eh1", 1) -> (3L, 3L),
+                         NameAndPartition("eh1", 2) -> (3L, 3L))))
     assert(DirectDStreamProgressTracker.getInstance != null)
     assert(eventHubDirectDStream.ehClients != null)
   }
@@ -117,13 +117,13 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart,
@@ -179,13 +179,13 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream
           .flatMap(eventData =>
@@ -226,13 +226,13 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream
           .window(Seconds(2), Seconds(1))
@@ -319,15 +319,15 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs1 = Map(
         "namespace1" ->
           OffsetRecord(1000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (2L, 2L),
-                           EventHubNameAndPartition("eh1", 1) -> (2L, 2L),
-                           EventHubNameAndPartition("eh1", 2) -> (2L, 2L)))),
+                       Map(NameAndPartition("eh1", 0) -> (2L, 2L),
+                           NameAndPartition("eh1", 1) -> (2L, 2L),
+                           NameAndPartition("eh1", 2) -> (2L, 2L)))),
       expectedStartingOffsetsAndSeqs2 = Map(
         "namespace2" ->
           OffsetRecord(1000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (2L, 2L),
-                           EventHubNameAndPartition("eh1", 1) -> (2L, 2L),
-                           EventHubNameAndPartition("eh1", 2) -> (2L, 2L)))),
+                       Map(NameAndPartition("eh1", 0) -> (2L, 2L),
+                           NameAndPartition("eh1", 1) -> (2L, 2L),
+                           NameAndPartition("eh1", 2) -> (2L, 2L)))),
       operation = (inputDStream1: EventHubDirectDStream, inputDStream2: EventHubDirectDStream) =>
         inputDStream1
           .flatMap(eventData => eventData.getProperties.asScala)
@@ -362,13 +362,13 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart,
@@ -400,9 +400,9 @@ class ProgressTrackingAndCheckpointSuite
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart
@@ -411,9 +411,9 @@ class ProgressTrackingAndCheckpointSuite
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L
     )
 
@@ -438,9 +438,9 @@ class ProgressTrackingAndCheckpointSuite
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(6000,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (7L, 7L),
-                           EventHubNameAndPartition("eh1", 1) -> (7L, 7L),
-                           EventHubNameAndPartition("eh1", 2) -> (7L, 7L)))),
+                       Map(NameAndPartition("eh1", 0) -> (7L, 7L),
+                           NameAndPartition("eh1", 1) -> (7L, 7L),
+                           NameAndPartition("eh1", 2) -> (7L, 7L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputAfterRestart
@@ -449,9 +449,9 @@ class ProgressTrackingAndCheckpointSuite
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = OffsetRecord(7000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
-                                                EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
-                                                EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
+                                            Map(NameAndPartition("eh1", 0) -> (9L, 9L),
+                                                NameAndPartition("eh1", 1) -> (9L, 9L),
+                                                NameAndPartition("eh1", 2) -> (9L, 9L))),
       8000L
     )
   }
@@ -482,9 +482,9 @@ class ProgressTrackingAndCheckpointSuite
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart
@@ -493,9 +493,9 @@ class ProgressTrackingAndCheckpointSuite
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L
     )
 
@@ -519,9 +519,9 @@ class ProgressTrackingAndCheckpointSuite
       .map(_.asInstanceOf[EventHubDirectDStream])
       .head
       .currentOffsetsAndSeqNums = OffsetRecord(2000L,
-                                               Map(EventHubNameAndPartition("eh1", 0) -> (1L, 1L),
-                                                   EventHubNameAndPartition("eh1", 1) -> (1L, 1L),
-                                                   EventHubNameAndPartition("eh1", 2) -> (1L, 1L)))
+                                               Map(NameAndPartition("eh1", 0) -> (1L, 1L),
+                                                   NameAndPartition("eh1", 1) -> (1L, 1L),
+                                                   NameAndPartition("eh1", 2) -> (1L, 1L)))
 
     runStreamsWithEventHubInput(ssc,
                                 expectedOutputAfterRestart.length - 1,
@@ -531,9 +531,9 @@ class ProgressTrackingAndCheckpointSuite
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = OffsetRecord(5000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
-                                                EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
-                                                EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
+                                            Map(NameAndPartition("eh1", 0) -> (9L, 9L),
+                                                NameAndPartition("eh1", 1) -> (9L, 9L),
+                                                NameAndPartition("eh1", 2) -> (9L, 9L))),
       6000L
     )
   }
@@ -562,9 +562,9 @@ class ProgressTrackingAndCheckpointSuite
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart
@@ -573,9 +573,9 @@ class ProgressTrackingAndCheckpointSuite
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = OffsetRecord(3000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                                                EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                                            Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                                                NameAndPartition("eh1", 1) -> (5L, 5L),
+                                                NameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L
     )
 
@@ -601,9 +601,9 @@ class ProgressTrackingAndCheckpointSuite
         .head
         .currentOffsetsAndSeqNums ===
         OffsetRecord(2000L,
-                     Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                         EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                         EventHubNameAndPartition("eh1", 2) -> (3L, 3L))))
+                     Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                         NameAndPartition("eh1", 1) -> (3L, 3L),
+                         NameAndPartition("eh1", 2) -> (3L, 3L))))
 
     runStreamsWithEventHubInput(ssc,
                                 expectedOutputAfterRestart.length - 1,
@@ -613,9 +613,9 @@ class ProgressTrackingAndCheckpointSuite
     testProgressTracker(
       eventhubNamespace,
       expectedOffsetsAndSeqs = OffsetRecord(5000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (9L, 9L),
-                                                EventHubNameAndPartition("eh1", 1) -> (9L, 9L),
-                                                EventHubNameAndPartition("eh1", 2) -> (9L, 9L))),
+                                            Map(NameAndPartition("eh1", 0) -> (9L, 9L),
+                                                NameAndPartition("eh1", 1) -> (9L, 9L),
+                                                NameAndPartition("eh1", 2) -> (9L, 9L))),
       6000L
     )
   }
@@ -647,13 +647,13 @@ class ProgressTrackingAndCheckpointSuite
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(0L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
-                           EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
-                           EventHubNameAndPartition("eh1", 2) -> (-1L, -1L)))),
+                       Map(NameAndPartition("eh1", 0) -> (-1L, -1L),
+                           NameAndPartition("eh1", 1) -> (-1L, -1L),
+                           NameAndPartition("eh1", 2) -> (-1L, -1L)))),
       expectedOffsetsAndSeqs = OffsetRecord(1000L,
-                                            Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                                                EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                                                EventHubNameAndPartition("eh1", 2) -> (3L, 3L))),
+                                            Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                                                NameAndPartition("eh1", 1) -> (3L, 3L),
+                                                NameAndPartition("eh1", 2) -> (3L, 3L))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutputBeforeRestart,

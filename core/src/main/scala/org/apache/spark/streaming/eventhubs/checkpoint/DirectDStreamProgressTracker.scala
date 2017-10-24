@@ -20,11 +20,7 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 import scala.collection.mutable.ListBuffer
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-import org.apache.spark.eventhubs.common.{
-  EventHubNameAndPartition,
-  EventHubsConnector,
-  OffsetRecord
-}
+import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, OffsetRecord }
 import org.apache.spark.eventhubs.common.progress.ProgressTrackerBase
 
 /**
@@ -48,7 +44,7 @@ private[spark] class DirectDStreamProgressTracker private[spark] (
   // and listener thread respectively.
   private val driverLock = new Object
 
-  override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
+  override def eventHubNameAndPartitions: Map[String, List[NameAndPartition]] = {
     DirectDStreamProgressTracker.registeredConnectors.map { connector =>
       (connector.uid, connector.connectedInstances)
     }.toMap
@@ -168,7 +164,7 @@ private[spark] class DirectDStreamProgressTracker private[spark] (
   /**
    * commit offsetToCommit to a new progress tracking file
    */
-  override def commit(offsetToCommit: Map[String, Map[EventHubNameAndPartition, (Long, Long)]],
+  override def commit(offsetToCommit: Map[String, Map[NameAndPartition, (Long, Long)]],
                       commitTime: Long): Unit = driverLock.synchronized {
     super.commit(offsetToCommit, commitTime)
   }

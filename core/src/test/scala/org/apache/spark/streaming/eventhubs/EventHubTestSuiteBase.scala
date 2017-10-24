@@ -20,7 +20,7 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{ IOException, ObjectInputStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
 import org.apache.spark.eventhubs.common.utils.{
   EventHubsTestUtilities,
   FluctuatedEventHubClient,
@@ -200,7 +200,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     val ehAndRawInputMap = eventhubsParams.keys.flatMap { eventHubName =>
       val ehList = {
         for (i <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
-          yield EventHubNameAndPartition(eventHubName, i)
+          yield NameAndPartition(eventHubName, i)
       }.toArray
       ehList.zip(input)
     }.toMap

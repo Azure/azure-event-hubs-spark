@@ -19,7 +19,7 @@ package org.apache.spark.sql.streaming.eventhubs.checkpoint
 
 import scala.collection.mutable
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, EventHubsConnector }
+import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector }
 import org.apache.spark.eventhubs.common.EventHubsConnector
 import org.apache.spark.eventhubs.common.progress.{ PathTools, ProgressTrackerBase }
 
@@ -37,7 +37,7 @@ private[spark] class StructuredStreamingProgressTracker private[spark] (
   private[spark] override lazy val metadataDirectoryStr =
     PathTools.makeMetadataDirectoryStr(progressDir, appName, uid)
 
-  override def eventHubNameAndPartitions: Map[String, List[EventHubNameAndPartition]] = {
+  override def eventHubNameAndPartitions: Map[String, List[NameAndPartition]] = {
     val connector = StructuredStreamingProgressTracker.registeredConnectors(uid)
     Map(connector.uid -> connector.connectedInstances)
   }

@@ -109,11 +109,12 @@ class ProgressTrackerSuite extends SharedUtils {
   test("incomplete progress would be discarded") {
     createDirectStreams(
       ssc,
-      "namespace1",
       progressRootPath.toString,
-      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3"))
+      Map(
+        "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
+      )
     )
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
@@ -167,20 +168,22 @@ class ProgressTrackerSuite extends SharedUtils {
     val dStream =
       createDirectStreams(
         ssc,
-        "namespace1",
         progressRootPath.toString,
-        Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-            "eh2" -> Map("eventhubs.partition.count" -> "2"),
-            "eh3" -> Map("eventhubs.partition.count" -> "3"))
+        Map(
+          "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
+          "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
+          "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
+        )
       )
     val dStream1 =
       createDirectStreams(
         ssc,
-        "namespace2",
         progressRootPath.toString,
-        Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-            "eh12" -> Map("eventhubs.partition.count" -> "2"),
-            "eh13" -> Map("eventhubs.partition.count" -> "3"))
+        Map(
+          "eh11" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace2"),
+          "eh12" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace2"),
+          "eh13" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace2")
+        )
       )
     dStream.start()
     dStream1.start()

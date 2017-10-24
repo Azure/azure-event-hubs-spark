@@ -42,22 +42,26 @@ import org.apache.spark.util.Utils
 /**
  * implementation of EventHub-based direct stream
  * @param _ssc the streaming context this stream belongs to
- * @param eventHubNameSpace the namespace of evenhub instances
  * @param progressDir the path of directory saving the progress file
- * @param eventhubsParams the parameters of your eventhub instances, format:
+ * @param ehParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
 private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     _ssc: StreamingContext,
-    val eventHubNameSpace: String,
     progressDir: String,
-    eventhubsParams: Map[String, Map[String, String]],
+    ehParams: Map[String, Map[String, String]],
     clientFactory: (Map[String, String]) => Client)
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
     with Logging {
   // This uniquely identifies entities on the EventHubs side
-  override def uid: String = eventHubNameSpace
+  val ehNamespace: String = ehParams(ehParams.keySet.head)("eventhubs.namespace")
+  for (ehName <- ehParams.keySet)
+    require(
+      ehParams(ehName)("eventhubs.namespace") == ehNamespace,
+      "Multiple namespaces detected in ehParams. DStreams cannot be created across multiple namespaces."
+    )
+  override def uid: String = ehNamespace
 
   private[streaming] override def name: String = s"EventHubs Direct DStream [$id]"
 
@@ -65,8 +69,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = {
-    for (eventHubName <- eventhubsParams.keySet;
-         partitionId <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
+    for (eventHubName <- ehParams.keySet;
+         partitionId <- 0 until ehParams(eventHubName)("eventhubs.partition.count").toInt)
       yield EventHubNameAndPartition(eventHubName, partitionId)
   }.toList
 
@@ -96,8 +100,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private[eventhubs] def ehClients = {
     if (_clients == null) {
       _clients = new mutable.HashMap[String, Client].empty
-      for (name <- eventhubsParams.keys)
-        _clients += name -> clientFactory(eventhubsParams(name))
+      for (name <- ehParams.keys)
+        _clients += name -> clientFactory(ehParams(name))
     }
     _clients
   }
@@ -142,7 +146,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
    */
   private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
     val offsetRecord = progressTracker.read(
-      eventHubNameSpace,
+      ehNamespace,
       validTime.milliseconds - ssc.graph.batchDuration.milliseconds,
       fallBack)
     require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
@@ -205,7 +209,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     if (rateController.isEmpty) {
       RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
                              fetchedHighestOffsetsAndSeqNums.offsets,
-                             eventhubsParams)
+                             ehParams)
     } else {
       val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
       estimateRateLimit.filter(_ > 0) match {
@@ -244,10 +248,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(ehClients.toMap,
-                                                 eventhubsParams,
-                                                 connectedInstances)
-        RateControlUtils.composeFromOffsetWithFilteringParams(eventhubsParams,
+        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, connectedInstances)
+        RateControlUtils.composeFromOffsetWithFilteringParams(ehParams,
                                                               startOffsetInNextBatch.offsets)
       } else {
         Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
@@ -281,12 +283,12 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     val offsetRanges = composeOffsetRange(startOffsetInNextBatch, highestOffsetOfAllPartitions)
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
-      eventhubsParams,
+      ehParams,
       offsetRanges,
       validTime.milliseconds,
       OffsetStoreParams(progressDir,
                         streamId,
-                        uid = eventHubNameSpace,
+                        uid = ehNamespace,
                         subDirs = ssc.sparkContext.appName),
       clientFactory
     )
@@ -417,13 +419,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
           logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
           generatedRDDs += t -> new EventHubsRDD(
             context.sparkContext,
-            eventhubsParams,
+            ehParams,
             b.map {
               case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
                 OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)
             }.toList,
             t.milliseconds,
-            OffsetStoreParams(progressDir, streamId, uid = eventHubNameSpace, subDirs = appName),
+            OffsetStoreParams(progressDir, streamId, uid = ehNamespace, subDirs = appName),
             clientFactory
           )
       }

@@ -113,7 +113,6 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
     new EventHubDirectDStream(
       ssc,
-      namespace,
       progressRootPath.toString,
       eventhubsParams,
       (ehParams: Map[String, String]) =>
@@ -225,9 +224,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       .getInputStreams()
       .filter(_.isInstanceOf[EventHubDirectDStream])
       .map(_.asInstanceOf[EventHubDirectDStream])
-      .filter(_.eventHubNameSpace == namespace)
-      .map(eventHubStream =>
-        (eventHubStream.eventHubNameSpace, eventHubStream.currentOffsetsAndSeqNums))
+      .filter(_.ehNamespace == namespace)
+      .map(eventHubStream => (eventHubStream.ehNamespace, eventHubStream.currentOffsetsAndSeqNums))
       .toMap
     assert(expectedOffsetsAndSeqs === producedOffsetsAndSeqs)
   }
@@ -292,7 +290,6 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     }
     new EventHubDirectDStream(
       ssc,
-      namespace,
       progressRootPath.toString,
       eventhubsParams,
       (ehParams: Map[String, String]) =>

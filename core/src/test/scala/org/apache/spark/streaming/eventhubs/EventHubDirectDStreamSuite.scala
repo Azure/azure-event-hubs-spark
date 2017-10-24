@@ -43,7 +43,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
 
   test("skip the batch when EH endpoint is unavailable for starting seq number query") {
     val ehDStream = new EventHubDirectDStream(ssc,
-                                              eventhubNamespace,
                                               progressRootPath.toString,
                                               Map("eh1" -> eventhubParameters),
                                               EventHubsClientWrapper.apply)
@@ -62,7 +61,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
 
   test("skip the batch when EH endpoint is unavailable for highest offset query") {
     val ehDStream = new EventHubDirectDStream(ssc,
-                                              eventhubNamespace,
                                               progressRootPath.toString,
                                               Map("eh1" -> eventhubParameters),
                                               EventHubsClientWrapper.apply)
@@ -98,7 +96,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -137,7 +135,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -199,7 +197,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "3",
           "eventhubs.name" -> "eh11",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "namespace1",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -209,7 +207,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "3",
           "eventhubs.name" -> "eh21",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "namespace2",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -262,7 +260,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -307,7 +305,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.partition.count" -> "3",
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -345,7 +343,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
           "eventhubs.maxRate" -> "2",
           "eventhubs.name" -> "eh1",
           "eventhubs.filter.enqueuetime" -> "3000",
-          "eventhubs.namespace" -> "namespace",
+          "eventhubs.namespace" -> "eventhubs",
           "eventhubs.policyname" -> "policyname",
           "eventhubs.policykey" -> "policykey"
         )
@@ -379,6 +377,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         eventhubsParams = Map[String, Map[String, String]](
           "eh1" -> Map(
             "eventhubs.partition.count" -> "3",
+            "eventhubs.namespace" -> "eventhubs",
             "eventhubs.maxRate" -> "2",
             "eventhubs.name" -> "eh1",
             "eventhubs.filter.enqueuetime" -> "10000"

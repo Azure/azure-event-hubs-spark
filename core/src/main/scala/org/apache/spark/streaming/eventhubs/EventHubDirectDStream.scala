@@ -56,6 +56,11 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     with Logging {
   // This uniquely identifies entities on the EventHubs side
   val ehNamespace: String = ehParams(ehParams.keySet.head)("eventhubs.namespace")
+  for (ehName <- ehParams.keySet)
+    require(
+      ehParams(ehName)("eventhubs.namespace") == ehNamespace,
+      "Multiple namespaces detected in ehParams. DStreams cannot be created across multiple namespaces."
+    )
   override def uid: String = ehNamespace
 
   private[streaming] override def name: String = s"EventHubs Direct DStream [$id]"

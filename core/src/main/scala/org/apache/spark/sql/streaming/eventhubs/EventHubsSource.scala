@@ -177,7 +177,7 @@ private[spark] class EventHubsSource private[eventhubs] (
       firstBatch = false
     }
     val targetOffsets = RateControlUtils.clamp(committedOffsetsAndSeqNums.offsets,
-                                               highestOffsetsOpt.get,
+                                               highestOffsetsOpt.get.toList,
                                                eventHubsParams)
     Some(
       EventHubsBatchRecord(

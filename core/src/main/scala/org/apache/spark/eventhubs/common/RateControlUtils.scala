@@ -25,42 +25,30 @@ import scala.collection.mutable
 
 private[spark] object RateControlUtils extends Logging {
 
-  private def maxRatePerPartition(ehName: String, ehParams: Map[String, _]): Int = {
-    val maxRate = ehParams.get(ehName) match {
-      // For DStream
-      case Some(params) =>
-        params
-          .asInstanceOf[Map[String, String]]
-          .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
-          .toInt
-      // For Structured Stream
-      case None =>
-        ehParams
-          .asInstanceOf[Map[String, String]]
-          .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
-          .toInt
-    }
-    require(maxRate > 0,
-            s"eventhubs.maxRate has to be larger than zero, violated by $ehName ($maxRate)")
-    maxRate
-  }
-
   /**
    * return the last sequence number of each partition, which are to be
    * received in this micro batch
    *
    * @param highestEndpoints the latest offset/seq of each partition
    */
-  private[spark] def clamp(currentOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)],
-                           highestEndpoints: Map[NameAndPartition, (Long, Long)],
+  // TODO: a lot of this code comes from the fact that EHSource takes Map[String, String] and
+  // TODO: DStream takes Map[String, Map[String, String]]. Which is preferred? We should pick one.
+  private[spark] def clamp(currentOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)],
+                           highestEndpoints: List[(NameAndPartition, (Long, Long))],
                            ehParams: Map[String, _]): Map[NameAndPartition, Long] = {
-    highestEndpoints.map {
-      case (nameAndPartition, (_, latestSeq)) =>
-        val maxRate = maxRatePerPartition(nameAndPartition.ehName, ehParams)
-        val endSeq =
-          math.min(latestSeq, maxRate + currentOffsetsAndSeqNums(nameAndPartition)._2)
-        (nameAndPartition, endSeq)
-    }
+    (for {
+      (nameAndPartition, (_, seqNo)) <- highestEndpoints
+      maxRate = ehParams.get(nameAndPartition.ehName) match {
+        case Some(x) => // for DStream
+          x.asInstanceOf[Map[String, String]]
+            .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
+        case None => // for Structured Stream
+          ehParams
+            .asInstanceOf[Map[String, String]]
+            .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
+      }
+      endSeqNo = math.min(seqNo, maxRate.toInt + currentOffsetsAndSeqNos(nameAndPartition)._2)
+    } yield (nameAndPartition, endSeqNo)) toMap
   }
 
   private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],

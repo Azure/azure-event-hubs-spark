@@ -189,7 +189,7 @@ private[spark] class EventHubDirectDStream private[spark] (
   private def clamp(
       highestEndpoints: Map[NameAndPartition, (Long, Long)]): Map[NameAndPartition, Long] = {
     RateControlUtils.clamp(currentOffsetsAndSeqNos.offsets,
-                           highestOffsetsAndSeqNos.offsets,
+                           highestOffsetsAndSeqNos.offsets.toList,
                            ehParams)
   }
 

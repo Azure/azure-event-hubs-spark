@@ -17,7 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
 import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ Duration, Seconds, Time }
@@ -50,7 +50,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
 
     Mockito
-      .when(eventHubClientMock.beginSeqNo(Matchers.any[EventHubNameAndPartition]))
+      .when(eventHubClientMock.beginSeqNo(Matchers.any[NameAndPartition]))
       .thenReturn(None)
     ehDStream.ehClients = ehNameToClient
     ssc.scheduler.start()
@@ -68,10 +68,10 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
 
     Mockito
-      .when(eventHubClientMock.beginSeqNo(Matchers.any[EventHubNameAndPartition]))
+      .when(eventHubClientMock.beginSeqNo(Matchers.any[NameAndPartition]))
       .thenReturn(Some(1L))
     Mockito
-      .when(eventHubClientMock.lastSeqAndOffset(Matchers.any[EventHubNameAndPartition]))
+      .when(eventHubClientMock.lastSeqAndOffset(Matchers.any[NameAndPartition]))
       .thenReturn(None)
     ehDStream.ehClients = ehNameToClient
     ssc.scheduler.start()
@@ -104,9 +104,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput
@@ -114,9 +114,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     testProgressTracker(
       eventhubNamespace,
       OffsetRecord(3000L,
-                   Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                   Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                       NameAndPartition("eh1", 1) -> (5L, 5L),
+                       NameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L
     )
   }
@@ -143,9 +143,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream
           .window(Seconds(2), Seconds(1))
@@ -155,9 +155,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     testProgressTracker(
       eventhubNamespace,
       OffsetRecord(3000L,
-                   Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                   Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                       NameAndPartition("eh1", 1) -> (5L, 5L),
+                       NameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L
     )
   }
@@ -215,15 +215,15 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       expectedOffsetsAndSeqs1 = Map(
         "namespace1" ->
           OffsetRecord(1000L,
-                       Map(EventHubNameAndPartition("eh11", 0) -> (2L, 2L),
-                           EventHubNameAndPartition("eh11", 1) -> (2L, 2L),
-                           EventHubNameAndPartition("eh11", 2) -> (2L, 2L)))),
+                       Map(NameAndPartition("eh11", 0) -> (2L, 2L),
+                           NameAndPartition("eh11", 1) -> (2L, 2L),
+                           NameAndPartition("eh11", 2) -> (2L, 2L)))),
       expectedOffsetsAndSeqs2 = Map(
         "namespace2" ->
           OffsetRecord(1000L,
-                       Map(EventHubNameAndPartition("eh21", 0) -> (2L, 2L),
-                           EventHubNameAndPartition("eh21", 1) -> (2L, 2L),
-                           EventHubNameAndPartition("eh21", 2) -> (2L, 2L)))),
+                       Map(NameAndPartition("eh21", 0) -> (2L, 2L),
+                           NameAndPartition("eh21", 1) -> (2L, 2L),
+                           NameAndPartition("eh21", 2) -> (2L, 2L)))),
       // join and sum up the value
       operation = (inputDStream1: EventHubDirectDStream, inputDStream2: EventHubDirectDStream) =>
         inputDStream1
@@ -235,17 +235,17 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     testProgressTracker(
       "namespace1",
       OffsetRecord(2000L,
-                   Map(EventHubNameAndPartition("eh11", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh11", 1) -> (5L, 5L),
-                       EventHubNameAndPartition("eh11", 2) -> (5L, 5L))),
+                   Map(NameAndPartition("eh11", 0) -> (5L, 5L),
+                       NameAndPartition("eh11", 1) -> (5L, 5L),
+                       NameAndPartition("eh11", 2) -> (5L, 5L))),
       3000L
     )
     testProgressTracker(
       "namespace2",
       OffsetRecord(2000L,
-                   Map(EventHubNameAndPartition("eh21", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh21", 1) -> (5L, 5L),
-                       EventHubNameAndPartition("eh21", 2) -> (5L, 5L))),
+                   Map(NameAndPartition("eh21", 0) -> (5L, 5L),
+                       NameAndPartition("eh21", 1) -> (5L, 5L),
+                       NameAndPartition("eh21", 2) -> (5L, 5L))),
       3000L
     )
   }
@@ -268,9 +268,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
-                           EventHubNameAndPartition("eh1", 2) -> (-1L, -1L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (-1L, -1L),
+                           NameAndPartition("eh1", 2) -> (-1L, -1L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
@@ -282,9 +282,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     testProgressTracker(
       eventhubNamespace,
       OffsetRecord(3000L,
-                   Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 1) -> (-1L, -1L),
-                       EventHubNameAndPartition("eh1", 2) -> (-1L, -1L))),
+                   Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                       NameAndPartition("eh1", 1) -> (-1L, -1L),
+                       NameAndPartition("eh1", 2) -> (-1L, -1L))),
       4000L
     )
   }
@@ -313,9 +313,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(5000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 1) -> (3L, 3L),
-                           EventHubNameAndPartition("eh1", 2) -> (3L, 3L)))),
+                       Map(NameAndPartition("eh1", 0) -> (3L, 3L),
+                           NameAndPartition("eh1", 1) -> (3L, 3L),
+                           NameAndPartition("eh1", 2) -> (3L, 3L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput,
@@ -325,9 +325,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     testProgressTracker(
       eventhubNamespace,
       OffsetRecord(6000L,
-                   Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                   Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                       NameAndPartition("eh1", 1) -> (5L, 5L),
+                       NameAndPartition("eh1", 2) -> (5L, 5L))),
       7000L
     )
   }
@@ -351,9 +351,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
-                       Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                           EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                           EventHubNameAndPartition("eh1", 2) -> (5L, 5L)))),
+                       Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                           NameAndPartition("eh1", 1) -> (5L, 5L),
+                           NameAndPartition("eh1", 2) -> (5L, 5L)))),
       operation = (inputDStream: EventHubDirectDStream) =>
         inputDStream.map(eventData => eventData.getProperties.get("output").asInstanceOf[Int] + 1),
       expectedOutput
@@ -361,9 +361,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     testProgressTracker(
       eventhubNamespace,
       OffsetRecord(3000L,
-                   Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                       EventHubNameAndPartition("eh1", 2) -> (5L, 5L))),
+                   Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                       NameAndPartition("eh1", 1) -> (5L, 5L),
+                       NameAndPartition("eh1", 2) -> (5L, 5L))),
       4000L
     )
   }
@@ -386,9 +386,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
         expectedOffsetsAndSeqs = Map(
           eventhubNamespace ->
             OffsetRecord(2000L,
-                         Map(EventHubNameAndPartition("eh1", 0) -> (5L, 5L),
-                             EventHubNameAndPartition("eh1", 1) -> (5L, 5L),
-                             EventHubNameAndPartition("eh1", 2) -> (5L, 5L)))),
+                         Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                             NameAndPartition("eh1", 1) -> (5L, 5L),
+                             NameAndPartition("eh1", 2) -> (5L, 5L)))),
         operation = (inputDStream: EventHubDirectDStream) =>
           inputDStream.map(eventData =>
             eventData.getProperties.get("output").asInstanceOf[Int] + 1),

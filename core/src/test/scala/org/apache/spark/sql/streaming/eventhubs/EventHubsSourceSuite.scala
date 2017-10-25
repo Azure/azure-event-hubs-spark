@@ -20,7 +20,7 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.{ Dataset, SparkSession }
 import org.apache.spark.sql.streaming.{ OutputMode, ProcessingTime }
@@ -797,14 +797,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       AddEventHubsData(eventHubsParameters, 2),
       UpdatePartialCheck(
         EventHubsBatchRecord(0,
-                             Map(EventHubNameAndPartition("eh1", 1) -> 2,
-                                 EventHubNameAndPartition("eh1", 0) -> 2))),
+                             Map(NameAndPartition("eh1", 1) -> 2,
+                                 NameAndPartition("eh1", 0) -> 2))),
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12),
       // in the second batch we have the right seq number of msgs
       UpdatePartialCheck(
         EventHubsBatchRecord(1,
-                             Map(EventHubNameAndPartition("eh1", 1) -> 6,
-                                 EventHubNameAndPartition("eh1", 0) -> 7))),
+                             Map(NameAndPartition("eh1", 1) -> 6,
+                                 NameAndPartition("eh1", 0) -> 7))),
       AdvanceManualClock(10),
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     )

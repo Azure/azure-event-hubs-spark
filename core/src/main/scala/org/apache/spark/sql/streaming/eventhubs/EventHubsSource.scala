@@ -24,7 +24,7 @@ import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
 import org.apache.spark.eventhubs.common.{
-  EventHubNameAndPartition,
+  NameAndPartition,
   EventHubsConnector,
   OffsetRecord,
   RateControlUtils
@@ -47,7 +47,7 @@ private[spark] class EventHubsSource private[eventhubs] (
     with EventHubsConnector
     with Logging {
 
-  case class EventHubsOffset(batchId: Long, offsets: Map[EventHubNameAndPartition, (Long, Long)])
+  case class EventHubsOffset(batchId: Long, offsets: Map[NameAndPartition, (Long, Long)])
 
   // the id of the stream which is mapped from eventhubs instance
   override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
@@ -85,7 +85,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   private val ehNameAndPartitions = {
     val partitionCount = eventHubsParams("eventhubs.partition.count").toInt
     (for (partitionId <- 0 until partitionCount)
-      yield EventHubNameAndPartition(eventHubsName, partitionId)).toList
+      yield NameAndPartition(eventHubsName, partitionId)).toList
   }
 
   private implicit val cleanupExecutorService =
@@ -116,7 +116,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   }
 
   private[spark] def composeHighestOffset(
-      retryIfFail: Boolean): Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+      retryIfFail: Boolean): Option[Map[NameAndPartition, (Long, Long)]] = {
     RateControlUtils.fetchLatestOffset(
       Map(eventHubsName -> ehClient),
       if (fetchedHighestOffsetsAndSeqNums == null) {
@@ -230,7 +230,7 @@ private[spark] class EventHubsSource private[eventhubs] (
           }
           .values
           .head
-          .filter(_._1.eventHubName == eventHubsParams("eventhubs.name"))
+          .filter(_._1.ehName == eventHubsParams("eventhubs.name"))
       )
     }
   }
@@ -238,9 +238,9 @@ private[spark] class EventHubsSource private[eventhubs] (
   private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
     val filterOffsetAndType = {
       if (committedOffsetsAndSeqNums.batchId == -1) {
-        val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
-        for (nameAndPartition <- connectedInstances) {
-          val name = nameAndPartition.eventHubName
+        val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
+        for (nameAndPartition <- namesAndPartitions) {
+          val name = nameAndPartition.ehName
           val seqNo = ehClient.beginSeqNo(nameAndPartition).get
 
           startSeqs += nameAndPartition -> seqNo
@@ -258,7 +258,7 @@ private[spark] class EventHubsSource private[eventhubs] (
         RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,
                                                               committedOffsetsAndSeqNums.offsets)
       } else {
-        Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
+        Map[NameAndPartition, (EventHubsOffsetType, Long)]()
       }
     }
     endOffset.targetSeqNums.map {
@@ -324,7 +324,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   }
 
   private def validateReadResults(readProgress: OffsetRecord): Boolean = {
-    readProgress.offsets.keySet == connectedInstances.toSet
+    readProgress.offsets.keySet == namesAndPartitions.toSet
   }
 
   private def readProgress(batchId: Long): EventHubsOffset = {
@@ -392,7 +392,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   override def uid: String = s"${eventHubsNamespace}_${eventHubsName}_$streamId"
 
   // the list of eventhubs partitions connecting with this connector
-  override def connectedInstances: List[EventHubNameAndPartition] = ehNameAndPartitions
+  override def namesAndPartitions: List[NameAndPartition] = ehNameAndPartitions
 
 }
 

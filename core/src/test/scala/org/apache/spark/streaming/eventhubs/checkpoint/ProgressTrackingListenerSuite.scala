@@ -19,7 +19,7 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.eventhubs.common.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
 import org.apache.spark.eventhubs.common.progress.ProgressWriter
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
@@ -51,7 +51,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     dstream.start()
     val progressWriter = new ProgressWriter(streamId,
                                             eventhubNamespace,
-                                            EventHubNameAndPartition("eh1", 1),
+                                            NameAndPartition("eh1", 1),
                                             1000L,
                                             new Configuration(),
                                             progressRootPath.toString,
@@ -66,8 +66,8 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       .read(eventhubNamespace, 1000L, fallBack = false)
     assert(
       record === OffsetRecord(1000L,
-                              Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
-                                  EventHubNameAndPartition("eh1", 1) -> (1L, 2L))))
+                              Map(NameAndPartition("eh1", 0) -> (-1L, -1L),
+                                  NameAndPartition("eh1", 1) -> (1L, 2L))))
   }
 
   test("do not commit offsets when there is a failure in microbatch") {
@@ -92,7 +92,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     // build temp directories
     val progressWriter = new ProgressWriter(streamId,
                                             eventhubNamespace,
-                                            EventHubNameAndPartition("eh1", 1),
+                                            NameAndPartition("eh1", 1),
                                             1000L,
                                             new Configuration(),
                                             progressTracker.tempDirectoryPath.toString,

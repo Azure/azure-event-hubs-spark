@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.sql.execution.streaming.Offset
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -26,9 +26,8 @@ import scala.collection.mutable
 import scala.util.control.NonFatal
 
 // the descriptor of EventHubsBatchRecord to communicate with StreamExecution
-private[streaming] case class EventHubsBatchRecord(
-    batchId: Long,
-    targetSeqNums: Map[EventHubNameAndPartition, Long])
+private[streaming] case class EventHubsBatchRecord(batchId: Long,
+                                                   targetSeqNums: Map[NameAndPartition, Long])
     extends Offset {
   override def json: String = JsonUtils.partitionAndSeqNum(batchId, targetSeqNums)
 }
@@ -36,7 +35,7 @@ private[streaming] case class EventHubsBatchRecord(
 private object JsonUtils {
   private implicit val formats = Serialization.formats(NoTypeHints)
 
-  def partitionAndSeqNum(batchId: Long, seqNums: Map[EventHubNameAndPartition, Long]): String = {
+  def partitionAndSeqNum(batchId: Long, seqNums: Map[NameAndPartition, Long]): String = {
     val convertedStringIndexedMap = new mutable.HashMap[String, Long]
     seqNums.foreach {
       case (eventHubNameAndPartition, offsetAndSeqNum) =>
@@ -51,7 +50,7 @@ private object JsonUtils {
       val batchId = deserializedTuple._1
       EventHubsBatchRecord(batchId, deserializedTuple._2.map {
         case (ehNameAndPartitionStr, seqNum) =>
-          (EventHubNameAndPartition.fromString(ehNameAndPartitionStr), seqNum)
+          (NameAndPartition.fromString(ehNameAndPartitionStr), seqNum)
       })
     } catch {
       case NonFatal(_) =>
@@ -60,7 +59,7 @@ private object JsonUtils {
   }
 
   def partitionOffsetAndSeqNums(batchId: Long,
-                                offsets: Map[EventHubNameAndPartition, (Long, Long)]): String = {
+                                offsets: Map[NameAndPartition, (Long, Long)]): String = {
     val convertedStringIndexedMap = new mutable.HashMap[String, (Long, Long)]
     offsets.foreach {
       case (eventHubNameAndPartition, offsetAndSeqNum) =>

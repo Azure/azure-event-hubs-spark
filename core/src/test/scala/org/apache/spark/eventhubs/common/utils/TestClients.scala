@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubs.common.utils
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.eventhubs.common.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
@@ -33,12 +33,12 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
     with TestClientSugar {
 
   override def lastSeqAndOffset(
-      targetEventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+      targetEventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
     Some((x, x))
   }
 
-  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] = {
     Some(
       eventHubs
         .messageStore(nameAndPartition)
@@ -51,29 +51,28 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
 
 class TestEventHubsClient(ehParams: Map[String, String],
                           eventHubs: SimulatedEventHubs,
-                          latestRecords: Map[EventHubNameAndPartition, (Long, Long, Long)])
+                          latestRecords: Map[NameAndPartition, (Long, Long, Long)])
     extends Client
     with TestClientSugar {
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = ehParams("eventhubs.name")
     if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
-      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId),
+      eventHubs.search(NameAndPartition(eventHubName, partitionId),
                        currentOffset.toInt,
                        expectedEventNum)
     } else {
-      eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
+      eventHubs.searchWithTime(NameAndPartition(eventHubName, partitionId),
                                ehParams("eventhubs.filter.enqueuetime").toLong,
                                expectedEventNum)
     }
   }
 
-  override def lastSeqAndOffset(
-      nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     val (offset, seq, _) = latestRecords(nameAndPartition)
     Some(offset, seq)
   }
 
-  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] =
+  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] =
     Some(latestRecords(nameAndPartition)._3)
 }
 
@@ -82,7 +81,7 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
                                ssc: StreamingContext,
                                messagesBeforeEmpty: Long,
                                numBatchesBeforeNewData: Int,
-                               latestRecords: Map[EventHubNameAndPartition, (Long, Long)])
+                               latestRecords: Map[NameAndPartition, (Long, Long)])
     extends Client
     with TestClientSugar {
   private var callIndex = -1
@@ -90,18 +89,17 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
     val eventHubName = ehParams("eventhubs.name")
     if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
-      eventHubs.search(EventHubNameAndPartition(eventHubName, partitionId),
+      eventHubs.search(NameAndPartition(eventHubName, partitionId),
                        currentOffset.toInt,
                        expectedEventNum)
     } else {
-      eventHubs.searchWithTime(EventHubNameAndPartition(eventHubName, partitionId),
+      eventHubs.searchWithTime(NameAndPartition(eventHubName, partitionId),
                                ehParams("eventhubs.filter.enqueuetime").toLong,
                                expectedEventNum)
     }
   }
 
-  override def lastSeqAndOffset(
-      nameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
       Some(messagesBeforeEmpty - 1, messagesBeforeEmpty - 1)
@@ -110,7 +108,7 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
     }
   }
 
-  override def lastEnqueuedTime(nameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] = {
     Some(Long.MaxValue)
   }
 }
@@ -124,8 +122,8 @@ sealed trait TestClientSugar extends Client {
 
   override def close(): Unit = {}
 
-  override def lastSeqAndOffset(
-      eventHubNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = Option.empty
+  override def lastSeqAndOffset(eventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] =
+    Option.empty
 
   override def initReceiver(partitionId: String,
                             offsetType: EventHubsOffsetType,
@@ -135,11 +133,11 @@ sealed trait TestClientSugar extends Client {
     this.currentOffset = currentOffset
   }
 
-  override def lastEnqueuedTime(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] =
+  override def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): Option[Long] =
     Option.empty
 
   override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
-  override def beginSeqNo(eventHubNameAndPartition: EventHubNameAndPartition): Option[Long] =
+  override def beginSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long] =
     Some(-1L)
 }

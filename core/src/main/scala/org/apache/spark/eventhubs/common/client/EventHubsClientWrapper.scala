@@ -22,7 +22,7 @@ import java.time.Instant
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.internal.Logging
 
 /**
@@ -73,9 +73,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
-  private def getRunTimeInfoOfPartitions(ehNameAndPartition: EventHubNameAndPartition) = {
+  private def getRunTimeInfo(nameAndPartition: NameAndPartition) = {
     try {
-      val partitionId = ehNameAndPartition.partitionId.toString
+      val partitionId = nameAndPartition.partitionId.toString
       client.getPartitionRuntimeInformation(partitionId).get
     } catch {
       case e: Exception =>
@@ -89,9 +89,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def beginSeqNo(ehNameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def beginSeqNo(nameAndPartition: NameAndPartition): Option[Long] = {
     try {
-      val runtimeInformation = getRunTimeInfoOfPartitions(ehNameAndPartition)
+      val runtimeInformation = getRunTimeInfo(nameAndPartition)
       Some(runtimeInformation.getBeginSequenceNumber)
     } catch {
       case e: Exception =>
@@ -105,10 +105,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  override def lastSeqAndOffset(
-      ehNameAndPartition: EventHubNameAndPartition): Option[(Long, Long)] = {
+  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     try {
-      val runtimeInfo = getRunTimeInfoOfPartitions(ehNameAndPartition)
+      val runtimeInfo = getRunTimeInfo(nameAndPartition)
       Some((runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber))
     } catch {
       case e: Exception =>
@@ -122,9 +121,9 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  override def lastEnqueuedTime(ehNameAndPartition: EventHubNameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] = {
     try {
-      val runtimeInfo = getRunTimeInfoOfPartitions(ehNameAndPartition)
+      val runtimeInfo = getRunTimeInfo(nameAndPartition)
       Some(runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)
     } catch {
       case e: Exception =>
@@ -144,18 +143,4 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
 private[spark] object EventHubsClientWrapper {
   private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
     new EventHubsClientWrapper(ehParams)
-
-  private[eventhubs] def configureStartOffset(
-      previousOffset: String,
-      eventhubsParams: Map[String, String]): (EventHubsOffsetType, String) = {
-    if (previousOffset != "-1" && previousOffset != null) {
-      (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
-    } else if (eventhubsParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset, eventhubsParams("eventhubs.filter.offset"))
-    } else if (eventhubsParams.contains("eventhubs.filter.enqueuetime")) {
-      (EventHubsOffsetTypes.EnqueueTime, eventhubsParams("eventhubs.filter.enqueuetime"))
-    } else {
-      (EventHubsOffsetTypes.None, PartitionReceiver.START_OF_STREAM)
-    }
-  }
 }

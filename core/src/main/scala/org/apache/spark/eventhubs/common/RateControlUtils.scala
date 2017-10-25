@@ -18,36 +18,30 @@
 package org.apache.spark.eventhubs.common
 
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubs.common.client.{
-  Client,
-  EventHubsClientWrapper,
-  EventHubsOffsetTypes
-}
+import org.apache.spark.eventhubs.common.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.internal.Logging
 
 import scala.collection.mutable
 
 private[spark] object RateControlUtils extends Logging {
 
-  private def maxRateLimitPerPartition(eventHubName: String, ehParams: Map[String, _]): Int = {
-    val maxRate = ehParams.get(eventHubName) match {
-      case Some(eventHubsConfigEntries) =>
-        // this part shall be called by direct dstream where the parameters are indexed by eventhubs
-        // names
-        eventHubsConfigEntries
+  private def maxRatePerPartition(ehName: String, ehParams: Map[String, _]): Int = {
+    val maxRate = ehParams.get(ehName) match {
+      // For DStream
+      case Some(params) =>
+        params
           .asInstanceOf[Map[String, String]]
-          .getOrElse("eventhubs.maxRate", "10000")
+          .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
           .toInt
+      // For Structured Stream
       case None =>
-        // this is called by structured streaming where ehParams only contains the parameters
-        // for a single eventhubs instance
         ehParams
           .asInstanceOf[Map[String, String]]
-          .getOrElse("eventhubs.maxRate", "10000")
+          .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
           .toInt
     }
     require(maxRate > 0,
-            s"eventhubs.maxRate has to be larger than zero, violated by $eventHubName ($maxRate)")
+            s"eventhubs.maxRate has to be larger than zero, violated by $ehName ($maxRate)")
     maxRate
   }
 
@@ -57,35 +51,26 @@ private[spark] object RateControlUtils extends Logging {
    *
    * @param highestEndpoints the latest offset/seq of each partition
    */
-  private def defaultRateControl(
-      currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
-      highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-      ehParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
+  private[spark] def clamp(currentOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)],
+                           highestEndpoints: Map[NameAndPartition, (Long, Long)],
+                           ehParams: Map[String, _]): Map[NameAndPartition, Long] = {
     highestEndpoints.map {
-      case (eventHubNameAndPar, (_, latestSeq)) =>
-        val maximumAllowedMessageCnt =
-          maxRateLimitPerPartition(eventHubNameAndPar.eventHubName, ehParams)
+      case (nameAndPartition, (_, latestSeq)) =>
+        val maxRate = maxRatePerPartition(nameAndPartition.ehName, ehParams)
         val endSeq =
-          math.min(latestSeq,
-                   maximumAllowedMessageCnt + currentOffsetsAndSeqNums(eventHubNameAndPar)._2)
-        (eventHubNameAndPar, endSeq)
+          math.min(latestSeq, maxRate + currentOffsetsAndSeqNums(nameAndPartition)._2)
+        (nameAndPartition, endSeq)
     }
-  }
-
-  private[spark] def clamp(currentOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)],
-                           highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)],
-                           ehParams: Map[String, _]): Map[EventHubNameAndPartition, Long] = {
-    defaultRateControl(currentOffsetsAndSeqNums, highestEndpoints, ehParams)
   }
 
   private[spark] def fetchLatestOffset(
       eventHubClients: Map[String, Client],
-      fetchedHighestOffsetsAndSeqNums: Map[EventHubNameAndPartition, (Long, Long)])
-    : Option[Map[EventHubNameAndPartition, (Long, Long)]] = {
+      fetchedHighestOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)])
+    : Option[Map[NameAndPartition, (Long, Long)]] = {
 
-    val r = new mutable.HashMap[EventHubNameAndPartition, (Long, Long)].empty
+    val r = new mutable.HashMap[NameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
-      val name = nameAndPartition.eventHubName
+      val name = nameAndPartition.ehName
       val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
       require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
 
@@ -100,15 +85,14 @@ private[spark] object RateControlUtils extends Logging {
     Option(mergedOffsets)
   }
 
-  private[spark] def validateFilteringParams(
-      eventHubsClients: Map[String, Client],
-      ehParams: Map[String, _],
-      ehNameAndPartitions: List[EventHubNameAndPartition]): Unit = {
+  private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],
+                                             ehParams: Map[String, _],
+                                             ehNameAndPartitions: List[NameAndPartition]): Unit = {
 
     // first check if the parameters are valid
-    val latestEnqueueTimeOfPartitions = new mutable.HashMap[EventHubNameAndPartition, Long].empty
+    val latestEnqueueTimeOfPartitions = new mutable.HashMap[NameAndPartition, Long].empty
     for (nameAndPartition <- ehNameAndPartitions) {
-      val name = nameAndPartition.eventHubName
+      val name = nameAndPartition.ehName
       val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
 
       latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
@@ -116,16 +100,16 @@ private[spark] object RateControlUtils extends Logging {
 
     latestEnqueueTimeOfPartitions.toMap.foreach {
       case (ehNameAndPartition, latestEnqueueTime) =>
-        val passInEnqueueTime = ehParams.get(ehNameAndPartition.eventHubName) match {
-          case Some(ehParams) =>
-            ehParams
+        val passInEnqueueTime = ehParams.get(ehNameAndPartition.ehName) match {
+          case Some(params) =>
+            params
               .asInstanceOf[Map[String, String]]
-              .getOrElse("eventhubs.filter.enqueuetime", Long.MinValue.toString)
+              .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
               .toLong
           case None =>
             ehParams
               .asInstanceOf[Map[String, String]]
-              .getOrElse("eventhubs.filter.enqueuetime", Long.MinValue.toString)
+              .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
               .toLong
         }
         require(
@@ -139,14 +123,14 @@ private[spark] object RateControlUtils extends Logging {
 
   private[spark] def composeFromOffsetWithFilteringParams(
       ehParams: Map[String, _],
-      fetchedStartOffsetsInNextBatch: Map[EventHubNameAndPartition, (Long, Long)])
-    : Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)] = {
+      fetchedStartOffsetsInNextBatch: Map[NameAndPartition, (Long, Long)])
+    : Map[NameAndPartition, (EventHubsOffsetType, Long)] = {
 
     fetchedStartOffsetsInNextBatch.map {
       case (ehNameAndPartition, (offset, _)) =>
-        val (offsetType, offsetStr) = EventHubsClientWrapper.configureStartOffset(
+        val (offsetType, offsetStr) = configureStartOffset(
           offset.toString,
-          ehParams.get(ehNameAndPartition.eventHubName) match {
+          ehParams.get(ehNameAndPartition.ehName) match {
             case Some(ehConfig) =>
               ehConfig.asInstanceOf[Map[String, String]]
             case None =>
@@ -158,13 +142,26 @@ private[spark] object RateControlUtils extends Logging {
   }
 
   private[spark] def calculateStartOffset(
-      ehNameAndPartition: EventHubNameAndPartition,
-      filteringOffsetAndType: Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)],
-      startOffsetInNextBatch: Map[EventHubNameAndPartition, (Long, Long)])
-    : (EventHubsOffsetType, Long) = {
+      ehNameAndPartition: NameAndPartition,
+      filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)],
+      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
     filteringOffsetAndType.getOrElse(
       ehNameAndPartition,
       (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(ehNameAndPartition)._1)
     )
+  }
+
+  private[eventhubs] def configureStartOffset(
+      previousOffset: String,
+      ehParams: Map[String, String]): (EventHubsOffsetType, String) = {
+    if (previousOffset != "-1" && previousOffset != null) {
+      (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
+    } else if (ehParams.contains("eventhubs.filter.offset")) {
+      (EventHubsOffsetTypes.InputByteOffset, ehParams("eventhubs.filter.offset"))
+    } else if (ehParams.contains("eventhubs.filter.enqueuetime")) {
+      (EventHubsOffsetTypes.EnqueueTime, ehParams("eventhubs.filter.enqueuetime"))
+    } else {
+      (EventHubsOffsetTypes.None, EventHubsUtils.StartOfStream)
+    }
   }
 }

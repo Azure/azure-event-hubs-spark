@@ -23,7 +23,7 @@ import java.util.Date
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.eventhubs.amqp.AmqpConstants
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.powermock.reflect.Whitebox
 import org.apache.spark.internal.Logging
 
@@ -41,7 +41,7 @@ private[spark] object EventHubsTestUtilities extends Logging {
     val eventHubsName = eventHubsParameters("eventhubs.name")
     val eventHubsPartitionList = {
       for (i <- 0 until eventHubsParameters("eventhubs.partition.count").toInt)
-        yield EventHubNameAndPartition(eventHubsName, i)
+        yield NameAndPartition(eventHubsName, i)
     }
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList.map(x => x -> 0).toMap,
                                                     eventPayloadsAndProperties)
@@ -59,7 +59,7 @@ private[spark] object EventHubsTestUtilities extends Logging {
   }
 
   def getHighestOffsetPerPartition(
-      eventHubs: SimulatedEventHubs): Map[EventHubNameAndPartition, (Long, Long, Long)] = {
+      eventHubs: SimulatedEventHubs): Map[NameAndPartition, (Long, Long, Long)] = {
     eventHubs.messageStore.map {
       case (ehNameAndPartition, messageQueue) =>
         (ehNameAndPartition,
@@ -82,10 +82,10 @@ private[spark] object EventHubsTestUtilities extends Logging {
     eventHubs
   }
 
-  private def roundRobinAllocation[T, U](
-      eventHubsPartitionOffsetMap: Map[EventHubNameAndPartition, Int],
-      eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])])
-    : Map[EventHubNameAndPartition, Array[EventData]] = {
+  private def roundRobinAllocation[T, U](eventHubsPartitionOffsetMap: Map[NameAndPartition, Int],
+                                         eventPayloadsAndProperties: Seq[(T, Seq[U])] =
+                                           Seq.empty[(T, Seq[U])])
+    : Map[NameAndPartition, Array[EventData]] = {
     val eventHubsPartitionList = eventHubsPartitionOffsetMap.keys.toSeq
     if (eventPayloadsAndProperties.isEmpty) {
       eventHubsPartitionList.map(x => x -> Seq.empty[EventData].toArray).toMap

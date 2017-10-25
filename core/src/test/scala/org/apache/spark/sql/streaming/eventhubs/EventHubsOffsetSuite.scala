@@ -17,17 +17,16 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.sql.streaming.OffsetSuite
 import org.apache.spark.sql.test.SharedSQLContext
 
 class EventHubsOffsetSuite extends OffsetSuite with SharedSQLContext {
 
-  val eventHubsBatchRecord = EventHubsBatchRecord(
-    0L,
-    Map(EventHubNameAndPartition("eventhub", 0) -> 0L,
-        EventHubNameAndPartition("eventhub", 1) -> 100L,
-        EventHubNameAndPartition("eventhub", 2) -> 200L))
+  val eventHubsBatchRecord = EventHubsBatchRecord(0L,
+                                                  Map(NameAndPartition("eventhub", 0) -> 0L,
+                                                      NameAndPartition("eventhub", 1) -> 100L,
+                                                      NameAndPartition("eventhub", 2) -> 200L))
 
   test("basic serialization and deserialization of Eventhubs batch record") {
 

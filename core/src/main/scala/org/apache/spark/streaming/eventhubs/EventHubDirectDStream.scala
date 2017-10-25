@@ -22,7 +22,7 @@ import java.io.{ IOException, ObjectInputStream }
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.common.{
-  EventHubNameAndPartition,
+  NameAndPartition,
   EventHubsConnector,
   OffsetRecord,
   RateControlUtils
@@ -46,7 +46,7 @@ import org.apache.spark.util.Utils
  * @param ehParams the parameters of your eventhub instances, format:
  *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
  */
-private[eventhubs] class EventHubDirectDStream private[eventhubs] (
+private[spark] class EventHubDirectDStream private[spark] (
     _ssc: StreamingContext,
     progressDir: String,
     ehParams: Map[String, Map[String, String]],
@@ -68,10 +68,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData(this)
 
   // the list of eventhubs partitions connecting with this connector
-  override def connectedInstances: List[EventHubNameAndPartition] = {
+  override def namesAndPartitions: List[NameAndPartition] = {
     for (eventHubName <- ehParams.keySet;
          partitionId <- 0 until ehParams(eventHubName)("eventhubs.partition.count").toInt)
-      yield EventHubNameAndPartition(eventHubName, partitionId)
+      yield NameAndPartition(eventHubName, partitionId)
   }.toList
 
   private var latestCheckpointTime: Time = _
@@ -82,11 +82,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   override protected[streaming] val rateController: Option[RateController] = {
     // TODO: performance evaluation of rate controller
     if (RateController.isBackPressureEnabled(ssc.sparkContext.conf)) {
-      logInfo("back pressure is not currently supported")
+      logWarning("rateController: BackPressure is not currently supported.")
       None
-      /*Some(
-        new EventHubDirectDStreamRateController(
-          id,
+      /*Some(new EventHubDirectDStreamRateController(id,
           RateEstimator.create(ssc.sparkContext.conf, graph.batchDuration)))*/
     } else {
       None
@@ -112,7 +110,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
-    connectedInstances.map { ehNameAndSpace =>
+    namesAndPartitions.map { ehNameAndSpace =>
       (ehNameAndSpace, (-1L, -1L))
     }.toMap
   })
@@ -155,9 +153,9 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
                    offsetRecord.offsets)
     } else {
       // query start startSeqs
-      val startSeqs = new mutable.HashMap[EventHubNameAndPartition, Long].empty
-      for (nameAndPartition <- connectedInstances) {
-        val name = nameAndPartition.eventHubName
+      val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
+      for (nameAndPartition <- namesAndPartitions) {
+        val name = nameAndPartition.ehName
         val seqNo = ehClients(name).beginSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
@@ -180,7 +178,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
     val description = offsetRanges
       .map { offsetRange =>
-        s"eventhub: ${offsetRange.eventHubNameAndPartition}\t" +
+        s"eventhub: ${offsetRange.nameAndPartition}\t" +
           s"starting offsets: ${offsetRange.fromOffset}" +
           s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
       }
@@ -193,7 +191,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   }
 
   private def validatePartitions(validTime: Time,
-                                 calculatedPartitions: List[EventHubNameAndPartition]): Unit = {
+                                 calculatedPartitions: List[NameAndPartition]): Unit = {
     if (currentOffsetsAndSeqNums != null) {
       val currentPartitions = currentOffsetsAndSeqNums.offsets.keys.toList
       val diff = currentPartitions.diff(calculatedPartitions)
@@ -204,36 +202,13 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  private def clamp(highestEndpoints: Map[EventHubNameAndPartition, (Long, Long)])
-    : Map[EventHubNameAndPartition, Long] = {
-    if (rateController.isEmpty) {
-      RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
-                             fetchedHighestOffsetsAndSeqNums.offsets,
-                             ehParams)
-    } else {
-      val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
-      estimateRateLimit.filter(_ > 0) match {
-        case None =>
-          highestEndpoints.map {
-            case (ehNameAndPartition, _) =>
-              (ehNameAndPartition, currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2)
-          }
-        case Some(allowedRate) =>
-          val lagPerPartition = highestEndpoints.map {
-            case (eventHubNameAndPartition, (_, latestSeq)) =>
-              eventHubNameAndPartition ->
-                math.max(latestSeq - currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
-                         0)
-          }
-          val totalLag = lagPerPartition.values.sum
-          lagPerPartition.map {
-            case (eventHubNameAndPartition, lag) =>
-              val backpressureRate = math.round(lag / totalLag.toFloat * allowedRate)
-              eventHubNameAndPartition ->
-                (backpressureRate + currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2)
-          }
-      }
-    }
+  // Old implementation was removed because there is no rate controller. Proper implementation
+  // will be re-visited in the future.
+  private def clamp(
+      highestEndpoints: Map[NameAndPartition, (Long, Long)]): Map[NameAndPartition, Long] = {
+    RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
+                           fetchedHighestOffsetsAndSeqNums.offsets,
+                           ehParams)
   }
 
   // we should only care about the passing offset types when we start for the first time of the
@@ -242,17 +217,17 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
 
   private def composeOffsetRange(
       startOffsetInNextBatch: OffsetRecord,
-      highestOffsets: Map[EventHubNameAndPartition, (Long, Long)]): List[OffsetRange] = {
+      highestOffsets: Map[NameAndPartition, (Long, Long)]): List[OffsetRange] = {
     val clampedSeqIDs = clamp(highestOffsets)
     // to handle filter.enqueueTime and filter.offset
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, connectedInstances)
+        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
         RateControlUtils.composeFromOffsetWithFilteringParams(ehParams,
                                                               startOffsetInNextBatch.offsets)
       } else {
-        Map[EventHubNameAndPartition, (EventHubsOffsetType, Long)]()
+        Map[NameAndPartition, (EventHubsOffsetType, Long)]()
       }
     }
     highestOffsets.map {
@@ -274,8 +249,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   private def proceedWithNonEmptyRDD(
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
-      highestOffsetOfAllPartitions: Map[EventHubNameAndPartition, (Long, Long)])
-    : Option[EventHubsRDD] = {
+      highestOffsetOfAllPartitions: Map[NameAndPartition, (Long, Long)]): Option[EventHubsRDD] = {
     // normal processing
     validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
     currentOffsetsAndSeqNums = startOffsetInNextBatch
@@ -309,16 +283,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     }
   }
 
-  /**
-   * when we have reached the end of the message queue in the remote end or we haven't get any
-   * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
-   * to prevent we die too much, we shall retry with 2-power interval in this case
-   */
-  private def failAppIfRestEndpointFail =
-    fetchedHighestOffsetsAndSeqNums == null ||
-      currentOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
-
-  private[spark] def composeHighestOffset(validTime: Time, retryIfFail: Boolean) = {
+  private[spark] def composeHighestOffset(validTime: Time) = {
     RateControlUtils.fetchLatestOffset(
       ehClients.toMap,
       if (fetchedHighestOffsetsAndSeqNums == null) {
@@ -332,11 +297,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
         Some(fetchedHighestOffsetsAndSeqNums.offsets)
       case _ =>
         logWarning(s"failed to fetch highest offset at $validTime")
-        if (retryIfFail) {
-          None
-        } else {
-          Some(fetchedHighestOffsetsAndSeqNums.offsets)
-        }
+        None
     }
   }
 
@@ -360,7 +321,7 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
     // is higher than the saved one -> leads to an exception;
     // 2) when the last batch was delayed, we should catch up by detecting the latest highest
     // offset
-    val highestOffsetOption = composeHighestOffset(validTime, failAppIfRestEndpointFail)
+    val highestOffsetOption = composeHighestOffset(validTime)
     require(highestOffsetOption.isDefined,
             "We cannot get starting highest offset of partitions," +
               " EventHubs endpoint is not available")
@@ -384,12 +345,10 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
       eventHubDirectDStream: EventHubDirectDStream)
       extends DStreamCheckpointData(this) {
 
-    def batchForTime: mutable.HashMap[
-      Time,
-      Array[(EventHubNameAndPartition, Long, Long, Long, EventHubsOffsetType)]] = {
-      data.asInstanceOf[mutable.HashMap[
-        Time,
-        Array[(EventHubNameAndPartition, Long, Long, Long, EventHubsOffsetType)]]]
+    def batchForTime
+      : mutable.HashMap[Time, Array[(NameAndPartition, Long, Long, Long, EventHubsOffsetType)]] = {
+      data.asInstanceOf[
+        mutable.HashMap[Time, Array[(NameAndPartition, Long, Long, Long, EventHubsOffsetType)]]]
     }
 
     override def update(time: Time): Unit = {

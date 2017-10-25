@@ -82,11 +82,9 @@ private[spark] class EventHubDirectDStream private[spark] (
   override protected[streaming] val rateController: Option[RateController] = {
     // TODO: performance evaluation of rate controller
     if (RateController.isBackPressureEnabled(ssc.sparkContext.conf)) {
-      logInfo("back pressure is not currently supported")
+      logWarning("rateController: BackPressure is not currently supported.")
       None
-      /*Some(
-        new EventHubDirectDStreamRateController(
-          id,
+      /*Some(new EventHubDirectDStreamRateController(id,
           RateEstimator.create(ssc.sparkContext.conf, graph.batchDuration)))*/
     } else {
       None
@@ -204,36 +202,13 @@ private[spark] class EventHubDirectDStream private[spark] (
     }
   }
 
+  // Old implementation was removed because there is no rate controller. Proper implementation
+  // will be re-visited in the future.
   private def clamp(
       highestEndpoints: Map[NameAndPartition, (Long, Long)]): Map[NameAndPartition, Long] = {
-    if (rateController.isEmpty) {
-      RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
-                             fetchedHighestOffsetsAndSeqNums.offsets,
-                             ehParams)
-    } else {
-      val estimateRateLimit = rateController.map(_.getLatestRate().toInt)
-      estimateRateLimit.filter(_ > 0) match {
-        case None =>
-          highestEndpoints.map {
-            case (ehNameAndPartition, _) =>
-              (ehNameAndPartition, currentOffsetsAndSeqNums.offsets(ehNameAndPartition)._2)
-          }
-        case Some(allowedRate) =>
-          val lagPerPartition = highestEndpoints.map {
-            case (eventHubNameAndPartition, (_, latestSeq)) =>
-              eventHubNameAndPartition ->
-                math.max(latestSeq - currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2,
-                         0)
-          }
-          val totalLag = lagPerPartition.values.sum
-          lagPerPartition.map {
-            case (eventHubNameAndPartition, lag) =>
-              val backpressureRate = math.round(lag / totalLag.toFloat * allowedRate)
-              eventHubNameAndPartition ->
-                (backpressureRate + currentOffsetsAndSeqNums.offsets(eventHubNameAndPartition)._2)
-          }
-      }
-    }
+    RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
+                           fetchedHighestOffsetsAndSeqNums.offsets,
+                           ehParams)
   }
 
   // we should only care about the passing offset types when we start for the first time of the

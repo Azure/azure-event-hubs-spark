@@ -19,14 +19,11 @@ package org.apache.spark.eventhubs.common.client
 import org.scalatest.{ BeforeAndAfter, FunSuite }
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
-
 /**
  * Test suite for EventHubsClientWrapper
  */
 class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
   var ehClientWrapperMock: EventHubsClientWrapper = _
-  var offsetStoreMock: OffsetStore = _
   val ehParams: Map[String, String] = Map(
     "eventhubs.policyname" -> "policyname",
     "eventhubs.policykey" -> "policykey",
@@ -35,9 +32,7 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
     "eventhubs.partition.count" -> "4"
   )
 
-  before {
-    offsetStoreMock = mock[OffsetStore]
-  }
+  before {}
 
   // TODO: re-implement these tests. The previous tests were pointless after the client redesign.
   test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {}

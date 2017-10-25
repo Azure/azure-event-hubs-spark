@@ -41,51 +41,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     "eventhubs.consumergroup" -> "$Default"
   )
 
-  test("skip the batch when EH endpoint is unavailable for starting seq number query") {
-    val ehDStream = new EventHubDirectDStream(ssc,
-                                              progressRootPath.toString,
-                                              Map("eh1" -> eventhubParameters),
-                                              EventHubsClientWrapper.apply)
-    val eventHubClientMock = mock[Client]
-    val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
-
-    Mockito
-      .when(eventHubClientMock.earliestSeqNo(Matchers.any[NameAndPartition]))
-      .thenReturn(None)
-    ehDStream.ehClients = ehNameToClient
-    ssc.scheduler.start()
-    intercept[IllegalArgumentException] {
-      ehDStream.compute(Time(1000))
-    }
-  }
-
-  test("skip the batch when EH endpoint is unavailable for highest offset query") {
-    val ehDStream = new EventHubDirectDStream(ssc,
-                                              progressRootPath.toString,
-                                              Map("eh1" -> eventhubParameters),
-                                              EventHubsClientWrapper.apply)
-    val eventHubClientMock = mock[Client]
-    val ehNameToClient = mutable.HashMap("eh1" -> eventHubClientMock)
-
-    Mockito
-      .when(eventHubClientMock.earliestSeqNo(Matchers.any[NameAndPartition]))
-      .thenReturn(Some(1L))
-    Mockito
-      .when(eventHubClientMock.lastOffsetAndSeqNo(Matchers.any[NameAndPartition]))
-      .thenReturn(None)
-    ehDStream.ehClients = ehNameToClient
-    ssc.scheduler.start()
-    intercept[IllegalArgumentException] {
-      try {
-        ehDStream.compute(Time(1000))
-      } catch {
-        case e: Exception =>
-          e.printStackTrace()
-          throw e
-      }
-    }
-  }
-
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))

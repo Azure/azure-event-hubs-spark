@@ -105,10 +105,10 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): (Long, Long) = {
     try {
       val runtimeInfo = getRunTimeInfo(nameAndPartition)
-      Some((runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber))
+      (runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber)
     } catch {
       case e: Exception =>
         e.printStackTrace()

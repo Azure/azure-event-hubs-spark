@@ -45,7 +45,7 @@ private[spark] trait Client extends Serializable {
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  def lastOffsetAndSeqNo(eventHubNameAndPartition: NameAndPartition): Option[(Long, Long)]
+  def lastOffsetAndSeqNo(eventHubNameAndPartition: NameAndPartition): (Long, Long)
 
   /**
    * Provides the last (highest) enqueue time of an event for a given partition.

@@ -283,11 +283,15 @@ private[spark] class EventHubDirectDStream private[spark] (
       startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
     }
 
-    highestOffsetsAndSeqNos =
-      RateControlUtils.lastOffsetAndSeqNo(ehClients.toMap, highestOffsetsAndSeqNos.offsets) match {
-        case Some(highestOffsets) => OffsetRecord(validTime.milliseconds, highestOffsets)
-        case _                    => throw new IllegalStateException("compute: failed to fetch highest offsets")
-      }
+    // Make API call to get up-to-date info from EventHubs
+    highestOffsetsAndSeqNos = OffsetRecord(
+      validTime.milliseconds,
+      (for {
+        nameAndPartition <- highestOffsetsAndSeqNos.offsets.keySet
+        name = nameAndPartition.ehName
+        endPoint = ehClients(name).lastOffsetAndSeqNo(nameAndPartition)
+      } yield nameAndPartition -> endPoint).toMap
+    )
 
     logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetsAndSeqNos.offsets}")
     logInfo(

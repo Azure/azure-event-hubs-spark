@@ -117,7 +117,7 @@ private[spark] class EventHubsSource private[eventhubs] (
 
   private[spark] def composeHighestOffset(
       retryIfFail: Boolean): Option[Map[NameAndPartition, (Long, Long)]] = {
-    RateControlUtils.fetchLatestOffset(
+    RateControlUtils.lastOffsetAndSeqNo(
       Map(eventHubsName -> ehClient),
       if (fetchedHighestOffsetsAndSeqNums == null) {
         committedOffsetsAndSeqNums.offsets
@@ -241,7 +241,7 @@ private[spark] class EventHubsSource private[eventhubs] (
         val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
         for (nameAndPartition <- namesAndPartitions) {
           val name = nameAndPartition.ehName
-          val seqNo = ehClient.beginSeqNo(nameAndPartition).get
+          val seqNo = ehClient.earliestSeqNo(nameAndPartition).get
 
           startSeqs += nameAndPartition -> seqNo
         }

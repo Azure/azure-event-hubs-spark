@@ -32,7 +32,7 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
     extends Client
     with TestClientSugar {
 
-  override def lastSeqAndOffset(
+  override def lastOffsetAndSeqNo(
       targetEventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
     Some((x, x))
@@ -67,7 +67,7 @@ class TestEventHubsClient(ehParams: Map[String, String],
     }
   }
 
-  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     val (offset, seq, _) = latestRecords(nameAndPartition)
     Some(offset, seq)
   }
@@ -99,7 +99,7 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
     }
   }
 
-  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
       Some(messagesBeforeEmpty - 1, messagesBeforeEmpty - 1)
@@ -122,7 +122,8 @@ sealed trait TestClientSugar extends Client {
 
   override def close(): Unit = {}
 
-  override def lastSeqAndOffset(eventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] =
+  override def lastOffsetAndSeqNo(
+      eventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] =
     Option.empty
 
   override def initReceiver(partitionId: String,
@@ -138,6 +139,6 @@ sealed trait TestClientSugar extends Client {
 
   override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
-  override def beginSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long] =
+  override def earliestSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long] =
     Some(-1L)
 }

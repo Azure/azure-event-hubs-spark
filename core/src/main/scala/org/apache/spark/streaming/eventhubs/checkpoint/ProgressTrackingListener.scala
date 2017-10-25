@@ -49,7 +49,7 @@ private[eventhubs] class ProgressTrackingListener private (ssc: StreamingContext
           val contentToCommit = allEventDStreams
             .map {
               case dstream: EventHubDirectDStream =>
-                (dstream.ehNamespace, dstream.currentOffsetsAndSeqNums.offsets)
+                (dstream.ehNamespace, dstream.currentOffsetsAndSeqNos.offsets)
             }
             .toMap
             .map {

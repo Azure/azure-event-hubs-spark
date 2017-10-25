@@ -109,27 +109,21 @@ private[spark] class EventHubDirectDStream private[spark] (
     this
   }
 
-  private[eventhubs] var currentOffsetsAndSeqNums = OffsetRecord(-1L, {
+  // This contains the most recent *starting* offsets and sequence numbers that have been
+  // used to make an RDD.
+  private[eventhubs] var currentOffsetsAndSeqNos = OffsetRecord(-1L, {
     namesAndPartitions.map { ehNameAndSpace =>
       (ehNameAndSpace, (-1L, -1L))
     }.toMap
   })
-  private[eventhubs] var fetchedHighestOffsetsAndSeqNums: OffsetRecord = _
 
-  override def start(): Unit = {
-    val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
-    require(
-      concurrentJobs == 1,
-      "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
-    DirectDStreamProgressTracker.initInstance(progressDir,
-                                              context.sparkContext.appName,
-                                              context.sparkContext.hadoopConfiguration)
-    ProgressTrackingListener.initInstance(ssc, progressDir)
-  }
-
-  override def stop(): Unit = {
-    logInfo("stop: stopping EventHubDirectDStream")
-  }
+  // We make API calls to the EventHubs service to get the highest offsets and
+  // sequence numbers that exist in the service.
+  private[eventhubs] var highestOffsetsAndSeqNos = OffsetRecord(-1L, {
+    namesAndPartitions.map { ehNameAndSpace =>
+      (ehNameAndSpace, (-1L, -1L))
+    }.toMap
+  })
 
   /**
    * EventHub uses *Number Of Messages* for rate control, but uses *offset* to setup of the start
@@ -156,7 +150,7 @@ private[spark] class EventHubDirectDStream private[spark] (
       val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
       for (nameAndPartition <- namesAndPartitions) {
         val name = nameAndPartition.ehName
-        val seqNo = ehClients(name).beginSeqNo(nameAndPartition)
+        val seqNo = ehClients(name).earliestSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
         startSeqs += nameAndPartition -> seqNo.get
@@ -190,24 +184,12 @@ private[spark] class EventHubDirectDStream private[spark] (
     ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
   }
 
-  private def validatePartitions(validTime: Time,
-                                 calculatedPartitions: List[NameAndPartition]): Unit = {
-    if (currentOffsetsAndSeqNums != null) {
-      val currentPartitions = currentOffsetsAndSeqNums.offsets.keys.toList
-      val diff = currentPartitions.diff(calculatedPartitions)
-      if (diff.nonEmpty) {
-        logError(s"detected lost partitions $diff")
-        throw new RuntimeException(s"some partitions are lost before $validTime")
-      }
-    }
-  }
-
   // Old implementation was removed because there is no rate controller. Proper implementation
   // will be re-visited in the future.
   private def clamp(
       highestEndpoints: Map[NameAndPartition, (Long, Long)]): Map[NameAndPartition, Long] = {
-    RateControlUtils.clamp(currentOffsetsAndSeqNums.offsets,
-                           fetchedHighestOffsetsAndSeqNums.offsets,
+    RateControlUtils.clamp(currentOffsetsAndSeqNos.offsets,
+                           highestOffsetsAndSeqNos.offsets,
                            ehParams)
   }
 
@@ -250,9 +232,9 @@ private[spark] class EventHubDirectDStream private[spark] (
       validTime: Time,
       startOffsetInNextBatch: OffsetRecord,
       highestOffsetOfAllPartitions: Map[NameAndPartition, (Long, Long)]): Option[EventHubsRDD] = {
-    // normal processing
-    validatePartitions(validTime, startOffsetInNextBatch.offsets.keys.toList)
-    currentOffsetsAndSeqNums = startOffsetInNextBatch
+    require(namesAndPartitions.diff(startOffsetInNextBatch.offsets.keys.toList).isEmpty,
+            "proceedWithNonEmptyRDD: a partition is missing.")
+    currentOffsetsAndSeqNos = startOffsetInNextBatch
     logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
     val offsetRanges = composeOffsetRange(startOffsetInNextBatch, highestOffsetOfAllPartitions)
     val eventHubRDD = new EventHubsRDD(
@@ -283,30 +265,14 @@ private[spark] class EventHubDirectDStream private[spark] (
     }
   }
 
-  private[spark] def composeHighestOffset(validTime: Time) = {
-    RateControlUtils.fetchLatestOffset(
-      ehClients.toMap,
-      if (fetchedHighestOffsetsAndSeqNums == null) {
-        currentOffsetsAndSeqNums.offsets
-      } else {
-        fetchedHighestOffsetsAndSeqNums.offsets
-      }
-    ) match {
-      case Some(highestOffsets) =>
-        fetchedHighestOffsetsAndSeqNums = OffsetRecord(validTime.milliseconds, highestOffsets)
-        Some(fetchedHighestOffsetsAndSeqNums.offsets)
-      case _ =>
-        logWarning(s"failed to fetch highest offset at $validTime")
-        None
-    }
-  }
-
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) {
       ProgressTrackingListener.initInstance(ssc, progressDir)
     }
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
+
     var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
+
     while (startPointRecord.timestamp < validTime.milliseconds -
              ssc.graph.batchDuration.milliseconds) {
       logInfo(
@@ -316,22 +282,38 @@ private[spark] class EventHubDirectDStream private[spark] (
       logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
       startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
     }
-    // we need to update highest offset after we skip or get out from the while loop, because
-    // 1) when the user pass in filtering params they may have received events whose seq number
-    // is higher than the saved one -> leads to an exception;
-    // 2) when the last batch was delayed, we should catch up by detecting the latest highest
-    // offset
-    val highestOffsetOption = composeHighestOffset(validTime)
-    require(highestOffsetOption.isDefined,
-            "We cannot get starting highest offset of partitions," +
-              " EventHubs endpoint is not available")
-    logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetOption.get}")
+
+    highestOffsetsAndSeqNos =
+      RateControlUtils.lastOffsetAndSeqNo(ehClients.toMap, highestOffsetsAndSeqNos.offsets) match {
+        case Some(highestOffsets) => OffsetRecord(validTime.milliseconds, highestOffsets)
+        case _                    => throw new IllegalStateException("compute: failed to fetch highest offsets")
+      }
+
+    logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetsAndSeqNos.offsets}")
     logInfo(
-      s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNums.timestamp}\t" +
+      s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNos.timestamp}\t" +
         s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
-    val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetOption.get)
+
+    val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetsAndSeqNos.offsets)
+    // this is at the bottom because "fetchStartOffsetForEachPartition" relies on this lol wow.
+    // hopefully that will be gone soon.
     initialized = true
     rdd
+  }
+
+  override def start(): Unit = {
+    val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
+    require(
+      concurrentJobs == 1,
+      "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
+    DirectDStreamProgressTracker.initInstance(progressDir,
+                                              context.sparkContext.appName,
+                                              context.sparkContext.hadoopConfiguration)
+    ProgressTrackingListener.initInstance(ssc, progressDir)
+  }
+
+  override def stop(): Unit = {
+    logInfo("stop: stopping EventHubDirectDStream")
   }
 
   @throws(classOf[IOException])

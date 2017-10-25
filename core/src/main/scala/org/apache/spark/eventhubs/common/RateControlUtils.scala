@@ -63,7 +63,7 @@ private[spark] object RateControlUtils extends Logging {
     }
   }
 
-  private[spark] def fetchLatestOffset(
+  private[spark] def lastOffsetAndSeqNo(
       eventHubClients: Map[String, Client],
       fetchedHighestOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)])
     : Option[Map[NameAndPartition, (Long, Long)]] = {
@@ -71,7 +71,7 @@ private[spark] object RateControlUtils extends Logging {
     val r = new mutable.HashMap[NameAndPartition, (Long, Long)].empty
     for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
       val name = nameAndPartition.ehName
-      val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
+      val endPoint = eventHubClients(name).lastOffsetAndSeqNo(nameAndPartition)
       require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
 
       r += nameAndPartition -> endPoint.get

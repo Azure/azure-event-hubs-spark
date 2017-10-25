@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
+import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
 import org.apache.spark.eventhubs.common.{
   NameAndPartition,
   EventHubsConnector,
@@ -282,11 +282,11 @@ private[spark] class EventHubsSource private[eventhubs] (
       Map(eventHubsParams("eventhubs.name") -> eventHubsParams),
       offsetRanges,
       committedOffsetsAndSeqNums.batchId + 1,
-      OffsetStoreParams(eventHubsParams("eventhubs.progressTrackingDir"),
-                        streamId,
-                        uid = uid,
-                        subDirs = sqlContext.sparkContext.appName,
-                        uid),
+      ProgressTrackerParams(eventHubsParams("eventhubs.progressTrackingDir"),
+                            streamId,
+                            uid = uid,
+                            subDirs = sqlContext.sparkContext.appName,
+                            uid),
       receiverFactory
     )
   }

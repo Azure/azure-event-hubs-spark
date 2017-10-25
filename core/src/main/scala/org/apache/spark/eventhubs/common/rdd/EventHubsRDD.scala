@@ -43,7 +43,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
                                   ehParams: Map[String, Map[String, String]],
                                   val offsetRanges: List[OffsetRange],
                                   batchTime: Long,
-                                  offsetParams: OffsetStoreParams,
+                                  offsetParams: ProgressTrackerParams,
                                   receiverFactory: (Map[String, String]) => Client)
     extends RDD[EventData](sc, Nil) {
 

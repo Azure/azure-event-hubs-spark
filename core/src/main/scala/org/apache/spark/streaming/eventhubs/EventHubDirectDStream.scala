@@ -29,7 +29,7 @@ import org.apache.spark.eventhubs.common.{
 }
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, OffsetStoreParams }
+import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ StreamingContext, Time }
@@ -260,10 +260,10 @@ private[spark] class EventHubDirectDStream private[spark] (
       ehParams,
       offsetRanges,
       validTime.milliseconds,
-      OffsetStoreParams(progressDir,
-                        streamId,
-                        uid = ehNamespace,
-                        subDirs = ssc.sparkContext.appName),
+      ProgressTrackerParams(progressDir,
+                            streamId,
+                            uid = ehNamespace,
+                            subDirs = ssc.sparkContext.appName),
       clientFactory
     )
     reportInputInto(validTime,
@@ -384,7 +384,7 @@ private[spark] class EventHubDirectDStream private[spark] (
                 OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)
             }.toList,
             t.milliseconds,
-            OffsetStoreParams(progressDir, streamId, uid = ehNamespace, subDirs = appName),
+            ProgressTrackerParams(progressDir, streamId, uid = ehNamespace, subDirs = appName),
             clientFactory
           )
       }

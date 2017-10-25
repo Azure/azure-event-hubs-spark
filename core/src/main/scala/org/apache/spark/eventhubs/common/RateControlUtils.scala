@@ -157,7 +157,7 @@ private[spark] object RateControlUtils extends Logging {
     if (previousOffset != "-1" && previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
     } else if (ehParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset, ehParams("eventhubs.filter.offset"))
+      (EventHubsOffsetTypes.Offset, ehParams("eventhubs.filter.offset"))
     } else if (ehParams.contains("eventhubs.filter.enqueuetime")) {
       (EventHubsOffsetTypes.EnqueueTime, ehParams("eventhubs.filter.enqueuetime"))
     } else {

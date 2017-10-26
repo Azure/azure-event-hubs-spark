@@ -187,8 +187,7 @@ private[spark] class EventHubDirectDStream private[spark] (
 
   // Old implementation was removed because there is no rate controller. Proper implementation
   // will be re-visited in the future.
-  private def clamp(
-      highestEndpoints: Map[NameAndPartition, (Long, Long)]): Map[NameAndPartition, Long] = {
+  private def clamp(): Map[NameAndPartition, Long] = {
     RateControlUtils.clamp(currentOffsetsAndSeqNos.offsetsAndSeqNos,
                            highestOffsetsAndSeqNos.offsetsAndSeqNos.toList,
                            ehParams)
@@ -196,39 +195,33 @@ private[spark] class EventHubDirectDStream private[spark] (
 
   // we should only care about the passing offset types when we start for the first time of the
   // application; this "first time" shall not include the restart from checkpoint
-  private def shouldCareEnqueueTimeOrOffset = !initialized && !ssc.isCheckpointPresent
+  private def filterIsProvided = !initialized && !ssc.isCheckpointPresent
 
   private def composeOffsetRange(
       currentOffsetsAndSeqNos: OffsetRecord,
-      highestOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)]): List[OffsetRange] = {
-    val clampedSeqNos: Map[NameAndPartition, Long] = clamp(highestOffsetsAndSeqNos)
-
-    // to handle filter.enqueueTime and filter.offset
-    val filteringOffsetAndType = {
-      if (shouldCareEnqueueTimeOrOffset) {
-        // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
-        RateControlUtils.composeFromOffsetWithFilteringParams(
-          ehParams,
-          currentOffsetsAndSeqNos.offsetsAndSeqNos)
-      } else {
-        Map[NameAndPartition, (EventHubsOffsetType, Long)]()
-      }
+      highestOffsetsAndSeqNos: List[(NameAndPartition, (Long, Long))]): List[OffsetRange] = {
+    val clampedSeqNos = clamp()
+    val filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)] = Map()
+    if (filterIsProvided) {
+      RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
+      filteringOffsetAndType ++ RateControlUtils.composeFromOffsetWithFilteringParams(
+        ehParams,
+        currentOffsetsAndSeqNos.offsetsAndSeqNos)
     }
-    highestOffsetsAndSeqNos.map {
-      case (eventHubNameAndPartition, (_, endSeqNum)) =>
-        val (offsetType, offset) =
-          RateControlUtils.calculateStartOffset(eventHubNameAndPartition,
-                                                filteringOffsetAndType,
-                                                currentOffsetsAndSeqNos.offsetsAndSeqNos)
-        OffsetRange(
-          eventHubNameAndPartition,
-          fromOffset = offset,
-          fromSeq = currentOffsetsAndSeqNos.offsetsAndSeqNos(eventHubNameAndPartition)._2,
-          untilSeq = math.min(clampedSeqNos(eventHubNameAndPartition), endSeqNum),
-          offsetType = offsetType
-        )
-    }.toList
+
+    for {
+      (nameAndPartition, (_, endSeqNo)) <- highestOffsetsAndSeqNos
+      (offsetType, fromOffset) = RateControlUtils.calculateStartOffset(
+        nameAndPartition,
+        filteringOffsetAndType,
+        currentOffsetsAndSeqNos.offsetsAndSeqNos)
+
+    } yield
+      (nameAndPartition,
+       fromOffset,
+       currentOffsetsAndSeqNos.offsetsAndSeqNos(nameAndPartition)._2,
+       math.min(clampedSeqNos(nameAndPartition), endSeqNo),
+       offsetType)
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
@@ -264,7 +257,7 @@ private[spark] class EventHubDirectDStream private[spark] (
             "proceedWithNonEmptyRDD: a partition is missing.")
 
     val offsetRanges =
-      composeOffsetRange(currentOffsetsAndSeqNos, highestOffsetsAndSeqNos.offsetsAndSeqNos)
+      composeOffsetRange(currentOffsetsAndSeqNos, highestOffsetsAndSeqNos.offsetsAndSeqNos.toList)
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
       ehParams,

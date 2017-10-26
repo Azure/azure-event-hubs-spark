@@ -51,6 +51,16 @@ private[spark] object RateControlUtils extends Logging {
     } yield (nameAndPartition, endSeqNo)) toMap
   }
 
+  private[spark] def calculateStartOffset(
+      nameAndPartition: NameAndPartition,
+      filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)],
+      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
+    filteringOffsetAndType.getOrElse(
+      nameAndPartition,
+      (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(nameAndPartition)._1)
+    )
+  }
+
   private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],
                                              ehParams: Map[String, _],
                                              ehNameAndPartitions: List[NameAndPartition]): Unit = {
@@ -101,16 +111,6 @@ private[spark] object RateControlUtils extends Logging {
         }
       )
     } yield (nameAndPartition, (offsetType, offsetStr.toLong))
-  }
-
-  private[spark] def calculateStartOffset(
-      ehNameAndPartition: NameAndPartition,
-      filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)],
-      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
-    filteringOffsetAndType.getOrElse(
-      ehNameAndPartition,
-      (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(ehNameAndPartition)._1)
-    )
   }
 
   private[eventhubs] def configureStartOffset(

@@ -35,7 +35,6 @@ private class EventHubRDDPartition(val sparkPartitionId: Int,
                                    val untilSeq: Long,
                                    val offsetType: EventHubsOffsetType)
     extends Partition {
-
   override def index: Int = sparkPartitionId
 }
 

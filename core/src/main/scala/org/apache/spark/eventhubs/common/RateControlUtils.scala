@@ -55,19 +55,16 @@ private[spark] object RateControlUtils extends Logging {
       ehParams: Map[String, _],
       startOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)])
     : Map[NameAndPartition, (EventHubsOffsetType, Long)] = {
-    startOffsetsAndSeqNos.map {
-      case (ehNameAndPartition, (offset, _)) =>
-        val (offsetType, offsetStr) = configureStartOffset(
-          offset.toString,
-          ehParams.get(ehNameAndPartition.ehName) match {
-            case Some(ehConfig) =>
-              ehConfig.asInstanceOf[Map[String, String]]
-            case None =>
-              ehParams.asInstanceOf[Map[String, String]]
-          }
-        )
-        (ehNameAndPartition, (offsetType, offsetStr.toLong))
-    }
+    for {
+      (nameAndPartition, (offset, _)) <- startOffsetsAndSeqNos
+      (offsetType, offsetStr) = configureStartOffset(
+        offset.toString,
+        ehParams.get(nameAndPartition.ehName) match {
+          case Some(x) => x.asInstanceOf[Map[String, String]]
+          case None    => ehParams.asInstanceOf[Map[String, String]]
+        }
+      )
+    } yield (nameAndPartition, (offsetType, offsetStr.toLong))
   }
 
   private[spark] def calculateStartOffset(

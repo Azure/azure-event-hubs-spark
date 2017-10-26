@@ -322,4 +322,33 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
       4000L
     )
   }
+
+  test("pass-in enqueuetime is not allowed to be later than the highest enqueuetime") {
+    val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
+    val expectedOutput = Seq(Seq(5, 6, 8, 9, 2, 3), Seq(7, 10, 4), Seq())
+    intercept[IllegalArgumentException] {
+      testUnaryOperation(
+        input,
+        eventhubsParams = Map[String, Map[String, String]](
+          "eh1" -> Map(
+            "eventhubs.partition.count" -> "3",
+            "eventhubs.namespace" -> "eventhubs",
+            "eventhubs.maxRate" -> "2",
+            "eventhubs.name" -> "eh1",
+            "eventhubs.filter.enqueuetime" -> "10000"
+          )
+        ),
+        expectedOffsetsAndSeqs = Map(
+          eventhubNamespace ->
+            OffsetRecord(2000L,
+                         Map(NameAndPartition("eh1", 0) -> (5L, 5L),
+                             NameAndPartition("eh1", 1) -> (5L, 5L),
+                             NameAndPartition("eh1", 2) -> (5L, 5L)))),
+        operation = (inputDStream: EventHubDirectDStream) =>
+          inputDStream.map(eventData =>
+            eventData.getProperties.get("output").asInstanceOf[Int] + 1),
+        expectedOutput
+      )
+    }
+  }
 }

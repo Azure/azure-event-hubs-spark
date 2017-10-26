@@ -207,6 +207,7 @@ private[spark] class EventHubDirectDStream private[spark] (
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
+        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
         RateControlUtils.composeFromOffsetWithFilteringParams(
           ehParams,
           currentOffsetsAndSeqNos.offsetsAndSeqNos)

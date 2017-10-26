@@ -809,4 +809,17 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     )
   }
+
+  test("Users cannot submit enqueueTime which is later than the latest in the queue") {
+    val eventHubsParameters =
+      buildEventHubsParameters("ns1", "eh1", 2, 3, enqueueTime = Some(Long.MaxValue))
+    val eventPayloadsAndProperties = generateIntKeyedData(15)
+    EventHubsTestUtilities.simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val manualClock = new StreamManualClock
+    testStream(sourceQuery)(
+      StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
+      ExpectFailure[IllegalArgumentException]()
+    )
+  }
 }

@@ -242,6 +242,9 @@ private[spark] class EventHubsSource private[eventhubs] (
           case (ehNameAndPartition, (offset, _)) =>
             (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
         })
+        RateControlUtils.validateFilteringParams(Map(eventHubsName -> ehClient),
+                                                 eventHubsParams,
+                                                 ehNameAndPartitions)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,
                                                               committedOffsetsAndSeqNums.offsets)
       } else {

@@ -109,7 +109,7 @@ private[spark] class EventHubDirectDStream private[spark] (
     this
   }
 
-  // This contains the most recent *starting* offsets and sequence numbers that have been
+  // This contains the most recent *starting* offsetsAndSeqNos and sequence numbers that have been
   // used to make an RDD.
   private[eventhubs] var currentOffsetsAndSeqNos = OffsetRecord(-1L, {
     namesAndPartitions.map { ehNameAndSpace =>
@@ -117,7 +117,7 @@ private[spark] class EventHubDirectDStream private[spark] (
     }.toMap
   })
 
-  // We make API calls to the EventHubs service to get the highest offsets and
+  // We make API calls to the EventHubs service to get the highest offsetsAndSeqNos and
   // sequence numbers that exist in the service.
   private[eventhubs] var highestOffsetsAndSeqNos = OffsetRecord(-1L, {
     namesAndPartitions.map { ehNameAndSpace =>
@@ -141,10 +141,10 @@ private[spark] class EventHubDirectDStream private[spark] (
       ehNamespace,
       validTime.milliseconds - ssc.graph.batchDuration.milliseconds,
       fallBack)
-    require(offsetRecord.offsets.nonEmpty, "progress file cannot be empty")
+    require(offsetRecord.offsetsAndSeqNos.nonEmpty, "progress file cannot be empty")
     if (offsetRecord.timestamp != -1) {
       OffsetRecord(math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
-                   offsetRecord.offsets)
+                   offsetRecord.offsetsAndSeqNos)
     } else {
       // query start startSeqs
       val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
@@ -158,7 +158,7 @@ private[spark] class EventHubDirectDStream private[spark] (
 
       OffsetRecord(
         math.max(ssc.graph.startTime.milliseconds, offsetRecord.timestamp),
-        offsetRecord.offsets.map {
+        offsetRecord.offsetsAndSeqNos.map {
           case (ehNameAndPartition, (offset, _)) =>
             (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
         }
@@ -173,13 +173,14 @@ private[spark] class EventHubDirectDStream private[spark] (
     val description = offsetRanges
       .map { offsetRange =>
         s"eventhub: ${offsetRange.nameAndPartition}\t" +
-          s"starting offsets: ${offsetRange.fromOffset}" +
+          s"starting offsetsAndSeqNos: ${offsetRange.fromOffset}" +
           s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
       }
       .mkString("\n")
     // Copy offsetRanges to immutable.List to prevent from being modified by the user
     val metadata =
-      Map("offsets" -> offsetRanges, StreamInputInfo.METADATA_KEY_DESCRIPTION -> description)
+      Map("offsetsAndSeqNos" -> offsetRanges,
+          StreamInputInfo.METADATA_KEY_DESCRIPTION -> description)
     val inputInfo = StreamInputInfo(id, inputSize, metadata)
     ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
   }
@@ -188,8 +189,8 @@ private[spark] class EventHubDirectDStream private[spark] (
   // will be re-visited in the future.
   private def clamp(
       highestEndpoints: Map[NameAndPartition, (Long, Long)]): Map[NameAndPartition, Long] = {
-    RateControlUtils.clamp(currentOffsetsAndSeqNos.offsets,
-                           highestOffsetsAndSeqNos.offsets.toList,
+    RateControlUtils.clamp(currentOffsetsAndSeqNos.offsetsAndSeqNos,
+                           highestOffsetsAndSeqNos.offsetsAndSeqNos.toList,
                            ehParams)
   }
 
@@ -198,31 +199,32 @@ private[spark] class EventHubDirectDStream private[spark] (
   private def shouldCareEnqueueTimeOrOffset = !initialized && !ssc.isCheckpointPresent
 
   private def composeOffsetRange(
-      startOffsetInNextBatch: OffsetRecord,
-      highestOffsets: Map[NameAndPartition, (Long, Long)]): List[OffsetRange] = {
-    val clampedSeqIDs = clamp(highestOffsets)
+      currentOffsetsAndSeqNos: OffsetRecord,
+      highestOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)]): List[OffsetRange] = {
+    val clampedSeqNos: Map[NameAndPartition, Long] = clamp(highestOffsetsAndSeqNos)
+
     // to handle filter.enqueueTime and filter.offset
     val filteringOffsetAndType = {
       if (shouldCareEnqueueTimeOrOffset) {
         // first check if the parameters are valid
-        RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
-        RateControlUtils.composeFromOffsetWithFilteringParams(ehParams,
-                                                              startOffsetInNextBatch.offsets)
+        RateControlUtils.composeFromOffsetWithFilteringParams(
+          ehParams,
+          currentOffsetsAndSeqNos.offsetsAndSeqNos)
       } else {
         Map[NameAndPartition, (EventHubsOffsetType, Long)]()
       }
     }
-    highestOffsets.map {
+    highestOffsetsAndSeqNos.map {
       case (eventHubNameAndPartition, (_, endSeqNum)) =>
         val (offsetType, offset) =
           RateControlUtils.calculateStartOffset(eventHubNameAndPartition,
                                                 filteringOffsetAndType,
-                                                startOffsetInNextBatch.offsets)
+                                                currentOffsetsAndSeqNos.offsetsAndSeqNos)
         OffsetRange(
           eventHubNameAndPartition,
           fromOffset = offset,
-          fromSeq = startOffsetInNextBatch.offsets(eventHubNameAndPartition)._2,
-          untilSeq = math.min(clampedSeqIDs(eventHubNameAndPartition), endSeqNum),
+          fromSeq = currentOffsetsAndSeqNos.offsetsAndSeqNos(eventHubNameAndPartition)._2,
+          untilSeq = math.min(clampedSeqNos(eventHubNameAndPartition), endSeqNum),
           offsetType = offsetType
         )
     }.toList
@@ -236,30 +238,32 @@ private[spark] class EventHubDirectDStream private[spark] (
     while (currentOffsetsAndSeqNos.timestamp < validTime.milliseconds -
              ssc.graph.batchDuration.milliseconds) {
       logInfo(
-        s"wait for ProgressTrackingListener to commit offsets at Batch" +
+        s"wait for ProgressTrackingListener to commit offsetsAndSeqNos at Batch" +
           s" ${validTime.milliseconds}")
       graph.wait()
       logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
       currentOffsetsAndSeqNos = fetchStartOffsetForEachPartition(validTime, !initialized)
     }
-
-    // Make API call to get up-to-date info from EventHubs
+    // At this point, currentOffsetsAndSeqNos is up to date. Now, we make API calls to the service
+    // to retrieve the highest offsetsAndSeqNos and sequences numbers available.
     highestOffsetsAndSeqNos = OffsetRecord(
       validTime.milliseconds,
       (for {
-        nameAndPartition <- highestOffsetsAndSeqNos.offsets.keySet
+        nameAndPartition <- highestOffsetsAndSeqNos.offsetsAndSeqNos.keySet
         name = nameAndPartition.ehName
         endPoint = ehClients(name).lastOffsetAndSeqNo(nameAndPartition)
       } yield nameAndPartition -> endPoint).toMap
     )
 
-    logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetsAndSeqNos.offsets}")
+    logInfo(
+      s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetsAndSeqNos.offsetsAndSeqNos}")
     logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNos.timestamp}")
     logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNos")
-    require(namesAndPartitions.diff(currentOffsetsAndSeqNos.offsets.keys.toList).isEmpty,
+    require(namesAndPartitions.diff(currentOffsetsAndSeqNos.offsetsAndSeqNos.keys.toList).isEmpty,
             "proceedWithNonEmptyRDD: a partition is missing.")
 
-    val offsetRanges = composeOffsetRange(currentOffsetsAndSeqNos, highestOffsetsAndSeqNos.offsets)
+    val offsetRanges =
+      composeOffsetRange(currentOffsetsAndSeqNos, highestOffsetsAndSeqNos.offsetsAndSeqNos)
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
       ehParams,
@@ -274,8 +278,6 @@ private[spark] class EventHubDirectDStream private[spark] (
     reportInputInto(validTime,
                     offsetRanges,
                     offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
-    // this is at the bottom because "fetchStartOffsetForEachPartition" relies on this lol wow.
-    // hopefully that will be gone soon.
     initialized = true
     Some(eventHubRDD)
   }

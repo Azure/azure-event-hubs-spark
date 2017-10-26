@@ -21,4 +21,4 @@ package org.apache.spark.eventhubs.common
  * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
  */
 private[spark] case class OffsetRecord(timestamp: Long,
-                                       offsets: Map[NameAndPartition, (Long, Long)])
+                                       offsetsAndSeqNos: Map[NameAndPartition, (Long, Long)])

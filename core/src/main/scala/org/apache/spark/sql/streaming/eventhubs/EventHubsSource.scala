@@ -104,11 +104,11 @@ private[spark] class EventHubsSource private[eventhubs] (
 
   // the flag to avoid committing in the first batch
   private[spark] var firstBatch = true
-  // the offsets which have been to the self-managed offset store
+  // the offsetsAndSeqNos which have been to the self-managed offset store
   private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
 
-  // the highest offsets in EventHubs side
+  // the highest offsetsAndSeqNos in EventHubs side
   private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
 
@@ -151,7 +151,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   }
 
   /**
-   * there are two things to do in this function, first is to collect the ending offsets of last
+   * there are two things to do in this function, first is to collect the ending offsetsAndSeqNos of last
    * batch, so that we know the starting offset of the current batch. And then, we calculate the
    * target seq number of the current batch
    *
@@ -191,7 +191,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   }
 
   /**
-   * collect the ending offsets/seq from executors to driver and commit
+   * collect the ending offsetsAndSeqNos/seq from executors to driver and commit
    */
   private[eventhubs] def collectFinishedBatchOffsetsAndCommit(committedBatchId: Long): Unit = {
     committedOffsetsAndSeqNums = fetchEndingOffsetOfLastBatch(committedBatchId)
@@ -202,7 +202,7 @@ private[spark] class EventHubsSource private[eventhubs] (
     // the offsests (check if the timestamp matches) and then collect the files if necessary
     progressTracker.commit(Map(uid -> committedOffsetsAndSeqNums.offsets), committedBatchId)
     logInfo(
-      s"committed offsets of batch $committedBatchId, collectedCommits:" +
+      s"committed offsetsAndSeqNos of batch $committedBatchId, collectedCommits:" +
         s" $committedOffsetsAndSeqNums")
   }
 
@@ -242,11 +242,6 @@ private[spark] class EventHubsSource private[eventhubs] (
           case (ehNameAndPartition, (offset, _)) =>
             (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
         })
-
-        RateControlUtils.validateFilteringParams(Map(eventHubsName -> ehClient),
-                                                 eventHubsParams,
-                                                 ehNameAndPartitions)
-
         RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,
                                                               committedOffsetsAndSeqNums.offsets)
       } else {
@@ -316,7 +311,7 @@ private[spark] class EventHubsSource private[eventhubs] (
   }
 
   private def validateReadResults(readProgress: OffsetRecord): Boolean = {
-    readProgress.offsets.keySet == namesAndPartitions.toSet
+    readProgress.offsetsAndSeqNos.keySet == namesAndPartitions.toSet
   }
 
   private def readProgress(batchId: Long): EventHubsOffset = {
@@ -325,9 +320,9 @@ private[spark] class EventHubsSource private[eventhubs] (
     if (progress.timestamp == -1 || !validateReadResults(progress)) {
       // next batch hasn't been committed successfully
       val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
-      EventHubsOffset(batchId, lastCommittedOffset.offsets)
+      EventHubsOffset(batchId, lastCommittedOffset.offsetsAndSeqNos)
     } else {
-      EventHubsOffset(nextBatchId, progress.offsets)
+      EventHubsOffset(nextBatchId, progress.offsetsAndSeqNos)
     }
   }
 

@@ -51,42 +51,6 @@ private[spark] object RateControlUtils extends Logging {
     } yield (nameAndPartition, endSeqNo)) toMap
   }
 
-  private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],
-                                             ehParams: Map[String, _],
-                                             ehNameAndPartitions: List[NameAndPartition]): Unit = {
-
-    // first check if the parameters are valid
-    val latestEnqueueTimeOfPartitions = new mutable.HashMap[NameAndPartition, Long].empty
-    for (nameAndPartition <- ehNameAndPartitions) {
-      val name = nameAndPartition.ehName
-      val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
-
-      latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
-    }
-
-    latestEnqueueTimeOfPartitions.toMap.foreach {
-      case (ehNameAndPartition, latestEnqueueTime) =>
-        val passInEnqueueTime = ehParams.get(ehNameAndPartition.ehName) match {
-          case Some(params) =>
-            params
-              .asInstanceOf[Map[String, String]]
-              .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
-              .toLong
-          case None =>
-            ehParams
-              .asInstanceOf[Map[String, String]]
-              .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
-              .toLong
-        }
-        require(
-          latestEnqueueTime >= passInEnqueueTime,
-          "you cannot pass in an enqueue time which is later than the highest enqueue time in" +
-            s" event hubs, ($ehNameAndPartition, pass-in-enqueuetime $passInEnqueueTime," +
-            s" latest-enqueuetime $latestEnqueueTime)"
-        )
-    }
-  }
-
   private[spark] def composeFromOffsetWithFilteringParams(
       ehParams: Map[String, _],
       fetchedStartOffsetsInNextBatch: Map[NameAndPartition, (Long, Long)])

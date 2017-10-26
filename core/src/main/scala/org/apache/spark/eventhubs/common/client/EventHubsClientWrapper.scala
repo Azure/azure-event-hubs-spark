@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubs.common.client
 
-import java.time.Instant
+import java.time.{ Duration, Instant }
 
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
@@ -62,6 +62,7 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
       case _ =>
         client.createReceiverSync(consumerGroup, partitionId, currentOffset)
     }
+    partitionReceiver.setReceiveTimeout(Duration.ofSeconds(5))
   }
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {

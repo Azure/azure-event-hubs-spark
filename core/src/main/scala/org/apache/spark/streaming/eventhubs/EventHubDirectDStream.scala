@@ -228,32 +228,6 @@ private[spark] class EventHubDirectDStream private[spark] (
     }.toList
   }
 
-  private def proceedWithNonEmptyRDD(
-      validTime: Time,
-      startOffsetInNextBatch: OffsetRecord,
-      highestOffsetOfAllPartitions: Map[NameAndPartition, (Long, Long)]): Option[EventHubsRDD] = {
-    require(namesAndPartitions.diff(startOffsetInNextBatch.offsets.keys.toList).isEmpty,
-            "proceedWithNonEmptyRDD: a partition is missing.")
-    currentOffsetsAndSeqNos = startOffsetInNextBatch
-    logInfo(s"starting batch at $validTime with $startOffsetInNextBatch")
-    val offsetRanges = composeOffsetRange(startOffsetInNextBatch, highestOffsetOfAllPartitions)
-    val eventHubRDD = new EventHubsRDD(
-      context.sparkContext,
-      ehParams,
-      offsetRanges,
-      validTime.milliseconds,
-      ProgressTrackerParams(progressDir,
-                            streamId,
-                            uid = ehNamespace,
-                            subDirs = ssc.sparkContext.appName),
-      clientFactory
-    )
-    reportInputInto(validTime,
-                    offsetRanges,
-                    offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
-    Some(eventHubRDD)
-  }
-
   override private[streaming] def clearCheckpointData(time: Time): Unit = {
     super.clearCheckpointData(time)
     EventHubDirectDStream.cleanupLock.synchronized {
@@ -266,13 +240,10 @@ private[spark] class EventHubDirectDStream private[spark] (
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
-    if (!initialized) {
-      ProgressTrackingListener.initInstance(ssc, progressDir)
-    }
+    if (!initialized) ProgressTrackingListener.initInstance(ssc, progressDir)
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
 
     var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
-
     while (startPointRecord.timestamp < validTime.milliseconds -
              ssc.graph.batchDuration.milliseconds) {
       logInfo(
@@ -292,17 +263,33 @@ private[spark] class EventHubDirectDStream private[spark] (
         endPoint = ehClients(name).lastOffsetAndSeqNo(nameAndPartition)
       } yield nameAndPartition -> endPoint).toMap
     )
+    currentOffsetsAndSeqNos = startPointRecord
 
     logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetsAndSeqNos.offsets}")
-    logInfo(
-      s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNos.timestamp}\t" +
-        s" startPointRecordTimestamp: ${startPointRecord.timestamp}")
+    logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNos.timestamp}")
+    logInfo(s"starting batch at $validTime with $startPointRecord")
+    require(namesAndPartitions.diff(startPointRecord.offsets.keys.toList).isEmpty,
+            "proceedWithNonEmptyRDD: a partition is missing.")
 
-    val rdd = proceedWithNonEmptyRDD(validTime, startPointRecord, highestOffsetsAndSeqNos.offsets)
+    val offsetRanges = composeOffsetRange(startPointRecord, highestOffsetsAndSeqNos.offsets)
+    val eventHubRDD = new EventHubsRDD(
+      context.sparkContext,
+      ehParams,
+      offsetRanges,
+      validTime.milliseconds,
+      ProgressTrackerParams(progressDir,
+                            streamId,
+                            uid = ehNamespace,
+                            subDirs = ssc.sparkContext.appName),
+      clientFactory
+    )
+    reportInputInto(validTime,
+                    offsetRanges,
+                    offsetRanges.map(ofr => ofr.untilSeq - ofr.fromSeq).sum.toInt)
     // this is at the bottom because "fetchStartOffsetForEachPartition" relies on this lol wow.
     // hopefully that will be gone soon.
     initialized = true
-    rdd
+    Some(eventHubRDD)
   }
 
   override def start(): Unit = {

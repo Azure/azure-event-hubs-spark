@@ -20,6 +20,8 @@ package org.apache.spark.eventhubs.common.rdd
 import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 
+import language.implicitConversions
+
 private[spark] case class OffsetRange(nameAndPartition: NameAndPartition,
                                       fromOffset: Long,
                                       fromSeq: Long,
@@ -27,4 +29,14 @@ private[spark] case class OffsetRange(nameAndPartition: NameAndPartition,
                                       offsetType: EventHubsOffsetType) {
 
   private[spark] def toTuple = (nameAndPartition, fromOffset, fromSeq, untilSeq, offsetType)
+}
+
+private[spark] object OffsetRange {
+  type OffsetRangeTuple = (NameAndPartition, Long, Long, Long, EventHubsOffsetType)
+
+  implicit def tupleToOffsetRange(tuple: OffsetRangeTuple): OffsetRange =
+    OffsetRange(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+
+  implicit def tupleListToOffsetRangeList(list: List[OffsetRangeTuple]): List[OffsetRange] =
+    for { tuple <- list } yield tupleToOffsetRange(tuple)
 }

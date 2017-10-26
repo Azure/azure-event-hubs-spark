@@ -32,10 +32,10 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
     extends Client
     with TestClientSugar {
 
-  override def lastSeqAndOffset(
-      targetEventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(
+      targetEventHubNameAndPartition: NameAndPartition): (Long, Long) = {
     val x = eventHubs.messageStore(targetEventHubNameAndPartition).length.toLong - 1
-    Some((x, x))
+    (x, x)
   }
 
   override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] = {
@@ -67,9 +67,9 @@ class TestEventHubsClient(ehParams: Map[String, String],
     }
   }
 
-  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): (Long, Long) = {
     val (offset, seq, _) = latestRecords(nameAndPartition)
-    Some(offset, seq)
+    (offset, seq)
   }
 
   override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] =
@@ -99,12 +99,12 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
     }
   }
 
-  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): (Long, Long) = {
     callIndex += 1
     if (callIndex < numBatchesBeforeNewData) {
-      Some(messagesBeforeEmpty - 1, messagesBeforeEmpty - 1)
+      (messagesBeforeEmpty - 1, messagesBeforeEmpty - 1)
     } else {
-      Some(latestRecords(nameAndPartition))
+      (latestRecords(nameAndPartition))
     }
   }
 
@@ -122,8 +122,8 @@ sealed trait TestClientSugar extends Client {
 
   override def close(): Unit = {}
 
-  override def lastSeqAndOffset(eventHubNameAndPartition: NameAndPartition): Option[(Long, Long)] =
-    Option.empty
+  override def lastOffsetAndSeqNo(eventHubNameAndPartition: NameAndPartition): (Long, Long) =
+    null
 
   override def initReceiver(partitionId: String,
                             offsetType: EventHubsOffsetType,
@@ -138,6 +138,6 @@ sealed trait TestClientSugar extends Client {
 
   override def receive(expectedEvents: Int): Iterable[EventData] = Iterable[EventData]()
 
-  override def beginSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long] =
+  override def earliestSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long] =
     Some(-1L)
 }

@@ -38,7 +38,7 @@ private[eventhubs] class ProgressTrackingListener private (ssc: StreamingContext
       if (batchCompleted.batchInfo.outputOperationInfos.forall(_._2.failureReason.isEmpty)) {
         val progressTracker =
           DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
-        // build current offsets
+        // build current offsetsAndSeqNos
         val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
         // merge with the temp directory
         val startTime = System.currentTimeMillis()
@@ -49,7 +49,7 @@ private[eventhubs] class ProgressTrackingListener private (ssc: StreamingContext
           val contentToCommit = allEventDStreams
             .map {
               case dstream: EventHubDirectDStream =>
-                (dstream.ehNamespace, dstream.currentOffsetsAndSeqNums.offsets)
+                (dstream.ehNamespace, dstream.currentOffsetsAndSeqNos.offsetsAndSeqNos)
             }
             .toMap
             .map {

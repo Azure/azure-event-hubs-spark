@@ -17,8 +17,8 @@
 
 package org.apache.spark.eventhubs.common.rdd
 
-// a helper object to avoid serializing OffsetStore instances
-private[spark] case class OffsetStoreParams(checkpointDir: String,
-                                            streamId: Int,
-                                            uid: String,
-                                            subDirs: String*)
+// This class contains the information the RDD needs to write temp progress files.
+private[spark] case class ProgressTrackerParams(checkpointDir: String,
+                                                streamId: Int,
+                                                uid: String,
+                                                subDirs: String*)

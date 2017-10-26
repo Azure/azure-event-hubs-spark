@@ -25,64 +25,40 @@ import scala.collection.mutable
 
 private[spark] object RateControlUtils extends Logging {
 
-  private def maxRatePerPartition(ehName: String, ehParams: Map[String, _]): Int = {
-    val maxRate = ehParams.get(ehName) match {
-      // For DStream
-      case Some(params) =>
-        params
-          .asInstanceOf[Map[String, String]]
-          .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
-          .toInt
-      // For Structured Stream
-      case None =>
-        ehParams
-          .asInstanceOf[Map[String, String]]
-          .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
-          .toInt
-    }
-    require(maxRate > 0,
-            s"eventhubs.maxRate has to be larger than zero, violated by $ehName ($maxRate)")
-    maxRate
-  }
-
   /**
    * return the last sequence number of each partition, which are to be
    * received in this micro batch
    *
    * @param highestEndpoints the latest offset/seq of each partition
    */
-  private[spark] def clamp(currentOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)],
-                           highestEndpoints: Map[NameAndPartition, (Long, Long)],
+  // TODO: a lot of this code comes from the fact that EHSource takes Map[String, String] and
+  // TODO: DStream takes Map[String, Map[String, String]]. Which is preferred? We should pick one.
+  private[spark] def clamp(currentOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)],
+                           highestEndpoints: List[(NameAndPartition, (Long, Long))],
                            ehParams: Map[String, _]): Map[NameAndPartition, Long] = {
-    highestEndpoints.map {
-      case (nameAndPartition, (_, latestSeq)) =>
-        val maxRate = maxRatePerPartition(nameAndPartition.ehName, ehParams)
-        val endSeq =
-          math.min(latestSeq, maxRate + currentOffsetsAndSeqNums(nameAndPartition)._2)
-        (nameAndPartition, endSeq)
-    }
+    (for {
+      (nameAndPartition, (_, seqNo)) <- highestEndpoints
+      maxRate = ehParams.get(nameAndPartition.ehName) match {
+        case Some(x) => // for DStream
+          x.asInstanceOf[Map[String, String]]
+            .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
+        case None => // for Structured Stream
+          ehParams
+            .asInstanceOf[Map[String, String]]
+            .getOrElse("eventhubs.maxRate", EventHubsUtils.DefaultMaxRate)
+      }
+      endSeqNo = math.min(seqNo, maxRate.toInt + currentOffsetsAndSeqNos(nameAndPartition)._2)
+    } yield (nameAndPartition, endSeqNo)) toMap
   }
 
-  private[spark] def fetchLatestOffset(
-      eventHubClients: Map[String, Client],
-      fetchedHighestOffsetsAndSeqNums: Map[NameAndPartition, (Long, Long)])
-    : Option[Map[NameAndPartition, (Long, Long)]] = {
-
-    val r = new mutable.HashMap[NameAndPartition, (Long, Long)].empty
-    for (nameAndPartition <- fetchedHighestOffsetsAndSeqNums.keySet) {
-      val name = nameAndPartition.ehName
-      val endPoint = eventHubClients(name).lastSeqAndOffset(nameAndPartition)
-      require(endPoint.isDefined, s"Failed to get ending sequence number for $nameAndPartition")
-
-      r += nameAndPartition -> endPoint.get
-    }
-
-    val mergedOffsets = if (fetchedHighestOffsetsAndSeqNums != null) {
-      fetchedHighestOffsetsAndSeqNums ++ r
-    } else {
-      r.toMap
-    }
-    Option(mergedOffsets)
+  private[spark] def calculateStartOffset(
+      nameAndPartition: NameAndPartition,
+      filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)],
+      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
+    filteringOffsetAndType.getOrElse(
+      nameAndPartition,
+      (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(nameAndPartition)._1)
+    )
   }
 
   private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],
@@ -123,32 +99,18 @@ private[spark] object RateControlUtils extends Logging {
 
   private[spark] def composeFromOffsetWithFilteringParams(
       ehParams: Map[String, _],
-      fetchedStartOffsetsInNextBatch: Map[NameAndPartition, (Long, Long)])
+      startOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)])
     : Map[NameAndPartition, (EventHubsOffsetType, Long)] = {
-
-    fetchedStartOffsetsInNextBatch.map {
-      case (ehNameAndPartition, (offset, _)) =>
-        val (offsetType, offsetStr) = configureStartOffset(
-          offset.toString,
-          ehParams.get(ehNameAndPartition.ehName) match {
-            case Some(ehConfig) =>
-              ehConfig.asInstanceOf[Map[String, String]]
-            case None =>
-              ehParams.asInstanceOf[Map[String, String]]
-          }
-        )
-        (ehNameAndPartition, (offsetType, offsetStr.toLong))
-    }
-  }
-
-  private[spark] def calculateStartOffset(
-      ehNameAndPartition: NameAndPartition,
-      filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)],
-      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
-    filteringOffsetAndType.getOrElse(
-      ehNameAndPartition,
-      (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(ehNameAndPartition)._1)
-    )
+    for {
+      (nameAndPartition, (offset, _)) <- startOffsetsAndSeqNos
+      (offsetType, offsetStr) = configureStartOffset(
+        offset.toString,
+        ehParams.get(nameAndPartition.ehName) match {
+          case Some(x) => x.asInstanceOf[Map[String, String]]
+          case None    => ehParams.asInstanceOf[Map[String, String]]
+        }
+      )
+    } yield (nameAndPartition, (offsetType, offsetStr.toLong))
   }
 
   private[eventhubs] def configureStartOffset(
@@ -157,7 +119,7 @@ private[spark] object RateControlUtils extends Logging {
     if (previousOffset != "-1" && previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset)
     } else if (ehParams.contains("eventhubs.filter.offset")) {
-      (EventHubsOffsetTypes.InputByteOffset, ehParams("eventhubs.filter.offset"))
+      (EventHubsOffsetTypes.Offset, ehParams("eventhubs.filter.offset"))
     } else if (ehParams.contains("eventhubs.filter.enqueuetime")) {
       (EventHubsOffsetTypes.EnqueueTime, ehParams("eventhubs.filter.enqueuetime"))
     } else {

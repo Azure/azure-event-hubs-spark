@@ -84,7 +84,7 @@ class ProgressTrackingAndCheckpointSuite
       .head
       .asInstanceOf[EventHubDirectDStream]
     assert(
-      eventHubDirectDStream.currentOffsetsAndSeqNums ===
+      eventHubDirectDStream.currentOffsetsAndSeqNos ===
         OffsetRecord(2000L,
                      Map(NameAndPartition("eh1", 0) -> (3L, 3L),
                          NameAndPartition("eh1", 1) -> (3L, 3L),
@@ -518,10 +518,10 @@ class ProgressTrackingAndCheckpointSuite
       .filter(_.isInstanceOf[EventHubDirectDStream])
       .map(_.asInstanceOf[EventHubDirectDStream])
       .head
-      .currentOffsetsAndSeqNums = OffsetRecord(2000L,
-                                               Map(NameAndPartition("eh1", 0) -> (1L, 1L),
-                                                   NameAndPartition("eh1", 1) -> (1L, 1L),
-                                                   NameAndPartition("eh1", 2) -> (1L, 1L)))
+      .currentOffsetsAndSeqNos = OffsetRecord(2000L,
+                                              Map(NameAndPartition("eh1", 0) -> (1L, 1L),
+                                                  NameAndPartition("eh1", 1) -> (1L, 1L),
+                                                  NameAndPartition("eh1", 2) -> (1L, 1L)))
 
     runStreamsWithEventHubInput(ssc,
                                 expectedOutputAfterRestart.length - 1,
@@ -599,7 +599,7 @@ class ProgressTrackingAndCheckpointSuite
         .filter(_.isInstanceOf[EventHubDirectDStream])
         .map(_.asInstanceOf[EventHubDirectDStream])
         .head
-        .currentOffsetsAndSeqNums ===
+        .currentOffsetsAndSeqNos ===
         OffsetRecord(2000L,
                      Map(NameAndPartition("eh1", 0) -> (3L, 3L),
                          NameAndPartition("eh1", 1) -> (3L, 3L),

@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubs.common.client
 
-import java.time.Instant
+import java.time.{ Duration, Instant }
 
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
@@ -62,6 +62,7 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
       case _ =>
         client.createReceiverSync(consumerGroup, partitionId, currentOffset)
     }
+    partitionReceiver.setReceiveTimeout(Duration.ofSeconds(5))
   }
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {
@@ -89,7 +90,7 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def beginSeqNo(nameAndPartition: NameAndPartition): Option[Long] = {
+  override def earliestSeqNo(nameAndPartition: NameAndPartition): Option[Long] = {
     try {
       val runtimeInformation = getRunTimeInfo(nameAndPartition)
       Some(runtimeInformation.getBeginSequenceNumber)
@@ -105,10 +106,10 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  override def lastSeqAndOffset(nameAndPartition: NameAndPartition): Option[(Long, Long)] = {
+  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): (Long, Long) = {
     try {
       val runtimeInfo = getRunTimeInfo(nameAndPartition)
-      Some((runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber))
+      (runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber)
     } catch {
       case e: Exception =>
         e.printStackTrace()

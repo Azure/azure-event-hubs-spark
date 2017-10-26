@@ -20,5 +20,5 @@ package org.apache.spark.eventhubs.common.client
 private[spark] object EventHubsOffsetTypes extends Enumeration {
   type EventHubsOffsetType = Value
 
-  val None, PreviousCheckpoint, InputByteOffset, EnqueueTime = Value
+  val None, PreviousCheckpoint, Offset, EnqueueTime = Value
 }

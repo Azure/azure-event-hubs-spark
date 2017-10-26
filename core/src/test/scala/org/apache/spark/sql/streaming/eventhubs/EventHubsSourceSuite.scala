@@ -66,7 +66,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       yield bodyId.toString -> Seq("propertyV" -> null, "property" -> null)
   }
 
-  test("Verify expected offsets are correct when rate is less than the available data") {
+  test("Verify expected offsetsAndSeqNos are correct when rate is less than the available data") {
     val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 2)
     val eventPayloadsAndProperties = generateIntKeyedData(6).map {
       case (body, properties) =>
@@ -86,7 +86,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     offset.targetSeqNums.values.foreach(x => assert(x == 1))
   }
 
-  test("Verify expected offsets are correct when rate is more than the available data") {
+  test("Verify expected offsetsAndSeqNos are correct when rate is more than the available data") {
     val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
@@ -104,7 +104,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
   }
 
   test(
-    "Verify expected offsets are correct when in subsequent fetch when rate is less than the available data") {
+    "Verify expected offsetsAndSeqNos are correct when in subsequent fetch when rate is less than the available data") {
     val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(10)
     val eventHubs =

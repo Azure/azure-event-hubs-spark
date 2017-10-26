@@ -34,7 +34,7 @@ import org.apache.spark.streaming.scheduler.{
 
 class ProgressTrackingListenerSuite extends SharedUtils {
 
-  test("commit offsets with a successful micro batch correctly") {
+  test("commit offsetsAndSeqNos with a successful micro batch correctly") {
     val batchCompletedEvent = StreamingListenerBatchCompleted(
       BatchInfo(
         Time(1000L),
@@ -70,7 +70,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
                                   NameAndPartition("eh1", 1) -> (1L, 2L))))
   }
 
-  test("do not commit offsets when there is a failure in microbatch") {
+  test("do not commit offsetsAndSeqNos when there is a failure in microbatch") {
     val batchCompletedEvent = StreamingListenerBatchCompleted(
       BatchInfo(
         Time(1000L),

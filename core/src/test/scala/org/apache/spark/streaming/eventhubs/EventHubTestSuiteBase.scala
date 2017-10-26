@@ -225,7 +225,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       .filter(_.isInstanceOf[EventHubDirectDStream])
       .map(_.asInstanceOf[EventHubDirectDStream])
       .filter(_.ehNamespace == namespace)
-      .map(eventHubStream => (eventHubStream.ehNamespace, eventHubStream.currentOffsetsAndSeqNums))
+      .map(eventHubStream => (eventHubStream.ehNamespace, eventHubStream.currentOffsetsAndSeqNos))
       .toMap
     assert(expectedOffsetsAndSeqs === producedOffsetsAndSeqs)
   }

@@ -151,7 +151,7 @@ class ProgressTrackerSuite extends SharedUtils {
     var expectedOffsetAndSeqIdx = 0
     for (partitionId <- partitionRange) {
       assert(
-        ehMap.offsets(NameAndPartition(ehName, partitionId)) ===
+        ehMap.offsetsAndSeqNos(NameAndPartition(ehName, partitionId)) ===
           expectedOffsetAndSeq(expectedOffsetAndSeqIdx))
       expectedOffsetAndSeqIdx += 1
     }
@@ -349,7 +349,7 @@ class ProgressTrackerSuite extends SharedUtils {
     }
   }
 
-  test("latest offsets can be committed correctly and temp directory is not cleaned") {
+  test("latest offsetsAndSeqNos can be committed correctly and temp directory is not cleaned") {
     progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
                                                                 appName,
                                                                 new Configuration())
@@ -452,7 +452,7 @@ class ProgressTrackerSuite extends SharedUtils {
     writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh13", 0 to 2, 5, 6)
 
     // if latest timestamp is earlier than the specified timestamp,
-    // then we shall return the latest offsets
+    // then we shall return the latest offsetsAndSeqNos
     verifyProgressFile("namespace1", "eh1", 0 to 0, 4000L, Seq((2, 3)))
     verifyProgressFile("namespace1", "eh2", 0 to 1, 4000L, Seq((2, 4), (2, 4)))
     verifyProgressFile("namespace1", "eh3", 0 to 2, 4000L, Seq((2, 5), (2, 5), (2, 5)))
@@ -489,7 +489,7 @@ class ProgressTrackerSuite extends SharedUtils {
     val result = progressTracker.read("namespace1", 1000, fallBack = true)
 
     assert(result.timestamp == 1000L)
-    assert(result.offsets == Map(NameAndPartition("eh1", 0) -> (0, 1)))
+    assert(result.offsetsAndSeqNos == Map(NameAndPartition("eh1", 0) -> (0, 1)))
   }
 
   test("ProgressTracker does query metadata when metadata exists") {

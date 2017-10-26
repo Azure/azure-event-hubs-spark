@@ -53,10 +53,9 @@ private[spark] object RateControlUtils extends Logging {
 
   private[spark] def composeFromOffsetWithFilteringParams(
       ehParams: Map[String, _],
-      fetchedStartOffsetsInNextBatch: Map[NameAndPartition, (Long, Long)])
+      startOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)])
     : Map[NameAndPartition, (EventHubsOffsetType, Long)] = {
-
-    fetchedStartOffsetsInNextBatch.map {
+    startOffsetsAndSeqNos.map {
       case (ehNameAndPartition, (offset, _)) =>
         val (offsetType, offsetStr) = configureStartOffset(
           offset.toString,

@@ -228,30 +228,19 @@ private[spark] class EventHubDirectDStream private[spark] (
     }.toList
   }
 
-  override private[streaming] def clearCheckpointData(time: Time): Unit = {
-    super.clearCheckpointData(time)
-    EventHubDirectDStream.cleanupLock.synchronized {
-      if (EventHubDirectDStream.lastCleanupTime < time.milliseconds) {
-        logInfo(s"clean up progress file which is earlier than ${time.milliseconds}")
-        progressTracker.cleanProgressFile(time.milliseconds)
-        EventHubDirectDStream.lastCleanupTime = time.milliseconds
-      }
-    }
-  }
-
   override def compute(validTime: Time): Option[RDD[EventData]] = {
     if (!initialized) ProgressTrackingListener.initInstance(ssc, progressDir)
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
 
-    var startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
-    while (startPointRecord.timestamp < validTime.milliseconds -
+    currentOffsetsAndSeqNos = fetchStartOffsetForEachPartition(validTime, !initialized)
+    while (currentOffsetsAndSeqNos.timestamp < validTime.milliseconds -
              ssc.graph.batchDuration.milliseconds) {
       logInfo(
         s"wait for ProgressTrackingListener to commit offsets at Batch" +
           s" ${validTime.milliseconds}")
       graph.wait()
       logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
-      startPointRecord = fetchStartOffsetForEachPartition(validTime, !initialized)
+      currentOffsetsAndSeqNos = fetchStartOffsetForEachPartition(validTime, !initialized)
     }
 
     // Make API call to get up-to-date info from EventHubs
@@ -263,15 +252,14 @@ private[spark] class EventHubDirectDStream private[spark] (
         endPoint = ehClients(name).lastOffsetAndSeqNo(nameAndPartition)
       } yield nameAndPartition -> endPoint).toMap
     )
-    currentOffsetsAndSeqNos = startPointRecord
 
     logInfo(s"highestOffsetOfAllPartitions at $validTime: ${highestOffsetsAndSeqNos.offsets}")
     logInfo(s"$validTime currentOffsetTimestamp: ${currentOffsetsAndSeqNos.timestamp}")
-    logInfo(s"starting batch at $validTime with $startPointRecord")
-    require(namesAndPartitions.diff(startPointRecord.offsets.keys.toList).isEmpty,
+    logInfo(s"starting batch at $validTime with $currentOffsetsAndSeqNos")
+    require(namesAndPartitions.diff(currentOffsetsAndSeqNos.offsets.keys.toList).isEmpty,
             "proceedWithNonEmptyRDD: a partition is missing.")
 
-    val offsetRanges = composeOffsetRange(startPointRecord, highestOffsetsAndSeqNos.offsets)
+    val offsetRanges = composeOffsetRange(currentOffsetsAndSeqNos, highestOffsetsAndSeqNos.offsets)
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
       ehParams,
@@ -305,6 +293,17 @@ private[spark] class EventHubDirectDStream private[spark] (
 
   override def stop(): Unit = {
     logInfo("stop: stopping EventHubDirectDStream")
+  }
+
+  override private[streaming] def clearCheckpointData(time: Time): Unit = {
+    super.clearCheckpointData(time)
+    EventHubDirectDStream.cleanupLock.synchronized {
+      if (EventHubDirectDStream.lastCleanupTime < time.milliseconds) {
+        logInfo(s"clean up progress file which is earlier than ${time.milliseconds}")
+        progressTracker.cleanProgressFile(time.milliseconds)
+        EventHubDirectDStream.lastCleanupTime = time.milliseconds
+      }
+    }
   }
 
   @throws(classOf[IOException])

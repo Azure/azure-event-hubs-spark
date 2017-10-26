@@ -172,9 +172,9 @@ private[spark] class EventHubDirectDStream private[spark] (
     require(inputSize >= 0, s"invalid inputSize ($inputSize) with offsetRanges: $offsetRanges")
     val description = offsetRanges
       .map { offsetRange =>
-        s"eventhub: ${offsetRange.nameAndPartition}\t" +
-          s"starting offsetsAndSeqNos: ${offsetRange.fromOffset}" +
-          s"sequenceNumbers: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
+        s"EventHubs: ${offsetRange.nameAndPartition}\t" +
+          s"Starting offsetsAndSeqNos: ${offsetRange.fromOffset}" +
+          s"SequenceNumber Range: ${offsetRange.fromSeq} to ${offsetRange.untilSeq}"
       }
       .mkString("\n")
     // Copy offsetRanges to immutable.List to prevent from being modified by the user
@@ -193,18 +193,14 @@ private[spark] class EventHubDirectDStream private[spark] (
                            ehParams)
   }
 
-  // we should only care about the passing offset types when we start for the first time of the
-  // application; this "first time" shall not include the restart from checkpoint
-  private def filterIsProvided = !initialized && !ssc.isCheckpointPresent
-
   private def composeOffsetRange(
       currentOffsetsAndSeqNos: OffsetRecord,
       highestOffsetsAndSeqNos: List[(NameAndPartition, (Long, Long))]): List[OffsetRange] = {
     val clampedSeqNos = clamp()
-    val filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Long)] = Map()
-    if (filterIsProvided) {
+    var filteringOffsetAndType = Map[NameAndPartition, (EventHubsOffsetType, Long)]()
+    if (!initialized && !ssc.isCheckpointPresent) {
       RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
-      filteringOffsetAndType ++ RateControlUtils.composeFromOffsetWithFilteringParams(
+      filteringOffsetAndType = RateControlUtils.composeFromOffsetWithFilteringParams(
         ehParams,
         currentOffsetsAndSeqNos.offsetsAndSeqNos)
     }

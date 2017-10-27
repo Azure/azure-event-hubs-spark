@@ -144,4 +144,8 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
 private[spark] object EventHubsClientWrapper {
   private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
     new EventHubsClientWrapper(ehParams)
+
+  def userAgent = { EventHubClient.userAgent }
+
+  def userAgent_=(str: String) { EventHubClient.userAgent = str }
 }

@@ -22,12 +22,12 @@ import java.io.{ IOException, ObjectInputStream }
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.common.{
-  NameAndPartition,
   EventHubsConnector,
+  NameAndPartition,
   OffsetRecord,
   RateControlUtils
 }
-import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
 import org.apache.spark.internal.Logging
@@ -281,6 +281,7 @@ private[spark] class EventHubDirectDStream private[spark] (
                                               context.sparkContext.appName,
                                               context.sparkContext.hadoopConfiguration)
     ProgressTrackingListener.initInstance(ssc, progressDir)
+    EventHubsClientWrapper.userAgent = s"Spark-Streaming-${ssc.sc.version}"
   }
 
   override def stop(): Unit = {

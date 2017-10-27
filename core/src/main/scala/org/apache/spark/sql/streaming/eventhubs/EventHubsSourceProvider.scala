@@ -43,8 +43,9 @@ private[sql] class EventHubsSourceProvider
                             schema: Option[StructType],
                             providerName: String,
                             parameters: Map[String, String]): Source = {
-    // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
-    // eventhubClientCreator
+    // TODO: use serviceLoader EH client dependency injection
+    EventHubsClientWrapper.userAgent =
+      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
     new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply)
   }
 }

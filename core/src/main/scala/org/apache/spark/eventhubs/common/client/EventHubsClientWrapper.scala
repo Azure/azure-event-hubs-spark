@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubs.common.client
 
-import java.time.{ Duration, Instant }
+import java.time.{Duration, Instant}
 
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
@@ -45,6 +45,8 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
   private val consumerGroup = ehParams
     .getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
     .toString
+
+  /* Establish connection */
   private val connectionString =
     new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
   client = EventHubClient.createFromConnectionStringSync(connectionString)

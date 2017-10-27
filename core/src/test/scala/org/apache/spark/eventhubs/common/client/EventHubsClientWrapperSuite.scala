@@ -35,9 +35,4 @@ class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with Mock
   before {}
 
   // TODO: re-implement these tests. The previous tests were pointless after the client redesign.
-  test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {}
-
-  test("EventHubsClientWrapper converts parameters for consumergroup") {}
-
-  test("EventHubsClientWrapper converts parameters for enqueuetime filter") {}
 }

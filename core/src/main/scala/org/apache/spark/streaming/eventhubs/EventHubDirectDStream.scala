@@ -18,7 +18,6 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.io.{ IOException, ObjectInputStream }
-import java.util.Properties
 
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }

@@ -136,7 +136,7 @@ private[spark] class EventHubDirectDStream private[spark] (
    *
    * @return EventHubName-Partition -> (offset, seq)
    */
-  private def fetchStartOffsetForEachPartition(validTime: Time, fallBack: Boolean): OffsetRecord = {
+  private def fetchStartOffsets(validTime: Time, fallBack: Boolean): OffsetRecord = {
     val offsetRecord = progressTracker.read(
       ehNamespace,
       validTime.milliseconds - ssc.graph.batchDuration.milliseconds,
@@ -224,7 +224,7 @@ private[spark] class EventHubDirectDStream private[spark] (
     if (!initialized) ProgressTrackingListener.initInstance(ssc, progressDir)
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
 
-    currentOffsetsAndSeqNos = fetchStartOffsetForEachPartition(validTime, !initialized)
+    currentOffsetsAndSeqNos = fetchStartOffsets(validTime, !initialized)
     while (currentOffsetsAndSeqNos.timestamp < validTime.milliseconds -
              ssc.graph.batchDuration.milliseconds) {
       logInfo(
@@ -232,7 +232,7 @@ private[spark] class EventHubDirectDStream private[spark] (
           s" ${validTime.milliseconds}")
       graph.wait()
       logInfo(s"wake up at Batch ${validTime.milliseconds} at DStream $id")
-      currentOffsetsAndSeqNos = fetchStartOffsetForEachPartition(validTime, !initialized)
+      currentOffsetsAndSeqNos = fetchStartOffsets(validTime, !initialized)
     }
     // At this point, currentOffsetsAndSeqNos is up to date. Now, we make API calls to the service
     // to retrieve the highest offsetsAndSeqNos and sequences numbers available.

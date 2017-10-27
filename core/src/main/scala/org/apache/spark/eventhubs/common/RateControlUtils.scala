@@ -63,38 +63,26 @@ private[spark] object RateControlUtils extends Logging {
 
   private[spark] def validateFilteringParams(eventHubsClients: Map[String, Client],
                                              ehParams: Map[String, _],
-                                             ehNameAndPartitions: List[NameAndPartition]): Unit = {
-
-    // first check if the parameters are valid
-    val latestEnqueueTimeOfPartitions = new mutable.HashMap[NameAndPartition, Long].empty
-    for (nameAndPartition <- ehNameAndPartitions) {
-      val name = nameAndPartition.ehName
-      val lastEnqueueTime = eventHubsClients(name).lastEnqueuedTime(nameAndPartition).get
-
-      latestEnqueueTimeOfPartitions += nameAndPartition -> lastEnqueueTime
-    }
-
-    latestEnqueueTimeOfPartitions.toMap.foreach {
-      case (ehNameAndPartition, latestEnqueueTime) =>
-        val passInEnqueueTime = ehParams.get(ehNameAndPartition.ehName) match {
-          case Some(params) =>
-            params
-              .asInstanceOf[Map[String, String]]
-              .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
-              .toLong
-          case None =>
-            ehParams
-              .asInstanceOf[Map[String, String]]
-              .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
-              .toLong
-        }
-        require(
-          latestEnqueueTime >= passInEnqueueTime,
-          "you cannot pass in an enqueue time which is later than the highest enqueue time in" +
-            s" event hubs, ($ehNameAndPartition, pass-in-enqueuetime $passInEnqueueTime," +
-            s" latest-enqueuetime $latestEnqueueTime)"
-        )
-    }
+                                             namesAndPartitions: List[NameAndPartition]): Unit = {
+    val lastEnqueuedTimes: List[(NameAndPartition, Long)] = for {
+      nAndP <- namesAndPartitions
+      name = nAndP.ehName
+      lastTime = eventHubsClients(name).lastEnqueuedTime(nAndP).get
+    } yield nAndP -> lastTime
+    val booleans: List[Boolean] = for {
+      (nAndP, lastTime) <- lastEnqueuedTimes
+      passInEnqueueTime = ehParams.get(nAndP.ehName) match {
+        case Some(x) =>
+          x.asInstanceOf[Map[String, String]]
+            .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
+        case None =>
+          ehParams
+            .asInstanceOf[Map[String, String]]
+            .getOrElse("eventhubs.filter.enqueuetime", EventHubsUtils.DefaultEnqueueTime)
+      }
+    } yield lastTime >= passInEnqueueTime.toLong
+    require(!booleans.contains(false),
+            "You cannot pass in an enqueue time that is greater than what exists in EventHubs.")
   }
 
   private[spark] def composeFromOffsetWithFilteringParams(

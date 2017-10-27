@@ -49,14 +49,10 @@ private[spark] class EventHubsSource private[eventhubs] (
 
   case class EventHubsOffset(batchId: Long, offsets: Map[NameAndPartition, (Long, Long)])
 
-  // the id of the stream which is mapped from eventhubs instance
   override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
 
-  private val eventHubsNamespace: String = eventHubsParams("eventhubs.namespace")
-  private val eventHubsName: String = eventHubsParams("eventhubs.name")
-
-  require(eventHubsNamespace != null, "eventhubs.namespace is not defined")
-  require(eventHubsName != null, "eventhubs.name is not defined")
+  private val ehNamespace = eventHubsParams("eventhubs.namespace")
+  private val ehName = eventHubsParams("eventhubs.name")
 
   private var _client: Client = _
   private[eventhubs] def ehClient = {
@@ -82,10 +78,10 @@ private[spark] class EventHubsSource private[eventhubs] (
     this
   }
 
-  private val ehNameAndPartitions = {
+  override def namesAndPartitions: List[NameAndPartition] = {
     val partitionCount = eventHubsParams("eventhubs.partition.count").toInt
     (for (partitionId <- 0 until partitionCount)
-      yield NameAndPartition(eventHubsName, partitionId)).toList
+      yield NameAndPartition(ehName, partitionId)).toList
   }
 
   private implicit val cleanupExecutorService =
@@ -104,26 +100,16 @@ private[spark] class EventHubsSource private[eventhubs] (
 
   // the flag to avoid committing in the first batch
   private[spark] var firstBatch = true
+
   // the offsetsAndSeqNos which have been to the self-managed offset store
   private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
-    EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
+    EventHubsOffset(-1L, namesAndPartitions.map((_, (-1L, -1L))).toMap)
 
-  // the highest offsetsAndSeqNos in EventHubs side
-  private var fetchedHighestOffsetsAndSeqNums: EventHubsOffset =
-    EventHubsOffset(-1L, ehNameAndPartitions.map((_, (-1L, -1L))).toMap)
+  // Highest Offsets and Sequence Numbers that exist in EventHubs (API call is made to get this)
+  private var highestOffsetsAndSeqNums: EventHubsOffset =
+    EventHubsOffset(-1L, namesAndPartitions.map((_, (-1L, -1L))).toMap)
 
-  override def schema: StructType = {
-    EventHubsSourceProvider.sourceSchema(eventHubsParams)
-  }
-
-  /**
-   * when we have reached the end of the message queue in the remote end or we haven't get any
-   * idea about the highest offset, we shall fail the app when rest endpoint is not responsive, and
-   * to prevent us from dying too much, we shall retry with 2-power interval in this case
-   */
-  private def failAppIfRestEndpointFail =
-    fetchedHighestOffsetsAndSeqNums == null ||
-      committedOffsetsAndSeqNums.offsets.equals(fetchedHighestOffsetsAndSeqNums.offsets)
+  override def schema: StructType = EventHubsSourceProvider.sourceSchema(eventHubsParams)
 
   private def cleanupFiles(batchIdToClean: Long): Unit = {
     Future {
@@ -132,9 +118,7 @@ private[spark] class EventHubsSource private[eventhubs] (
       case Success(_) =>
         logInfo(s"finished cleanup for batch $batchIdToClean")
       case Failure(exception) =>
-        logWarning(
-          s"error happened when clean up for batch $batchIdToClean," +
-            s" $exception")
+        logWarning(s"error happened when clean up for batch $batchIdToClean, $exception")
     }
   }
 
@@ -143,8 +127,7 @@ private[spark] class EventHubsSource private[eventhubs] (
     EventHubsOffset(
       committedOffsetsAndSeqNums.batchId,
       (for {
-        nameAndPartition <- fetchedHighestOffsetsAndSeqNums.offsets.keySet
-        name = nameAndPartition.ehName
+        nameAndPartition <- highestOffsetsAndSeqNums.offsets.keySet
         endPoint = ehClient.lastOffsetAndSeqNo(nameAndPartition)
       } yield nameAndPartition -> endPoint).toMap
     )
@@ -158,35 +141,24 @@ private[spark] class EventHubsSource private[eventhubs] (
    * @return return the target seqNum of current batch
    */
   override def getOffset: Option[Offset] = {
-    fetchedHighestOffsetsAndSeqNums = updatedHighest()
-
-    // TODO - highestOffsetOp is not necessary
-    val highestOffsetsOpt = Some(fetchedHighestOffsetsAndSeqNums.offsets)
-    require(highestOffsetsOpt.isDefined,
-            "cannot get highest offset from rest endpoint of" +
-              " eventhubs")
+    highestOffsetsAndSeqNums = updatedHighest()
     if (!firstBatch) {
       // committedOffsetsAndSeqNums.batchId is always no larger than the latest finished batch id
       val lastCommittedBatchId = committedOffsetsAndSeqNums.batchId
       collectFinishedBatchOffsetsAndCommit(lastCommittedBatchId + 1)
-      // after the previous call the batch id of committedOffsetsAndSeqNums has been incremented
-      // with one, we are safe to clean the progress files which have been committed before the last
-      // finished batch
       cleanupFiles(lastCommittedBatchId)
     } else {
       firstBatch = false
     }
     val targetOffsets = RateControlUtils.clamp(committedOffsetsAndSeqNums.offsets,
-                                               highestOffsetsOpt.get.toList,
+                                               highestOffsetsAndSeqNums.offsets.toList,
                                                eventHubsParams)
     Some(
       EventHubsBatchRecord(
         committedOffsetsAndSeqNums.batchId + 1,
-        targetOffsets.map {
-          case (ehNameAndPartition, seqNum) =>
-            (ehNameAndPartition,
-             math.min(seqNum, fetchedHighestOffsetsAndSeqNums.offsets(ehNameAndPartition)._2))
-        }
+        for { (nameAndPartition, seqNum) <- targetOffsets } yield
+          (nameAndPartition,
+           math.min(seqNum, highestOffsetsAndSeqNums.offsets(nameAndPartition)._2))
       ))
   }
 
@@ -202,8 +174,7 @@ private[spark] class EventHubsSource private[eventhubs] (
     // the offsests (check if the timestamp matches) and then collect the files if necessary
     progressTracker.commit(Map(uid -> committedOffsetsAndSeqNums.offsets), committedBatchId)
     logInfo(
-      s"committed offsetsAndSeqNos of batch $committedBatchId, collectedCommits:" +
-        s" $committedOffsetsAndSeqNums")
+      s"committed offsetsAndSeqNos of batch $committedBatchId, collectedCommits: $committedOffsetsAndSeqNums")
   }
 
   private def fetchEndingOffsetOfLastBatch(committedBatchId: Long) = {
@@ -232,9 +203,7 @@ private[spark] class EventHubsSource private[eventhubs] (
       if (committedOffsetsAndSeqNums.batchId == -1) {
         val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
         for (nameAndPartition <- namesAndPartitions) {
-          val name = nameAndPartition.ehName
           val seqNo = ehClient.earliestSeqNo(nameAndPartition).get
-
           startSeqs += nameAndPartition -> seqNo
         }
 
@@ -242,27 +211,28 @@ private[spark] class EventHubsSource private[eventhubs] (
           case (ehNameAndPartition, (offset, _)) =>
             (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
         })
-        RateControlUtils.validateFilteringParams(Map(eventHubsName -> ehClient),
+        RateControlUtils.validateFilteringParams(Map(ehName -> ehClient),
                                                  eventHubsParams,
-                                                 ehNameAndPartitions)
+                                                 namesAndPartitions)
         RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,
                                                               committedOffsetsAndSeqNums.offsets)
       } else {
         Map[NameAndPartition, (EventHubsOffsetType, Long)]()
       }
     }
-    endOffset.targetSeqNums.map {
-      case (ehNameAndPartition, seqNum) =>
-        val (offsetType, offset) =
-          RateControlUtils.calculateStartOffset(ehNameAndPartition,
-                                                filterOffsetAndType,
-                                                committedOffsetsAndSeqNums.offsets)
-        OffsetRange(ehNameAndPartition,
-                    fromOffset = offset,
-                    fromSeq = committedOffsetsAndSeqNums.offsets(ehNameAndPartition)._2,
-                    untilSeq = seqNum,
-                    offsetType = offsetType)
-    }.toList
+
+    for {
+      (nameAndPartition, seqNo) <- endOffset.targetSeqNums.toList
+      (offsetType, fromOffset) = RateControlUtils.calculateStartOffset(
+        nameAndPartition,
+        filterOffsetAndType,
+        committedOffsetsAndSeqNums.offsets)
+    } yield
+      (nameAndPartition,
+       fromOffset,
+       committedOffsetsAndSeqNums.offsets(nameAndPartition)._2,
+       seqNo,
+       offsetType)
   }
 
   private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
@@ -313,14 +283,12 @@ private[spark] class EventHubsSource private[eventhubs] (
     sqlContext.createDataFrame(rowRDD, schema)
   }
 
-  private def validateReadResults(readProgress: OffsetRecord): Boolean = {
-    readProgress.offsetsAndSeqNos.keySet == namesAndPartitions.toSet
-  }
-
   private def readProgress(batchId: Long): EventHubsOffset = {
     val nextBatchId = batchId + 1
     val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
-    if (progress.timestamp == -1 || !validateReadResults(progress)) {
+
+    val validateReadResults = progress.offsetsAndSeqNos.keySet == namesAndPartitions.toSet
+    if (progress.timestamp == -1 || !validateReadResults) {
       // next batch hasn't been committed successfully
       val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
       EventHubsOffset(batchId, lastCommittedOffset.offsetsAndSeqNos)
@@ -352,7 +320,7 @@ private[spark] class EventHubsSource private[eventhubs] (
       committedOffsetsAndSeqNums = latestProgress
     }
     logInfo(s"recovered from a failure, startOffset: $start, endOffset: $end")
-    fetchedHighestOffsetsAndSeqNums = updatedHighest()
+    highestOffsetsAndSeqNums = updatedHighest()
     firstBatch = false
   }
 
@@ -376,11 +344,7 @@ private[spark] class EventHubsSource private[eventhubs] (
 
   override def stop(): Unit = {}
 
-  override def uid: String = s"${eventHubsNamespace}_${eventHubsName}_$streamId"
-
-  // the list of eventhubs partitions connecting with this connector
-  override def namesAndPartitions: List[NameAndPartition] = ehNameAndPartitions
-
+  override def uid: String = s"${ehNamespace}_${ehName}_$streamId"
 }
 
 private object EventHubsSource {

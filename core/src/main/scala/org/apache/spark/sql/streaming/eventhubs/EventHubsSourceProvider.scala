@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+import com.microsoft.azure.eventhubs.EventHubClient
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
@@ -45,6 +46,8 @@ private[sql] class EventHubsSourceProvider
                             parameters: Map[String, String]): Source = {
     // TODO: use serviceLoader to pass in customized eventhubReceiverCreator and
     // eventhubClientCreator
+    EventHubClient.userAgent =
+      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
     new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply)
   }
 }

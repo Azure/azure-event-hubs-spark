@@ -18,12 +18,13 @@
 package org.apache.spark.streaming.eventhubs
 
 import java.io.{ IOException, ObjectInputStream }
+import java.util.Properties
 
 import scala.collection.mutable
-import com.microsoft.azure.eventhubs.EventData
+import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
 import org.apache.spark.eventhubs.common.{
-  NameAndPartition,
   EventHubsConnector,
+  NameAndPartition,
   OffsetRecord,
   RateControlUtils
 }
@@ -61,6 +62,7 @@ private[spark] class EventHubDirectDStream private[spark] (
       ehParams(ehName)("eventhubs.namespace") == ehNamespace,
       "Multiple namespaces detected in ehParams. DStreams cannot be created across multiple namespaces."
     )
+
   override def uid: String = ehNamespace
 
   private[streaming] override def name: String = s"EventHubs Direct DStream [$id]"
@@ -273,6 +275,7 @@ private[spark] class EventHubDirectDStream private[spark] (
   }
 
   override def start(): Unit = {
+    EventHubClient.userAgent = s"Spark-Streaming-${_ssc.sc.version}"
     val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
     require(
       concurrentJobs == 1,

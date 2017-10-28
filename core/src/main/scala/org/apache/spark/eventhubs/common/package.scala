@@ -15,22 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common
+// TODO I think Structured Streaming needs this convert to a map.
+// So I need to write an implicit converter for Structured Streaming.
+// And need to tackle how to encode the per partition stuff. Might not be able to.
+// TODO make Direct Streams just use EventHubsConf directly.
 
-/**
- * interface representing the bridge between EventHubs and Spark-side processing engine
- * (Direct DStream or Structured Streaming)
- */
-// TODO this can go when progress tracker is removed.
-private[spark] trait EventHubsConnector {
+package org.apache.spark.eventhubs
 
-  // the id of the stream which is mapped from eventhubs instance
-  def streamId: Int
-
-  // uniquely identify the entities in eventhubs side, it can be the EventHubs namespace or the
-  // combination of namespace and eventhubs name and streamId
-  def uid: String
-
-  // the list of eventhubs partitions connecting with this connector
-  def namesAndPartitions: List[NameAndPartition]
+package object common {
+  type PartitionId = Int
+  type Rate = Int
+  type Offset = Long
+  type EnqueueTime = Long
+  type SequenceNumber = Long
 }

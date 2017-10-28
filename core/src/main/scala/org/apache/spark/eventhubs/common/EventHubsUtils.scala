@@ -16,6 +16,8 @@
  */
 package org.apache.spark.eventhubs.common
 
+import java.time.Duration
+
 import com.microsoft.azure.eventhubs.{ EventData, PartitionReceiver }
 import org.apache.spark.SparkConf
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
@@ -29,6 +31,10 @@ object EventHubsUtils {
   val DefaultEnqueueTime: String = Long.MinValue.toString
   val StartOfStream = PartitionReceiver.START_OF_STREAM
   val EndOfStream = PartitionReceiver.END_OF_STREAM
+  val DefaultMaxRatePerPartition: Int = 10000
+  val DefaultStartOffset: Long = -1L
+  val DefaultReceiverTimeout: Duration = Duration.ofSeconds(5)
+  val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
 
   /**
    * Return an initialized SparkConf that registered

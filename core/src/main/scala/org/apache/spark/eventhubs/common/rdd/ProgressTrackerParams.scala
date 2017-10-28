@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubs.common.rdd
 
 // This class contains the information the RDD needs to write temp progress files.
+// TODO can be removed when progress tracker is gone.
 private[spark] case class ProgressTrackerParams(checkpointDir: String,
                                                 streamId: Int,
                                                 uid: String,

@@ -25,7 +25,7 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
-import scala.util.{Try,Failure}
+import scala.util.{Try,Success,Failure}
 import java.net._
 
 /**

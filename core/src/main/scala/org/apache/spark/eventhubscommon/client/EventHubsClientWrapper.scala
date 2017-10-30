@@ -25,7 +25,7 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
-import scala.util.Try
+import scala.util.{Try,Failure}
 import java.net._
 
 /**
@@ -49,8 +49,16 @@ private[spark] class EventHubsClientWrapper(
   private val ehPolicy = ehParams("eventhubs.policykey").toString
 
   // first try and generate connection string using namespace as URI, then if that fails, use namespace as string only
-  val connectionString = Try(new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString)
-                            .getOrElse(new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString)
+  val connectionString = Try{
+    new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
+  } getOrElse Try {
+    new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
+  }
+
+  connectionString match {
+    case Success(str) => // continue
+    case Failure(e) => throw e
+  }
 
   private val consumerGroup = ehParams
     .getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)

@@ -25,6 +25,9 @@ import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
 
+import scala.util.{Try,Success,Failure}
+import java.net._
+
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
@@ -45,8 +48,18 @@ private[spark] class EventHubsClientWrapper(
   private val ehPolicyName = ehParams("eventhubs.policyname").toString
   private val ehPolicy = ehParams("eventhubs.policykey").toString
 
-  private val connectionString =
+  // first try and generate connection string using namespace as URI, then if that fails, use namespace as string only
+  val connectionString = Try{
+    new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
+  } getOrElse Try {
     new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
+  }
+
+  connectionString match {
+    case Success(str) => // continue
+    case Failure(e) => throw e
+  }
+
   private val consumerGroup = ehParams
     .getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
     .toString
@@ -107,7 +120,7 @@ private[spark] class EventHubsClientWrapper(
   private[spark] def createReceiverInternal(partitionId: String,
                                             offsetType: EventHubsOffsetType,
                                             currentOffset: String): Unit = {
-    eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString)
+    eventhubsClient = EventHubClient.createFromConnectionStringSync(connectionString.toString)
 
     eventhubsReceiver = offsetType match {
       case EventHubsOffsetTypes.None | EventHubsOffsetTypes.PreviousCheckpoint |

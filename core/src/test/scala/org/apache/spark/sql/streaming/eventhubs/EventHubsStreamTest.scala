@@ -35,7 +35,7 @@ import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
 import org.apache.spark.DebugFilesystem
-import org.apache.spark.eventhubs.common.EventHubsConnector
+import org.apache.spark.eventhubs.common.{ EventHubsConf, EventHubsConnector }
 import org.apache.spark.eventhubs.common.progress.ProgressTrackerBase
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.{ Dataset, Encoder, QueryTest, Row }
@@ -499,8 +499,8 @@ trait EventHubsStreamTest
             val eventHubsSource = searchCurrentSource()
             val eventHubs = EventHubsTestUtilities.getOrCreateSimulatedEventHubs(null)
             eventHubsSource.ehClient = new SimulatedEventHubsRestClient(eventHubs)
-            eventHubsSource.receiverFactory = (eventHubsParameters: Map[String, String]) =>
-              new TestEventHubsClient(eventHubsParameters, eventHubs, null)
+            eventHubsSource.receiverFactory =
+              (ehConf: EventHubsConf) => new TestEventHubsClient(ehConf, eventHubs, null)
             currentStream.start()
 
           case AdvanceManualClock(timeToAdd) =>

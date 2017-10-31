@@ -18,7 +18,7 @@ package org.apache.spark.eventhubs.common
 
 import java.time.Duration
 
-import com.microsoft.azure.eventhubs.{ EventData, PartitionReceiver }
+import com.microsoft.azure.eventhubs.{ EventData, EventHubClient, PartitionReceiver }
 import org.apache.spark.SparkConf
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
 import org.apache.spark.streaming.StreamingContext
@@ -27,14 +27,14 @@ import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 object EventHubsUtils {
 
   // Will place constants here for now.
-  val DefaultMaxRate: String = "10000"
   val DefaultEnqueueTime: String = Long.MinValue.toString
   val StartOfStream = PartitionReceiver.START_OF_STREAM
   val EndOfStream = PartitionReceiver.END_OF_STREAM
-  val DefaultMaxRatePerPartition: Int = 10000
-  val DefaultStartOffset: Long = -1L
+  val DefaultMaxRatePerPartition: Rate = 10000
+  val DefaultStartOffset: Offset = -1L
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(5)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
+  val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
 
   /**
    * Return an initialized SparkConf that registered
@@ -49,39 +49,11 @@ object EventHubsUtils {
   /**
    * Creates a Direct DStream that consumes from multiple Event Hubs instances within a namespace.
    *
-   * For example, let's say we have a namespace called "test-ns" which had two EventHubs: "eh1" and "eh2".
-   * To consume frome both, you need to create a map that maps from those EventHubs names to the EventHubs
-   * parameters you'd like to use for each one. For our example, it would be:
-   *
-   * Map("eh1" -> "~all parameters specific to eh1~",
-   *     "eh2" -> "~all parameters specific to eh2~")
-   *
-   * Pass that Map (of type Map[String, Map[String, String]]) and we'll consume from all EventHubs listed
-   *
    * @param ssc the StreamingContext this DStream belongs to
-   * @param progressDir progress directory path to store EventHubs specific information(we only support HDFS-based checkpoint
-   *                      storage for now, so you have to prefix your path with hdfs://clustername/
-   * @param ehParams the parameters of your EventHubs instances
+   * @param ehConf the parameters for your EventHubs instance
    * @return An EventHubsDirectDStream
    */
-  def createDirectStreams(ssc: StreamingContext,
-                          progressDir: String,
-                          ehParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
-    new EventHubDirectDStream(ssc, progressDir, ehParams, EventHubsClientWrapper.apply)
-  }
-
-  /**
-   * Creates a Direct DStream that consumes from a single Event Hubs instance.
-   *
-   * @param ssc the StreamingContext this DStream belongs to
-   * @param progressDir progress directory path to store EventHubs specific information
-   * @param ehParams the parameters of your EventHubs instance
-   * @return An EventHubsDirectDStream
-   */
-  def createDirectStream(ssc: StreamingContext,
-                         progressDir: String,
-                         ehParams: Map[String, String]): EventHubDirectDStream = {
-    val ehName = ehParams("eventhubs.name")
-    createDirectStreams(ssc, progressDir, Map(ehName -> ehParams))
+  def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf): EventHubDirectDStream = {
+    new EventHubDirectDStream(ssc, ehConf, EventHubsClientWrapper.apply)
   }
 }

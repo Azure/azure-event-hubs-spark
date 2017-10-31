@@ -21,12 +21,7 @@ import java.io.{ IOException, ObjectInputStream }
 
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.common.{
-  EventHubsConnector,
-  NameAndPartition,
-  OffsetRecord,
-  RateControlUtils
-}
+import org.apache.spark.eventhubs.common._
 import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
@@ -42,26 +37,17 @@ import org.apache.spark.util.Utils
 /**
  * implementation of EventHub-based direct stream
  * @param _ssc the streaming context this stream belongs to
- * @param progressDir the path of directory saving the progress file
- * @param ehParams the parameters of your eventhub instances, format:
- *                    Map[eventhubinstanceName -> Map(parameterName -> parameterValue)
+ * @param ehConf the parameters of your eventhub instances
  */
-private[spark] class EventHubDirectDStream private[spark] (
-    _ssc: StreamingContext,
-    progressDir: String,
-    ehParams: Map[String, Map[String, String]],
-    clientFactory: (Map[String, String]) => Client)
+private[spark] class EventHubDirectDStream private[spark] (_ssc: StreamingContext,
+                                                           ehConf: EventHubsConf,
+                                                           clientFactory: (EventHubsConf => Client))
     extends InputDStream[EventData](_ssc)
     with EventHubsConnector
     with Logging {
   // This uniquely identifies entities on the EventHubs side
-  val ehNamespace: String = ehParams(ehParams.keySet.head)("eventhubs.namespace")
-  for (ehName <- ehParams.keySet)
-    require(
-      ehParams(ehName)("eventhubs.namespace") == ehNamespace,
-      "Multiple namespaces detected in ehParams. DStreams cannot be created across multiple namespaces."
-    )
-  override def uid: String = ehNamespace
+  private[spark] val ehNamespace = ehConf.namespace
+  override def uid: String = ehConf.namespace
 
   private[streaming] override def name: String = s"EventHubs Direct DStream [$id]"
 
@@ -69,9 +55,8 @@ private[spark] class EventHubDirectDStream private[spark] (
 
   // the list of eventhubs partitions connecting with this connector
   override def namesAndPartitions: List[NameAndPartition] = {
-    for (eventHubName <- ehParams.keySet;
-         partitionId <- 0 until ehParams(eventHubName)("eventhubs.partition.count").toInt)
-      yield NameAndPartition(eventHubName, partitionId)
+    for (partitionId <- 0 until ehConf.partitionCount.toInt)
+      yield NameAndPartition(ehConf.name, partitionId)
   }.toList
 
   private var latestCheckpointTime: Time = _
@@ -94,18 +79,15 @@ private[spark] class EventHubDirectDStream private[spark] (
   private def progressTracker =
     DirectDStreamProgressTracker.getInstance.asInstanceOf[DirectDStreamProgressTracker]
 
-  @transient private var _clients: mutable.HashMap[String, Client] = _
-  private[eventhubs] def ehClients = {
-    if (_clients == null) {
-      _clients = new mutable.HashMap[String, Client].empty
-      for (name <- ehParams.keys)
-        _clients += name -> clientFactory(ehParams(name))
+  @transient private var _client: Client = _
+  private[eventhubs] def ehClient = {
+    if (_client == null) {
+      _client = clientFactory(ehConf)
     }
-    _clients
+    _client
   }
-
-  private[eventhubs] def ehClients_=(client: mutable.HashMap[String, Client]) = {
-    _clients = client
+  private[eventhubs] def ehClient_=(client: Client) = {
+    _client = client
     this
   }
 
@@ -138,7 +120,7 @@ private[spark] class EventHubDirectDStream private[spark] (
    */
   private def fetchStartOffsets(validTime: Time, fallBack: Boolean): OffsetRecord = {
     val offsetRecord = progressTracker.read(
-      ehNamespace,
+      ehConf.namespace,
       validTime.milliseconds - ssc.graph.batchDuration.milliseconds,
       fallBack)
     require(offsetRecord.offsetsAndSeqNos.nonEmpty, "progress file cannot be empty")
@@ -149,8 +131,7 @@ private[spark] class EventHubDirectDStream private[spark] (
       // query start startSeqs
       val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
       for (nameAndPartition <- namesAndPartitions) {
-        val name = nameAndPartition.ehName
-        val seqNo = ehClients(name).earliestSeqNo(nameAndPartition)
+        val seqNo = ehClient.earliestSeqNo(nameAndPartition)
         require(seqNo.isDefined, s"Failed to get starting sequence number for $nameAndPartition")
 
         startSeqs += nameAndPartition -> seqNo.get
@@ -190,7 +171,7 @@ private[spark] class EventHubDirectDStream private[spark] (
   private def clamp(): Map[NameAndPartition, Long] = {
     RateControlUtils.clamp(currentOffsetsAndSeqNos.offsetsAndSeqNos,
                            highestOffsetsAndSeqNos.offsetsAndSeqNos.toList,
-                           ehParams)
+                           ehConf)
   }
 
   private def composeOffsetRange(
@@ -199,9 +180,9 @@ private[spark] class EventHubDirectDStream private[spark] (
     val clampedSeqNos = clamp()
     var filteringOffsetAndType = Map[NameAndPartition, (EventHubsOffsetType, Long)]()
     if (!initialized && !ssc.isCheckpointPresent) {
-      RateControlUtils.validateFilteringParams(ehClients.toMap, ehParams, namesAndPartitions)
+      RateControlUtils.validateFilteringParams(ehClient, ehConf, namesAndPartitions)
       filteringOffsetAndType = RateControlUtils.composeFromOffsetWithFilteringParams(
-        ehParams,
+        ehConf,
         currentOffsetsAndSeqNos.offsetsAndSeqNos)
     }
 
@@ -221,7 +202,7 @@ private[spark] class EventHubDirectDStream private[spark] (
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
-    if (!initialized) ProgressTrackingListener.initInstance(ssc, progressDir)
+    if (!initialized) ProgressTrackingListener.initInstance(ssc, ehConf.progressDir)
     require(progressTracker != null, "ProgressTracker hasn't been initialized")
 
     currentOffsetsAndSeqNos = fetchStartOffsets(validTime, !initialized)
@@ -240,8 +221,7 @@ private[spark] class EventHubDirectDStream private[spark] (
       validTime.milliseconds,
       (for {
         nameAndPartition <- highestOffsetsAndSeqNos.offsetsAndSeqNos.keySet
-        name = nameAndPartition.ehName
-        endPoint = ehClients(name).lastOffsetAndSeqNo(nameAndPartition)
+        endPoint = ehClient.lastOffsetAndSeqNo(nameAndPartition)
       } yield nameAndPartition -> endPoint).toMap
     )
 
@@ -256,13 +236,10 @@ private[spark] class EventHubDirectDStream private[spark] (
       composeOffsetRange(currentOffsetsAndSeqNos, highestOffsetsAndSeqNos.offsetsAndSeqNos.toList)
     val eventHubRDD = new EventHubsRDD(
       context.sparkContext,
-      ehParams,
+      ehConf,
       offsetRanges,
       validTime.milliseconds,
-      ProgressTrackerParams(progressDir,
-                            streamId,
-                            uid = ehNamespace,
-                            subDirs = ssc.sparkContext.appName),
+      ProgressTrackerParams(ehConf.progressDir, streamId, uid, subDirs = ssc.sparkContext.appName),
       clientFactory
     )
     reportInputInto(validTime,
@@ -277,10 +254,10 @@ private[spark] class EventHubDirectDStream private[spark] (
     require(
       concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
-    DirectDStreamProgressTracker.initInstance(progressDir,
+    DirectDStreamProgressTracker.initInstance(ehConf.progressDir,
                                               context.sparkContext.appName,
                                               context.sparkContext.hadoopConfiguration)
-    ProgressTrackingListener.initInstance(ssc, progressDir)
+    ProgressTrackingListener.initInstance(ssc, ehConf.progressDir)
     EventHubsClientWrapper.userAgent = s"Spark-Streaming-${ssc.sc.version}"
   }
 
@@ -335,7 +312,7 @@ private[spark] class EventHubDirectDStream private[spark] (
       // checkpoint
       logInfo("initialized ProgressTracker")
       val appName = context.sparkContext.appName
-      DirectDStreamProgressTracker.initInstance(progressDir,
+      DirectDStreamProgressTracker.initInstance(ehConf.progressDir,
                                                 appName,
                                                 context.sparkContext.hadoopConfiguration)
       batchForTime.toSeq.sortBy(_._1)(Time.ordering).foreach {
@@ -343,13 +320,13 @@ private[spark] class EventHubDirectDStream private[spark] (
           logInfo(s"Restoring EventHubRDD for time $t ${b.mkString("[", ", ", "]")}")
           generatedRDDs += t -> new EventHubsRDD(
             context.sparkContext,
-            ehParams,
+            ehConf,
             b.map {
               case (ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType) =>
                 OffsetRange(ehNameAndPar, fromOffset, fromSeq, untilSeq, offsetType)
             }.toList,
             t.milliseconds,
-            ProgressTrackerParams(progressDir, streamId, uid = ehNamespace, subDirs = appName),
+            ProgressTrackerParams(ehConf.progressDir, streamId, uid, subDirs = appName),
             clientFactory
           )
       }

@@ -24,7 +24,7 @@ package org.apache.spark.eventhubs
 
 package object common {
   type PartitionId = Int
-  type Rate = Int
+  type Rate = Long
   type Offset = Long
   type EnqueueTime = Long
   type SequenceNumber = Long

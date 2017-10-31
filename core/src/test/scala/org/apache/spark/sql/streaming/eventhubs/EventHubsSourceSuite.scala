@@ -20,7 +20,7 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.{ Dataset, SparkSession }
 import org.apache.spark.sql.streaming.{ OutputMode, ProcessingTime, Trigger }
@@ -36,19 +36,18 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                        maxRate: Int,
                                        containsProperties: Boolean = false,
                                        userDefinedKeys: Option[String] = None,
-                                       enqueueTime: Option[Long] = None): Map[String, String] = {
-    Map[String, String](
-      "eventhubs.policyname" -> "policyName",
-      "eventhubs.policykey" -> "policyKey",
-      "eventhubs.namespace" -> s"$namespace",
-      "eventhubs.name" -> s"$name",
-      "eventhubs.partition.count" -> s"$partitionCount",
-      "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.progressTrackingDir" -> tempRoot,
-      "eventhubs.maxRate" -> s"$maxRate",
-      "eventhubs.sql.containsProperties" -> s"$containsProperties"
-    ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map()) ++
-      enqueueTime.map(et => Map("eventhubs.filter.enqueuetime" -> et.toString)).getOrElse(Map())
+                                       enqueueTime: Option[Long] = None): EventHubsConf = {
+    val ehConf =
+      new EventHubsConf(namespace, name, "policyName", "policyKey", s"$partitionCount", tempRoot)
+        .setConsumerGroup("$Default")
+        .setMaxRatePerPartition(maxRate)
+
+    if (enqueueTime.isDefined)
+      ehConf.setStartEnqueueTimes(enqueueTime.get)
+
+    if (userDefinedKeys.isDefined)
+      ehConf.setSqlUserDefinedKeys(userDefinedKeys.get)
+    ehConf
   }
 
   private def generateIntKeyedData(num: Int, offset: Int = 0): Seq[(Int, Seq[(String, String)])] = {
@@ -79,7 +78,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -97,7 +96,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -116,8 +115,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       ehParams,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(ehParams, eventHubs, highestOffsetPerPartition)
+      (_: EventHubsConf) => new TestEventHubsClient(ehParams, eventHubs, highestOffsetPerPartition)
     )
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -145,7 +143,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -165,7 +163,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -187,7 +185,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     // First batch
@@ -224,7 +222,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -267,7 +265,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -289,7 +287,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -316,7 +314,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -343,7 +341,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       eventHubsParameters,
-      (_: Map[String, String]) =>
+      (_: EventHubsConf) =>
         new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]

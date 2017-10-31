@@ -23,7 +23,7 @@ import java.time.{ Duration, Instant }
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.internal.Logging
 
 import scala.util.{ Failure, Success, Try }
@@ -32,7 +32,7 @@ import scala.util.{ Failure, Success, Try }
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, String])
+private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     extends Serializable
     with Client
     with Logging {
@@ -41,12 +41,11 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
   private[spark] var partitionReceiver: PartitionReceiver = _
 
   /* Extract relevant info from ehParams */
-  private val ehNamespace = ehParams("eventhubs.namespace").toString
-  private val ehName = ehParams("eventhubs.name").toString
-  private val ehPolicyName = ehParams("eventhubs.policyname").toString
-  private val ehPolicy = ehParams("eventhubs.policykey").toString
-  private val consumerGroup =
-    ehParams.getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
+  private val ehNamespace = ehConf.namespace
+  private val ehName = ehConf.name
+  private val ehPolicyName = ehConf.keyName
+  private val ehPolicy = ehConf.key
+  private val consumerGroup = ehConf.consumerGroup
   private val connectionString =
     Try {
       new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
@@ -152,10 +151,10 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
 }
 
 private[spark] object EventHubsClientWrapper {
-  private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
-    new EventHubsClientWrapper(ehParams)
+  private[spark] def apply(ehConf: EventHubsConf): EventHubsClientWrapper =
+    new EventHubsClientWrapper(ehConf)
 
-  def userAgent = { EventHubClient.userAgent }
+  def userAgent: String = { EventHubClient.userAgent }
 
   def userAgent_=(str: String) { EventHubClient.userAgent = str }
 }

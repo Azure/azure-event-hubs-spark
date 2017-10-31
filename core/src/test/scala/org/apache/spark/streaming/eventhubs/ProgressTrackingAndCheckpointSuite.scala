@@ -22,7 +22,7 @@ import java.nio.file.Files
 import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
-import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition, OffsetRecord }
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.eventhubs.checkpoint.{
   DirectDStreamProgressTracker,
@@ -52,18 +52,12 @@ class ProgressTrackingAndCheckpointSuite
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutputBeforeRestart =
       Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     runStopAndRecover(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -90,7 +84,7 @@ class ProgressTrackingAndCheckpointSuite
                          NameAndPartition("eh1", 1) -> (3L, 3L),
                          NameAndPartition("eh1", 2) -> (3L, 3L))))
     assert(DirectDStreamProgressTracker.getInstance != null)
-    assert(eventHubDirectDStream.ehClients != null)
+    assert(eventHubDirectDStream.ehClient != null)
   }
 
   ignore("test integration of spark checkpoint and progress tracking (single stream)") {
@@ -102,18 +96,12 @@ class ProgressTrackingAndCheckpointSuite
     val expectedOutputAfterRestart =
       Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq())
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testCheckpointedOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -164,18 +152,12 @@ class ProgressTrackingAndCheckpointSuite
           "6" -> 1)
     )
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testCheckpointedOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -211,18 +193,12 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(8, 9, 11, 2, 5, 6, 10, 11, 3, 4, 7, 8),
                                          Seq(10, 11, 3, 4, 7, 8))
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testCheckpointedOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -292,30 +268,16 @@ class ProgressTrackingAndCheckpointSuite
           "c" -> 6),
       Seq()
     )
+    val ehConf1 = new EventHubsConf("namespace1", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(3)
+    val ehConf2 = new EventHubsConf("namespace2", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(3)
 
     testCheckpointedOperation(
       input1,
       input2,
-      eventhubsParams1 = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "3",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace1",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
-      eventhubsParams2 = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "3",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "namespace2",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf1,
+      ehConf2,
       expectedStartingOffsetsAndSeqs1 = Map(
         "namespace1" ->
           OffsetRecord(1000L,
@@ -347,18 +309,12 @@ class ProgressTrackingAndCheckpointSuite
     val expectedOutputAfterRestart =
       Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq())
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testCheckpointedOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -385,18 +341,12 @@ class ProgressTrackingAndCheckpointSuite
       Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart = Seq(Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testUnaryOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -421,20 +371,14 @@ class ProgressTrackingAndCheckpointSuite
     reset()
 
     ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
-
     ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(5000)
+
+    val conf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testUnaryOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      conf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(6000,
@@ -467,18 +411,12 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(8, 9, 11, 2, 5, 6),
                                          Seq(10, 11, 3, 4, 7, 8))
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testUnaryOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -547,18 +485,12 @@ class ProgressTrackingAndCheckpointSuite
     val expectedOutputAfterRestart =
       Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
 
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+
     testUnaryOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -630,20 +562,13 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(8, 9, 11, 2, 5, 6),
                                          Seq(10, 11, 3, 4, 7, 8),
                                          Seq())
+    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
+      .setMaxRatePerPartition(2)
+      .setStartEnqueueTimes(2000)
 
     testCheckpointedOperation(
       input,
-      eventhubsParams = Map[String, Map[String, String]](
-        "eh1" -> Map(
-          "eventhubs.partition.count" -> "3",
-          "eventhubs.maxRate" -> "2",
-          "eventhubs.name" -> "eh1",
-          "eventhubs.filter.enqueuetime" -> "2000",
-          "eventhubs.namespace" -> "eventhubs",
-          "eventhubs.policyname" -> "policyname",
-          "eventhubs.policykey" -> "policykey"
-        )
-      ),
+      ehConf,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(0L,

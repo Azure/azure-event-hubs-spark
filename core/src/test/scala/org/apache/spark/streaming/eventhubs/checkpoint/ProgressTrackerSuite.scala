@@ -21,7 +21,12 @@ import java.nio.file.{ Files, Paths, StandardOpenOption }
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
-import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, OffsetRecord }
+import org.apache.spark.eventhubs.common.{
+  EventHubsConf,
+  EventHubsConnector,
+  NameAndPartition,
+  OffsetRecord
+}
 import org.apache.spark.eventhubs.common.progress.{ PathTools, ProgressRecord, ProgressWriter }
 import org.apache.spark.streaming.eventhubs.SharedUtils
 
@@ -101,15 +106,27 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   test("incomplete progress would be discarded") {
-    createDirectStreams(
-      ssc,
-      progressRootPath.toString,
-      Map(
-        "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
-        "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
-        "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
-      )
-    )
+    val ehConf1 = new EventHubsConf("namespace1",
+                                    "eh1",
+                                    "policyname",
+                                    "policykey",
+                                    "1",
+                                    progressRootPath.toString)
+    val ehConf2 = new EventHubsConf("namespace1",
+                                    "eh2",
+                                    "policyname",
+                                    "policykey",
+                                    "2",
+                                    progressRootPath.toString)
+    val ehConf3 = new EventHubsConf("namespace1",
+                                    "eh3",
+                                    "policyname",
+                                    "policykey",
+                                    "3",
+                                    progressRootPath.toString)
+    createDirectStreams(ssc, ehConf1)
+    createDirectStreams(ssc, ehConf2)
+    createDirectStreams(ssc, ehConf3)
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
@@ -158,29 +175,23 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   test("start from the beginning of the streams when the latest progress file does not exist") {
-    // generate 6 EventHubAndPartitions
-    val dStream =
-      createDirectStreams(
-        ssc,
-        progressRootPath.toString,
-        Map(
-          "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
-        )
-      )
-    val dStream1 =
-      createDirectStreams(
-        ssc,
-        progressRootPath.toString,
-        Map(
-          "eh11" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace2"),
-          "eh12" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace2"),
-          "eh13" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace2")
-        )
-      )
-    dStream.start()
+    val ehConf1 = new EventHubsConf("namespace1",
+                                    "eh1",
+                                    "policyname",
+                                    "policykey",
+                                    "1",
+                                    progressRootPath.toString)
+    val dStream1 = createDirectStreams(ssc, ehConf1)
+    val ehConf2 = new EventHubsConf("namespace2",
+                                    "eh11",
+                                    "policyname",
+                                    "policykey",
+                                    "1",
+                                    progressRootPath.toString)
+    val dStream2 = createDirectStreams(ssc, ehConf2)
+
     dStream1.start()
+    dStream2.start()
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
     fs.mkdirs(new Path(progressPath))
@@ -188,11 +199,7 @@ class ProgressTrackerSuite extends SharedUtils {
       .initInstance(progressRootPath.toString, appName, new Configuration())
 
     verifyProgressFile("namespace1", "eh1", 0 to 0, 1000L, Seq((-1L, -1L)))
-    verifyProgressFile("namespace1", "eh2", 0 to 1, 1000L, Seq((-1L, -1L), (-1L, -1L)))
-    verifyProgressFile("namespace1", "eh3", 0 to 2, 1000L, Seq((-1L, -1L), (-1L, -1L), (-1L, -1L)))
     verifyProgressFile("namespace2", "eh11", 0 to 0, 1000L, Seq((-1L, -1L)))
-    verifyProgressFile("namespace2", "eh12", 0 to 1, 1000L, Seq((-1L, -1L), (-1L, -1L)))
-    verifyProgressFile("namespace2", "eh13", 0 to 2, 1000L, Seq((-1L, -1L), (-1L, -1L), (-1L, -1L)))
   }
 
   test("the progress tracks can be read correctly") {

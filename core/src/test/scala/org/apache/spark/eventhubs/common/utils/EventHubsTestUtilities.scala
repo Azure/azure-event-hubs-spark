@@ -23,7 +23,7 @@ import java.util.Date
 import com.microsoft.azure.eventhubs.EventData
 import com.microsoft.azure.eventhubs.EventData.SystemProperties
 import com.microsoft.azure.eventhubs.amqp.AmqpConstants
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.powermock.reflect.Whitebox
 import org.apache.spark.internal.Logging
 
@@ -33,14 +33,13 @@ private[spark] object EventHubsTestUtilities extends Logging {
                                      eventPayloadsAndProperties: Seq[(T, Seq[U])] =
                                        Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
 
-    assert(eventHubsParameters != null)
-    assert(eventHubsParameters.nonEmpty)
+    assert(ehConf.nonEmpty)
 
     // Round-robin allocation of payloads to partitions
-    val eventHubsNamespace = eventHubsParameters("eventhubs.namespace")
-    val eventHubsName = eventHubsParameters("eventhubs.name")
+    val eventHubsNamespace = ehConf.namespace
+    val eventHubsName = ehConf.name
     val eventHubsPartitionList = {
-      for (i <- 0 until eventHubsParameters("eventhubs.partition.count").toInt)
+      for (i <- 0 until ehConf.partitionCount.toInt)
         yield NameAndPartition(eventHubsName, i)
     }
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList.map(x => x -> 0).toMap,

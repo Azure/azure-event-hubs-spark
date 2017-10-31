@@ -21,7 +21,7 @@ import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.progress.ProgressWriter
@@ -39,11 +39,11 @@ private class EventHubRDDPartition(val sparkPartitionId: Int,
 }
 
 private[spark] class EventHubsRDD(sc: SparkContext,
-                                  ehParams: Map[String, Map[String, String]],
+                                  ehConf: EventHubsConf,
                                   val offsetRanges: List[OffsetRange],
                                   batchTime: Long,
                                   offsetParams: ProgressTrackerParams,
-                                  receiverFactory: (Map[String, String]) => Client)
+                                  receiverFactory: (EventHubsConf => Client))
     extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
@@ -102,8 +102,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       s"${ehRDDPartition.nameAndPartition}: " +
         s"Expected Rate $expectedEvents, (fromSeq $fromSeq, untilSeq $untilSeq] at $batchTime")
 
-    val params = ehParams(ehRDDPartition.nameAndPartition.ehName)
-    val eventHubReceiver = receiverFactory(params)
+    val eventHubReceiver = receiverFactory(ehConf)
     eventHubReceiver.initReceiver(ehRDDPartition.nameAndPartition.partitionId.toString,
                                   ehRDDPartition.offsetType,
                                   fromOffset.toString)

@@ -18,7 +18,7 @@
 package org.apache.spark.streaming.eventhubs
 
 import org.apache.hadoop.fs.{ Path, PathFilter }
-import org.apache.spark.eventhubs.common.OffsetRecord
+import org.apache.spark.eventhubs.common.{ EventHubsConf, OffsetRecord }
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
@@ -112,8 +112,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
   protected def testCheckpointedOperation[U: ClassTag, V: ClassTag, W: ClassTag](
       input1: Seq[Seq[U]],
       input2: Seq[Seq[V]],
-      eventhubsParams1: Map[String, Map[String, String]],
-      eventhubsParams2: Map[String, Map[String, String]],
+      ehConf1: EventHubsConf,
+      ehConf2: EventHubsConf,
       expectedStartingOffsetsAndSeqs1: Map[String, OffsetRecord],
       expectedStartingOffsetsAndSeqs2: Map[String, OffsetRecord],
       operation: (EventHubDirectDStream, EventHubDirectDStream) => DStream[W],
@@ -125,8 +125,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
     testBinaryOperation(input1,
                         input2,
-                        eventhubsParams1,
-                        eventhubsParams2,
+                        ehConf1,
+                        ehConf2,
                         expectedStartingOffsetsAndSeqs1,
                         expectedStartingOffsetsAndSeqs2,
                         operation,
@@ -173,7 +173,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
   protected def runStopAndRecover[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
-      eventhubsParams: Map[String, Map[String, String]],
+      ehConf: EventHubsConf,
       expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
       expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
@@ -181,7 +181,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
       useSetFlag: Boolean = false): Unit = {
 
     testUnaryOperation(input,
-                       eventhubsParams,
+                       ehConf,
                        expectedStartingOffsetsAndSeqs,
                        operation,
                        expectedOutputBeforeRestart,
@@ -203,7 +203,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
 
   protected def testCheckpointedOperation[U: ClassTag, V: ClassTag](
       input: Seq[Seq[U]],
-      eventhubsParams: Map[String, Map[String, String]],
+      ehConf: EventHubsConf,
       expectedStartingOffsetsAndSeqs: Map[String, OffsetRecord],
       expectedOffsetsAndSeqs: OffsetRecord,
       operation: EventHubDirectDStream => DStream[V],
@@ -216,7 +216,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
             "Cannot run test without manual clock in the conf")
 
     runStopAndRecover(input,
-                      eventhubsParams,
+                      ehConf,
                       expectedStartingOffsetsAndSeqs,
                       expectedOffsetsAndSeqs,
                       operation,

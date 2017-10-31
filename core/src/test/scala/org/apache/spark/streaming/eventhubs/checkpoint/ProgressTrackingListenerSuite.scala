@@ -19,7 +19,7 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition, OffsetRecord }
 import org.apache.spark.eventhubs.common.progress.ProgressWriter
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
@@ -44,10 +44,14 @@ class ProgressTrackingListenerSuite extends SharedUtils {
         None,
         Map(1 -> OutputOperationInfo(Time(1000L), 1, "output", "", None, None, None))
       ))
-    val dstream = createDirectStreams(
-      ssc,
-      progressRootPath.toString,
-      Map("eh1" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "eventhubs")))
+    val ehConf = new EventHubsConf("eventhuns",
+                                   "eh1",
+                                   "policyname",
+                                   "policykey",
+                                   "2",
+                                   progressRootPath.toString)
+
+    val dstream = createDirectStreams(ssc, ehConf)
     dstream.start()
     val progressWriter = new ProgressWriter(streamId,
                                             eventhubNamespace,
@@ -112,24 +116,23 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     ssc = new StreamingContext(
       new SparkContext(new SparkConf().setAppName(appName).setMaster("local[*]")),
       Seconds(5))
-    createDirectStreams(
-      ssc,
-      progressRootPath.toString,
-      Map(
-        "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
-        "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
-        "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
-      )
-    ).start()
-    createDirectStreams(
-      ssc,
-      progressRootPath.toString,
-      Map(
-        "eh11" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace2"),
-        "eh12" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace2"),
-        "eh13" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace2")
-      )
-    ).start()
+
+    val ehConf1 = new EventHubsConf("namespace1",
+                                    "eh1",
+                                    "policyname",
+                                    "policykey",
+                                    "1",
+                                    progressRootPath.toString)
+    createDirectStreams(ssc, ehConf1).start()
+
+    val ehConf2 = new EventHubsConf("namespace2",
+                                    "eh11",
+                                    "policyname",
+                                    "policykey",
+                                    "1",
+                                    progressRootPath.toString)
+    createDirectStreams(ssc, ehConf2).start()
+
     import scala.collection.JavaConverters._
     assert(
       ssc.scheduler.listenerBus.listeners.asScala

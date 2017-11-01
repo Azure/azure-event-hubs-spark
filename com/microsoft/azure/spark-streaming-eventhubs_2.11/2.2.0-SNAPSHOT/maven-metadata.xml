@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>com.microsoft.azure</groupId>
+  <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+  <version>2.2.0-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <timestamp>20171101.233620</timestamp>
+      <buildNumber>1</buildNumber>
+    </snapshot>
+    <lastUpdated>20171101233620</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>2.2.0-20171101.233620-1</value>
+        <updated>20171101233620</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>2.2.0-20171101.233620-1</value>
+        <updated>20171101233620</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>

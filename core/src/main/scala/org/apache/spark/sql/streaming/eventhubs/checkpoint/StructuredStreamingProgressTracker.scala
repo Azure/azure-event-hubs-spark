@@ -62,15 +62,13 @@ private[spark] class StructuredStreamingProgressTracker private[spark] (
       val progressDirExist = fs.exists(progressDirectoryPath)
       if (progressDirExist) {
         val (validationPass, latestFile) = validateProgressFile(fs)
-        if (!validationPass) {
-          if (latestFile.isDefined) {
-            logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
-            val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
-            val progressRecords = collectProgressRecordsForBatch(
-              latestFileTimestamp,
-              List(StructuredStreamingProgressTracker.registeredConnectors(uid)))
-            commit(progressRecords, latestFileTimestamp)
-          }
+        if (!validationPass && latestFile.isDefined) {
+          logWarning(s"latest progress file ${latestFile.get} corrupt, rebuild file...")
+          val latestFileTimestamp = fromPathToTimestamp(latestFile.get)
+          val progressRecords = collectProgressRecordsForBatch(
+            latestFileTimestamp,
+            List(StructuredStreamingProgressTracker.registeredConnectors(uid)))
+          commit(progressRecords, latestFileTimestamp)
         }
       } else {
         fs.mkdirs(progressDirectoryPath)

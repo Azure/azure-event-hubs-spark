@@ -23,12 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
-import org.apache.spark.eventhubs.common.{
-  NameAndPartition,
-  EventHubsConnector,
-  OffsetRecord,
-  RateControlUtils
-}
+import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, RateControlUtils }
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset, Source }
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker

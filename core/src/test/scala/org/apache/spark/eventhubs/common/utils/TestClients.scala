@@ -68,12 +68,29 @@ class TestEventHubsClient(ehParams: Map[String, String],
   }
 
   override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): (Long, Long) = {
-    val (offset, seq, _) = latestRecords(nameAndPartition)
-    (offset, seq)
+    if (latestRecords != null) {
+      val (offset, seq, _) = latestRecords(nameAndPartition)
+      (offset, seq)
+    } else {
+      val x = eventHubs.messageStore(nameAndPartition).length.toLong - 1
+      (x, x)
+    }
   }
 
-  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] =
-    Some(latestRecords(nameAndPartition)._3)
+  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] = {
+    if (latestRecords != null) {
+      Some(latestRecords(nameAndPartition)._3)
+    } else {
+      Some(
+        eventHubs
+          .messageStore(nameAndPartition)
+          .last
+          .getSystemProperties
+          .getEnqueuedTime
+          .toEpochMilli)
+
+    }
+  }
 }
 
 class FluctuatedEventHubClient(ehParams: Map[String, String],

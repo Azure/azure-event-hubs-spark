@@ -29,9 +29,9 @@ import org.apache.spark.internal.Logging
 
 private[spark] object EventHubsTestUtilities extends Logging {
 
-  def simulateEventHubs[T, U](
-      eventHubsParameters: Map[String, String],
-      eventPayloadsAndProperties: Seq[(T, Seq[U])] = Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
+  def createSimulatedEventHubs[T, U](eventHubsParameters: Map[String, String],
+                                     eventPayloadsAndProperties: Seq[(T, Seq[U])] =
+                                       Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
 
     assert(eventHubsParameters != null)
     assert(eventHubsParameters.nonEmpty)
@@ -49,11 +49,11 @@ private[spark] object EventHubsTestUtilities extends Logging {
     simulatedEventHubs
   }
 
-  def getOrSimulateEventHubs[T, U](eventHubsParameters: Map[String, String],
-                                   eventPayloadsAndProperties: Seq[(T, Seq[U])] =
-                                     Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
+  def getOrCreateSimulatedEventHubs[T, U](eventHubsParameters: Map[String, String],
+                                          eventPayloadsAndProperties: Seq[(T, Seq[U])] =
+                                            Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
     if (simulatedEventHubs == null) {
-      simulatedEventHubs = simulateEventHubs(eventHubsParameters, eventPayloadsAndProperties)
+      simulatedEventHubs = createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
     }
     simulatedEventHubs
   }

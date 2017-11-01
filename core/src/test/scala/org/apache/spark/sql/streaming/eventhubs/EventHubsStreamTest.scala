@@ -300,7 +300,7 @@ trait EventHubsStreamTest
     var lastStream: StreamExecution = null
     val awaiting = new mutable.HashMap[Int, Offset]() // source index -> offset to wait for
     val partialAwaiting = new mutable.HashMap[Int, Offset]()
-    var sink = new MemorySink(stream.schema, outputMode)
+    var sink = new CustomizedMemorySink(stream.schema, outputMode)
     val resetConfValues = mutable.Map[String, Option[String]]()
 
     @volatile
@@ -465,30 +465,20 @@ trait EventHubsStreamTest
             })
 
             lastStream = currentStream
-            val createQueryMethod = sparkSession.streams.getClass.getDeclaredMethods
-              .filter(m => m.getName == "createQuery")
-              .head
-            createQueryMethod.setAccessible(true)
-            val checkpointLocation =
-              additionalConfs.getOrElse[String]("eventhubs.test.checkpointLocation", metadataRoot)
-            if (additionalConfs.contains("eventhubs.test.newSink") &&
-                additionalConfs("eventhubs.test.newSink").toBoolean) {
-              sink = new MemorySink(stream.schema, outputMode)
+            if (additionalConfs.getOrElse("eventhubs.test.newSink", "false").toBoolean) {
+              sink = new CustomizedMemorySink(stream.schema, outputMode)
             }
-            currentStream = createQueryMethod
-              .invoke(
-                sparkSession.streams,
-                None,
-                Some(checkpointLocation),
-                stream,
-                sink,
-                outputMode,
-                Boolean.box(false), // useTempCheckpointLocation
-                Boolean.box(true), // recoverFromCheckpointLocation
-                trigger,
-                triggerClock
-              )
-              .asInstanceOf[StreamExecution]
+
+            currentStream = sparkSession.streams
+              .startQuery(None,
+                          Some(metadataRoot),
+                          stream,
+                          sink,
+                          outputMode,
+                          trigger = trigger,
+                          triggerClock = triggerClock)
+              .asInstanceOf[StreamingQueryWrapper]
+              .streamingQuery
 
             triggerClock match {
               case smc: StreamManualClock =>
@@ -507,7 +497,7 @@ trait EventHubsStreamTest
             activeQueries += currentStream.id -> currentStream
 
             val eventHubsSource = searchCurrentSource()
-            val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
+            val eventHubs = EventHubsTestUtilities.getOrCreateSimulatedEventHubs(null)
             eventHubsSource.ehClient = new SimulatedEventHubsRestClient(eventHubs)
             eventHubsSource.receiverFactory = (eventHubsParameters: Map[String, String]) =>
               new TestEventHubsClient(eventHubsParameters, eventHubs, null)
@@ -620,7 +610,7 @@ trait EventHubsStreamTest
             }.head
             val sourceIndex = findSourceIndex(currentStream.logicalPlan, sources)
             partialAwaiting.put(sourceIndex.get, expectedOffset)
-          case a: EventHubsAddData =>
+          case a: AddDataToEventHubs[_, _] =>
             try {
               // Add data and get the source where it was added, and the expected offset of the
               // added data.

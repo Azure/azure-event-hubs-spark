@@ -17,6 +17,7 @@
 
 package org.apache.spark.eventhubs.common.client
 
+import java.net.URI
 import java.time.{ Duration, Instant }
 
 import scala.collection.JavaConverters._
@@ -24,6 +25,8 @@ import EventHubsOffsetTypes.EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.internal.Logging
+
+import scala.util.{ Failure, Success, Try }
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -42,12 +45,19 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
   private val ehName = ehParams("eventhubs.name").toString
   private val ehPolicyName = ehParams("eventhubs.policyname").toString
   private val ehPolicy = ehParams("eventhubs.policykey").toString
-  private val consumerGroup = ehParams
-    .getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
-    .toString
+  private val consumerGroup =
+    ehParams.getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
   private val connectionString =
-    new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
-  client = EventHubClient.createFromConnectionStringSync(connectionString)
+    Try {
+      new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
+    } getOrElse Try {
+      new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
+    }
+
+  client = connectionString match {
+    case Success(str) => EventHubClient.createFromConnectionStringSync(str.toString)
+    case Failure(e)   => throw e
+  }
 
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,

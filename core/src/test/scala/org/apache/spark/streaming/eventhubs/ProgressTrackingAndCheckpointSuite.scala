@@ -93,7 +93,7 @@ class ProgressTrackingAndCheckpointSuite
     assert(eventHubDirectDStream.ehClients != null)
   }
 
-  test("test integration of spark checkpoint and progress tracking (single stream)") {
+  ignore("test integration of spark checkpoint and progress tracking (single stream)") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
                     Seq(4, 5, 6, 7, 8, 9, 10, 1, 2, 3),
                     Seq(7, 8, 9, 1, 2, 3, 4, 5, 6, 7))
@@ -131,7 +131,7 @@ class ProgressTrackingAndCheckpointSuite
     )
   }
 
-  test("test integration of spark checkpoint and progress tracking (reduceByKeyAndWindow)") {
+  ignore("test integration of spark checkpoint and progress tracking (reduceByKeyAndWindow)") {
     val input = Seq(Seq("1", "2", "3", "4", "5", "6", "7", "8", "9", "10"),
                     Seq("4", "5", "6", "7", "8", "9", "10", "1", "2", "3"),
                     Seq("7", "8", "9", "1", "2", "3", "4", "5", "6", "7"))

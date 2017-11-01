@@ -88,7 +88,6 @@ class TestEventHubsClient(ehParams: Map[String, String],
           .getSystemProperties
           .getEnqueuedTime
           .toEpochMilli)
-
     }
   }
 }

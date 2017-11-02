@@ -22,7 +22,7 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 |-------------|------------|----------------|
 |Spark 2.1|spark_streaming-eventhubs_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11)|
 |Spark 2.0|spark-streaming-eventhubs_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.9.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11)|
-|Spark 1.6|sparking-streaming-eventhubs_2.10|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10)
+|Spark 1.6|spark-streaming-eventhubs_2.10|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10)
 
 [Change Log](docs/change_log.md)
 

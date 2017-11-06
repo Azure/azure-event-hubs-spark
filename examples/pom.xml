@@ -22,11 +22,11 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.microsoft.azure</groupId>
-    <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <artifactId>azure-eventhubs-databricks-parent_2.11</artifactId>
+    <version>3.3.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
-  <artifactId>spark-streaming-eventhubs_examples_2.11</artifactId>
+  <artifactId>azure-eventhubs-databricks-examples_2.11</artifactId>
   <packaging>jar</packaging>
   <dependencies>
     <dependency>

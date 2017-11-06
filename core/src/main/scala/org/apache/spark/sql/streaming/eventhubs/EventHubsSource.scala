@@ -23,12 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
-import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, RateControlUtils }
+import org.apache.spark.eventhubs.common.{ EventHubsConnector, NameAndPartition, RateControlUtils }
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset, Source }
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{ DataFrame, Row, SQLContext }
+import org.apache.spark.sql.{ DataFrame, SQLContext }
 
 import scala.collection.mutable
 import scala.concurrent.{ ExecutionContext, Future }
@@ -252,7 +253,7 @@ private[spark] class EventHubsSource private[eventhubs] (
       EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(eventHubsParams)
     val rowRDD = eventHubsRDD.map(
       eventData =>
-        Row.fromSeq(Seq(
+        InternalRow.fromSeq(Seq(
           eventData.getBytes,
           eventData.getSystemProperties.getOffset.toLong,
           eventData.getSystemProperties.getSequenceNumber,
@@ -275,7 +276,7 @@ private[spark] class EventHubsSource private[eventhubs] (
             Seq()
           }
         }))
-    sqlContext.createDataFrame(rowRDD, schema)
+    sqlContext.sparkSession.internalCreateDataFrame(rowRDD, schema, isStreaming = true)
   }
 
   private def readProgress(batchId: Long): EventHubsOffset = {

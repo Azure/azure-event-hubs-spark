@@ -52,12 +52,8 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
       new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
     } getOrElse Try {
       new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
-    }
-
-  client = connectionString match {
-    case Success(str) => EventHubClient.createFromConnectionStringSync(str.toString)
-    case Failure(e)   => throw e
-  }
+    }.get
+  client = EventHubClient.createFromConnectionStringSync(connectionString)
 
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,

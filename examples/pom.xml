@@ -31,7 +31,7 @@
   <dependencies>
     <dependency>
       <groupId>com.microsoft.azure</groupId>
-      <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+      <artifactId>azure-eventhubs-databricks_2.11</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>

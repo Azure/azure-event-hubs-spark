@@ -25,8 +25,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
-  <version>${this.version}</version>
+  <artifactId>azure-eventhubs-databricks-parent_2.11</artifactId>
+  <version>3.3.0</version>
   <packaging>pom</packaging>
 
   <name>${project.groupId}:${project.artifactId}</name>
@@ -49,8 +49,7 @@
   </developers>
 
   <properties>
-    <this.version>2.3.0-SNAPSHOT</this.version>
-    <sbt.project.name>spark-streaming-eventhubs_connector</sbt.project.name>
+    <sbt.project.name>azure-eventhubs-databricks-parent</sbt.project.name>
     <scala.binary.version>2.11</scala.binary.version>
     <spark.version>2.3.0-SNAPSHOT</spark.version>
     <github.global.server>github</github.global.server>

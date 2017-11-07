@@ -6,10 +6,10 @@
 
 |Branch|Status|
 |------|-------------|
-|master|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=master)](https://travis-ci.org/Azure/spark-eventhubs)|
-|dev|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=dev)](https://travis-ci.org/Azure/spark-eventhubs)|
-|2.1.x|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=2.1.x)](https://travis-ci.org/Azure/spark-eventhubs)|
-|2.0.x|[![Build Status](https://travis-ci.org/Azure/spark-eventhubs.svg?branch=2.0.x)](https://travis-ci.org/Azure/spark-eventhubs)|
+|master|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
+|spark-2.1|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.1)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
+|spark-2.0|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.0)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
+|databricks-3.3|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=databricks-3.3)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 
 This is the source code for the Azure Event Hubs and Apache Spark Connector. 
 
@@ -21,7 +21,7 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Spark
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
-|Spark 2.1|spark_streaming-eventhubs_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11)|
+|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11)|
 |Spark 2.0|spark-streaming-eventhubs_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.9.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11)|
 |Spark 1.6|spark-streaming-eventhubs_2.10|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10)
 
@@ -47,7 +47,7 @@ This library is available for use in Maven projects from the Maven Central Repos
 ```XML
     <dependency>
         <groupId>com.microsoft.azure</groupId>
-        <artifactId>spark-streaming-eventhubs_[2.XX]</artifactId>
+        <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
         <version>[LATEST]</version>
     </dependency>
 	
@@ -56,16 +56,16 @@ This library is available for use in Maven projects from the Maven Central Repos
 ```
 
 #### SBT Dependency
-    // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_[2.XX]" % "[LATEST]"
+    // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
+    libraryDependencies += "com.microsoft.azure" % "azure-eventhubs-spark_[2.XX]" % "[LATEST]"
 
 ### Getting the Staging Version
-We also publish a staging version of the Spark-EventHubs connector in GitHub. To use the staging version of Spark-EventHubs, two things needed to be added to your pom.xml. First add a new repository like so:
+We also publish a staging version of the Azure EventHubs + Apache Spark connector in GitHub. To use the staging version, two things needed to be added to your pom.xml. First add a new repository like so:
 
 ```XML
 	<repository>
-		<id>spark-eventhubs</id>
-		<url>https://raw.github.com/Azure/spark-eventhubs/maven-repo/</url>
+		<id>azure-event-hubs-spark</id>
+		<url>https://raw.github.com/Azure/azure-event-hubs-spark/maven-repo/</url>
 		<snapshots>
 			<enabled>true</enabled>
 			<updatePolicy>always</updatePolicy>
@@ -78,14 +78,14 @@ Then add the following dependency declaration:
 ```XML
     <dependency>
         <groupId>com.microsoft.azure</groupId>
-        <artifactId>spark-streaming-eventhubs_[2.XX]</artifactId>
+        <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
         <version>2.1.6-SNAPSHOT</version>
     </dependency>
 ```
 
 #### SBT Dependency
-    // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.1.6-SNAPSHOT"
+    // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
+    libraryDependencies += "com.microsoft.azure" % "azure-eventhubs-spark_2.11" % "2.1.6-SNAPSHOT"
 
 ## Build Prerequisites
 
@@ -100,4 +100,4 @@ More details on building from source and running tests can be found in our [Cont
 ## Build Command
     mvn clean
     mvn install 
-This command builds and installs spark-streaming-eventhubs jar to your local maven cache. Subsequently, you can build any Spark Streaming application that references this jar.
+This command builds and installs the azure-eventhubs-spark jar to your local maven cache. Subsequently, you can build any Spark Streaming application that references this jar.

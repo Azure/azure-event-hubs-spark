@@ -15,19 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.progress
+package org.apache.spark.eventhubs.common.progress
 
 import java.io.IOException
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FSDataOutputStream, Path }
-
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 import org.apache.spark.internal.Logging
 
 private[spark] class ProgressWriter(streamId: Int,
                                     uid: String,
-                                    eventHubNameAndPartition: EventHubNameAndPartition,
+                                    eventHubNameAndPartition: NameAndPartition,
                                     timestamp: Long,
                                     hadoopConfiguration: Configuration,
                                     progressDir: String,
@@ -53,7 +52,7 @@ private[spark] class ProgressWriter(streamId: Int,
       cpFileStream = fs.create(tempProgressTrackingPointPath, true)
       val record = ProgressRecord(recordTime,
                                   uid,
-                                  eventHubNameAndPartition.eventHubName,
+                                  eventHubNameAndPartition.ehName,
                                   eventHubNameAndPartition.partitionId,
                                   cpOffset,
                                   cpSeq)

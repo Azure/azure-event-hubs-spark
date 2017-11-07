@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubs.common
 
 /**
  * interface representing the bridge between EventHubs and Spark-side processing engine
@@ -31,5 +31,5 @@ private[spark] trait EventHubsConnector {
   def uid: String
 
   // the list of eventhubs partitions connecting with this connector
-  def connectedInstances: List[EventHubNameAndPartition]
+  def namesAndPartitions: List[NameAndPartition]
 }

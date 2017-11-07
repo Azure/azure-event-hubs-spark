@@ -15,49 +15,42 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.rdd
+package org.apache.spark.eventhubs.common.rdd
 
 import scala.collection.mutable.ListBuffer
-
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.hadoop.conf.Configuration
-
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.eventhubscommon.client.EventHubsClientWrapper
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.progress.ProgressWriter
+import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.progress.ProgressWriter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
 private class EventHubRDDPartition(val sparkPartitionId: Int,
-                                   val eventHubNameAndPartitionID: EventHubNameAndPartition,
+                                   val nameAndPartition: NameAndPartition,
                                    val fromOffset: Long,
                                    val fromSeq: Long,
                                    val untilSeq: Long,
                                    val offsetType: EventHubsOffsetType)
     extends Partition {
-
   override def index: Int = sparkPartitionId
 }
 
 private[spark] class EventHubsRDD(sc: SparkContext,
-                                  eventHubsParamsMap: Map[String, Map[String, String]],
+                                  ehParams: Map[String, Map[String, String]],
                                   val offsetRanges: List[OffsetRange],
                                   batchTime: Long,
-                                  offsetParams: OffsetStoreParams,
-                                  eventHubReceiverCreator: (Map[String, String],
-                                                            Int,
-                                                            Long,
-                                                            EventHubsOffsetType,
-                                                            Int) => EventHubsClientWrapper)
+                                  offsetParams: ProgressTrackerParams,
+                                  receiverFactory: (Map[String, String]) => Client)
     extends RDD[EventData](sc, Nil) {
 
   override def getPartitions: Array[Partition] = {
     offsetRanges.zipWithIndex.map {
       case (offsetRange, index) =>
         new EventHubRDDPartition(index,
-                                 offsetRange.eventHubNameAndPartition,
+                                 offsetRange.nameAndPartition,
                                  offsetRange.fromOffset,
                                  offsetRange.fromSeq,
                                  offsetRange.untilSeq,
@@ -65,61 +58,34 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     }.toArray
   }
 
-  private def wrappingReceive(eventHubNameAndPartition: EventHubNameAndPartition,
-                              eventHubClient: EventHubsClientWrapper,
-                              expectedEventNumber: Int,
-                              expectedHighestSeqNum: Long): List[EventData] = {
+  private def wrappingReceive(nameAndPartition: NameAndPartition,
+                              client: Client,
+                              expectedEvents: Int,
+                              untilSeqNo: Long): List[EventData] = {
     val receivedBuffer = new ListBuffer[EventData]
-    val receivingTrace = new ListBuffer[Long]
-    var cnt = 0
-    while (receivedBuffer.size < expectedEventNumber) {
-      if (cnt > expectedEventNumber * 2) {
-        throw new Exception(
-          s"$eventHubNameAndPartition cannot return data, the trace is" +
-            s" ${receivingTrace.toList}")
-      }
-      val receivedEventsItr = eventHubClient.receive(expectedEventNumber - receivedBuffer.size)
-      if (receivedEventsItr == null) {
-        // no more messages
-        return receivedBuffer.toList
-      }
-      val receivedEvents = receivedEventsItr.toList
-      receivingTrace += receivedEvents.length
-      cnt += 1
+    while (receivedBuffer.size < expectedEvents) {
+      val receivedEvents = client.receive(expectedEvents - receivedBuffer.size)
+      if (receivedEvents == null) return receivedBuffer.toList // no more messages
       receivedBuffer ++= receivedEvents
       if (receivedBuffer.nonEmpty &&
-          receivedBuffer.last.getSystemProperties.getSequenceNumber >= expectedHighestSeqNum) {
-        // this is for the case where user has passed in filtering params and the remaining
-        // msg number is less than expectedEventNumber
+          receivedBuffer.last.getSystemProperties.getSequenceNumber >= untilSeqNo) {
+        // TODO: What is untilSeqNo set to on first batch when Enqueue Time is used?
         return receivedBuffer.toList
       }
     }
     receivedBuffer.toList
   }
 
-  private def processFullyConsumedPartition(ehRDDPartition: EventHubRDDPartition,
-                                            progressWriter: ProgressWriter): Iterator[EventData] = {
-    logInfo(s"No new data in ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
-    val fromOffset = ehRDDPartition.fromOffset
-    progressWriter.write(batchTime, ehRDDPartition.fromOffset, ehRDDPartition.fromSeq)
-    logInfo(
-      s"write offset $fromOffset, sequence number" +
-        s" ${ehRDDPartition.fromSeq} for EventHub" +
-        s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
-    Iterator()
-  }
-
   private def extractOffsetAndSeqToWrite(receivedEvents: List[EventData],
-                                         eventHubReceiver: EventHubsClientWrapper,
+                                         ehReceiver: Client,
                                          ehRDDPartition: EventHubRDDPartition): (Long, Long) = {
     if (receivedEvents.nonEmpty) {
       val lastEvent = receivedEvents.last
       (lastEvent.getSystemProperties.getOffset.toLong,
        lastEvent.getSystemProperties.getSequenceNumber)
     } else {
-      val partitionInfo = eventHubReceiver.eventhubsClient
-        .getPartitionRuntimeInformation(
-          ehRDDPartition.eventHubNameAndPartitionID.partitionId.toString)
+      val partitionInfo = ehReceiver.client
+        .getPartitionRuntimeInformation(ehRDDPartition.nameAndPartition.partitionId.toString)
         .get()
       (partitionInfo.getLastEnqueuedOffset.toLong, partitionInfo.getLastEnqueuedSequenceNumber)
     }
@@ -130,25 +96,21 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     val fromOffset = ehRDDPartition.fromOffset
     val fromSeq = ehRDDPartition.fromSeq
     val untilSeq = ehRDDPartition.untilSeq
-    val maxRate = (untilSeq - fromSeq).toInt
+    val expectedEvents = (untilSeq - fromSeq).toInt
     val startTime = System.currentTimeMillis()
     logInfo(
-      s"${ehRDDPartition.eventHubNameAndPartitionID}" +
-        s" expected rate $maxRate, fromSeq $fromSeq (exclusive) untilSeq" +
-        s" $untilSeq (inclusive) at $batchTime")
-    var eventHubReceiver: EventHubsClientWrapper = null
+      s"${ehRDDPartition.nameAndPartition}: " +
+        s"Expected Rate $expectedEvents, (fromSeq $fromSeq, untilSeq $untilSeq] at $batchTime")
+
+    val params = ehParams(ehRDDPartition.nameAndPartition.ehName)
+    val eventHubReceiver = receiverFactory(params)
+    eventHubReceiver.initReceiver(ehRDDPartition.nameAndPartition.partitionId.toString,
+                                  ehRDDPartition.offsetType,
+                                  fromOffset.toString)
     try {
-      val eventHubParameters = eventHubsParamsMap(
-        ehRDDPartition.eventHubNameAndPartitionID.eventHubName)
-      eventHubReceiver = eventHubReceiverCreator(
-        eventHubParameters,
-        ehRDDPartition.eventHubNameAndPartitionID.partitionId,
-        fromOffset,
-        ehRDDPartition.offsetType,
-        maxRate)
-      val receivedEvents = wrappingReceive(ehRDDPartition.eventHubNameAndPartitionID,
+      val receivedEvents = wrappingReceive(ehRDDPartition.nameAndPartition,
                                            eventHubReceiver,
-                                           maxRate,
+                                           expectedEvents,
                                            ehRDDPartition.untilSeq)
       logInfo(
         s"received ${receivedEvents.length} messages before Event Hubs server indicates" +
@@ -159,16 +121,12 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       progressWriter.write(batchTime, offsetToWrite, seqToWrite)
       logInfo(
         s"write offset $offsetToWrite, sequence number $seqToWrite for EventHub" +
-          s" ${ehRDDPartition.eventHubNameAndPartitionID} at $batchTime")
+          s" ${ehRDDPartition.nameAndPartition} at $batchTime")
       receivedEvents.iterator
     } catch {
-      case e: Exception =>
-        e.printStackTrace()
-        throw e
+      case e: Exception => throw e
     } finally {
-      if (eventHubReceiver != null) {
-        eventHubReceiver.close()
-      }
+      if (eventHubReceiver != null) eventHubReceiver.close()
     }
   }
 
@@ -178,14 +136,18 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     val progressWriter = new ProgressWriter(
       offsetParams.streamId,
       offsetParams.uid,
-      ehRDDPartition.eventHubNameAndPartitionID,
+      ehRDDPartition.nameAndPartition,
       batchTime,
       new Configuration(),
       offsetParams.checkpointDir,
       offsetParams.subDirs: _*
     )
     if (ehRDDPartition.fromSeq >= ehRDDPartition.untilSeq) {
-      processFullyConsumedPartition(ehRDDPartition, progressWriter)
+      logInfo(s"No new data in ${ehRDDPartition.nameAndPartition} at $batchTime")
+      progressWriter.write(batchTime, ehRDDPartition.fromOffset, ehRDDPartition.fromSeq)
+      logInfo(s"write offset ${ehRDDPartition.fromOffset}, sequence number" +
+        s" ${ehRDDPartition.fromSeq} for EventHub ${ehRDDPartition.nameAndPartition} at $batchTime")
+      Iterator()
     } else {
       retrieveDataFromPartition(ehRDDPartition, progressWriter)
     }

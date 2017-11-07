@@ -21,11 +21,11 @@ import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
+import org.apache.spark.eventhubs.common.EventHubsConnector
 import org.scalatest.{ BeforeAndAfterEach, FunSuite }
-
 import org.apache.spark.{ SparkConf, SparkContext }
-import org.apache.spark.eventhubscommon.EventHubsConnector
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
+import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.common.progress.ProgressTrackerBase
 import org.apache.spark.streaming.{ Duration, Seconds, StreamingContext }
 import org.apache.spark.streaming.eventhubs.checkpoint.{
   DirectDStreamProgressTracker,
@@ -86,10 +86,8 @@ private[spark] trait SharedUtils extends FunSuite with BeforeAndAfterEach {
 
   protected def createDirectStreams(
       ssc: StreamingContext,
-      eventHubNamespace: String,
       progressDir: String,
       eventParams: Predef.Map[String, Predef.Map[String, String]]): EventHubDirectDStream = {
-    val newStream = new EventHubDirectDStream(ssc, eventHubNamespace, progressDir, eventParams)
-    newStream
+    new EventHubDirectDStream(ssc, progressDir, eventParams, EventHubsClientWrapper.apply)
   }
 }

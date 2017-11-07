@@ -18,13 +18,17 @@ Azure Event Hubs is a highly scalable publish-subscribe service that can ingest 
 By making Event Hubs and Spark easier to use together, we hope this connector makes building scalable, fault-tolerant applications easier for our users. 
 
 ## Latest Releases
+#### Spark
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
 |Spark 2.1|spark_streaming-eventhubs_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11)|
 |Spark 2.0|spark-streaming-eventhubs_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/spark-streaming-eventhubs_2.11/2.0.9.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.11)|
-|Spark 1.6|sparking-streaming-eventhubs_2.10|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10)
+|Spark 1.6|spark-streaming-eventhubs_2.10|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/spark-streaming-eventhubs_2.10)
 
-[Change Log](docs/change_log.md)
+#### Databricks
+|Databricks Runtime Version|Package Name|Package Version|
+|-------------|------------|----------------|
+|Databricks Runtime 3.3|azure-eventhubs-databricks_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
 
 ## Overview
 The best place to start when using this library is to **make sure you're acquainted with Azure Event Hubs and Apache Spark**. You can read Azure Event Hubs documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, last but not least, Structured Streaming [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 
@@ -75,13 +79,13 @@ Then add the following dependency declaration:
     <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>spark-streaming-eventhubs_[2.XX]</artifactId>
-        <version>2.1.5-SNAPSHOT</version>
+        <version>2.1.6-SNAPSHOT</version>
     </dependency>
 ```
 
 #### SBT Dependency
     // https://mvnrepository.com/artifact/com.microsoft.azure/spark-streaming-eventhubs_2.11
-    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.1.5-SNAPSHOT"
+    libraryDependencies += "com.microsoft.azure" % "spark-streaming-eventhubs_2.11" % "2.1.6-SNAPSHOT"
 
 ## Build Prerequisites
 

@@ -19,13 +19,12 @@ package org.apache.spark.streaming.eventhubs.checkpoint
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.spark.eventhubscommon.progress.ProgressWriter
-import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.progress.ProgressWriter
 import org.apache.spark.streaming.eventhubs.SharedUtils
 import org.apache.spark.streaming.scheduler.OutputOperationInfo
 import org.apache.spark.streaming.{ Seconds, StreamingContext }
 import org.apache.spark.{ SparkConf, SparkContext }
-
 import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.scheduler.{
   BatchInfo,
@@ -35,7 +34,7 @@ import org.apache.spark.streaming.scheduler.{
 
 class ProgressTrackingListenerSuite extends SharedUtils {
 
-  test("commit offsets with a successful micro batch correctly") {
+  test("commit offsetsAndSeqNos with a successful micro batch correctly") {
     val batchCompletedEvent = StreamingListenerBatchCompleted(
       BatchInfo(
         Time(1000L),
@@ -45,14 +44,14 @@ class ProgressTrackingListenerSuite extends SharedUtils {
         None,
         Map(1 -> OutputOperationInfo(Time(1000L), 1, "output", "", None, None, None))
       ))
-    val dstream = createDirectStreams(ssc,
-                                      eventhubNamespace,
-                                      progressRootPath.toString,
-                                      Map("eh1" -> Map("eventhubs.partition.count" -> "2")))
+    val dstream = createDirectStreams(
+      ssc,
+      progressRootPath.toString,
+      Map("eh1" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "eventhubs")))
     dstream.start()
     val progressWriter = new ProgressWriter(streamId,
                                             eventhubNamespace,
-                                            EventHubNameAndPartition("eh1", 1),
+                                            NameAndPartition("eh1", 1),
                                             1000L,
                                             new Configuration(),
                                             progressRootPath.toString,
@@ -67,11 +66,11 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       .read(eventhubNamespace, 1000L, fallBack = false)
     assert(
       record === OffsetRecord(1000L,
-                              Map(EventHubNameAndPartition("eh1", 0) -> (-1L, -1L),
-                                  EventHubNameAndPartition("eh1", 1) -> (1L, 2L))))
+                              Map(NameAndPartition("eh1", 0) -> (-1L, -1L),
+                                  NameAndPartition("eh1", 1) -> (1L, 2L))))
   }
 
-  test("do not commit offsets when there is a failure in microbatch") {
+  test("do not commit offsetsAndSeqNos when there is a failure in microbatch") {
     val batchCompletedEvent = StreamingListenerBatchCompleted(
       BatchInfo(
         Time(1000L),
@@ -93,7 +92,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
     // build temp directories
     val progressWriter = new ProgressWriter(streamId,
                                             eventhubNamespace,
-                                            EventHubNameAndPartition("eh1", 1),
+                                            NameAndPartition("eh1", 1),
                                             1000L,
                                             new Configuration(),
                                             progressTracker.tempDirectoryPath.toString,
@@ -115,19 +114,21 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       Seconds(5))
     createDirectStreams(
       ssc,
-      "namespace1",
       progressRootPath.toString,
-      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3"))
+      Map(
+        "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
+      )
     ).start()
     createDirectStreams(
       ssc,
-      "namespace2",
       progressRootPath.toString,
-      Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-          "eh12" -> Map("eventhubs.partition.count" -> "2"),
-          "eh13" -> Map("eventhubs.partition.count" -> "3"))
+      Map(
+        "eh11" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace2"),
+        "eh12" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace2"),
+        "eh13" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace2")
+      )
     ).start()
     import scala.collection.JavaConverters._
     assert(

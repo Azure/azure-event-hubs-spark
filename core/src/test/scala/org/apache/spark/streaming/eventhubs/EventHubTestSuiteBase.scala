@@ -20,11 +20,15 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{ IOException, ObjectInputStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import scala.reflect.ClassTag
+import org.apache.spark.eventhubs.common.{ NameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.utils.{
+  EventHubsTestUtilities,
+  FluctuatedEventHubClient,
+  SimulatedEventHubs,
+  TestEventHubsClient
+}
 
-import org.apache.spark.eventhubscommon.{ EventHubNameAndPartition, OffsetRecord }
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.utils._
+import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.{ DStream, ForEachDStream }
@@ -38,7 +42,7 @@ private[eventhubs] class TestEventHubOutputStream[T: ClassTag](
     extends ForEachDStream[T](
       parent, { (rdd: RDD[T], t: Time) =>
         val rddOpToApply =
-          rddOperation.getOrElse((rdd: RDD[T], t: Time) => rdd.glom().collect().map(_.toSeq))
+          rddOperation.getOrElse((rdd: RDD[T], _: Time) => rdd.glom().collect().map(_.toSeq))
         val resultsInABatch = rddOpToApply(rdd, t)
         output.add(resultsInABatch)
       },
@@ -99,59 +103,6 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     ssc
   }
 
-  private def setupFragileInputStream(
-      namespace: String,
-      simulatedEventHubs: SimulatedEventHubs,
-      eventhubsParams: Map[String, Map[String, String]]): EventHubDirectDStream = {
-
-    new EventHubDirectDStream(
-      ssc,
-      namespace,
-      progressRootPath.toString,
-      eventhubsParams,
-      (eventHubParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubParams,
-                                  simulatedEventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
-      (_: String, _: Map[String, Map[String, String]]) =>
-        FragileEventHubClient.getInstance("", Map())
-    )
-  }
-
-  private def setupFragileEventHubStream[V: ClassTag](
-      simulatedEventHubs: SimulatedEventHubs,
-      eventhubsParams: Map[String, Map[String, String]],
-      operation: EventHubDirectDStream => DStream[V]): StreamingContext = {
-
-    val inputStream =
-      setupFragileInputStream(eventhubNamespace, simulatedEventHubs, eventhubsParams)
-    val operatedStream = operation(inputStream)
-    val outputStream =
-      new TestEventHubOutputStream(operatedStream, new ConcurrentLinkedQueue[Seq[Seq[V]]], None)
-    outputStream.register()
-    ssc
-  }
-
-  def testFragileStream[U: ClassTag, V: ClassTag](input: Seq[Seq[U]],
-                                                  eventhubsParams: Map[String, Map[String, String]],
-                                                  expectedOffsetsAndSeqs: Map[String, OffsetRecord],
-                                                  operation: EventHubDirectDStream => DStream[V],
-                                                  expectedOutput: Seq[Seq[V]]) {
-    val numBatches_ = expectedOutput.size
-    val simulatedEventHubs = createSimulatedEventHub(eventhubNamespace, input, eventhubsParams)
-    withStreamingContext(setupFragileEventHubStream(simulatedEventHubs, eventhubsParams, operation)) {
-      ssc =>
-        runStreamsWithEventHubInput(ssc, numBatches_, expectedOutput, useSet = false)
-    }
-    verifyOffsetsAndSeqs(ssc, eventhubNamespace, expectedOffsetsAndSeqs)
-  }
-
   def setupEventHubInputStream(
       namespace: String,
       simulatedEventHubs: SimulatedEventHubs,
@@ -162,21 +113,10 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
 
     new EventHubDirectDStream(
       ssc,
-      namespace,
       progressRootPath.toString,
       eventhubsParams,
-      (eventHubParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubParams,
-                                  simulatedEventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
-      (_: String, _: Map[String, Map[String, String]]) =>
-        new TestRestEventHubClient(maxOffsetForEachEventHub)
+      (ehParams: Map[String, String]) =>
+        new TestEventHubsClient(ehParams, simulatedEventHubs, maxOffsetForEachEventHub)
     )
   }
 
@@ -223,7 +163,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       val clock = ssc.scheduler.clock.asInstanceOf[ManualClock]
       logInfo("Manual clock before advancing = " + clock.getTimeMillis())
       if (actuallyWait) {
-        for (i <- 1 to numBatches) {
+        for (_ <- 1 to numBatches) {
           logInfo("Actually waiting for " + batchDuration)
           clock.advance(batchDuration.milliseconds)
           Thread.sleep(batchDuration.milliseconds)
@@ -260,7 +200,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     val ehAndRawInputMap = eventhubsParams.keys.flatMap { eventHubName =>
       val ehList = {
         for (i <- 0 until eventhubsParams(eventHubName)("eventhubs.partition.count").toInt)
-          yield EventHubNameAndPartition(eventHubName, i)
+          yield NameAndPartition(eventHubName, i)
       }.toArray
       ehList.zip(input)
     }.toMap
@@ -284,9 +224,8 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
       .getInputStreams()
       .filter(_.isInstanceOf[EventHubDirectDStream])
       .map(_.asInstanceOf[EventHubDirectDStream])
-      .filter(_.eventHubNameSpace == namespace)
-      .map(eventHubStream =>
-        (eventHubStream.eventHubNameSpace, eventHubStream.currentOffsetsAndSeqNums))
+      .filter(_.ehNamespace == namespace)
+      .map(eventHubStream => (eventHubStream.ehNamespace, eventHubStream.currentOffsetsAndSeqNos))
       .toMap
     assert(expectedOffsetsAndSeqs === producedOffsetsAndSeqs)
   }
@@ -351,21 +290,12 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     }
     new EventHubDirectDStream(
       ssc,
-      namespace,
       progressRootPath.toString,
       eventhubsParams,
-      (eventHubParams: Map[String, String],
-       partitionId: Int,
-       startOffset: Long,
-       eventHubsOffsetType: EventHubsOffsetType,
-       _: Int) =>
-        new TestEventHubsReceiver(eventHubParams,
-                                  simulatedEventHubs,
-                                  partitionId,
-                                  startOffset,
-                                  eventHubsOffsetType),
-      (_: String, _: Map[String, Map[String, String]]) =>
-        new FluctuatedEventHubClient(ssc,
+      (ehParams: Map[String, String]) =>
+        new FluctuatedEventHubClient(ehParams,
+                                     simulatedEventHubs,
+                                     ssc,
                                      messagesBeforeEmpty,
                                      numBatchesBeforeNewData,
                                      maxOffsetForEachEventHub)

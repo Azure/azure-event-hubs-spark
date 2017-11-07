@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.rdd
+package org.apache.spark.eventhubs.common.client
 
-// a helper object to avoid serialzing offsetstore instances
-private[spark] case class OffsetStoreParams(checkpointDir: String,
-                                            streamId: Int,
-                                            uid: String,
-                                            subDirs: String*)
+private[spark] object EventHubsOffsetTypes extends Enumeration {
+  type EventHubsOffsetType = Value
+
+  val None, PreviousCheckpoint, Offset, EnqueueTime = Value
+}

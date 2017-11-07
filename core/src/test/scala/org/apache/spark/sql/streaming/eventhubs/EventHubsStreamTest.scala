@@ -25,7 +25,6 @@ import scala.language.experimental.macros
 import scala.reflect.ClassTag
 import scala.util.Random
 import scala.util.control.NonFatal
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
 import org.scalatest.{ Assertions, BeforeAndAfter }
@@ -35,14 +34,12 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.time.Span
 import org.scalatest.time.SpanSugar._
-
 import org.apache.spark.DebugFilesystem
-import org.apache.spark.eventhubscommon.EventHubsConnector
-import org.apache.spark.eventhubscommon.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubscommon.progress.ProgressTrackerBase
-import org.apache.spark.eventhubscommon.utils._
+import org.apache.spark.eventhubs.common.EventHubsConnector
+import org.apache.spark.eventhubs.common.progress.ProgressTrackerBase
+import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.{ Dataset, Encoder, QueryTest, Row }
-import org.apache.spark.sql.catalyst.encoders.{ encoderFor, ExpressionEncoder, RowEncoder }
+import org.apache.spark.sql.catalyst.encoders.{ ExpressionEncoder, RowEncoder, encoderFor }
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util._
 import org.apache.spark.sql.execution.streaming._
@@ -97,7 +94,7 @@ trait EventHubsStreamTest
   }
 
   /** How long to wait for an active stream to catch up when checking a result. */
-  val streamingTimeout = 60 seconds
+  protected val streamingTimeout = 60 seconds
 
   /** A trait for actions that can be performed while testing a streaming DataFrame. */
   // trait StreamAction
@@ -303,7 +300,7 @@ trait EventHubsStreamTest
     var lastStream: StreamExecution = null
     val awaiting = new mutable.HashMap[Int, Offset]() // source index -> offset to wait for
     val partialAwaiting = new mutable.HashMap[Int, Offset]()
-    var sink = new MemorySink(stream.schema, outputMode)
+    var sink = new CustomizedMemorySink(stream.schema, outputMode)
     val resetConfValues = mutable.Map[String, Option[String]]()
 
     @volatile
@@ -468,30 +465,20 @@ trait EventHubsStreamTest
             })
 
             lastStream = currentStream
-            val createQueryMethod = sparkSession.streams.getClass.getDeclaredMethods
-              .filter(m => m.getName == "createQuery")
-              .head
-            createQueryMethod.setAccessible(true)
-            val checkpointLocation =
-              additionalConfs.getOrElse[String]("eventhubs.test.checkpointLocation", metadataRoot)
-            if (additionalConfs.contains("eventhubs.test.newSink") &&
-                additionalConfs("eventhubs.test.newSink").toBoolean) {
-              sink = new MemorySink(stream.schema, outputMode)
+            if (additionalConfs.getOrElse("eventhubs.test.newSink", "false").toBoolean) {
+              sink = new CustomizedMemorySink(stream.schema, outputMode)
             }
-            currentStream = createQueryMethod
-              .invoke(
-                sparkSession.streams,
-                None,
-                Some(checkpointLocation),
-                stream,
-                sink,
-                outputMode,
-                Boolean.box(false), // useTempCheckpointLocation
-                Boolean.box(true), // recoverFromCheckpointLocation
-                trigger,
-                triggerClock
-              )
-              .asInstanceOf[StreamExecution]
+
+            currentStream = sparkSession.streams
+              .startQuery(None,
+                          Some(metadataRoot),
+                          stream,
+                          sink,
+                          outputMode,
+                          trigger = trigger,
+                          triggerClock = triggerClock)
+              .asInstanceOf[StreamingQueryWrapper]
+              .streamingQuery
 
             triggerClock match {
               case smc: StreamManualClock =>
@@ -510,20 +497,10 @@ trait EventHubsStreamTest
             activeQueries += currentStream.id -> currentStream
 
             val eventHubsSource = searchCurrentSource()
-            val eventHubs = EventHubsTestUtilities.getOrSimulateEventHubs(null)
-            eventHubsSource.setEventHubClient(new SimulatedEventHubsRestClient(eventHubs))
-            eventHubsSource.setEventHubsReceiver(
-              (eventHubsParameters: Map[String, String],
-               partitionId: Int,
-               startOffset: Long,
-               offsetType: EventHubsOffsetType,
-               _: Int) =>
-                new TestEventHubsReceiver(eventHubsParameters,
-                                          eventHubs,
-                                          partitionId,
-                                          startOffset,
-                                          offsetType)
-            )
+            val eventHubs = EventHubsTestUtilities.getOrCreateSimulatedEventHubs(null)
+            eventHubsSource.ehClient = new SimulatedEventHubsRestClient(eventHubs)
+            eventHubsSource.receiverFactory = (eventHubsParameters: Map[String, String]) =>
+              new TestEventHubsClient(eventHubsParameters, eventHubs, null)
             currentStream.start()
 
           case AdvanceManualClock(timeToAdd) =>
@@ -633,7 +610,7 @@ trait EventHubsStreamTest
             }.head
             val sourceIndex = findSourceIndex(currentStream.logicalPlan, sources)
             partialAwaiting.put(sourceIndex.get, expectedOffset)
-          case a: EventHubsAddData =>
+          case a: AddDataToEventHubs[_, _] =>
             try {
               // Add data and get the source where it was added, and the expected offset of the
               // added data.
@@ -734,7 +711,7 @@ trait EventHubsStreamTest
   def runStressTest(ds: Dataset[Int],
                     addData: Seq[Int] => StreamAction,
                     iterations: Int = 100): Unit = {
-    runStressTest(ds, Seq.empty, (data, running) => addData(data), iterations)
+    runStressTest(ds, Seq.empty, (data, _) => addData(data), iterations)
   }
 
   /**
@@ -767,7 +744,7 @@ trait EventHubsStreamTest
       actions += addData(data, running)
     }
 
-    (1 to iterations).foreach { i =>
+    (1 to iterations).foreach { _ =>
       val rand = Random.nextDouble()
       if (!running) {
         rand match {

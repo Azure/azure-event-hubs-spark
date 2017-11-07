@@ -19,7 +19,7 @@ package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.EventHubsUtils
+import org.apache.spark.eventhubs.common.EventHubsUtils
 
 object MultiStreamsJoin {
 
@@ -56,13 +56,11 @@ object MultiStreamsJoin {
 
     val inputDirectStream1 = EventHubsUtils.createDirectStreams(
       ssc,
-      namespace1,
       progressDir,
       eventhubParameters(name1, namespace1, policyName1, policykey1))
 
     val inputDirectStream2 = EventHubsUtils.createDirectStreams(
       ssc,
-      namespace2,
       progressDir,
       eventhubParameters(name2, namespace2, policyName2, policykey2))
 

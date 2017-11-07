@@ -15,11 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon.progress
+package org.apache.spark.eventhubs.common.progress
 
 import org.apache.hadoop.fs.Path
-
-import org.apache.spark.eventhubscommon.EventHubNameAndPartition
+import org.apache.spark.eventhubs.common.NameAndPartition
 
 private[spark] object PathTools extends Serializable {
 
@@ -52,14 +51,14 @@ private[spark] object PathTools extends Serializable {
 
   def makeTempFileName(streamId: Int,
                        uid: String,
-                       eventHubNameAndPartition: EventHubNameAndPartition,
+                       eventHubNameAndPartition: NameAndPartition,
                        timestamp: Long): String =
     s"$streamId-$uid-$eventHubNameAndPartition-$timestamp"
 
   def makeTempFilePath(basePath: String,
                        streamId: Int,
                        uid: String,
-                       eventHubNameAndPartition: EventHubNameAndPartition,
+                       eventHubNameAndPartition: NameAndPartition,
                        timestamp: Long): Path =
     new Path(
       s"${combineDirectoryNames(basePath, makeTempFileName(streamId, uid, eventHubNameAndPartition, timestamp))}")

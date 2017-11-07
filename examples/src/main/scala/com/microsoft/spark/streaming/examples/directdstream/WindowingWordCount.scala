@@ -19,7 +19,7 @@ package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.EventHubsUtils
+import org.apache.spark.eventhubs.common.EventHubsUtils
 
 object WindowingWordCount {
 
@@ -34,7 +34,6 @@ object WindowingWordCount {
     ssc.checkpoint(sparkCheckpointDir)
     val inputDirectStream = EventHubsUtils.createDirectStreams(
       ssc,
-      namespace,
       progressDir,
       Map(eventHunName -> eventhubParams))
 

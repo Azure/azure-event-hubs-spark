@@ -18,7 +18,7 @@
 package org.apache.spark.streaming.eventhubs
 
 import org.apache.hadoop.fs.{ Path, PathFilter }
-import org.apache.spark.eventhubscommon.OffsetRecord
+import org.apache.spark.eventhubs.common.OffsetRecord
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
@@ -137,8 +137,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length - 1,
       expectedOutputBeforeRestart.length,
-      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsets).size +
-        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsets).size
+      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsetsAndSeqNos).size +
+        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsetsAndSeqNos).size
     )
 
     val currentCheckpointDir = ssc.checkpointDir
@@ -166,8 +166,8 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
-      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsets).size +
-        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsets).size
+      expectedStartingOffsetsAndSeqs1.values.flatMap(_.offsetsAndSeqNos).size +
+        expectedStartingOffsetsAndSeqs2.values.flatMap(_.offsetsAndSeqNos).size
     )
   }
 
@@ -192,7 +192,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
                                 expectedOutputBeforeRestart.length)
     validateTempFileCleanup(expectedOutputBeforeRestart.length - 1,
                             expectedOutputBeforeRestart.length,
-                            expectedOffsetsAndSeqs.offsets.size)
+                            expectedOffsetsAndSeqs.offsetsAndSeqNos.size)
 
     val currentCheckpointDir = ssc.checkpointDir
     // simulate down
@@ -245,7 +245,7 @@ trait CheckpointAndProgressTrackerTestSuiteBase extends EventHubTestSuiteBase { 
     validateTempFileCleanup(
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 2,
       expectedOutputBeforeRestart.length + expectedOutputAfterRestart.length - 1,
-      expectedOffsetsAndSeqs.offsets.size
+      expectedOffsetsAndSeqs.offsetsAndSeqNos.size
     )
   }
 }

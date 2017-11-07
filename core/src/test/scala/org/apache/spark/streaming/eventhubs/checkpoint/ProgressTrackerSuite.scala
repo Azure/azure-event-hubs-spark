@@ -21,25 +21,19 @@ import java.nio.file.{ Files, Paths, StandardOpenOption }
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
-import org.apache.spark.eventhubscommon.progress.{ PathTools, ProgressRecord, ProgressWriter }
-import org.apache.spark.eventhubscommon.{
-  EventHubNameAndPartition,
-  EventHubsConnector,
-  OffsetRecord
-}
+import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, OffsetRecord }
+import org.apache.spark.eventhubs.common.progress.{ PathTools, ProgressRecord, ProgressWriter }
 import org.apache.spark.streaming.eventhubs.SharedUtils
 
 class ProgressTrackerSuite extends SharedUtils {
 
-  class DummyEventHubsConnector(sId: Int,
-                                uniqueId: String,
-                                connedInstances: List[EventHubNameAndPartition])
+  class DummyEventHubsConnector(sId: Int, uniqueId: String, connedInstances: List[NameAndPartition])
       extends EventHubsConnector {
     override def streamId: Int = sId
 
     override def uid: String = uniqueId
 
-    override def connectedInstances: List[EventHubNameAndPartition] = connedInstances
+    override def namesAndPartitions: List[NameAndPartition] = connedInstances
   }
 
   override def beforeEach(): Unit = {
@@ -109,11 +103,12 @@ class ProgressTrackerSuite extends SharedUtils {
   test("incomplete progress would be discarded") {
     createDirectStreams(
       ssc,
-      "namespace1",
       progressRootPath.toString,
-      Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-          "eh2" -> Map("eventhubs.partition.count" -> "2"),
-          "eh3" -> Map("eventhubs.partition.count" -> "3"))
+      Map(
+        "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
+        "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
+        "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
+      )
     )
 
     val progressPath = PathTools.makeProgressDirectoryStr(progressRootPath.toString, appName)
@@ -156,7 +151,7 @@ class ProgressTrackerSuite extends SharedUtils {
     var expectedOffsetAndSeqIdx = 0
     for (partitionId <- partitionRange) {
       assert(
-        ehMap.offsets(EventHubNameAndPartition(ehName, partitionId)) ===
+        ehMap.offsetsAndSeqNos(NameAndPartition(ehName, partitionId)) ===
           expectedOffsetAndSeq(expectedOffsetAndSeqIdx))
       expectedOffsetAndSeqIdx += 1
     }
@@ -167,20 +162,22 @@ class ProgressTrackerSuite extends SharedUtils {
     val dStream =
       createDirectStreams(
         ssc,
-        "namespace1",
         progressRootPath.toString,
-        Map("eh1" -> Map("eventhubs.partition.count" -> "1"),
-            "eh2" -> Map("eventhubs.partition.count" -> "2"),
-            "eh3" -> Map("eventhubs.partition.count" -> "3"))
+        Map(
+          "eh1" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace1"),
+          "eh2" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace1"),
+          "eh3" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace1")
+        )
       )
     val dStream1 =
       createDirectStreams(
         ssc,
-        "namespace2",
         progressRootPath.toString,
-        Map("eh11" -> Map("eventhubs.partition.count" -> "1"),
-            "eh12" -> Map("eventhubs.partition.count" -> "2"),
-            "eh13" -> Map("eventhubs.partition.count" -> "3"))
+        Map(
+          "eh11" -> Map("eventhubs.partition.count" -> "1", "eventhubs.namespace" -> "namespace2"),
+          "eh12" -> Map("eventhubs.partition.count" -> "2", "eventhubs.namespace" -> "namespace2"),
+          "eh13" -> Map("eventhubs.partition.count" -> "3", "eventhubs.namespace" -> "namespace2")
+        )
       )
     dStream.start()
     dStream1.start()
@@ -252,8 +249,8 @@ class ProgressTrackerSuite extends SharedUtils {
     progressTracker = DirectDStreamProgressTracker
       .initInstance(progressRootPath.toString, appName, new Configuration())
 
-    val eh1Partition0 = EventHubNameAndPartition("eh1", 0)
-    val eh2Partition0 = EventHubNameAndPartition("eh2", 0)
+    val eh1Partition0 = NameAndPartition("eh1", 0)
+    val eh2Partition0 = NameAndPartition("eh2", 0)
     val connectedInstances = List(eh1Partition0, eh2Partition0)
     val connector1 = new DummyEventHubsConnector(0, "namespace1", connectedInstances)
     val connector2 = new DummyEventHubsConnector(0, "namespace2", connectedInstances)
@@ -296,18 +293,18 @@ class ProgressTrackerSuite extends SharedUtils {
 
     assert(s.contains("namespace1"))
     assert(s.contains("namespace2"))
-    assert(s("namespace1")(EventHubNameAndPartition("eh1", 0)) === (0, 1))
-    assert(s("namespace1")(EventHubNameAndPartition("eh2", 0)) === (0, 1))
-    assert(s("namespace2")(EventHubNameAndPartition("eh1", 0)) === (10, 20))
-    assert(s("namespace2")(EventHubNameAndPartition("eh2", 0)) === (20, 30))
+    assert(s("namespace1")(NameAndPartition("eh1", 0)) === (0, 1))
+    assert(s("namespace1")(NameAndPartition("eh2", 0)) === (0, 1))
+    assert(s("namespace2")(NameAndPartition("eh1", 0)) === (10, 20))
+    assert(s("namespace2")(NameAndPartition("eh2", 0)) === (20, 30))
   }
 
   test("inconsistent timestamp in temp progress directory can be detected") {
     progressTracker = DirectDStreamProgressTracker
       .initInstance(progressRootPath.toString, appName, new Configuration())
 
-    val eh1Partition0 = EventHubNameAndPartition("eh1", 0)
-    val eh2Partition0 = EventHubNameAndPartition("eh2", 0)
+    val eh1Partition0 = NameAndPartition("eh1", 0)
+    val eh2Partition0 = NameAndPartition("eh2", 0)
     val connectedInstances = List(eh1Partition0, eh2Partition0)
     val connector1 = new DummyEventHubsConnector(0, "namespace1", connectedInstances)
     val connector2 = new DummyEventHubsConnector(0, "namespace2", connectedInstances)
@@ -352,14 +349,14 @@ class ProgressTrackerSuite extends SharedUtils {
     }
   }
 
-  test("latest offsets can be committed correctly and temp directory is not cleaned") {
+  test("latest offsetsAndSeqNos can be committed correctly and temp directory is not cleaned") {
     progressTracker = DirectDStreamProgressTracker.initInstance(progressRootPath.toString,
                                                                 appName,
                                                                 new Configuration())
 
     var progressWriter = new ProgressWriter(0,
                                             "namespace1",
-                                            EventHubNameAndPartition("eh1", 0),
+                                            NameAndPartition("eh1", 0),
                                             1000L,
                                             new Configuration(),
                                             progressRootPath.toString,
@@ -367,7 +364,7 @@ class ProgressTrackerSuite extends SharedUtils {
     progressWriter.write(1000L, 0, 0)
     progressWriter = new ProgressWriter(0,
                                         "namespace1",
-                                        EventHubNameAndPartition("eh2", 0),
+                                        NameAndPartition("eh2", 0),
                                         1000L,
                                         new Configuration(),
                                         progressRootPath.toString,
@@ -375,7 +372,7 @@ class ProgressTrackerSuite extends SharedUtils {
     progressWriter.write(1000L, 1, 1)
     progressWriter = new ProgressWriter(0,
                                         "namespace2",
-                                        EventHubNameAndPartition("eh1", 0),
+                                        NameAndPartition("eh1", 0),
                                         1000L,
                                         new Configuration(),
                                         progressRootPath.toString,
@@ -383,7 +380,7 @@ class ProgressTrackerSuite extends SharedUtils {
     progressWriter.write(1000L, 2, 2)
     progressWriter = new ProgressWriter(0,
                                         "namespace2",
-                                        EventHubNameAndPartition("eh2", 0),
+                                        NameAndPartition("eh2", 0),
                                         1000L,
                                         new Configuration(),
                                         progressRootPath.toString,
@@ -391,10 +388,10 @@ class ProgressTrackerSuite extends SharedUtils {
     progressWriter.write(1000L, 3, 3)
 
     val offsetToCommit = Map(
-      "namespace1" -> Map(EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
-                          EventHubNameAndPartition("eh2", 1) -> (1L, 1L)),
-      "namespace2" -> Map(EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
-                          EventHubNameAndPartition("eh2", 4) -> (3L, 3L))
+      "namespace1" -> Map(NameAndPartition("eh1", 0) -> (0L, 0L),
+                          NameAndPartition("eh2", 1) -> (1L, 1L)),
+      "namespace2" -> Map(NameAndPartition("eh1", 3) -> (2L, 2L),
+                          NameAndPartition("eh2", 4) -> (3L, 3L))
     )
     progressTracker.asInstanceOf[DirectDStreamProgressTracker].commit(offsetToCommit, 1000L)
     val namespace1Offsets = progressTracker
@@ -402,15 +399,15 @@ class ProgressTrackerSuite extends SharedUtils {
       .read("namespace1", 1000L, fallBack = false)
     assert(
       namespace1Offsets === OffsetRecord(1000L,
-                                         Map(EventHubNameAndPartition("eh1", 0) -> (0L, 0L),
-                                             EventHubNameAndPartition("eh2", 1) -> (1L, 1L))))
+                                         Map(NameAndPartition("eh1", 0) -> (0L, 0L),
+                                             NameAndPartition("eh2", 1) -> (1L, 1L))))
     val namespace2Offsets = progressTracker
       .asInstanceOf[DirectDStreamProgressTracker]
       .read("namespace2", 1000L, fallBack = false)
     assert(
       namespace2Offsets === OffsetRecord(1000L,
-                                         Map(EventHubNameAndPartition("eh1", 3) -> (2L, 2L),
-                                             EventHubNameAndPartition("eh2", 4) -> (3L, 3L))))
+                                         Map(NameAndPartition("eh1", 3) -> (2L, 2L),
+                                             NameAndPartition("eh2", 4) -> (3L, 3L))))
 
     // test temp directory cleanup
     assert(fs.exists(PathTools.makeTempDirectoryPath(progressRootPath.toString, appName)))
@@ -455,7 +452,7 @@ class ProgressTrackerSuite extends SharedUtils {
     writeProgressFile(progressPath, 1, fs, 3000L, "namespace2", "eh13", 0 to 2, 5, 6)
 
     // if latest timestamp is earlier than the specified timestamp,
-    // then we shall return the latest offsets
+    // then we shall return the latest offsetsAndSeqNos
     verifyProgressFile("namespace1", "eh1", 0 to 0, 4000L, Seq((2, 3)))
     verifyProgressFile("namespace1", "eh2", 0 to 1, 4000L, Seq((2, 4), (2, 4)))
     verifyProgressFile("namespace1", "eh3", 0 to 2, 4000L, Seq((2, 5), (2, 5), (2, 5)))
@@ -492,7 +489,7 @@ class ProgressTrackerSuite extends SharedUtils {
     val result = progressTracker.read("namespace1", 1000, fallBack = true)
 
     assert(result.timestamp == 1000L)
-    assert(result.offsets == Map(EventHubNameAndPartition("eh1", 0) -> (0, 1)))
+    assert(result.offsetsAndSeqNos == Map(NameAndPartition("eh1", 0) -> (0, 1)))
   }
 
   test("ProgressTracker does query metadata when metadata exists") {

@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubscommon
+package org.apache.spark.eventhubs.common
 
 /**
  * this class represents the in-memory offset record hold by [[EventHubsConnector]]s
  */
 private[spark] case class OffsetRecord(timestamp: Long,
-                                       offsets: Map[EventHubNameAndPartition, (Long, Long)])
+                                       offsetsAndSeqNos: Map[NameAndPartition, (Long, Long)])

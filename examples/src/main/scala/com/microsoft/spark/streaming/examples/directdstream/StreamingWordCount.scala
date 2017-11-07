@@ -19,7 +19,7 @@ package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.streaming.eventhubs.EventHubsUtils
+import org.apache.spark.eventhubs.common.EventHubsUtils
 
 /**
  * an example application of Streaming WordCount
@@ -54,7 +54,6 @@ object StreamingWordCount {
 
     val inputDirectStream = EventHubsUtils.createDirectStreams(
       ssc,
-      eventHubNamespace,
       progressDir,
       Map(eventHubName -> eventhubParameters))
 

@@ -7,12 +7,3 @@ jdk:
 
 script:
     - ./run_tests.sh
-
-branches:
-    only:
-        - master
-        - 2.1.x
-        - 2.0.x
-        - dev
-    except:
-        - maven-repo

@@ -21,14 +21,21 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
-  <version>2.1.5</version>
+  <artifactId>azure-eventhubs-spark-parent_2.11</artifactId>
+  <version>2.1.6</version>
+  <packaging>pom</packaging>
+  <name>EventHubs Spark Parent POM</name>
+  <url>http://github.com/Azure/azure-event-hubs-spark</url>
+
+  <description>Connects Azure EventHubs and with Apache Spark</description>
+
   <licenses>
     <license>
       <name>The Apache License, Version 2.0</name>
       <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
     </license>
   </licenses>
+
   <developers>
     <developer>
       <name>Sabee Grewal</name>
@@ -37,16 +44,19 @@
       <organizationUrl>http://www.microsoft.com</organizationUrl>
     </developer>
   </developers>
+
   <properties>
-    <sbt.project.name>spark-streaming-eventhubs_connector</sbt.project.name>
+    <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
     <scala.binary.version>2.11</scala.binary.version>
     <spark.version>2.1.0</spark.version>
     <github.global.server>github</github.global.server>
   </properties>
+
   <modules>
     <module>core</module>
     <module>examples</module>
   </modules>
+
   <profiles>
     <profile>
       <id>assembly</id>
@@ -99,7 +109,7 @@
               <outputDirectory>${project.build.directory}/mvn-repo</outputDirectory>
               <branch>refs/heads/maven-repo</branch>
               <includes><include>**/*</include></includes>
-              <repositoryName>spark-eventhubs</repositoryName>
+              <repositoryName>azure-event-hubs-spark</repositoryName>
               <repositoryOwner>Azure</repositoryOwner>
               <merge>true</merge>
             </configuration>
@@ -173,14 +183,10 @@
     </profile>
   </profiles>
   <scm>
-    <connection>scm:git:git:/github.com/Azure/spark-eventhubs.git</connection>
-    <developerConnection>scm:git:ssh://github.com/Azure/spark-eventhubs.git</developerConnection>
-    <url>https://github.com/Azure/spark-eventhubs/tree/master</url>
+    <connection>scm:git:git:/github.com/Azure/azure-event-hubs-spark.git</connection>
+    <developerConnection>scm:git:ssh://github.com/Azure/azure-event-hubs-spark.git</developerConnection>
+    <url>https://github.com/Azure/azure-event-hubs-spark/tree/master</url>
   </scm>
-  <packaging>pom</packaging>
-  <name>${project.groupId}:${project.artifactId}</name>
-  <description>Azure Eventhubs Connector for Spark Streaming Applications</description>
-  <url>https://github.com/Azure/spark-eventhubs</url>
   <dependencies>
     <dependency>
       <groupId>org.apache.spark</groupId>

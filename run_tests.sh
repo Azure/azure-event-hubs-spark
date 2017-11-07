@@ -1,3 +1,2 @@
 set -e
-mvn install -DskipTests
-mvn test        
+mvn install -DskipTests       

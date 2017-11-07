@@ -22,20 +22,25 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>com.microsoft.azure</groupId>
-    <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
-    <version>2.1.5</version>
+    <artifactId>azure-eventhubs-spark-parent_2.11</artifactId>
+    <version>2.1.6</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
-  <artifactId>spark-streaming-eventhubs_2.11</artifactId>
+  <artifactId>azure-eventhubs-spark_2.11</artifactId>
   <packaging>jar</packaging>
   <dependencies>
-  <dependency>
-    <groupId>org.apache.spark</groupId>
-    <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
-    <version>${spark.version}</version>
-    <type>test-jar</type>
-    <scope>test</scope>
-  </dependency>
+    <dependency>
+      <groupId>com.microsoft.azure</groupId>
+      <artifactId>azure-eventhubs</artifactId>
+      <version>0.15.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
+      <version>${spark.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>

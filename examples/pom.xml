@@ -26,7 +26,7 @@
     <version>2.1.6</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
-  <artifactId>azure-eventhubs-spark_2.11</artifactId>
+  <artifactId>azure-eventhubs-spark-examples_2.11</artifactId>
   <packaging>jar</packaging>
   <dependencies>
     <dependency>

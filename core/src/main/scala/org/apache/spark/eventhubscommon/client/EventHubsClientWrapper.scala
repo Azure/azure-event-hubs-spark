@@ -16,6 +16,7 @@
  */
 package org.apache.spark.eventhubscommon.client
 
+import java.net.URI
 import java.time.Instant
 
 import scala.collection.JavaConverters._
@@ -24,6 +25,8 @@ import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.eventhubs.checkpoint.OffsetStore
+
+import scala.util.Try
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -45,8 +48,12 @@ private[spark] class EventHubsClientWrapper(
   private val ehPolicyName = ehParams("eventhubs.policyname").toString
   private val ehPolicy = ehParams("eventhubs.policykey").toString
 
-  private val connectionString =
+  private val connectionString = Try {
     new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
+  } getOrElse Try {
+    new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
+  }.get
+
   private val consumerGroup = ehParams
     .getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
     .toString

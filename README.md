@@ -11,6 +11,8 @@
 |spark-2.0|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.0)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 |databricks-3.3|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=databricks-3.3)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 
+[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/azure-event-hubs-spark)
+
 This is the source code for the Azure Event Hubs and Apache Spark Connector. 
 
 Azure Event Hubs is a highly scalable publish-subscribe service that can ingest millions of events per second and stream them into multiple applications. Spark Streaming and Structured Streaming are scalable and fault-tolerant stream processing engines that allow users to process huge amounts of data using complex algorithms expressed with high-level functions like ```map```, ```reduce```, ```join```, and ```window```. This data can then be pushed to filesystems, databases, or even back to Event Hubs.  

@@ -25,12 +25,16 @@ import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOf
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
 import org.apache.spark.eventhubs.common._
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.util.ArrayBasedMapData
 import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset, Source }
 import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{ DataFrame, Row, SQLContext }
+import org.apache.spark.sql.{ DataFrame, SQLContext }
+import org.apache.spark.unsafe.types.UTF8String
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success }
 
@@ -248,30 +252,34 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(parameters)
     val rowRDD = eventHubsRDD.map(
       eventData =>
-        Row.fromSeq(Seq(
+        InternalRow.fromSeq(Seq(
           eventData.getBytes,
           eventData.getSystemProperties.getOffset.toLong,
           eventData.getSystemProperties.getSequenceNumber,
           eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,
-          eventData.getSystemProperties.getPublisher,
-          eventData.getSystemProperties.getPartitionKey
+          UTF8String.fromString(eventData.getSystemProperties.getPublisher),
+          UTF8String.fromString(eventData.getSystemProperties.getPartitionKey)
         ) ++ {
           if (containsProperties) {
             if (userDefinedKeys.nonEmpty) {
               userDefinedKeys.map(k => {
-                eventData.getProperties.asScala.getOrElse(k, "").toString
+                UTF8String.fromString(eventData.getProperties.asScala.getOrElse(k, "").toString)
               })
             } else {
-              Seq(eventData.getProperties.asScala.map {
-                case (k, v) =>
-                  k -> (if (v == null) null else v.toString)
-              })
+              val keys = ArrayBuffer[UTF8String]()
+              val values = ArrayBuffer[UTF8String]()
+              for ((k, v) <- eventData.getProperties.asScala) {
+                keys.append(UTF8String.fromString(k))
+                if (v == null) values.append(null)
+                else values.append(UTF8String.fromString(v.toString))
+              }
+              Seq(ArrayBasedMapData(keys.toArray, values.toArray))
             }
           } else {
             Seq()
           }
         }))
-    sqlContext.createDataFrame(rowRDD, schema)
+    sqlContext.internalCreateDataFrame(rowRDD, schema)
   }
 
   private def readProgress(batchId: Long): EventHubsOffset = {

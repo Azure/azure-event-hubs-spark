@@ -21,9 +21,9 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 
 import scala.collection.JavaConverters._
-
 import language.implicitConversions
 
 // TODO deprecate partitionCount ASAP (like don't release with it included). Get partition count from the service.
@@ -59,17 +59,17 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
 
   private[common] def set[T](key: String, value: T): EventHubsConf = {
     if (key == null) {
-      throw new NullPointerException("null key")
+      throw new NullPointerException("set: null key")
     }
     if (value == null) {
-      throw new NullPointerException(s"null value for $key")
+      throw new NullPointerException(s"set: null value for $key")
     }
 
-    if (self.get(key).isDefined) {
+    if (self.get(key.toLowerCase).isDefined) {
       logWarning(s"$key has already been set to ${self.get(key).get}. Overwriting with $value")
     }
 
-    settings.put(key, value.toString)
+    settings.put(key.toLowerCase, value.toString)
     this
   }
 
@@ -78,7 +78,7 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   }
 
   private def get(key: String): Option[String] = {
-    Option(settings.get(key))
+    Option(settings.get(key.toLowerCase))
   }
 
   private def setStartingWith(str: String): Unit = {
@@ -140,7 +140,7 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
       case _ =>
     }
 
-    settings.asScala.toMap
+    CaseInsensitiveMap(settings.asScala.toMap)
   }
 
   /** Make a copy of you EventHubsConf */

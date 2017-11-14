@@ -480,6 +480,12 @@ trait EventHubsStreamTest
               .asInstanceOf[StreamingQueryWrapper]
               .streamingQuery
 
+            try {
+              currentStream.awaitInitialization(streamingTimeout.toMillis)
+            } catch {
+              case _: StreamingQueryException =>
+            }
+
             triggerClock match {
               case smc: StreamManualClock =>
                 smc.setStream(currentStream)
@@ -501,7 +507,7 @@ trait EventHubsStreamTest
             eventHubsSource.ehClient = new SimulatedEventHubsRestClient(eventHubs)
             eventHubsSource.receiverFactory =
               (ehConf: EventHubsConf) => new TestEventHubsClient(ehConf, eventHubs, null)
-            currentStream.start()
+          //currentStream.start()
 
           case AdvanceManualClock(timeToAdd) =>
             verify(currentStream != null,
@@ -650,18 +656,13 @@ trait EventHubsStreamTest
               .toMap
 
             // Block until all data added has been processed for all the source
-            { if (!partial) awaiting else partialAwaiting }.foreach {
+            awaiting.foreach {
               case (sourceIndex, offset) =>
-                try {
-                  failAfter(streamingTimeout) {
-                    currentStream.awaitOffset(indexToSource(sourceIndex), offset)
-                  }
-                } catch {
-                  case e: Exception =>
-                    e.printStackTrace()
-                    throw e
+                failAfter(streamingTimeout) {
+                  currentStream.awaitOffset(indexToSource(sourceIndex), offset)
                 }
             }
+
             val sparkAnswer = try if (lastOnly) sink.latestBatchData else sink.allData
             catch {
               case e: Exception =>

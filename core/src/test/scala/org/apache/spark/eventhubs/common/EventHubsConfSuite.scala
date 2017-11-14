@@ -17,6 +17,7 @@
 
 package org.apache.spark.eventhubs.common
 
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.scalatest.FunSuite
 
 /**
@@ -252,18 +253,19 @@ class EventHubsConfSuite extends FunSuite {
   }
 
   test("Map to Conf to Map: there and back again") {
-    val oldSchoolMap = Map[String, String](
-      "eventhubs.namespace" -> "namespace",
-      "eventhubs.name" -> "name",
-      "eventhubs.keyName" -> "keyName",
-      "eventhubs.key" -> "key",
-      "eventhubs.partitionCount" -> "4",
-      "eventhubs.progressDirectory" -> "dir",
-      "eventhubs.consumerGroup" -> "consumerGroup",
-      "eventhubs.maxRates" -> "0:20",
-      "eventhubs.startingWith" -> "Offsets",
-      "eventhubs.startOffsets" -> "1:50"
-    )
+    val oldSchoolMap = CaseInsensitiveMap(
+      Map(
+        "eventhubs.namespace" -> "namespace",
+        "eventhubs.name" -> "name",
+        "eventhubs.keyName" -> "keyName",
+        "eventhubs.key" -> "key",
+        "eventhubs.partitionCount" -> "4",
+        "eventhubs.progressDirectory" -> "dir",
+        "eventhubs.consumerGroup" -> "consumerGroup",
+        "eventhubs.maxRates" -> "0:20",
+        "eventhubs.startingWith" -> "Offsets",
+        "eventhubs.startOffsets" -> "1:50"
+      ))
     val newMap = EventHubsConf.toConf(oldSchoolMap).toMap
     assert(newMap == oldSchoolMap)
   }

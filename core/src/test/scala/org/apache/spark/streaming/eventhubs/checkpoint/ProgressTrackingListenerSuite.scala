@@ -129,7 +129,7 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       .setProgressDirectory(progressRootPath.toString)
     createDirectStreams(ssc, ehConf1).start()
 
-    val ehConf2 = ehConf1.copy.setNamespace("namespace2").setName("eh11")
+    val ehConf2 = ehConf1.clone.setNamespace("namespace2").setName("eh11")
     createDirectStreams(ssc, ehConf2).start()
 
     import scala.collection.JavaConverters._

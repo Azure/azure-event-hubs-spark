@@ -63,7 +63,7 @@ object MultiStreamsJoin {
       .setConsumerGroup("$Default")
 
     val ehConf2 =
-      ehConf1.copy.setNamespace(namespace2).setName(name2).setKeyName(policyName2).setKey(key2)
+      ehConf1.clone.setNamespace(namespace2).setName(name2).setKeyName(policyName2).setKey(key2)
 
     val inputDirectStream1 = EventHubsUtils.createDirectStream(ssc, ehConf1)
 

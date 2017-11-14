@@ -268,8 +268,8 @@ class ProgressTrackingAndCheckpointSuite
       Seq()
     )
 
-    val ehConf1 = ehConf.copy.setNamespace("namespace1").setMaxRatePerPartition(3)
-    val ehConf2 = ehConf1.copy.setMaxRatePerPartition(3)
+    val ehConf1 = ehConf.clone.setNamespace("namespace1").setMaxRatePerPartition(3)
+    val ehConf2 = ehConf1.clone.setMaxRatePerPartition(3)
 
     testCheckpointedOperation(
       input1,
@@ -545,7 +545,7 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(8, 9, 11, 2, 5, 6),
                                          Seq(10, 11, 3, 4, 7, 8),
                                          Seq())
-    val ehConf1: EventHubsConf = ehConf.copy.setStartEnqueueTimes(2000).setStartOfStream(false)
+    val ehConf1: EventHubsConf = ehConf.clone.setStartEnqueueTimes(2000).setStartOfStream(false)
 
     testCheckpointedOperation(
       input,

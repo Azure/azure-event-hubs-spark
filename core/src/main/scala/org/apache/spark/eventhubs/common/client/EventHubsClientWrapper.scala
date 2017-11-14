@@ -50,12 +50,13 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
   private val connectionString =
     Try {
-      new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
+      new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy)
     } getOrElse Try {
-      new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
+      new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy)
     }.get
+  connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
 
-  client = EventHubClient.createFromConnectionStringSync(connectionString)
+  client = EventHubClient.createFromConnectionStringSync(connectionString.toString)
 
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,
@@ -70,7 +71,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       case _ =>
         client.createReceiverSync(consumerGroup, partitionId, currentOffset)
     }
-    partitionReceiver.setReceiveTimeout(Duration.ofSeconds(5))
+    partitionReceiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
   }
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {

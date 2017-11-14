@@ -125,8 +125,8 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with SharedUtils 
                                  "q" -> 4,
                                  "r" -> 6))
 
-    val ehConf1 = ehConf.copy.setNamespace("namespace1").setName("eh11").setMaxRatePerPartition(3)
-    val ehConf2 = ehConf1.copy.setNamespace("namespace2").setName("eh21")
+    val ehConf1 = ehConf.clone.setNamespace("namespace1").setName("eh11").setMaxRatePerPartition(3)
+    val ehConf2 = ehConf1.clone.setNamespace("namespace2").setName("eh21")
 
     testBinaryOperation(
       input1,
@@ -241,7 +241,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with SharedUtils 
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(5, 6, 8, 9, 2, 3), Seq(7, 10, 4), Seq())
 
-    val confWithTimes = ehConf.copy.setStartEnqueueTimes(3000).setStartOfStream(false)
+    val confWithTimes = ehConf.clone.setStartEnqueueTimes(3000).setStartOfStream(false)
     testUnaryOperation(
       input,
       confWithTimes,
@@ -268,7 +268,7 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with SharedUtils 
   test("pass-in enqueuetime is not allowed to be later than the highest enqueuetime") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(5, 6, 8, 9, 2, 3), Seq(7, 10, 4), Seq())
-    val confWithTimes = ehConf.copy.setStartEnqueueTimes(10000).setStartOfStream(false)
+    val confWithTimes = ehConf.clone.setStartEnqueueTimes(10000).setStartOfStream(false)
     intercept[IllegalArgumentException] {
       testUnaryOperation(
         input,

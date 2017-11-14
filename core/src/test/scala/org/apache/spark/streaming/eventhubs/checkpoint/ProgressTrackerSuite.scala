@@ -114,8 +114,8 @@ class ProgressTrackerSuite extends SharedUtils {
       .setPartitionCount("1")
       .setProgressDirectory(progressRootPath.toString)
       .setStartOfStream(true)
-    val ehConf2 = ehConf1.copy.setName("eh2").setPartitionCount("2")
-    val ehConf3 = ehConf1.copy.setName("eh3").setPartitionCount("3")
+    val ehConf2 = ehConf1.clone.setName("eh2").setPartitionCount("2")
+    val ehConf3 = ehConf1.clone.setName("eh3").setPartitionCount("3")
 
     createDirectStreams(ssc, ehConf1)
     createDirectStreams(ssc, ehConf2)
@@ -177,7 +177,7 @@ class ProgressTrackerSuite extends SharedUtils {
       .setStartOfStream(true)
       .setProgressDirectory(progressRootPath.toString)
     val dStream1 = createDirectStreams(ssc, ehConf1)
-    val ehConf2 = ehConf1.copy.setNamespace("namespace2").setName("eh11")
+    val ehConf2 = ehConf1.clone.setNamespace("namespace2").setName("eh11")
     val dStream2 = createDirectStreams(ssc, ehConf2)
 
     dStream1.start()

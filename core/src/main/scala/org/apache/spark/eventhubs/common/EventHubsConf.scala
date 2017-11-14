@@ -139,7 +139,7 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   }
 
   /** Make a copy of you EventHubsConf */
-  def copy: EventHubsConf = {
+  override def clone: EventHubsConf = {
     val newConf = EventHubsConf()
     newConf.settings.putAll(self.settings)
     newConf._startOffsets ++= self._startOffsets

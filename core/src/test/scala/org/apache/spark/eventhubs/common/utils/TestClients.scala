@@ -55,7 +55,7 @@ class TestEventHubsClient(ehConf: EventHubsConf,
     extends Client
     with TestClientSugar {
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val eventHubName = ehConf.name
+    val eventHubName = ehConf.name.get
     if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
       eventHubs.search(NameAndPartition(eventHubName, partitionId),
                        currentOffset.toInt,
@@ -103,7 +103,7 @@ class FluctuatedEventHubClient(ehConf: EventHubsConf,
   private var callIndex = -1
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val eventHubName = ehConf.name
+    val eventHubName = ehConf.name.get
     if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
       eventHubs.search(NameAndPartition(eventHubName, partitionId),
                        currentOffset.toInt,
@@ -120,7 +120,7 @@ class FluctuatedEventHubClient(ehConf: EventHubsConf,
     if (callIndex < numBatchesBeforeNewData) {
       (messagesBeforeEmpty - 1, messagesBeforeEmpty - 1)
     } else {
-      (latestRecords(nameAndPartition))
+      latestRecords(nameAndPartition)
     }
   }
 

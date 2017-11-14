@@ -44,12 +44,14 @@ class ProgressTrackingListenerSuite extends SharedUtils {
         None,
         Map(1 -> OutputOperationInfo(Time(1000L), 1, "output", "", None, None, None))
       ))
-    val ehConf = new EventHubsConf("eventhuns",
-                                   "eh1",
-                                   "policyname",
-                                   "policykey",
-                                   "2",
-                                   progressRootPath.toString)
+    val ehConf = EventHubsConf()
+      .setNamespace("eventhubs")
+      .setName("eh1")
+      .setKeyName("policyname")
+      .setKey("policykey")
+      .setPartitionCount("2")
+      .setStartOfStream(true)
+      .setProgressDirectory(progressRootPath.toString)
 
     val dstream = createDirectStreams(ssc, ehConf)
     dstream.start()
@@ -117,20 +119,17 @@ class ProgressTrackingListenerSuite extends SharedUtils {
       new SparkContext(new SparkConf().setAppName(appName).setMaster("local[*]")),
       Seconds(5))
 
-    val ehConf1 = new EventHubsConf("namespace1",
-                                    "eh1",
-                                    "policyname",
-                                    "policykey",
-                                    "1",
-                                    progressRootPath.toString)
+    val ehConf1 = EventHubsConf()
+      .setNamespace("namespace1")
+      .setName("eh1")
+      .setKeyName("policyname")
+      .setKey("policykey")
+      .setPartitionCount("1")
+      .setStartOfStream(true)
+      .setProgressDirectory(progressRootPath.toString)
     createDirectStreams(ssc, ehConf1).start()
 
-    val ehConf2 = new EventHubsConf("namespace2",
-                                    "eh11",
-                                    "policyname",
-                                    "policykey",
-                                    "1",
-                                    progressRootPath.toString)
+    val ehConf2 = ehConf1.copy.setNamespace("namespace2").setName("eh11")
     createDirectStreams(ssc, ehConf2).start()
 
     import scala.collection.JavaConverters._

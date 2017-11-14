@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
@@ -54,21 +53,21 @@ private[sql] class EventHubsSourceProvider
 private[sql] object EventHubsSourceProvider extends Serializable {
 
   private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(
-      ehConf: EventHubsConf): (Boolean, Seq[String]) = {
+      parameters: Map[String, String]): (Boolean, Seq[String]) = {
     val containsProperties =
-      ehConf.sqlContainsProperties
+      parameters.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
     val userDefinedKeys = {
-      if (ehConf.sqlUserDefinedKeys.isEmpty) {
-        Seq()
+      if (parameters.contains("eventhubs.sql.userDefinedKeys")) {
+        parameters("eventhubs.sql.userDefinedKeys").split(",").toSeq
       } else {
-        ehConf.sqlUserDefinedKeys.toSeq
+        Seq()
       }
     }
     (containsProperties, userDefinedKeys)
   }
 
-  def sourceSchema(ehConf: EventHubsConf): StructType = {
-    val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(ehConf)
+  def sourceSchema(parameters: Map[String, String]): StructType = {
+    val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
     StructType(
       Seq(
         StructField("body", BinaryType),

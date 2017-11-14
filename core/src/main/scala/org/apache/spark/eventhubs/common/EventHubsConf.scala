@@ -27,12 +27,7 @@ import scala.collection.JavaConverters._
 import language.implicitConversions
 
 // TODO deprecate partitionCount ASAP (like don't release with it included). Get partition count from the service.
-// TODO: look at ficus. Can we catch malformed confs at compile-time? <- LOOK INTO ANNOTATIONS
-
-// TODO we need to provide a getOrElse so default values can be used for cases where there ARE default values.
-
-// TODO consumer group should NOT be required!!!!!!
-
+// TODO: Can we catch malformed configs at compile-time?
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *

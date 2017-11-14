@@ -110,6 +110,7 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
     val maxOffsetForEachEventHub =
       EventHubsTestUtilities.getHighestOffsetPerPartition(simulatedEventHubs)
 
+    ehConf.setProgressDirectory(progressRootPath.toString)
     new EventHubDirectDStream(
       ssc,
       ehConf,
@@ -194,9 +195,9 @@ private[eventhubs] trait EventHubTestSuiteBase extends TestSuiteBase {
   protected def createSimulatedEventHub[U: ClassTag](namespace: String,
                                                      input: Seq[Seq[U]],
                                                      ehConf: EventHubsConf): SimulatedEventHubs = {
-    val ehAndRawInputMap = Set(ehConf.name).flatMap { name =>
+    val ehAndRawInputMap = Set(ehConf.name.get).flatMap { name =>
       val ehList = {
-        for (i <- 0 until ehConf.partitionCount.toInt) yield NameAndPartition(name, i)
+        for (i <- 0 until ehConf.partitionCount.get.toInt) yield NameAndPartition(name, i)
       }.toArray
       ehList.zip(input)
     }.toMap

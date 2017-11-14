@@ -18,39 +18,33 @@
 package org.apache.spark.streaming.eventhubs
 
 import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition, OffsetRecord }
-import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ Duration, Seconds, Time }
-import org.mockito.{ Matchers, Mockito }
 import org.scalatest.mock.MockitoSugar
 
-import scala.collection.mutable
-
-class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar with SharedUtils {
+class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with SharedUtils with MockitoSugar {
 
   override protected val streamingClock = "org.apache.spark.util.ManualClock"
 
   override def batchDuration: Duration = Seconds(1)
 
-  val eventhubParameters: Map[String, String] = Map(
-    "eventhubs.policyname" -> "policyName",
-    "eventhubs.policykey" -> "policykey",
-    "eventhubs.namespace" -> "eventhubs",
-    "eventhubs.name" -> "eh1",
-    "eventhubs.partition.count" -> "32",
-    "eventhubs.consumergroup" -> "$Default"
-  )
+  val ehConf: EventHubsConf = EventHubsConf()
+    .setNamespace("eventhubs")
+    .setName("eh1")
+    .setKeyName("policyname")
+    .setKey("policykey")
+    .setPartitionCount("3")
+    .setConsumerGroup("$Default")
+    .setMaxRatePerPartition(2)
+    .setStartOfStream(true)
 
   test("interaction among Listener/ProgressTracker/Spark Streaming (single stream)") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
 
-    val conf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-
     testUnaryOperation(
       input,
-      conf,
+      ehConf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -79,12 +73,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
                              Seq(2, 3, 5, 6, 8, 9, 4, 5, 7, 8, 10, 2),
                              Seq(4, 5, 7, 8, 10, 2, 6, 7, 9, 10, 3, 4))
 
-    val conf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-
     testUnaryOperation(
       input,
-      conf,
+      ehConf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -134,10 +125,9 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
                                  "q" -> 4,
                                  "r" -> 6))
 
-    val ehConf1 = new EventHubsConf("namespace1", "eh11", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(3)
-    val ehConf2 = new EventHubsConf("namespace2", "eh21", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(3)
+    val ehConf1 = ehConf.copy.setNamespace("namespace1").setName("eh11").setMaxRatePerPartition(3)
+    val ehConf2 = ehConf1.copy.setNamespace("namespace2").setName("eh21")
+
     testBinaryOperation(
       input1,
       input2,
@@ -185,9 +175,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(2), Seq(4), Seq(6))
 
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-
     testUnaryOperation(
       input,
       ehConf,
@@ -224,8 +211,6 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
                              Seq(),
                              Seq(),
                              Seq(6, 7, 9, 10, 3, 4))
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     testFluctuatedStream(
       input,
@@ -255,12 +240,11 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
   test("filter messages for enqueueTime correctly") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(5, 6, 8, 9, 2, 3), Seq(7, 10, 4), Seq())
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
+    val confWithTimes = ehConf.copy.setStartEnqueueTimes(3000).setStartOfStream(false)
     testUnaryOperation(
       input,
-      ehConf,
+      confWithTimes,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(2000L,
@@ -284,13 +268,11 @@ class EventHubDirectDStreamSuite extends EventHubTestSuiteBase with MockitoSugar
   test("pass-in enqueuetime is not allowed to be later than the highest enqueuetime") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutput = Seq(Seq(5, 6, 8, 9, 2, 3), Seq(7, 10, 4), Seq())
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-      .setStartEnqueueTimes(10000)
+    val confWithTimes = ehConf.copy.setStartEnqueueTimes(10000).setStartOfStream(false)
     intercept[IllegalArgumentException] {
       testUnaryOperation(
         input,
-        ehConf,
+        confWithTimes,
         expectedOffsetsAndSeqs = Map(
           eventhubNamespace ->
             OffsetRecord(2000L,

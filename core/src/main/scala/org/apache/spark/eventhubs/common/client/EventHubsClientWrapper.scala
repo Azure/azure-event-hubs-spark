@@ -23,7 +23,7 @@ import java.time.{ Duration, Instant }
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
+import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.internal.Logging
 
 import scala.util.{ Failure, Success, Try }
@@ -37,15 +37,17 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     with Client
     with Logging {
 
+  import org.apache.spark.eventhubs.common._
+
   override private[spark] var client: EventHubClient = _
   private[spark] var partitionReceiver: PartitionReceiver = _
 
   /* Extract relevant info from ehParams */
-  private val ehNamespace = ehConf.namespace
-  private val ehName = ehConf.name
-  private val ehPolicyName = ehConf.keyName
-  private val ehPolicy = ehConf.key
-  private val consumerGroup = ehConf.consumerGroup
+  private val ehNamespace = ehConf.namespace.get
+  private val ehName = ehConf.name.get
+  private val ehPolicyName = ehConf.keyName.get
+  private val ehPolicy = ehConf.key.get
+  private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
   private val connectionString =
     Try {
       new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString

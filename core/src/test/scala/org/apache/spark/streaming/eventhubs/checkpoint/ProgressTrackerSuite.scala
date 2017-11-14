@@ -106,24 +106,17 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   test("incomplete progress would be discarded") {
-    val ehConf1 = new EventHubsConf("namespace1",
-                                    "eh1",
-                                    "policyname",
-                                    "policykey",
-                                    "1",
-                                    progressRootPath.toString)
-    val ehConf2 = new EventHubsConf("namespace1",
-                                    "eh2",
-                                    "policyname",
-                                    "policykey",
-                                    "2",
-                                    progressRootPath.toString)
-    val ehConf3 = new EventHubsConf("namespace1",
-                                    "eh3",
-                                    "policyname",
-                                    "policykey",
-                                    "3",
-                                    progressRootPath.toString)
+    val ehConf1 = EventHubsConf()
+      .setNamespace("namespace1")
+      .setName("eh1")
+      .setKeyName("policyname")
+      .setKey("policykey")
+      .setPartitionCount("1")
+      .setProgressDirectory(progressRootPath.toString)
+      .setStartOfStream(true)
+    val ehConf2 = ehConf1.copy.setName("eh2").setPartitionCount("2")
+    val ehConf3 = ehConf1.copy.setName("eh3").setPartitionCount("3")
+
     createDirectStreams(ssc, ehConf1)
     createDirectStreams(ssc, ehConf2)
     createDirectStreams(ssc, ehConf3)
@@ -175,19 +168,16 @@ class ProgressTrackerSuite extends SharedUtils {
   }
 
   test("start from the beginning of the streams when the latest progress file does not exist") {
-    val ehConf1 = new EventHubsConf("namespace1",
-                                    "eh1",
-                                    "policyname",
-                                    "policykey",
-                                    "1",
-                                    progressRootPath.toString)
+    val ehConf1 = EventHubsConf()
+      .setNamespace("namespace1")
+      .setName("eh1")
+      .setKeyName("policyname")
+      .setKey("policykey")
+      .setPartitionCount("1")
+      .setStartOfStream(true)
+      .setProgressDirectory(progressRootPath.toString)
     val dStream1 = createDirectStreams(ssc, ehConf1)
-    val ehConf2 = new EventHubsConf("namespace2",
-                                    "eh11",
-                                    "policyname",
-                                    "policykey",
-                                    "1",
-                                    progressRootPath.toString)
+    val ehConf2 = ehConf1.copy.setNamespace("namespace2").setName("eh11")
     val dStream2 = createDirectStreams(ssc, ehConf2)
 
     dStream1.start()

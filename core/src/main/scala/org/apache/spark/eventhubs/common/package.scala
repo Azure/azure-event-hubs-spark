@@ -15,17 +15,34 @@
  * limitations under the License.
  */
 
-// TODO I think Structured Streaming needs this convert to a map.
-// So I need to write an implicit converter for Structured Streaming.
-// And need to tackle how to encode the per partition stuff. Might not be able to.
-// TODO make Direct Streams just use EventHubsConf directly.
-
 package org.apache.spark.eventhubs
 
+import java.time.Duration
+
+import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+
 package object common {
+  val DefaultEnqueueTime: EnqueueTime = Long.MinValue
+  val StartOfStream = PartitionReceiver.START_OF_STREAM
+  val EndOfStream = PartitionReceiver.END_OF_STREAM
+  val DefaultMaxRatePerPartition: Rate = 10000
+  val DefaultStartOffset: Offset = -1L
+  val DefaultReceiverTimeout: Duration = Duration.ofSeconds(5)
+  val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
+  val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
+
   type PartitionId = Int
-  type Rate = Long
+  type Rate = Int
   type Offset = Long
   type EnqueueTime = Long
   type SequenceNumber = Long
+
+  // Allow Strings to be converted to types defined in this library.
+  implicit class EventHubsString(val str: String) extends AnyVal {
+    def toPartitionId: PartitionId = str.toInt
+    def toRate: Rate = str.toInt
+    def toOffset: Offset = str.toLong
+    def toEnqueueTime: EnqueueTime = str.toLong
+    def toSequenceNumber: SequenceNumber = str.toLong
+  }
 }

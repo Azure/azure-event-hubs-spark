@@ -29,12 +29,13 @@ private[spark] object RateControlUtils extends Logging {
    *
    * @param highestEndpoints the latest offset/seq of each partition
    */
-  private[spark] def clamp(currentOffsetsAndSeqNos: Map[NameAndPartition, (Long, Long)],
-                           highestEndpoints: List[(NameAndPartition, (Long, Long))],
-                           ehConf: EventHubsConf): Map[NameAndPartition, Long] = {
+  private[spark] def clamp(currentOffsetsAndSeqNos: Map[NameAndPartition, (Offset, SequenceNumber)],
+                           highestEndpoints: List[(NameAndPartition, (Offset, SequenceNumber))],
+                           ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
     (for {
       (nAndP, (_, seqNo)) <- highestEndpoints
-      maxRate: Long = ehConf.maxRatePerPartition(nAndP.partitionId)
+      maxRate: Rate = ehConf.maxRatesPerPartition.getOrElse(nAndP.partitionId,
+                                                            DefaultMaxRatePerPartition)
       endSeqNo = math.min(seqNo, maxRate + currentOffsetsAndSeqNos(nAndP)._2)
     } yield (nAndP, endSeqNo)) toMap
   }
@@ -42,7 +43,8 @@ private[spark] object RateControlUtils extends Logging {
   private[spark] def calculateStartOffset(
       nameAndPartition: NameAndPartition,
       filteringOffsetAndType: Map[NameAndPartition, (EventHubsOffsetType, Offset)],
-      startOffsetInNextBatch: Map[NameAndPartition, (Long, Long)]): (EventHubsOffsetType, Long) = {
+      startOffsetInNextBatch: Map[NameAndPartition, (Offset, SequenceNumber)])
+    : (EventHubsOffsetType, Long) = {
     filteringOffsetAndType.getOrElse(
       nameAndPartition,
       (EventHubsOffsetTypes.PreviousCheckpoint, startOffsetInNextBatch(nameAndPartition)._1)
@@ -52,14 +54,16 @@ private[spark] object RateControlUtils extends Logging {
   private[spark] def validateFilteringParams(ehClient: Client,
                                              ehConf: EventHubsConf,
                                              namesAndPartitions: List[NameAndPartition]): Unit = {
-    val lastEnqueuedTimes: List[(NameAndPartition, Long)] = for {
+    val lastEnqueuedTimes = for {
       nAndP <- namesAndPartitions
       lastTime = ehClient.lastEnqueuedTime(nAndP).get
     } yield nAndP -> lastTime
-    val booleans: List[Boolean] = for {
+
+    val booleans = for {
       (nAndP, lastTime) <- lastEnqueuedTimes
-      passInEnqueueTime = ehConf.startEnqueueTimes(nAndP.partitionId)
-    } yield lastTime >= passInEnqueueTime.toLong
+      passInEnqueueTime = ehConf.startEnqueueTimes
+        .getOrElse(nAndP.partitionId, DefaultEnqueueTime)
+    } yield lastTime >= passInEnqueueTime
     require(!booleans.contains(false),
             "You cannot pass in an enqueue time that is greater than what exists in EventHubs.")
   }
@@ -80,12 +84,19 @@ private[spark] object RateControlUtils extends Logging {
       ehConf: EventHubsConf): (EventHubsOffsetType, Offset) = {
     if (previousOffset != "-1" && previousOffset != null) {
       (EventHubsOffsetTypes.PreviousCheckpoint, previousOffset.toLong)
-    } else if (ehConf.startOffsets != null) {
-      (EventHubsOffsetTypes.Offset, ehConf.startOffsets(partitionId))
-    } else if (ehConf.startEnqueueTimes != null) {
-      (EventHubsOffsetTypes.EnqueueTime, ehConf.startEnqueueTimes(partitionId))
     } else {
-      (EventHubsOffsetTypes.None, EventHubsUtils.StartOfStream.toLong)
+      ehConf("eventhubs.startingWith") match {
+        case "Offsets" =>
+          (EventHubsOffsetTypes.Offset,
+           ehConf.startOffsets.getOrElse(partitionId, DefaultStartOffset))
+        case "EnqueueTimes" =>
+          (EventHubsOffsetTypes.EnqueueTime,
+           ehConf.startEnqueueTimes.getOrElse(partitionId, DefaultEnqueueTime))
+        case "StartOfStream" =>
+          (EventHubsOffsetTypes.None, StartOfStream.toLong)
+        case "EndOfStream" =>
+          (EventHubsOffsetTypes.None, EndOfStream.toLong)
+      }
     }
   }
 }

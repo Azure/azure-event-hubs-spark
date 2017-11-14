@@ -46,14 +46,22 @@ class ProgressTrackingAndCheckpointSuite
 
   override def batchDuration: Duration = Seconds(1)
 
+  private val ehConf: EventHubsConf = EventHubsConf()
+    .setNamespace("eventhubs")
+    .setName("eh1")
+    .setKeyName("policyname")
+    .setKey("policykey")
+    .setPartitionCount("3")
+    .setProgressDirectory("dir")
+    .setMaxRatePerPartition(2)
+    .setStartOfStream(true)
+
   test(
     "currentOffset, ProgressTracker and EventHubClient are setup correctly when" +
       " EventHubDirectDStream is recovered") {
     val input = Seq(Seq(1, 2, 3, 4, 5, 6), Seq(4, 5, 6, 7, 8, 9), Seq(7, 8, 9, 1, 2, 3))
     val expectedOutputBeforeRestart =
       Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     runStopAndRecover(
       input,
@@ -95,9 +103,6 @@ class ProgressTrackingAndCheckpointSuite
       Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart =
       Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq())
-
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     testCheckpointedOperation(
       input,
@@ -152,9 +157,6 @@ class ProgressTrackingAndCheckpointSuite
           "6" -> 1)
     )
 
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-
     testCheckpointedOperation(
       input,
       ehConf,
@@ -192,9 +194,6 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(6, 7, 9, 10, 3, 4, 8, 9, 11, 2, 5, 6),
                                          Seq(8, 9, 11, 2, 5, 6, 10, 11, 3, 4, 7, 8),
                                          Seq(10, 11, 3, 4, 7, 8))
-
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     testCheckpointedOperation(
       input,
@@ -268,10 +267,9 @@ class ProgressTrackingAndCheckpointSuite
           "c" -> 6),
       Seq()
     )
-    val ehConf1 = new EventHubsConf("namespace1", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(3)
-    val ehConf2 = new EventHubsConf("namespace2", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(3)
+
+    val ehConf1 = ehConf.copy.setNamespace("namespace1").setMaxRatePerPartition(3)
+    val ehConf2 = ehConf1.copy.setMaxRatePerPartition(3)
 
     testCheckpointedOperation(
       input1,
@@ -309,9 +307,6 @@ class ProgressTrackingAndCheckpointSuite
     val expectedOutputAfterRestart =
       Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8), Seq())
 
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-
     testCheckpointedOperation(
       input,
       ehConf,
@@ -340,9 +335,6 @@ class ProgressTrackingAndCheckpointSuite
     val expectedOutputBeforeRestart =
       Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart = Seq(Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
-
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     testUnaryOperation(
       input,
@@ -373,12 +365,9 @@ class ProgressTrackingAndCheckpointSuite
     ssc = createContextForCheckpointOperation(batchDuration, checkpointDirectory)
     ssc.scheduler.clock.asInstanceOf[ManualClock].setTime(5000)
 
-    val conf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-
     testUnaryOperation(
       input,
-      conf,
+      ehConf,
       expectedOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(6000,
@@ -410,9 +399,6 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(6, 7, 9, 10, 3, 4),
                                          Seq(8, 9, 11, 2, 5, 6),
                                          Seq(10, 11, 3, 4, 7, 8))
-
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     testUnaryOperation(
       input,
@@ -484,9 +470,6 @@ class ProgressTrackingAndCheckpointSuite
       Seq(Seq(2, 3, 5, 6, 8, 9), Seq(4, 5, 7, 8, 10, 2), Seq(6, 7, 9, 10, 3, 4))
     val expectedOutputAfterRestart =
       Seq(Seq(6, 7, 9, 10, 3, 4), Seq(8, 9, 11, 2, 5, 6), Seq(10, 11, 3, 4, 7, 8))
-
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
 
     testUnaryOperation(
       input,
@@ -562,13 +545,11 @@ class ProgressTrackingAndCheckpointSuite
                                          Seq(8, 9, 11, 2, 5, 6),
                                          Seq(10, 11, 3, 4, 7, 8),
                                          Seq())
-    val ehConf = new EventHubsConf("eventhubs", "eh1", "policyname", "policykey", "3", "dir")
-      .setMaxRatePerPartition(2)
-      .setStartEnqueueTimes(2000)
+    val ehConf1: EventHubsConf = ehConf.copy.setStartEnqueueTimes(2000).setStartOfStream(false)
 
     testCheckpointedOperation(
       input,
-      ehConf,
+      ehConf1,
       expectedStartingOffsetsAndSeqs = Map(
         eventhubNamespace ->
           OffsetRecord(0L,

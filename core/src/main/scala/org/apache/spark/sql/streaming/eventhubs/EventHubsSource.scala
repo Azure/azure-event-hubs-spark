@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
+import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.common._
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
@@ -125,7 +125,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       committedOffsetsAndSeqNums.batchId,
       (for {
         nameAndPartition <- highestOffsetsAndSeqNums.offsets.keySet
-        endPoint = ehClient.lastOffsetAndSeqNo(nameAndPartition)
+        endPoint = ehClient.latestSeqNo(nameAndPartition)
       } yield nameAndPartition -> endPoint).toMap
     )
   }
@@ -198,9 +198,9 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
     val filterOffsetAndType = {
       if (committedOffsetsAndSeqNums.batchId == -1) {
-        val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
+        val startSeqs = new mutable.HashMap[NameAndPartition, SequenceNumber].empty
         for (nameAndPartition <- namesAndPartitions) {
-          val seqNo = ehClient.earliestSeqNo(nameAndPartition).get
+          val seqNo = ehClient.earliestSeqNo(nameAndPartition)
           startSeqs += nameAndPartition -> seqNo
         }
 
@@ -212,7 +212,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         RateControlUtils.composeFromOffsetWithFilteringParams(ehConf,
                                                               committedOffsetsAndSeqNums.offsets)
       } else {
-        Map[NameAndPartition, (EventHubsOffsetType, Long)]()
+        Map[NameAndPartition, (EventHubsOffsetType, SequenceNumber)]()
       }
     }
 
@@ -237,11 +237,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       ehConf,
       offsetRanges,
       committedOffsetsAndSeqNums.batchId + 1,
-      ProgressTrackerParams(ehConf("eventhubs.progressDirectory"),
-                            streamId,
-                            uid = uid,
-                            subDirs = sqlContext.sparkContext.appName,
-                            uid),
       receiverFactory
     )
   }

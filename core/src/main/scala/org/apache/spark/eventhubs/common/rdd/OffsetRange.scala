@@ -17,25 +17,42 @@
 
 package org.apache.spark.eventhubs.common.rdd
 
-import org.apache.spark.eventhubs.common.NameAndPartition
-import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common._
 
 import language.implicitConversions
 
-private[spark] case class OffsetRange(nameAndPartition: NameAndPartition,
-                                      fromOffset: Long,
-                                      fromSeq: Long,
-                                      untilSeq: Long,
-                                      offsetType: EventHubsOffsetType) {
+private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
+                                       val fromSeqNo: SequenceNumber,
+                                       val untilSeqNo: SequenceNumber) {
+  import OffsetRange.OffsetRangeTuple
 
-  private[spark] def toTuple = (nameAndPartition, fromOffset, fromSeq, untilSeq, offsetType)
+  def name: String = nameAndPartition.ehName
+
+  def partitionId: Int = nameAndPartition.partitionId
+
+  def count: Long = untilSeqNo - fromSeqNo
+
+  def toTuple: OffsetRangeTuple = (nameAndPartition, fromSeqNo, untilSeqNo)
+
+  override def toString =
+    s"OffsetRange(partitionId: ${nameAndPartition.partitionId} | fromSeqNo: $fromSeqNo | untilSeqNo: $untilSeqNo)"
 }
 
 private[spark] object OffsetRange {
-  type OffsetRangeTuple = (NameAndPartition, Long, Long, Long, EventHubsOffsetType)
+  type OffsetRangeTuple = (NameAndPartition, SequenceNumber, SequenceNumber)
+
+  def apply(nAndP: NameAndPartition,
+            fromSeq: SequenceNumber,
+            untilSeq: SequenceNumber): OffsetRange = {
+    new OffsetRange(nAndP, fromSeq, untilSeq)
+  }
+
+  def apply(tuple: OffsetRangeTuple): OffsetRange = {
+    tupleToOffsetRange(tuple)
+  }
 
   implicit def tupleToOffsetRange(tuple: OffsetRangeTuple): OffsetRange =
-    OffsetRange(tuple._1, tuple._2, tuple._3, tuple._4, tuple._5)
+    OffsetRange(tuple._1, tuple._2, tuple._3)
 
   implicit def tupleListToOffsetRangeList(list: List[OffsetRangeTuple]): List[OffsetRange] =
     for { tuple <- list } yield tupleToOffsetRange(tuple)

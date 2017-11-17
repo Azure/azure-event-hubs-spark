@@ -26,8 +26,9 @@ import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import scala.collection.JavaConverters._
 import language.implicitConversions
 
-// TODO deprecate partitionCount ASAP (like don't release with it included). Get partition count from the service.
 // TODO: Can we catch malformed configs at compile-time?
+// TODO: What if users are starting from a checkpoint? Currently it's mandated they specify some starting point
+// TODO: Add support for a starting sequence number. Should we deprecate start offset?
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *
@@ -87,9 +88,8 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
         name.isDefined &&
         keyName.isDefined &&
         key.isDefined &&
-        partitionCount.isDefined &&
         progressDirectory.isDefined,
-      "EventHubsConf is invalid. You must set a namespace, name, keyName, key, partitionCount, progressDirectory, and consumerGroup"
+      "EventHubsConf is invalid. You must set a namespace, name, keyName, key, progressDirectory, and consumerGroup"
     )
 
     if (startOfStream.isDefined && startOfStream.get) {
@@ -174,11 +174,6 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     set("eventhubs.key", key)
   }
 
-  /** Set the partition count of your EventHubs instance */
-  def setPartitionCount(count: String): EventHubsConf = {
-    set("eventhubs.partitionCount", count)
-  }
-
   /** Set the progress directory used to checkpoint EventHubs specific files. */
   def setProgressDirectory(path: String): EventHubsConf = {
     set("eventhubs.progressDirectory", path)
@@ -201,17 +196,6 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     set("eventhubs.endOfStream", b)
   }
 
-  /** Set the max rate per partition. This will set all partitions with the same rate. */
-  def setMaxRatePerPartition(rate: Int): EventHubsConf = {
-    if (partitionCount.isEmpty) {
-      logWarning("Your max rate was not set. The partition count must be set first.")
-    } else {
-      setMaxRatePerPartition(0 until partitionCount.get.toInt, rate)
-    }
-    this
-
-  }
-
   /**
    * Set the max rate per partition. This allows you to set rates on a per partition basis.
    * If you don't specify a max rate for a specific partition, we'll use [[DefaultMaxRatePerPartition]].
@@ -227,28 +211,9 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
    * ehConf.setMaxRatePerPartition(4 until 7, 50) // exclusive option }}}
    */
   def setMaxRatePerPartition(range: Range, rate: Rate): EventHubsConf = {
-    if (partitionCount.isEmpty) {
-      logWarning("Your max rate was not set. The partition count must be set first.")
-    } else if (!EventHubsConf.isSubset(partitionCount.get, range)) {
-      logWarning(s"Your start offsets were not set. $range contains invalid partitions.")
-    } else {
-      val newRates: Map[PartitionId, Rate] =
-        (for { partitionId <- range } yield partitionId -> rate).toMap
-      _maxRatesPerPartition ++= newRates
-    }
-    this
-  }
-
-  /**
-   * Set your starting offsets. Spark will consume from these offsets on startup.
-   * This will set all partitions with the same starting offsets.
-   */
-  def setStartOffsets(offset: Offset): EventHubsConf = {
-    if (partitionCount.isEmpty) {
-      logWarning("Your start offsets were not set. The partition count must be set first.")
-    } else {
-      setStartOffsets(0 until partitionCount.get.toInt, offset)
-    }
+    val newRates: Map[PartitionId, Rate] =
+      (for { partitionId <- range } yield partitionId -> rate).toMap
+    _maxRatesPerPartition ++= newRates
     this
   }
 
@@ -267,41 +232,19 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
    * ehConf.setStartOffsets(4 until 7, 50) // exclusive option }}}
    */
   def setStartOffsets(range: Range, offset: Offset): EventHubsConf = {
-    if (partitionCount.isEmpty) {
-      logWarning("Your start offsets were not set. The partition count must be set first.")
-    } else if (!EventHubsConf.isSubset(partitionCount.get, range)) {
-      logWarning(s"Your start offsets were not set. $range contains invalid partitions.")
-    } else {
-      setStartingWith("Offsets")
-      val newOffsets: Map[PartitionId, Offset] =
-        (for { partitionId <- range } yield partitionId -> offset).toMap
-      _startOffsets ++= newOffsets
-    }
-    this
-  }
-
-  /** Behavior is the same as [[setStartOffsets(Offset)]] (except with enqueue times!) */
-  def setStartEnqueueTimes(enqueueTime: EnqueueTime): EventHubsConf = {
-    if (partitionCount.isEmpty) {
-      logWarning("Your enqueue times were not set. The partition count must be set first.")
-    } else {
-      setStartEnqueueTimes(0 until partitionCount.get.toInt, enqueueTime)
-    }
+    setStartingWith("Offsets")
+    val newOffsets: Map[PartitionId, Offset] =
+      (for { partitionId <- range } yield partitionId -> offset).toMap
+    _startOffsets ++= newOffsets
     this
   }
 
   /** Behavior is the same as [[setStartOffsets(Range, Offset)]] (except with enqueue times!) */
   def setStartEnqueueTimes(range: Range, enqueueTime: EnqueueTime): EventHubsConf = {
-    if (partitionCount.isEmpty) {
-      logWarning("Your enqueue times were not set. The partition count must be set first.")
-    } else if (!EventHubsConf.isSubset(partitionCount.get, range)) {
-      logWarning(s"Your enqueue times were not set. $range contains invalid partitions.")
-    } else {
-      setStartingWith("EnqueueTimes")
-      val newEnqueueTimes =
-        (for { partitionId <- range } yield partitionId -> enqueueTime).toMap
-      _startEnqueueTimes ++= newEnqueueTimes
-    }
+    setStartingWith("EnqueueTimes")
+    val newEnqueueTimes =
+      (for { partitionId <- range } yield partitionId -> enqueueTime).toMap
+    _startEnqueueTimes ++= newEnqueueTimes
     this
   }
 
@@ -354,11 +297,6 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   /** The currently set key. */
   def key: Option[String] = {
     self.get("eventhubs.key")
-  }
-
-  /** The currently set partition count. */
-  def partitionCount: Option[String] = {
-    self.get("eventhubs.partitionCount")
   }
 
   /** The currently set progress directory. */
@@ -458,11 +396,6 @@ object EventHubsConf extends Logging {
     ehConf._maxRatesPerPartition = parseMaxRatesPerPartition(params("eventhubs.maxRates"))
 
     ehConf
-  }
-
-  private def isSubset(partitionCount: String, subset: Range): Boolean = {
-    val maxRange = 0 until partitionCount.toInt
-    subset.start >= maxRange.start && subset.end <= maxRange.end
   }
 
   private[common] def parseOffsets(startOffsets: String): Map[PartitionId, Offset] = {

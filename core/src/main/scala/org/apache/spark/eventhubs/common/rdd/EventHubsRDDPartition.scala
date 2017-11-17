@@ -15,22 +15,23 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common
+package org.apache.spark.eventhubs.common.rdd
 
-/**
- * interface representing the bridge between EventHubs and Spark-side processing engine
- * (Direct DStream or Structured Streaming)
- */
-// TODO this can go when progress tracker is removed.
-private[spark] trait EventHubsConnector {
+import org.apache.spark.Partition
+import org.apache.spark.eventhubs.common.{ NameAndPartition, SequenceNumber, PartitionId }
 
-  // the id of the stream which is mapped from eventhubs instance
-  def streamId: Int
+private class EventHubsRDDPartition(val index: Int,
+                                    val nameAndPartition: NameAndPartition,
+                                    val fromSeqNo: SequenceNumber,
+                                    val untilSeqNo: SequenceNumber)
+    extends Partition {
 
-  // uniquely identify the entities in eventhubs side, it can be the EventHubs namespace or the
-  // combination of namespace and eventhubs name and streamId
-  def uid: String
+  /** Number of messages this partition refers to */
+  def count: Long = untilSeqNo - fromSeqNo
 
-  // the list of eventhubs partitions connecting with this connector
-  def namesAndPartitions: List[NameAndPartition]
+  /** The EventHubs name corresponding to this RDD Partition */
+  def name: String = nameAndPartition.ehName
+
+  /** The EventHubs partitionId corresponding to this RDD Partition */
+  def partitionId: PartitionId = nameAndPartition.partitionId
 }

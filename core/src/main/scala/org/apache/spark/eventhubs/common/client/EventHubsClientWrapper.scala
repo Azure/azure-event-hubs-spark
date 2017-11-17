@@ -19,6 +19,7 @@ package org.apache.spark.eventhubs.common.client
 
 import java.net.URI
 import java.time.{ Duration, Instant }
+import java.util.concurrent.{ ConcurrentHashMap, ConcurrentMap }
 
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
@@ -58,28 +59,24 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
   client = EventHubClient.createFromConnectionStringSync(connectionString.toString)
 
-  private[spark] def initReceiver(partitionId: String,
-                                  offsetType: EventHubsOffsetType,
-                                  currentOffset: String): Unit = {
-    logInfo(
-      s"createReceiverInternal: Starting a receiver for partitionId $partitionId with start offset $currentOffset")
-    partitionReceiver = offsetType match {
-      case EventHubsOffsetTypes.EnqueueTime =>
-        client.createReceiverSync(consumerGroup,
-                                  partitionId,
-                                  Instant.ofEpochSecond(currentOffset.toLong))
-      case _ =>
-        client.createReceiverSync(consumerGroup, partitionId, currentOffset)
-    }
-    partitionReceiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-  }
+  private[spark] override def receiver(partitionId: String,
+                                       seqNo: SequenceNumber): PartitionReceiver = {
 
-  def receive(expectedEventNum: Int): Iterable[EventData] = {
-    // TODO: revisit this method after refactoring the RDD. We should not need to call min like this.
-    val events = partitionReceiver
-      .receive(math.min(expectedEventNum, partitionReceiver.getPrefetchCount))
-      .get()
-    if (events != null) events.asScala else null
+    // TODO: just so this build. Remove this once API is actually available.
+    implicit class SeqNoAPI(val client: EventHubClient) extends AnyVal {
+      def createReceiver(consumerGroup: String,
+                         partitionId: String,
+                         seqNo: Long,
+                         inclusiveSeqNo: Boolean): PartitionReceiver =
+        null
+    }
+
+    if (partitionReceiver == null) {
+      logInfo(s"Starting receiver for partitionId $partitionId from seqNo $seqNo")
+      client.createReceiver(consumerGroup, partitionId, seqNo, true)
+      partitionReceiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+    }
+    partitionReceiver
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
@@ -99,10 +96,10 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def earliestSeqNo(nameAndPartition: NameAndPartition): Option[Long] = {
+  override def earliestSeqNo(nameAndPartition: NameAndPartition): SequenceNumber = {
     try {
       val runtimeInformation = getRunTimeInfo(nameAndPartition)
-      Some(runtimeInformation.getBeginSequenceNumber)
+      runtimeInformation.getBeginSequenceNumber
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -115,10 +112,10 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  override def lastOffsetAndSeqNo(nameAndPartition: NameAndPartition): (Long, Long) = {
+  override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
     try {
-      val runtimeInfo = getRunTimeInfo(nameAndPartition)
-      (runtimeInfo.getLastEnqueuedOffset.toLong, runtimeInfo.getLastEnqueuedSequenceNumber)
+      val runtimeInfo = getRunTimeInfo(NameAndPartition(ehName, partitionId))
+      runtimeInfo.getLastEnqueuedSequenceNumber
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -131,10 +128,21 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    *
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): Option[Long] = {
+  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): EnqueueTime = {
     try {
       val runtimeInfo = getRunTimeInfo(nameAndPartition)
-      Some(runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond)
+      runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond
+    } catch {
+      case e: Exception =>
+        e.printStackTrace()
+        throw e
+    }
+  }
+
+  override def partitionCount(): Int = {
+    try {
+      val runtimeInfo = client.getRuntimeInformation.get
+      runtimeInfo.getPartitionCount
     } catch {
       case e: Exception =>
         e.printStackTrace()
@@ -148,6 +156,60 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     if (client != null) client.closeSync()
   }
 
+  /**
+   * Translate will take any starting point, and then return the corresponding Offset and SequenceNumber.
+   */
+  override def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber] = {
+    val startingWith = ehConf("eventhubs.startingWith")
+    val partitionCount = ehConf("eventhubs.partitionCount").toInt
+    val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
+
+    val threads = for (partitionId <- 0 until partitionCount)
+      yield
+        new Thread {
+          override def run(): Unit = {
+            // Pattern  match is to create the correct receiver based on what we're startingWith.
+            val receiver = startingWith match {
+              case "Offsets" =>
+                val offsets = ehConf.startOffsets
+                client
+                  .createReceiver(DefaultConsumerGroup,
+                                  partitionId.toString,
+                                  offsets.getOrElse(partitionId, DefaultStartOffset).toString,
+                                  true)
+                  .get
+              case "EnqueueTimes" =>
+                val enqueueTimes = ehConf.startEnqueueTimes
+                client
+                  .createReceiver(
+                    DefaultConsumerGroup,
+                    partitionId.toString,
+                    Instant.ofEpochSecond(enqueueTimes.getOrElse(partitionId, DefaultEnqueueTime)))
+                  .get
+              case "StartOfStream" =>
+                client
+                  .createReceiver(DefaultConsumerGroup, partitionId.toString, StartOfStream, true)
+                  .get
+              case "EndOfStream" =>
+                client
+                  .createReceiver(DefaultConsumerGroup, partitionId.toString, EndOfStream, true)
+                  .get
+            }
+            // TODO for now this is hardcoded. This needs to change to PartitionReceiver.PREFETCH_COUNT_MINIMUM.
+            // It will be available next EH Client release.
+            receiver.setPrefetchCount(10)
+            val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
+            receiver.close().get()
+            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+          }
+        }
+
+    logInfo("translate: Starting threads to translate to (offset, sequence number) pairs.")
+    threads.foreach(thread => thread.start())
+    threads.foreach(thread => thread.join())
+    logInfo("translate: Translation complete.")
+    result.asScala.toMap
+  }
 }
 
 private[spark] object EventHubsClientWrapper {

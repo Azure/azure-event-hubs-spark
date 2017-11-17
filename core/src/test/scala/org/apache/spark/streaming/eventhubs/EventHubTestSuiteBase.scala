@@ -20,7 +20,7 @@ package org.apache.spark.streaming.eventhubs
 import java.io.{ IOException, ObjectInputStream }
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.common.utils.{
   EventHubsTestUtilities,
   FluctuatedEventHubClient,

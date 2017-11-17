@@ -17,7 +17,7 @@
 
 package org.apache.spark.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition, OffsetRecord }
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.{ Duration, Seconds, Time }
 import org.scalatest.mock.MockitoSugar

@@ -56,7 +56,7 @@ private[spark] object RateControlUtils extends Logging {
                                              namesAndPartitions: List[NameAndPartition]): Unit = {
     val lastEnqueuedTimes = for {
       nAndP <- namesAndPartitions
-      lastTime = ehClient.lastEnqueuedTime(nAndP).get
+      lastTime = ehClient.lastEnqueuedTime(nAndP)
     } yield nAndP -> lastTime
 
     val booleans = for {

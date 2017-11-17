@@ -17,17 +17,15 @@
 
 package org.apache.spark.eventhubs.common.client
 
-import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubs.common.NameAndPartition
+import com.microsoft.azure.eventhubs.{ EventData, EventHubClient, PartitionReceiver }
+import org.apache.spark.eventhubs.common._
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 
 private[spark] trait Client extends Serializable {
 
   private[spark] var client: EventHubClient
 
-  private[spark] def initReceiver(partitionId: String,
-                                  offsetType: EventHubsOffsetType,
-                                  currentOffset: String): Unit
+  private[spark] def receiver(partitionId: String, seqNo: SequenceNumber): PartitionReceiver
 
   def receive(expectedEvents: Int): Iterable[EventData]
 
@@ -37,7 +35,7 @@ private[spark] trait Client extends Serializable {
    *
    * @return a map from eventhubName-partition to seq
    */
-  def earliestSeqNo(eventHubNameAndPartition: NameAndPartition): Option[Long]
+  def earliestSeqNo(eventHubNameAndPartition: NameAndPartition): SequenceNumber
 
   /**
    * Provides the last (highest) sequence number and offset that exists in the EventHubs
@@ -45,14 +43,23 @@ private[spark] trait Client extends Serializable {
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
-  def lastOffsetAndSeqNo(eventHubNameAndPartition: NameAndPartition): (Long, Long)
+  def latestSeqNo(partitionId: PartitionId): SequenceNumber
 
   /**
    * Provides the last (highest) enqueue time of an event for a given partition.
    *
    * @return a map from eventHubsNamePartition to EnqueueTime
    */
-  def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): Option[Long]
+  def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): EnqueueTime
+
+  /**
+   * Translates any starting point provided by a user to the specific offset and sequence number
+   * that we need to start from. This ensure that within Spark, we're only dealing with offsets
+   * and sequence numbers.
+   */
+  def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber]
+
+  def partitionCount(): Int
 
   /**
    * Closes the EventHubs client.

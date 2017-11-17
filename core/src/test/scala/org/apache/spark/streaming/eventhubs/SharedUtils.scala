@@ -21,7 +21,7 @@ import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{ FileSystem, Path }
-import org.apache.spark.eventhubs.common.{ EventHubsConf, EventHubsConnector }
+import org.apache.spark.eventhubs.common.EventHubsConf
 import org.scalatest.{ BeforeAndAfterEach, FunSuite }
 import org.apache.spark.{ SparkConf, SparkContext }
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper

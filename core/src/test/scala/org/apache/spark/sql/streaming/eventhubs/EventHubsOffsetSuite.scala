@@ -23,16 +23,17 @@ import org.apache.spark.sql.test.SharedSQLContext
 
 class EventHubsOffsetSuite extends OffsetSuite with SharedSQLContext {
 
-  val eventHubsBatchRecord = EventHubsBatchRecord(0L,
-                                                  Map(NameAndPartition("eventhub", 0) -> 0L,
-                                                      NameAndPartition("eventhub", 1) -> 100L,
-                                                      NameAndPartition("eventhub", 2) -> 200L))
+  val eventHubsBatchRecord = EventHubsSourceOffset(0L,
+                                                   Map(NameAndPartition("eventhub", 0) -> 0L,
+                                                       NameAndPartition("eventhub", 1) -> 100L,
+                                                       NameAndPartition("eventhub", 2) -> 200L))
 
   test("basic serialization and deserialization of Eventhubs batch record") {
 
     val deserializedEventhubsBatchRecord = JsonUtils.partitionAndSeqNum(eventHubsBatchRecord.json)
 
     assert(deserializedEventhubsBatchRecord.batchId === eventHubsBatchRecord.batchId)
-    assert(deserializedEventhubsBatchRecord.targetSeqNums === eventHubsBatchRecord.targetSeqNums)
+    assert(
+      deserializedEventhubsBatchRecord.partitionToSeqNos === eventHubsBatchRecord.partitionToSeqNos)
   }
 }

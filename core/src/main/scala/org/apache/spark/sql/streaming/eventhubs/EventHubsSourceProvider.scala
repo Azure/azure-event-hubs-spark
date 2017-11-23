@@ -43,19 +43,18 @@ private[sql] class EventHubsSourceProvider
                             schema: Option[StructType],
                             providerName: String,
                             parameters: Map[String, String]): Source = {
-    // TODO: use serviceLoader EH client dependency injection
     EventHubsClientWrapper.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
-    new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply)
+    new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply, metadataPath)
   }
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
 
-  private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(
-      parameters: Map[String, String]): (Boolean, Seq[String]) = {
+  def sourceSchema(parameters: Map[String, String]): StructType = {
     val containsProperties =
       parameters.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
+
     val userDefinedKeys = {
       if (parameters.contains("eventhubs.sql.userDefinedKeys")) {
         parameters("eventhubs.sql.userDefinedKeys").split(",").toSeq
@@ -63,30 +62,24 @@ private[sql] object EventHubsSourceProvider extends Serializable {
         Seq()
       }
     }
-    (containsProperties, userDefinedKeys)
-  }
 
-  def sourceSchema(parameters: Map[String, String]): StructType = {
-    val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
-    StructType(
-      Seq(
-        StructField("body", BinaryType),
-        StructField("offset", LongType),
-        StructField("seqNumber", LongType),
-        StructField("enqueuedTime", LongType),
-        StructField("publisher", StringType),
-        StructField("partitionKey", StringType)
-      ) ++ {
-        if (containsProperties) {
-          if (userDefinedKeys.nonEmpty) {
-            userDefinedKeys.map(key => StructField(key, StringType))
-          } else {
-            Seq(
-              StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
-          }
-        } else {
-          Seq()
-        }
-      })
+    val defaultProps = Seq(
+      StructField("body", BinaryType),
+      StructField("offset", LongType),
+      StructField("seqNumber", LongType),
+      StructField("enqueuedTime", LongType),
+      StructField("publisher", StringType),
+      StructField("partitionKey", StringType)
+    )
+
+    val additionalProps = if (containsProperties && userDefinedKeys.nonEmpty) {
+      userDefinedKeys.map(key => StructField(key, StringType))
+    } else if (containsProperties && userDefinedKeys.isEmpty) {
+      Seq(StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
+    } else {
+      Seq()
+    }
+
+    StructType(defaultProps ++ additionalProps)
   }
 }

@@ -92,9 +92,9 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     assert(offset.batchId == 0)
-    offset.targetSeqNums.values.foreach(x => assert(x == 1))
+    offset.partitionToSeqNos.values.foreach(x => assert(x == 1))
   }
 
   test("Verify expected offsetsAndSeqNos are correct when rate is more than the available data") {
@@ -111,9 +111,9 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     assert(offset.batchId == 0)
-    offset.targetSeqNums.values.foreach(x => assert(x == 2))
+    offset.partitionToSeqNos.values.foreach(x => assert(x == 2))
   }
 
   test(
@@ -133,19 +133,19 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 highestOffsetPerPartition)
     )
     // First batch
-    var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     var dataFrame = eventHubsSource.getBatch(None, offset)
     dataFrame.foreach(_ => Unit)
     eventHubsSource.commit(offset)
     assert(offset.batchId == 0)
-    offset.targetSeqNums.values.foreach(x => assert(x == 2))
+    offset.partitionToSeqNos.values.foreach(x => assert(x == 2))
     // Second batch
-    offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     dataFrame = eventHubsSource.getBatch(None, offset)
     dataFrame.foreach(_ => Unit)
     eventHubsSource.commit(offset)
     assert(offset.batchId == 1)
-    offset.targetSeqNums.values.foreach(x => assert(x == 4))
+    offset.partitionToSeqNos.values.foreach(x => assert(x == 4))
   }
 
   test("Verify expected dataframe size is correct when the rate is less than the available data") {
@@ -162,7 +162,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -183,7 +183,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -207,13 +207,13 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 highestOffsetPerPartition)
     )
     // First batch
-    var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     var dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
     assert(dataFrame.select("body").count == 6)
     // Second batch
-    offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -244,7 +244,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -289,7 +289,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -312,7 +312,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -340,7 +340,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -368,7 +368,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                 eventHubs,
                                 highestOffsetPerPartition)
     )
-    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
+    val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsSourceOffset]
     val dataFrame = eventHubsSource.getBatch(None, offset)
     assert(dataFrame.schema == eventHubsSource.schema)
     eventHubsSource.commit(offset)
@@ -828,15 +828,15 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       AddDataToEventHubs(ehParams, 2),
       UpdatePartialCheck(
-        EventHubsBatchRecord(0,
-                             Map(NameAndPartition("eh1", 1) -> 2,
-                                 NameAndPartition("eh1", 0) -> 2))),
+        EventHubsSourceOffset(0,
+                              Map(NameAndPartition("eh1", 1) -> 2,
+                                  NameAndPartition("eh1", 0) -> 2))),
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12),
       // in the second batch we have the right seq number of msgs
       UpdatePartialCheck(
-        EventHubsBatchRecord(1,
-                             Map(NameAndPartition("eh1", 1) -> 6,
-                                 NameAndPartition("eh1", 0) -> 7))),
+        EventHubsSourceOffset(1,
+                              Map(NameAndPartition("eh1", 1) -> 6,
+                                  NameAndPartition("eh1", 0) -> 7))),
       AdvanceManualClock(10),
       CheckAnswer(true, false, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     )

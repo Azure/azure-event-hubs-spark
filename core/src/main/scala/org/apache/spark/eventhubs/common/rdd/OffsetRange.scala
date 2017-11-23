@@ -21,6 +21,10 @@ import org.apache.spark.eventhubs.common._
 
 import language.implicitConversions
 
+trait HasOffsetRanges {
+  def offsetRanges: Array[OffsetRange]
+}
+
 private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
                                        val fromSeqNo: SequenceNumber,
                                        val untilSeqNo: SequenceNumber) {

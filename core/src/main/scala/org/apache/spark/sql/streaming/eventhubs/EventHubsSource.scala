@@ -17,9 +17,11 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+import java.io._
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.commons.io.IOUtils
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange }
@@ -27,8 +29,12 @@ import org.apache.spark.eventhubs.common._
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.ArrayBasedMapData
-import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset, Source }
-import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
+import org.apache.spark.sql.execution.streaming.{
+  HDFSMetadataLog,
+  Offset,
+  SerializedOffset,
+  Source
+}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ DataFrame, SQLContext }
 import org.apache.spark.unsafe.types.UTF8String
@@ -39,46 +45,65 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.util.{ Failure, Success }
 
 private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
-                                                         parameters: Map[String, String],
-                                                         clientFactory: (EventHubsConf => Client))
+                                                         options: Map[String, String],
+                                                         clientFactory: (EventHubsConf => Client),
+                                                         metadataPath: String)
     extends Source
-    with EventHubsConnector
     with Logging {
 
-  private val ehConf = EventHubsConf.toConf(parameters)
-
-  case class EventHubsOffset(batchId: Long, offsets: Map[NameAndPartition, (Long, Long)])
-
-  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
+  private val ehConf = EventHubsConf.toConf(options)
+  private val sc = sqlContext.sparkContext
 
   private var _client: Client = _
+
   private[eventhubs] def ehClient = {
-    if (_client == null) {
-      _client = clientFactory(ehConf)
-    }
+    if (_client == null) _client = clientFactory(ehConf)
     _client
   }
-  private[spark] def ehClient_=(eventHubClient: Client) = {
-    _client = eventHubClient
-    this
-  }
 
-  private var _receiver: EventHubsConf => Client = _
-  private[eventhubs] def receiverFactory = {
-    if (_receiver == null) {
-      _receiver = clientFactory
-    }
-    _receiver
-  }
-  private[spark] def receiverFactory_=(f: EventHubsConf => Client) = {
-    _receiver = f
-    this
-  }
+  private lazy val initialPartitionSeqNos = {
+    val metadataLog =
+      new HDFSMetadataLog[EventHubsSourceOffset](sqlContext.sparkSession, metadataPath) {
+        override def serialize(metadata: EventHubsSourceOffset, out: OutputStream): Unit = {
+          out.write(0) // SPARK-19517
+          val writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))
+          writer.write("v" + VERSION + "\n")
+          writer.write(metadata.json)
+          writer.flush()
+        }
 
-  override def namesAndPartitions: List[NameAndPartition] = {
-    val partitionCount = ehConf("eventhubs.partitionCount").toInt
-    (for (partitionId <- 0 until partitionCount)
-      yield NameAndPartition(ehConf("eventhubs.name"), partitionId)).toList
+        override def deserialize(in: InputStream): EventHubsSourceOffset = {
+          in.read() // zero byte is read (SPARK-19517)
+          val content = IOUtils.toString(new InputStreamReader(in, StandardCharsets.UTF_8))
+          // HDFSMetadataLog guarantees that it never creates a partial file.
+          assert(content.length != 0)
+          if (content(0) == 'v') {
+            val indexOfNewLine = content.indexOf("\n")
+            if (indexOfNewLine > 0) {
+              val version = parseVersion(content.substring(0, indexOfNewLine), VERSION)
+              EventHubsSourceOffset(SerializedOffset(content.substring(indexOfNewLine + 1)))
+            } else {
+              throw new IllegalStateException("Log file was malformed.")
+            }
+          } else {
+            EventHubsSourceOffset(SerializedOffset(content)) // Spark 2.1 log file
+          }
+        }
+      }
+
+    metadataLog
+      .get(0)
+      .getOrElse {
+        val seqNos = ehClient.translate(ehConf).map {
+          case (pId, seqNo) =>
+            (NameAndPartition(ehConf.name.get, pId), seqNo)
+        }
+        val offset = EventHubsSourceOffset(seqNos)
+        metadataLog.add(0, offset)
+        logInfo(s"Initial sequence numbers: $seqNos")
+        offset
+      }
+      .partitionToSeqNos
   }
 
   private implicit val cleanupExecutorService =
@@ -106,7 +131,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private var highestOffsetsAndSeqNums: EventHubsOffset =
     EventHubsOffset(-1L, namesAndPartitions.map((_, (-1L, -1L))).toMap)
 
-  override def schema: StructType = EventHubsSourceProvider.sourceSchema(parameters)
+  override def schema: StructType = EventHubsSourceProvider.sourceSchema(options)
 
   private def cleanupFiles(batchIdToClean: Long): Unit = {
     Future {
@@ -151,7 +176,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                highestOffsetsAndSeqNums.offsets.toList,
                                                ehConf)
     Some(
-      EventHubsBatchRecord(
+      EventHubsSourceOffset(
         committedOffsetsAndSeqNums.batchId + 1,
         for { (nameAndPartition, seqNum) <- targetOffsets } yield
           (nameAndPartition,
@@ -195,7 +220,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     }
   }
 
-  private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
+  private def composeOffsetRange(endOffset: EventHubsSourceOffset): List[OffsetRange] = {
     val filterOffsetAndType = {
       if (committedOffsetsAndSeqNums.batchId == -1) {
         val startSeqs = new mutable.HashMap[NameAndPartition, SequenceNumber].empty
@@ -217,7 +242,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     }
 
     for {
-      (nameAndPartition, seqNo) <- endOffset.targetSeqNums.toList
+      (nameAndPartition, seqNo) <- endOffset.partitionToSeqNos.toList
       (offsetType, fromOffset) = RateControlUtils.calculateStartOffset(
         nameAndPartition,
         filterOffsetAndType,
@@ -230,7 +255,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
        offsetType)
   }
 
-  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
+  private def buildEventHubsRDD(endOffset: EventHubsSourceOffset): EventHubsRDD = {
     val offsetRanges = composeOffsetRange(endOffset)
     new EventHubsRDD(
       sqlContext.sparkContext,
@@ -243,8 +268,17 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private def convertEventHubsRDDToDataFrame(eventHubsRDD: EventHubsRDD): DataFrame = {
     import scala.collection.JavaConverters._
-    val (containsProperties, userDefinedKeys) =
-      EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(parameters)
+    val containsProperties =
+      options.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
+
+    val userDefinedKeys = {
+      if (options.contains("eventhubs.sql.userDefinedKeys")) {
+        options("eventhubs.sql.userDefinedKeys").split(",").toSeq
+      } else {
+        Seq()
+      }
+    }
+
     val rowRDD = eventHubsRDD.map(
       eventData =>
         InternalRow.fromSeq(Seq(
@@ -277,70 +311,47 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     sqlContext.internalCreateDataFrame(rowRDD, schema)
   }
 
-  private def readProgress(batchId: Long): EventHubsOffset = {
-    val nextBatchId = batchId + 1
-    val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
-
-    val validateReadResults = progress.offsetsAndSeqNos.keySet == namesAndPartitions.toSet
-    if (progress.timestamp == -1 || !validateReadResults) {
-      // next batch hasn't been committed successfully
-      val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
-      EventHubsOffset(batchId, lastCommittedOffset.offsetsAndSeqNos)
-    } else {
-      EventHubsOffset(nextBatchId, progress.offsetsAndSeqNos)
-    }
-  }
-
-  private def recoverFromFailure(start: Option[Offset], end: Offset): Unit = {
-    val recoveredCommittedBatchId = {
-      if (start.isEmpty) {
-        -1
-      } else {
-        start.map {
-          case so: SerializedOffset =>
-            val batchRecord = JsonUtils.partitionAndSeqNum(so.json)
-            batchRecord.asInstanceOf[EventHubsBatchRecord].batchId
-          case batchRecord: EventHubsBatchRecord =>
-            batchRecord.batchId
-        }.get
-      }
-    }
-    val latestProgress = readProgress(recoveredCommittedBatchId)
-    if (latestProgress.offsets.isEmpty && start.isDefined) {
-      // we shall not commit when start is empty, otherwise, we will have a duplicate processing
-      // of the first batch
-      collectFinishedBatchOffsetsAndCommit(recoveredCommittedBatchId)
-    } else {
-      committedOffsetsAndSeqNums = latestProgress
-    }
-    logInfo(s"recovered from a failure, startOffset: $start, endOffset: $end")
-    highestOffsetsAndSeqNums = updatedHighest()
-    firstBatch = false
-  }
-
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
-    if (firstBatch) {
-      // in this case, we are just recovering from a failure; the committedOffsets and
-      // availableOffsets are fetched from in populateStartOffset() of StreamExecution
-      // convert (committedOffsetsAndSeqNums is in initial state)
-      recoverFromFailure(start, end)
+    initialPartitionSeqNos
+
+    logInfo(s"getBatch called with start = $start and end = $end")
+    val untilSeqNos = EventHubsSourceOffset.getPartitionSeqNos(end)
+    val fromSeqNos = start match {
+      case Some(prevBatchEndOffset) =>
+        EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+      case None =>
+        initialPartitionSeqNos
     }
+
+    // TODO: is there possibility for data loss? Will partitions ever be missing?
+    val newPartitions = untilSeqNos.keySet.diff(fromSeqNos.keySet)
+    val newPartitionSeqNos = (for {
+      nameAndPartition <- newPartitions
+      seqNo = ehClient.earliestSeqNo(nameAndPartition)
+    } yield nameAndPartition -> seqNo).toMap
+    assert(newPartitions == newPartitionSeqNos.keySet,
+           s"Missing partitions: ${newPartitions.diff(newPartitionSeqNos.keySet)}")
+    logInfo(s"Partitions added: $newPartitionSeqNos")
+
+    // TODO: same as the one above.
+    val deletedPartitions = fromSeqNos.keySet.diff(untilSeqNos.keySet)
+
     val eventhubsRDD = buildEventHubsRDD({
       end match {
         case so: SerializedOffset =>
           JsonUtils.partitionAndSeqNum(so.json)
-        case batchRecord: EventHubsBatchRecord =>
+        case batchRecord: EventHubsSourceOffset =>
           batchRecord
       }
     })
     convertEventHubsRDDToDataFrame(eventhubsRDD)
   }
 
-  override def stop(): Unit = {}
-
-  override def uid: String = s"${ehConf.namespace}_${ehConf.name}_$streamId"
+  override def stop(): Unit = synchronized {
+    ehClient.close()
+  }
 }
 
-private object EventHubsSource {
-  val streamIdGenerator = new AtomicInteger(0)
+private[eventhubs] object EventHubsSource {
+  private[eventhubs] val VERSION = 1
 }

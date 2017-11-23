@@ -21,14 +21,17 @@ import scala.collection.mutable.ArrayBuffer
 import com.microsoft.azure.eventhubs.{ EventData, PartitionReceiver }
 import org.apache.spark.eventhubs.common.{ EventHubsConf, SequenceNumber }
 import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
 private[spark] class EventHubsRDD(sc: SparkContext,
-                                  ehConf: EventHubsConf,
+                                  val ehConf: EventHubsConf,
                                   val offsetRanges: Array[OffsetRange],
                                   receiverFactory: (EventHubsConf => Client))
-    extends RDD[EventData](sc, Nil) {
+    extends RDD[EventData](sc, Nil)
+    with Logging
+    with HasOffsetRanges {
 
   override def getPartitions: Array[Partition] = {
     for {
@@ -36,7 +39,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     } yield new EventHubsRDDPartition(i, o.nameAndPartition, o.fromSeqNo, o.untilSeqNo)
   }
 
-  override def count(): Long = offsetRanges.map(_.count).sum
+  override def count: Long = offsetRanges.map(_.count).sum
 
   override def isEmpty(): Boolean = count == 0L
 

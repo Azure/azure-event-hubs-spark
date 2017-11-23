@@ -52,7 +52,7 @@ case class AddDataToEventHubs[T: ClassTag, U: ClassTag](
     val targetOffsetPerPartition = highestOffsetPerPartition.map {
       case (ehNameAndPartition, (offset, _, _)) => (ehNameAndPartition, offset)
     }
-    val eventHubsBatchRecord = EventHubsBatchRecord(highestBatchId, targetOffsetPerPartition)
+    val eventHubsBatchRecord = EventHubsSourceOffset(highestBatchId, targetOffsetPerPartition)
     (eventHubsSource, eventHubsBatchRecord)
   }
 }

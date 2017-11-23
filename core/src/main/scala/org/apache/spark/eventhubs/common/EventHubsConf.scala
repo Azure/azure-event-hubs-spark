@@ -32,7 +32,9 @@ import language.implicitConversions
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *
- * Namespace, name, keyName, key, partitionCount, progressDirectory, and consumerGroup are required.
+ * Namespace, name, keyName, key, and consumerGroup are required.
+ *
+ * EventHubsConf is case insensitive.
  *
  * You can start from the beginning of a stream, end of a stream, from particular offsets, or from
  * particular enqueue times. If none of those are provided, we will start from the beginning of your stream.
@@ -87,9 +89,8 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
       namespace.isDefined &&
         name.isDefined &&
         keyName.isDefined &&
-        key.isDefined &&
-        progressDirectory.isDefined,
-      "EventHubsConf is invalid. You must set a namespace, name, keyName, key, progressDirectory, and consumerGroup"
+        key.isDefined,
+      "EventHubsConf is invalid. You must set a namespace, name, keyName, key, and consumerGroup"
     )
 
     if (startOfStream.isDefined && startOfStream.get) {
@@ -172,11 +173,6 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   /** Set the key for your EventHubs instance */
   def setKey(key: String): EventHubsConf = {
     set("eventhubs.key", key)
-  }
-
-  /** Set the progress directory used to checkpoint EventHubs specific files. */
-  def setProgressDirectory(path: String): EventHubsConf = {
-    set("eventhubs.progressDirectory", path)
   }
 
   /** Set the consumer group for your EventHubs instance. */
@@ -297,11 +293,6 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   /** The currently set key. */
   def key: Option[String] = {
     self.get("eventhubs.key")
-  }
-
-  /** The currently set progress directory. */
-  def progressDirectory: Option[String] = {
-    self.get("eventhubs.progressDirectory")
   }
 
   /** The currently set consumer group. */

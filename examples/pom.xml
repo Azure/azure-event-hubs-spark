@@ -23,7 +23,7 @@
   <parent>
     <groupId>com.microsoft.azure</groupId>
     <artifactId>azure-eventhubs-databricks-parent_2.11</artifactId>
-    <version>3.3.0</version>
+    <version>3.3.1</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>azure-eventhubs-databricks-examples_2.11</artifactId>

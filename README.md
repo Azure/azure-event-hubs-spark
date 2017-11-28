@@ -30,7 +30,8 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Databricks
 |Databricks Runtime Version|Package Name|Package Version|
 |-------------|------------|----------------|
-|Databricks Runtime 3.3|azure-eventhubs-databricks_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
+|Databricks Runtime 3.4|azure-eventhubs-databricks_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
+|Databricks Runtime 3.3|azure-eventhubs-databricks_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-databricks_2.11/3.3.0.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
 
 #### Roadmap
 Planned changes can be found on our [wiki](https://github.com/Azure/azure-event-hubs-spark/wiki).

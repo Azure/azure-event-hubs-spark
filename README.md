@@ -4,12 +4,13 @@
 
 # Azure EventHubs + Apache Spark Connector 
 
+[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/azure-event-hubs-spark)
+
 |Branch|Status|
 |------|-------------|
 |master|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 |spark-2.1|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.1)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
-|spark-2.0|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.0)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
-|databricks-3.3|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=databricks-3.3)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
+|databricks-3.4|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=databricks-3.4)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 
 This is the source code for the Azure Event Hubs and Apache Spark Connector. 
 
@@ -28,7 +29,11 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Databricks
 |Databricks Runtime Version|Package Name|Package Version|
 |-------------|------------|----------------|
-|Databricks Runtime 3.3|azure-eventhubs-databricks_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
+|Databricks Runtime 3.4|azure-eventhubs-databricks_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
+|Databricks Runtime 3.3|azure-eventhubs-databricks_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-databricks_2.11/3.3.0.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-databricks_2.11)|
+
+#### Roadmap
+Planned changes can be found on our [wiki](https://github.com/Azure/azure-event-hubs-spark/wiki).
 
 ## Overview
 The best place to start when using this library is to **make sure you're acquainted with Azure Event Hubs and Apache Spark**. You can read Azure Event Hubs documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, last but not least, Structured Streaming [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 

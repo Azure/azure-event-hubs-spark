@@ -18,28 +18,29 @@
 package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
-import org.apache.spark.streaming.{Seconds, StreamingContext}
-import org.apache.spark.eventhubs.common.EventHubsUtils
+import org.apache.spark.streaming.{ Seconds, StreamingContext }
+import org.apache.spark.eventhubs.common.{ EventHubsConf, EventHubsUtils }
 
 object WindowingWordCount {
 
-  private def createStreamingContext(
-      sparkCheckpointDir: String,
-      batchDuration: Int,
-      namespace: String,
-      eventHunName: String,
-      eventhubParams: Map[String, String],
-      progressDir: String) = {
+  private def createStreamingContext(sparkCheckpointDir: String,
+                                     batchDuration: Int,
+                                     namespace: String,
+                                     eventHunName: String,
+                                     ehConf: EventHubsConf,
+                                     progressDir: String) = {
     val ssc = new StreamingContext(new SparkContext(), Seconds(batchDuration))
     ssc.checkpoint(sparkCheckpointDir)
-    val inputDirectStream = EventHubsUtils.createDirectStreams(
-      ssc,
-      progressDir,
-      Map(eventHunName -> eventhubParams))
+    val inputDirectStream =
+      EventHubsUtils.createDirectStream(ssc, ehConf)
 
-    inputDirectStream.map(receivedRecord => (new String(receivedRecord.getBody), 1)).
-      reduceByKeyAndWindow((v1, v2) => v1 + v2, (v1, v2) => v1 - v2, Seconds(batchDuration * 3),
-        Seconds(batchDuration)).print()
+    inputDirectStream
+      .map(receivedRecord => (new String(receivedRecord.getBody), 1))
+      .reduceByKeyAndWindow((v1, v2) => v1 + v2,
+                            (v1, v2) => v1 - v2,
+                            Seconds(batchDuration * 3),
+                            Seconds(batchDuration))
+      .print()
 
     ssc
   }
@@ -47,33 +48,38 @@ object WindowingWordCount {
   def main(args: Array[String]): Unit = {
 
     if (args.length != 8) {
-      println("Usage: program progressDir PolicyName PolicyKey EventHubNamespace EventHubName" +
-        " BatchDuration(seconds) Spark_Checkpoint_Directory maxRate")
+      println(
+        "Usage: program progressDir PolicyName PolicyKey EventHubNamespace EventHubName" +
+          " BatchDuration(seconds) Spark_Checkpoint_Directory maxRate")
       sys.exit(1)
     }
 
     val progressDir = args(0)
-    val policyName = args(1)
-    val policykey = args(2)
+    val keyName = args(1)
+    val key = args(2)
     val namespace = args(3)
     val name = args(4)
     val batchDuration = args(5).toInt
     val sparkCheckpointDir = args(6)
     val maxRate = args(7)
 
-    val eventhubParameters = Map[String, String] (
-      "eventhubs.policyname" -> policyName,
-      "eventhubs.policykey" -> policykey,
-      "eventhubs.namespace" -> namespace,
-      "eventhubs.name" -> name,
-      "eventhubs.partition.count" -> "32",
-      "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.maxRate" -> s"$maxRate"
-    )
+    val ehConf = EventHubsConf()
+      .setNamespace(namespace)
+      .setName(name)
+      .setKeyName(keyName)
+      .setKey(key)
+      .setMaxRatePerPartition(maxRate.toInt)
+      .setProgressDirectory(progressDir)
+      .setConsumerGroup("$Default")
 
     val ssc = StreamingContext.getOrCreate(sparkCheckpointDir,
-      () => createStreamingContext(sparkCheckpointDir, batchDuration, namespace, name,
-        eventhubParameters, progressDir))
+                                           () =>
+                                             createStreamingContext(sparkCheckpointDir,
+                                                                    batchDuration,
+                                                                    namespace,
+                                                                    name,
+                                                                    ehConf,
+                                                                    progressDir))
 
     ssc.start()
     ssc.awaitTermination()

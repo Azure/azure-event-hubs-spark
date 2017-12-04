@@ -20,10 +20,10 @@ package org.apache.spark.sql.streaming.eventhubs
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.{ Dataset, SparkSession }
-import org.apache.spark.sql.streaming.{ OutputMode, ProcessingTime, Trigger }
+import org.apache.spark.sql.streaming.{ OutputMode, ProcessingTime }
 import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.util.Utils
 import org.scalatest.mock.MockitoSugar
@@ -37,18 +37,27 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                                        containsProperties: Boolean = false,
                                        userDefinedKeys: Option[String] = None,
                                        enqueueTime: Option[Long] = None): Map[String, String] = {
-    Map[String, String](
-      "eventhubs.policyname" -> "policyName",
-      "eventhubs.policykey" -> "policyKey",
-      "eventhubs.namespace" -> s"$namespace",
-      "eventhubs.name" -> s"$name",
-      "eventhubs.partition.count" -> s"$partitionCount",
-      "eventhubs.consumergroup" -> "$Default",
-      "eventhubs.progressTrackingDir" -> tempRoot,
-      "eventhubs.maxRate" -> s"$maxRate",
-      "eventhubs.sql.containsProperties" -> s"$containsProperties"
-    ) ++ userDefinedKeys.map(udk => Map("eventhubs.sql.userDefinedKeys" -> udk)).getOrElse(Map()) ++
-      enqueueTime.map(et => Map("eventhubs.filter.enqueuetime" -> et.toString)).getOrElse(Map())
+    val ehConf =
+      EventHubsConf()
+        .setNamespace(namespace)
+        .setName(name)
+        .setKeyName("policyName")
+        .setKey("policyKey")
+        .setPartitionCount(s"$partitionCount")
+        .setProgressDirectory(tempRoot)
+        .setConsumerGroup("$Default")
+        .setMaxRatePerPartition(maxRate)
+        .setSqlContainsProperties(containsProperties)
+
+    if (enqueueTime.isDefined) {
+      ehConf.setStartEnqueueTimes(enqueueTime.get)
+    } else {
+      ehConf.setStartOfStream(true)
+    }
+
+    if (userDefinedKeys.isDefined)
+      ehConf.setSqlUserDefinedKeys(userDefinedKeys.get)
+    ehConf.toMap
   }
 
   private def generateIntKeyedData(num: Int, offset: Int = 0): Seq[(Int, Seq[(String, String)])] = {
@@ -66,46 +75,48 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       yield bodyId.toString -> Seq("propertyV" -> null, "property" -> null)
   }
 
-  ignore("Verify expected offsetsAndSeqNos are correct when rate is less than the available data") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 2)
+  test("Verify expected offsetsAndSeqNos are correct when rate is less than the available data") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 2)
     val eventPayloadsAndProperties = generateIntKeyedData(6).map {
       case (body, properties) =>
         (body.asInstanceOf[Int], properties)
     }
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     assert(offset.batchId == 0)
     offset.targetSeqNums.values.foreach(x => assert(x == 1))
   }
 
-  ignore("Verify expected offsetsAndSeqNos are correct when rate is more than the available data") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
+  test("Verify expected offsetsAndSeqNos are correct when rate is more than the available data") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     assert(offset.batchId == 0)
     offset.targetSeqNums.values.foreach(x => assert(x == 2))
   }
 
-  ignore(
+  test(
     "Verify expected offsetsAndSeqNos are correct when in subsequent fetch when rate is less than the available data") {
     val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(10)
@@ -116,8 +127,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
       ehParams,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(ehParams, eventHubs, highestOffsetPerPartition)
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -135,18 +148,19 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     offset.targetSeqNums.values.foreach(x => assert(x == 4))
   }
 
-  ignore("Verify expected dataframe size is correct when the rate is less than the available data") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 2)
+  test("Verify expected dataframe size is correct when the rate is less than the available data") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 2)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -155,18 +169,19 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     assert(dataFrame.select("body").count == 4)
   }
 
-  ignore("Verify expected dataframe size is correct when the rate is more than the available data") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
+  test("Verify expected dataframe size is correct when the rate is more than the available data") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -175,20 +190,21 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     assert(dataFrame.select("body").count == 6)
   }
 
-  ignore(
+  test(
     "Verify expected dataframe size is correct in subsequent fetch when the rate is" +
       " less than the available data") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(10)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     // First batch
     var offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
@@ -204,10 +220,10 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     assert(dataFrame.select("body").count == 4)
   }
 
-  ignore(
+  test(
     "Verify all user-defined keys show up in dataframe schema if not specify" +
       " userDefinedKeys") {
-    val eventHubsParameters =
+    val ehParams =
       buildEventHubsParameters("ns1", "eh1", 2, 10, containsProperties = true)
     val eventPayloadsAndProperties = Seq(
       1 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1),
@@ -218,14 +234,15 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       11 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1)
     )
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -238,14 +255,15 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
         r =>
           r.get(0)
             .asInstanceOf[Map[String, String]])
+    val test = properties.collect()
     assert(
       properties
         .collect()
         .forall(propertyMap => propertyMap.keySet == Set("creationTime", "otherUserDefinedKey")))
   }
 
-  ignore("Verify user-defined keys show up in dataframe schema if specify userDefinedKey") {
-    val eventHubsParameters =
+  test("Verify user-defined keys show up in dataframe schema if specify userDefinedKey") {
+    val ehParams =
       buildEventHubsParameters("ns1",
                                "eh1",
                                2,
@@ -261,14 +279,15 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       11 -> Seq("creationTime" -> Calendar.getInstance().getTime, "otherUserDefinedKey" -> 1)
     )
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -278,19 +297,20 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     assert(dataFrame.columns.contains("otherUserDefinedKey"))
   }
 
-  ignore("Verify null references in user-defined keys are handled correctly") {
-    val eventHubsParameters =
+  test("Verify null references in user-defined keys are handled correctly") {
+    val ehParams =
       buildEventHubsParameters("ns1", "eh1", 2, 10, containsProperties = true)
     val eventPayloadsAndProperties = generateKeyedDataWithNullValue(6)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -306,18 +326,19 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     assert(outputArray.sorted.corresponds(inputArray.sorted) { _ == _ })
   }
 
-  ignore("Verify dataframe body is correct for String type") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
+  test("Verify dataframe body is correct for String type") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateStringKeyedData(6)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -333,18 +354,19 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     assert(outputArray.sorted.corresponds(inputArray.sorted) { _ == _ })
   }
 
-  ignore("Verify dataframe body is correct for Int type") {
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 10)
+  test("Verify dataframe body is correct for Int type") {
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
     val eventHubs =
-      EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                      eventPayloadsAndProperties)
+      EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
     val highestOffsetPerPartition = EventHubsTestUtilities.getHighestOffsetPerPartition(eventHubs)
     val eventHubsSource = new EventHubsSource(
       spark.sqlContext,
-      eventHubsParameters,
-      (_: Map[String, String]) =>
-        new TestEventHubsClient(eventHubsParameters, eventHubs, highestOffsetPerPartition)
+      ehParams,
+      (_: EventHubsConf) =>
+        new TestEventHubsClient(EventHubsConf.toConf(ehParams),
+                                eventHubs,
+                                highestOffsetPerPartition)
     )
     val offset = eventHubsSource.getOffset.get.asInstanceOf[EventHubsBatchRecord]
     val dataFrame = eventHubsSource.getBatch(None, offset)
@@ -372,15 +394,15 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     dataSource.map(x => x.toInt + 1)
   }
 
-  ignore("Verify input row metric is correct when source is started with initial data") {
+  test("Verify input row metric is correct when source is started with initial data") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(0)),
-      AddDataToEventHubs(eventHubsParameters),
+      AddDataToEventHubs(ehParams),
       CheckAnswer(1, 3, 5, 2, 4, 6),
       AssertOnQuery { sourceQuery =>
         val recordsRead = sourceQuery.recentProgress.map(_.numInputRows).sum
@@ -389,37 +411,37 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     )
   }
 
-  ignore("Verify expected dataframe can be retrieved after data addition to source") {
+  test("Verify expected dataframe can be retrieved after data addition to source") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(6)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val highestBatchId = 1
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       CheckAnswer(),
-      AddDataToEventHubs(eventHubsParameters, highestBatchId, eventPayloadsAndProperties),
+      AddDataToEventHubs(ehParams, highestBatchId, eventPayloadsAndProperties),
       AdvanceManualClock(10),
       CheckAnswer(1, 3, 5, 2, 4, 6)
     )
   }
 
-  ignore(
+  test(
     "Verify expected dataframe can be retrieved after data added to source in excess" +
       " of the rate") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties = generateIntKeyedData(15)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val highestBatchId = 3
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       CheckAnswer(),
-      AddDataToEventHubs(eventHubsParameters, highestBatchId, eventPayloadsAndProperties),
+      AddDataToEventHubs(ehParams, highestBatchId, eventPayloadsAndProperties),
       AdvanceManualClock(10),
       AdvanceManualClock(10),
       AdvanceManualClock(10),
@@ -427,29 +449,28 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     )
   }
 
-  ignore(
+  test(
     "Verify expected dataframe can be retrieved when more data is added to" +
       " source after stream has started") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties1 = generateIntKeyedData(6)
     val eventPayloadsAndProperties2 = generateIntKeyedData(6, offset = 2)
     val eventPayloadsAndProperties3 = generateIntKeyedData(6, offset = 3)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                    eventPayloadsAndProperties1)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties1)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val highestBatchId = new AtomicInteger(0)
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-      AddDataToEventHubs(eventHubsParameters),
+      AddDataToEventHubs(ehParams),
       CheckAnswer(1, 3, 5, 2, 4, 6),
-      AddDataToEventHubs(eventHubsParameters,
+      AddDataToEventHubs(ehParams,
                          highestBatchId.incrementAndGet.toLong,
                          eventPayloadsAndProperties2),
       AdvanceManualClock(10),
       CheckAnswer(1, 3, 5, 2, 4, 6, 3, 5, 7, 4, 6, 8),
-      AddDataToEventHubs(eventHubsParameters,
+      AddDataToEventHubs(ehParams,
                          highestBatchId.incrementAndGet.toLong,
                          eventPayloadsAndProperties3),
       AdvanceManualClock(10),
@@ -457,26 +478,26 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     )
   }
 
-  ignore(
+  test(
     "Verify expected dataframe can be retrieved with data added to source after the stream" +
       " has started") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties1 = generateIntKeyedData(6)
     val eventPayloadsAndProperties2 = generateIntKeyedData(6, offset = 2)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val highestBatchId = new AtomicInteger(0)
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
       CheckAnswer(),
-      AddDataToEventHubs(eventHubsParameters,
+      AddDataToEventHubs(ehParams,
                          highestBatchId.incrementAndGet().toLong,
                          eventPayloadsAndProperties1),
       AdvanceManualClock(10),
       CheckAnswer(1, 3, 5, 2, 4, 6),
-      AddDataToEventHubs(eventHubsParameters,
+      AddDataToEventHubs(ehParams,
                          highestBatchId.incrementAndGet().toLong,
                          eventPayloadsAndProperties2),
       AdvanceManualClock(10),
@@ -484,67 +505,65 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     )
   }
 
-  ignore(
+  test(
     "Verify expected dataframe can be retrieved from different" +
       " sources with same event hubs on different streams on different queries at same rate") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
-    val sourceQuery1 = generateInputQuery(eventHubsParameters, spark)
-    val sourceQuery2 = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
+    val sourceQuery1 = generateInputQuery(ehParams, spark)
+    val sourceQuery2 = generateInputQuery(ehParams, spark)
     testStream(sourceQuery1)(
       StartStream(trigger = ProcessingTime(200)),
-      AddDataToEventHubs(eventHubsParameters, highestBatchId = 16),
+      AddDataToEventHubs(ehParams, highestBatchId = 16),
       CheckAnswer(1 to 1000: _*)
     )
     testStream(sourceQuery2)(
       StartStream(trigger = ProcessingTime(200)),
-      AddDataToEventHubs(eventHubsParameters, highestBatchId = 16),
+      AddDataToEventHubs(ehParams, highestBatchId = 16),
       CheckAnswer(1 to 1000: _*)
     )
   }
 
-  ignore(
+  test(
     "Verify expected dataframe can be retrieved from different " +
       "sources with same event hubs on different streams on different queries at different rates") {
     import testImplicits._
-    val eventHubsParameters1 = buildEventHubsParameters("ns1", "eh1", 2, 30)
-    val eventHubsParameters2 = buildEventHubsParameters("ns1", "eh1", 2, 10)
+    val ehParams1 = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams2 = buildEventHubsParameters("ns1", "eh1", 2, 10)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters1,
-                                                    eventPayloadsAndProperties)
-    val sourceQuery1 = generateInputQuery(eventHubsParameters1, spark)
-    val sourceQuery2 = generateInputQuery(eventHubsParameters2, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams1, eventPayloadsAndProperties)
+    val sourceQuery1 = generateInputQuery(ehParams1, spark)
+    val sourceQuery2 = generateInputQuery(ehParams2, spark)
     testStream(sourceQuery1)(
       StartStream(trigger = ProcessingTime(200)),
-      AddDataToEventHubs(eventHubsParameters1, highestBatchId = 16),
+      AddDataToEventHubs(ehParams1, highestBatchId = 16),
       CheckAnswer(1 to 1000: _*)
     )
     testStream(sourceQuery2)(
       StartStream(trigger = ProcessingTime(200)),
-      AddDataToEventHubs(eventHubsParameters2, highestBatchId = 49),
+      AddDataToEventHubs(ehParams2, highestBatchId = 49),
       CheckAnswer(1 to 1000: _*)
     )
   }
 
-  ignore(
+  test(
     "Verify expected dataframe can be retrieved from same " +
       "source on different queries") {
     import testImplicits._
-    val eventHubsParameters1 = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams1 = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters1,
-                                                    eventPayloadsAndProperties)
-    val sourceQuery = generateInputQuery(eventHubsParameters1, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams1, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(ehParams1, spark)
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(200)),
-      AddDataToEventHubs(eventHubsParameters1, highestBatchId = 16),
+      AddDataToEventHubs(ehParams1, highestBatchId = 16),
       CheckAnswer(1 to 1000: _*)
     )
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(200)),
-      AddDataToEventHubs(eventHubsParameters1, highestBatchId = 16),
+      AddDataToEventHubs(ehParams1, highestBatchId = 16),
       CheckAnswer(1 to 1000: _*)
     )
   }
@@ -553,14 +572,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     "Verify expected dataframe can be retrieved when the stream is stopped before the last" +
       " batch's offset is committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams,
                                                     eventPayloadsAndProperties.take(30 * 10 * 2))
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-                         AddDataToEventHubs(eventHubsParameters, 9))
+                         AddDataToEventHubs(ehParams, 9))
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
@@ -568,7 +587,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       StartStream(trigger = ProcessingTime(10),
                   triggerClock = manualClock,
                   additionalConfs = Map("eventhubs.test.newSink" -> "true")),
-      AddDataToEventHubs(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400))
+      AddDataToEventHubs(ehParams, 17, eventPayloadsAndProperties.takeRight(400))
     )
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
     val thirdBatch = Seq(CheckAnswer(541 to 1000: _*))
@@ -579,14 +598,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     "Verify expected dataframe can be retrieved when the stream is stopped after the last" +
       " batch's offset is committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams,
                                                     eventPayloadsAndProperties.take(30 * 10 * 2))
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-                         AddDataToEventHubs(eventHubsParameters, 9))
+                         AddDataToEventHubs(ehParams, 9))
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
@@ -594,7 +613,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       StartStream(trigger = ProcessingTime(10),
                   triggerClock = manualClock,
                   additionalConfs = Map("eventhubs.test.newSink" -> "true")),
-      AddDataToEventHubs(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400))
+      AddDataToEventHubs(ehParams, 17, eventPayloadsAndProperties.takeRight(400))
     )
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
     val thirdBatch = Seq(CheckAnswer(601 to 1000: _*))
@@ -603,14 +622,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
 
   ignore("Verify expected dataframe can be retrieved when the progress file is partially committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams,
                                                     eventPayloadsAndProperties.take(30 * 10 * 2))
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-                         AddDataToEventHubs(eventHubsParameters, 9))
+                         AddDataToEventHubs(ehParams, 9))
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
@@ -618,7 +637,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       StartStream(trigger = ProcessingTime(10),
                   triggerClock = manualClock,
                   additionalConfs = Map("eventhubs.test.newSink" -> "true")),
-      AddDataToEventHubs(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400))
+      AddDataToEventHubs(ehParams, 17, eventPayloadsAndProperties.takeRight(400))
     )
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
     // in structured streaming, even metadata is not committed, we will be able to skip the
@@ -631,14 +650,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     "Verify expected dataframe can be retrieved when upgrading from a directory without" +
       " metadata") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams,
                                                     eventPayloadsAndProperties.take(30 * 10 * 2))
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-                         AddDataToEventHubs(eventHubsParameters, 9))
+                         AddDataToEventHubs(ehParams, 9))
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
@@ -646,7 +665,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       StartStream(trigger = ProcessingTime(10),
                   triggerClock = manualClock,
                   additionalConfs = Map("eventhubs.test.newSink" -> "true")),
-      AddDataToEventHubs(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400))
+      AddDataToEventHubs(ehParams, 17, eventPayloadsAndProperties.takeRight(400))
     )
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
     // in structured streaming, even metadata is not committed, we will be able to skip the
@@ -657,14 +676,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
 
   ignore("Verify expected dataframe can be retrieved when metadata is not committed") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 30)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 30)
     val eventPayloadsAndProperties = generateIntKeyedData(1000)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams,
                                                     eventPayloadsAndProperties.take(30 * 10 * 2))
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-                         AddDataToEventHubs(eventHubsParameters, 9))
+                         AddDataToEventHubs(ehParams, 9))
     val clockMove = Array.fill(9)(AdvanceManualClock(10)).toSeq
     val secondBatch = Seq(
       CheckAnswer(1 to 600: _*),
@@ -674,7 +693,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       StartStream(trigger = ProcessingTime(10),
                   triggerClock = manualClock,
                   additionalConfs = Map("eventhubs.test.newSink" -> "true")),
-      AddDataToEventHubs(eventHubsParameters, 17, eventPayloadsAndProperties.takeRight(400))
+      AddDataToEventHubs(ehParams, 17, eventPayloadsAndProperties.takeRight(400))
     )
     val clockMove2 = Array.fill(8)(AdvanceManualClock(10)).toSeq
     // in structured streaming, even metadata is not committed, we will be able to skip the
@@ -687,17 +706,16 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     "Verify expected dataframe is retrieved from starting offset" +
       " on different streams on the same query") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3)
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3)
     val eventPayloadsAndProperties1 = generateIntKeyedData(6)
     val eventPayloadsAndProperties2 = generateIntKeyedData(12)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters,
-                                                    eventPayloadsAndProperties1)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties1)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     val highestBatchId = new AtomicInteger(0)
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-      AddDataToEventHubs(eventHubsParameters, highestBatchId.incrementAndGet().toLong),
+      AddDataToEventHubs(ehParams, highestBatchId.incrementAndGet().toLong),
       AdvanceManualClock(10),
       CheckAnswer(1, 2, 3, 4, 5, 6),
       StopStream(),
@@ -709,9 +727,9 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
                 s"${Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath}",
               "eventhubs.test.newSink" -> "true")
       ),
-      AddDataToEventHubs(eventHubsParameters),
+      AddDataToEventHubs(ehParams),
       CheckAnswer(1, 2, 3, 4, 5, 6),
-      AddDataToEventHubs(eventHubsParameters,
+      AddDataToEventHubs(ehParams,
                          highestBatchId.incrementAndGet().toLong,
                          eventPayloadsAndProperties2),
       AdvanceManualClock(10),
@@ -725,19 +743,19 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
       yield bodyId -> Seq("creationTime" -> s"1999-12-31 00:00:$creationTime")
   }
 
-  ignore("Verify expected dataframe is retrieved with windowing operation") {
-    val eventHubsParameters = buildEventHubsParameters("ns1",
-                                                       "eh1",
-                                                       2,
-                                                       40,
-                                                       containsProperties = true,
-                                                       userDefinedKeys = Some("creationTime"))
+  test("Verify expected dataframe is retrieved with windowing operation") {
+    val ehParams = buildEventHubsParameters("ns1",
+                                            "eh1",
+                                            2,
+                                            40,
+                                            containsProperties = true,
+                                            userDefinedKeys = Some("creationTime"))
     val eventPayloadsAndProperties = {
       for (time <- Range(0, 10))
         yield testDataForWindowingOperation(100, time)
     }.reduce((a, b) => a ++ b)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
-    val sourceQuery = spark.readStream.format("eventhubs").options(eventHubsParameters).load()
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
+    val sourceQuery = spark.readStream.format("eventhubs").options(ehParams).load()
     import sourceQuery.sparkSession.implicits._
     import org.apache.spark.sql.functions._
     val windowedStream = sourceQuery
@@ -749,7 +767,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(1000), triggerClock = manualClock))
     val clockMove = Array.fill(13)(AdvanceManualClock(1000)).toSeq
     val secondBatch =
-      Seq(AddDataToEventHubs(eventHubsParameters, 12),
+      Seq(AddDataToEventHubs(ehParams, 12),
           CheckAnswer(true, 100, 200, 300, 300, 300, 300, 300, 300, 300, 300, 200, 100))
     testStream(windowedStream, outputMode = OutputMode.Complete())(
       firstBatch ++ clockMove ++ secondBatch: _*)
@@ -771,16 +789,16 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     normalData ++ lateData ++ rejectData
   }
 
-  ignore("Verify expected dataframe is retrieved with watermarks") {
-    val eventHubsParameters = buildEventHubsParameters("ns1",
-                                                       "eh1",
-                                                       1,
-                                                       1,
-                                                       containsProperties = true,
-                                                       userDefinedKeys = Some("creationTime"))
+  test("Verify expected dataframe is retrieved with watermarks") {
+    val ehParams = buildEventHubsParameters("ns1",
+                                            "eh1",
+                                            1,
+                                            1,
+                                            containsProperties = true,
+                                            userDefinedKeys = Some("creationTime"))
     val eventPayloadsAndProperties = testDataForWatermark(2)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
-    val sourceQuery = spark.readStream.format("eventhubs").options(eventHubsParameters).load()
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
+    val sourceQuery = spark.readStream.format("eventhubs").options(ehParams).load()
     import sourceQuery.sparkSession.implicits._
     import org.apache.spark.sql.functions._
     val windowedStream = sourceQuery
@@ -793,7 +811,7 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     val firstBatch = Seq(StartStream(trigger = ProcessingTime(1000), triggerClock = manualClock))
     val clockMove = Array.fill(35)(AdvanceManualClock(1000)).toSeq
     val secondBatch =
-      Seq(AddDataToEventHubs(eventHubsParameters, 35),
+      Seq(AddDataToEventHubs(ehParams, 35),
           CheckAnswer(true, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 5, 6, 6))
     testStream(windowedStream, outputMode = OutputMode.Append())(
       firstBatch ++ clockMove ++ secondBatch: _*)
@@ -801,14 +819,14 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
 
   ignore("Filter enqueuetime correctly in structured streaming") {
     import testImplicits._
-    val eventHubsParameters = buildEventHubsParameters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
+    val ehParams = buildEventHubsParameters("ns1", "eh1", 2, 3, enqueueTime = Some(3000))
     val eventPayloadsAndProperties = generateIntKeyedData(15)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),
-      AddDataToEventHubs(eventHubsParameters, 2),
+      AddDataToEventHubs(ehParams, 2),
       UpdatePartialCheck(
         EventHubsBatchRecord(0,
                              Map(NameAndPartition("eh1", 1) -> 2,
@@ -824,12 +842,12 @@ class EventHubsSourceSuite extends EventHubsStreamTest with MockitoSugar {
     )
   }
 
-  ignore("Users cannot submit enqueueTime which is later than the latest in the queue") {
-    val eventHubsParameters =
+  test("Users cannot submit enqueueTime which is later than the latest in the queue") {
+    val ehParams =
       buildEventHubsParameters("ns1", "eh1", 2, 3, enqueueTime = Some(Long.MaxValue))
     val eventPayloadsAndProperties = generateIntKeyedData(15)
-    EventHubsTestUtilities.createSimulatedEventHubs(eventHubsParameters, eventPayloadsAndProperties)
-    val sourceQuery = generateInputQuery(eventHubsParameters, spark)
+    EventHubsTestUtilities.createSimulatedEventHubs(ehParams, eventPayloadsAndProperties)
+    val sourceQuery = generateInputQuery(ehParams, spark)
     val manualClock = new StreamManualClock
     testStream(sourceQuery)(
       StartStream(trigger = ProcessingTime(10), triggerClock = manualClock),

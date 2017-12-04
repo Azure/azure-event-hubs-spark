@@ -23,7 +23,7 @@ import java.time.{ Duration, Instant }
 import scala.collection.JavaConverters._
 import EventHubsOffsetTypes.EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.internal.Logging
 
 import scala.util.{ Failure, Success, Try }
@@ -32,32 +32,31 @@ import scala.util.{ Failure, Success, Try }
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, String])
+private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     extends Serializable
     with Client
     with Logging {
+
+  import org.apache.spark.eventhubs.common._
 
   override private[spark] var client: EventHubClient = _
   private[spark] var partitionReceiver: PartitionReceiver = _
 
   /* Extract relevant info from ehParams */
-  private val ehNamespace = ehParams("eventhubs.namespace").toString
-  private val ehName = ehParams("eventhubs.name").toString
-  private val ehPolicyName = ehParams("eventhubs.policyname").toString
-  private val ehPolicy = ehParams("eventhubs.policykey").toString
-  private val consumerGroup =
-    ehParams.getOrElse("eventhubs.consumergroup", EventHubClient.DEFAULT_CONSUMER_GROUP_NAME)
+  private val ehNamespace = ehConf.namespace.get
+  private val ehName = ehConf.name.get
+  private val ehPolicyName = ehConf.keyName.get
+  private val ehPolicy = ehConf.key.get
+  private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
   private val connectionString =
     Try {
-      new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy).toString
+      new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy)
     } getOrElse Try {
-      new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy).toString
-    }
+      new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy)
+    }.get
+  connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
 
-  client = connectionString match {
-    case Success(str) => EventHubClient.createFromConnectionStringSync(str.toString)
-    case Failure(e)   => throw e
-  }
+  client = EventHubClient.createFromConnectionStringSync(connectionString.toString)
 
   private[spark] def initReceiver(partitionId: String,
                                   offsetType: EventHubsOffsetType,
@@ -72,7 +71,7 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
       case _ =>
         client.createReceiverSync(consumerGroup, partitionId, currentOffset)
     }
-    partitionReceiver.setReceiveTimeout(Duration.ofSeconds(5))
+    partitionReceiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
   }
 
   def receive(expectedEventNum: Int): Iterable[EventData] = {
@@ -152,10 +151,10 @@ private[spark] class EventHubsClientWrapper(private val ehParams: Map[String, St
 }
 
 private[spark] object EventHubsClientWrapper {
-  private[spark] def apply(ehParams: Map[String, String]): EventHubsClientWrapper =
-    new EventHubsClientWrapper(ehParams)
+  private[spark] def apply(ehConf: EventHubsConf): EventHubsClientWrapper =
+    new EventHubsClientWrapper(ehConf)
 
-  def userAgent = { EventHubClient.userAgent }
+  def userAgent: String = { EventHubClient.userAgent }
 
   def userAgent_=(str: String) { EventHubClient.userAgent = str }
 }

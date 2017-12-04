@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubs.common.utils
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.common.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.common.client.{ Client, EventHubsOffsetTypes }
 import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
@@ -49,20 +49,20 @@ class SimulatedEventHubsRestClient(eventHubs: SimulatedEventHubs)
   }
 }
 
-class TestEventHubsClient(ehParams: Map[String, String],
+class TestEventHubsClient(ehConf: EventHubsConf,
                           eventHubs: SimulatedEventHubs,
                           latestRecords: Map[NameAndPartition, (Long, Long, Long)])
     extends Client
     with TestClientSugar {
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val eventHubName = ehParams("eventhubs.name")
+    val eventHubName = ehConf.name.get
     if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
       eventHubs.search(NameAndPartition(eventHubName, partitionId),
                        currentOffset.toInt,
                        expectedEventNum)
     } else {
       eventHubs.searchWithTime(NameAndPartition(eventHubName, partitionId),
-                               ehParams("eventhubs.filter.enqueuetime").toLong,
+                               ehConf.startEnqueueTimes.head._2,
                                expectedEventNum)
     }
   }
@@ -92,7 +92,7 @@ class TestEventHubsClient(ehParams: Map[String, String],
   }
 }
 
-class FluctuatedEventHubClient(ehParams: Map[String, String],
+class FluctuatedEventHubClient(ehConf: EventHubsConf,
                                eventHubs: SimulatedEventHubs,
                                ssc: StreamingContext,
                                messagesBeforeEmpty: Long,
@@ -103,14 +103,14 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
   private var callIndex = -1
 
   override def receive(expectedEventNum: Int): Iterable[EventData] = {
-    val eventHubName = ehParams("eventhubs.name")
+    val eventHubName = ehConf.name.get
     if (offsetType != EventHubsOffsetTypes.EnqueueTime) {
       eventHubs.search(NameAndPartition(eventHubName, partitionId),
                        currentOffset.toInt,
                        expectedEventNum)
     } else {
       eventHubs.searchWithTime(NameAndPartition(eventHubName, partitionId),
-                               ehParams("eventhubs.filter.enqueuetime").toLong,
+                               ehConf.startEnqueueTimes.head._2,
                                expectedEventNum)
     }
   }
@@ -120,7 +120,7 @@ class FluctuatedEventHubClient(ehParams: Map[String, String],
     if (callIndex < numBatchesBeforeNewData) {
       (messagesBeforeEmpty - 1, messagesBeforeEmpty - 1)
     } else {
-      (latestRecords(nameAndPartition))
+      latestRecords(nameAndPartition)
     }
   }
 

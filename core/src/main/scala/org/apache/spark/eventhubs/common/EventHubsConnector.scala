@@ -21,6 +21,7 @@ package org.apache.spark.eventhubs.common
  * interface representing the bridge between EventHubs and Spark-side processing engine
  * (Direct DStream or Structured Streaming)
  */
+// TODO this can go when progress tracker is removed.
 private[spark] trait EventHubsConnector {
 
   // the id of the stream which is mapped from eventhubs instance

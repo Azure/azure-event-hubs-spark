@@ -29,18 +29,15 @@ import org.apache.spark.internal.Logging
 
 private[spark] object EventHubsTestUtilities extends Logging {
 
-  def createSimulatedEventHubs[T, U](eventHubsParameters: Map[String, String],
+  def createSimulatedEventHubs[T, U](ehParams: Map[String, String],
                                      eventPayloadsAndProperties: Seq[(T, Seq[U])] =
                                        Seq.empty[(T, Seq[U])]): SimulatedEventHubs = {
 
-    assert(eventHubsParameters != null)
-    assert(eventHubsParameters.nonEmpty)
-
     // Round-robin allocation of payloads to partitions
-    val eventHubsNamespace = eventHubsParameters("eventhubs.namespace")
-    val eventHubsName = eventHubsParameters("eventhubs.name")
+    val eventHubsNamespace = ehParams("eventhubs.namespace")
+    val eventHubsName = ehParams("eventhubs.name")
     val eventHubsPartitionList = {
-      for (i <- 0 until eventHubsParameters("eventhubs.partition.count").toInt)
+      for (i <- 0 until ehParams("eventhubs.partitionCount").toInt)
         yield NameAndPartition(eventHubsName, i)
     }
     val payloadPropertyStore = roundRobinAllocation(eventHubsPartitionList.map(x => x -> 0).toMap,

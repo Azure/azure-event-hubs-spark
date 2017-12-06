@@ -1,3 +1,7 @@
+/**
+ *  Here we need to test all functionality against an EventHubs instance.
+ *  Add a testing context with EventHub info, and then make calls against that instance.
+ */
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with

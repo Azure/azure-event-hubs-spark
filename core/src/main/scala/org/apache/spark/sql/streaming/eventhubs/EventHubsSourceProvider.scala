@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
+import java.util.Locale
+
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
@@ -28,6 +30,7 @@ private[sql] class EventHubsSourceProvider
     extends DataSourceRegister
     with StreamSourceProvider
     with Logging {
+  import EventHubsSourceProvider._
 
   override def shortName(): String = "eventhubs"
 
@@ -45,11 +48,24 @@ private[sql] class EventHubsSourceProvider
                             parameters: Map[String, String]): Source = {
     EventHubsClientWrapper.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
-    new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply, metadataPath)
+
+    val caseInsensitiveParameters = parameters.map {
+      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
+    }
+
+    new EventHubsSource(sqlContext,
+                        parameters,
+                        EventHubsClientWrapper.apply,
+                        metadataPath,
+                        failOnDataLoss(caseInsensitiveParameters))
   }
+
+  private def failOnDataLoss(caseInsensitiveParams: Map[String, String]) =
+    caseInsensitiveParams.getOrElse(FailOnDataLossOptionKey, "true").toBoolean
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
+  private val FailOnDataLossOptionKey = "eventhubs.failondataloss"
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
     val containsProperties =

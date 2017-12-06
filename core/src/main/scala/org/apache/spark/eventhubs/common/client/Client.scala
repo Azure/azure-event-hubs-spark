@@ -19,7 +19,7 @@ package org.apache.spark.eventhubs.common.client
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient, PartitionReceiver }
 import org.apache.spark.eventhubs.common._
-import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import .EventHubsOffsetType
 
 private[spark] trait Client extends Serializable {
 

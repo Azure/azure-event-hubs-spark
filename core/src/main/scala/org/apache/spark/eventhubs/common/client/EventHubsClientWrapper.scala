@@ -22,7 +22,7 @@ import java.time.{ Duration, Instant }
 import java.util.concurrent.{ ConcurrentHashMap, ConcurrentMap }
 
 import scala.collection.JavaConverters._
-import EventHubsOffsetTypes.EventHubsOffsetType
+import .EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.internal.Logging

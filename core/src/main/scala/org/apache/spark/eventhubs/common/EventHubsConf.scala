@@ -270,6 +270,10 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     set("eventhubs.sql.userDefinedKeys", keys.toSet.mkString(","))
   }
 
+  def setFailOnDataLoss(b: Boolean): EventHubsConf = {
+    set("failOnDataLoss", b)
+  }
+
   /** The currently set namespace. */
   def namespace: Option[String] = {
     self.get("eventhubs.namespace")
@@ -344,6 +348,10 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   /** Current user defined keys. */
   def sqlUserDefinedKeys: Option[Array[String]] = {
     self.get("eventhubs.sql.userDefinedKeys") map (str => str.split(","))
+  }
+
+  def failOnDataLoss: Option[Boolean] = {
+    self.get("failOnDataLoss") map (str => str.toBoolean)
   }
 
   /** All max rates currently set will be erased. */

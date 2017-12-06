@@ -25,8 +25,8 @@ import org.apache.spark.eventhubs.common.{
   Offset,
   SequenceNumber
 }
-import org.apache.spark.eventhubs.common.client.{ Client, EventHubsOffsetTypes }
-import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
+import org.apache.spark.eventhubs.common.client.Client
+import .EventHubsOffsetType
 import org.apache.spark.streaming.StreamingContext
 
 /**

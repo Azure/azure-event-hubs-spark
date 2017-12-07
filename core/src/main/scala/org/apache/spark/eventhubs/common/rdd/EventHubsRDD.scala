@@ -98,7 +98,8 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
     val receiver: PartitionReceiver =
       receiverFactory(ehConf).receiver(part.partitionId.toString, part.fromSeqNo)
-    receiver.setPrefetchCount(part.count.toInt)
+    val prefetchCount = if (part.count.toInt < 10) 10 else part.count.toInt
+    receiver.setPrefetchCount(prefetchCount)
 
     var requestSeqNo: SequenceNumber = part.fromSeqNo
 

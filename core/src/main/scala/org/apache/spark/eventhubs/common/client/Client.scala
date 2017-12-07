@@ -19,15 +19,12 @@ package org.apache.spark.eventhubs.common.client
 
 import com.microsoft.azure.eventhubs.{ EventData, EventHubClient, PartitionReceiver }
 import org.apache.spark.eventhubs.common._
-import .EventHubsOffsetType
 
 private[spark] trait Client extends Serializable {
 
   private[spark] var client: EventHubClient
 
   private[spark] def receiver(partitionId: String, seqNo: SequenceNumber): PartitionReceiver
-
-  def receive(expectedEvents: Int): Iterable[EventData]
 
   /**
    * Provides the earliest (lowest) sequence number that exists in the EventHubs instance

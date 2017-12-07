@@ -18,16 +18,15 @@
 package org.apache.spark.eventhubs.common.client
 
 import java.net.URI
-import java.time.{ Duration, Instant }
-import java.util.concurrent.{ ConcurrentHashMap, ConcurrentMap }
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
-import .EventHubsOffsetType
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.internal.Logging
 
-import scala.util.{ Failure, Success, Try }
+import scala.util.Try
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -73,7 +72,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
     if (partitionReceiver == null) {
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $seqNo")
-      client.createReceiver(consumerGroup, partitionId, seqNo, true)
+      client.createReceiver(consumerGroup, partitionId, seqNo, inclusiveSeqNo = true)
       partitionReceiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
     partitionReceiver

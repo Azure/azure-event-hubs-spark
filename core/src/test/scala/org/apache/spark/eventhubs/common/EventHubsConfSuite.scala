@@ -131,6 +131,14 @@ class EventHubsConfSuite extends FunSuite {
     assert(actual == expected)
   }
 
+  test("sequenceNosToString") {
+    val expected = "0:50,1:50,2:50,3:50"
+    val ehConf = confWithTestValues
+    ehConf.setStartSequenceNumbers(0 to 3, 50)
+    val actual = EventHubsConf.sequenceNosToString(ehConf.startSequenceNumbers)
+    assert(actual == expected)
+  }
+
   test("enqueueTimesToString") {
     val expected = "0:50,1:50,2:50,3:50"
     val ehConf = confWithTestValues
@@ -173,6 +181,15 @@ class EventHubsConfSuite extends FunSuite {
 
     val offsets = "0:50,1:50,2:50,3:50"
     val actual = EventHubsConf.parseOffsets(offsets)
+    assert(actual == expected)
+  }
+
+  test("parseSequenceNos") {
+    val ehConf = confWithTestValues
+    val expected = ehConf.setStartSequenceNumbers(0 to 3, 50).startSequenceNumbers
+
+    val seqNos = "0:50,1:50,2:50,3:50"
+    val actual = EventHubsConf.parseSequenceNos(seqNos)
     assert(actual == expected)
   }
 
@@ -254,7 +271,7 @@ class EventHubsConfSuite extends FunSuite {
     assert(newMap == oldSchoolMap)
   }
 
-  test("Conf to Map to Conf") {
+  test("Conf to Map to Conf: back and there again") {
     val expectedConf = confWithTestValues.setStartOfStream(true)
     val actualConf = EventHubsConf.toConf(expectedConf.toMap)
 

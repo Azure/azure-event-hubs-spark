@@ -155,54 +155,61 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   /**
    * Translate will take any starting point, and then return the corresponding Offset and SequenceNumber.
    */
-  override def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber] = {
+  override def translate[T](ehConf: EventHubsConf,
+                            partitionCount: Int): Map[PartitionId, SequenceNumber] = {
     val startingWith = ehConf("eventhubs.startingWith")
-    val partitionCount = ehConf("eventhubs.partitionCount").toInt
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
 
-    val threads = for (partitionId <- 0 until partitionCount)
-      yield
-        new Thread {
-          override def run(): Unit = {
-            // Pattern  match is to create the correct receiver based on what we're startingWith.
-            val receiver = startingWith match {
-              case "Offsets" =>
-                val offsets = ehConf.startOffsets
-                client
-                  .createReceiver(DefaultConsumerGroup,
-                                  partitionId.toString,
-                                  offsets.getOrElse(partitionId, DefaultStartOffset).toString,
-                                  true)
-                  .get
-              case "EnqueueTimes" =>
-                val enqueueTimes = ehConf.startEnqueueTimes
-                client
-                  .createReceiver(
-                    DefaultConsumerGroup,
-                    partitionId.toString,
-                    Instant.ofEpochSecond(enqueueTimes.getOrElse(partitionId, DefaultEnqueueTime)))
-                  .get
-              case "StartOfStream" =>
-                client
-                  .createReceiver(DefaultConsumerGroup, partitionId.toString, StartOfStream, true)
-                  .get
-              case "EndOfStream" =>
-                client
-                  .createReceiver(DefaultConsumerGroup, partitionId.toString, EndOfStream, true)
-                  .get
+    if (startingWith equals "SequenceNumbers") {
+      (for (partitionId <- 0 until partitionCount)
+        yield
+          partitionId -> ehConf.startSequenceNumbers.getOrElse(partitionId,
+                                                               DefaultStartSequenceNumber)).toMap
+    } else {
+      val threads = for (partitionId <- 0 until partitionCount)
+        yield
+          new Thread {
+            override def run(): Unit = {
+              // Pattern  match is to create the correct receiver based on what we're startingWith.
+              val receiver = startingWith match {
+                case "Offsets" =>
+                  val offsets = ehConf.startOffsets
+                  client
+                    .createReceiver(DefaultConsumerGroup,
+                                    partitionId.toString,
+                                    offsets.getOrElse(partitionId, DefaultStartOffset).toString,
+                                    true)
+                    .get
+                case "EnqueueTimes" =>
+                  val enqueueTimes = ehConf.startEnqueueTimes
+                  client
+                    .createReceiver(DefaultConsumerGroup,
+                                    partitionId.toString,
+                                    Instant.ofEpochSecond(
+                                      enqueueTimes.getOrElse(partitionId, DefaultEnqueueTime)))
+                    .get
+                case "StartOfStream" =>
+                  client
+                    .createReceiver(DefaultConsumerGroup, partitionId.toString, StartOfStream, true)
+                    .get
+                case "EndOfStream" =>
+                  client
+                    .createReceiver(DefaultConsumerGroup, partitionId.toString, EndOfStream, true)
+                    .get
+              }
+              receiver.setPrefetchCount(PrefetchCountMinimum)
+              val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
+              receiver.close().get()
+              result.put(partitionId, event.getSystemProperties.getSequenceNumber)
             }
-            receiver.setPrefetchCount(PrefetchCountMinimum)
-            val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
-            receiver.close().get()
-            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
           }
-        }
 
-    logInfo("translate: Starting threads to translate to (offset, sequence number) pairs.")
-    threads.foreach(thread => thread.start())
-    threads.foreach(thread => thread.join())
-    logInfo("translate: Translation complete.")
-    result.asScala.toMap
+      logInfo("translate: Starting threads to translate to (offset, sequence number) pairs.")
+      threads.foreach(thread => thread.start())
+      threads.foreach(thread => thread.join())
+      logInfo("translate: Translation complete.")
+      result.asScala.toMap
+    }
   }
 }
 

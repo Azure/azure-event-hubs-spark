@@ -27,6 +27,7 @@ package object common {
   val EndOfStream = PartitionReceiver.END_OF_STREAM
   val DefaultMaxRatePerPartition: Rate = 10000
   val DefaultStartOffset: Offset = -1L
+  val DefaultStartSequenceNumber: SequenceNumber = 0L
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(5)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
@@ -48,7 +49,7 @@ package object common {
     def toSequenceNumber: SequenceNumber = str.toLong
   }
 
-  // TODO: just so this build. Remove this once API is actually available.
+  // TODO: just so this builds. Remove this once API is actually available from EH Java Client.
   implicit class SeqNoAPI(val client: EventHubClient) extends AnyVal {
     def createReceiver(consumerGroup: String,
                        partitionId: String,

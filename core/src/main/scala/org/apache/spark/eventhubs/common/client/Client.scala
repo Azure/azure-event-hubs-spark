@@ -66,7 +66,7 @@ private[spark] trait Client extends Serializable {
    * that we need to start from. This ensure that within Spark, we're only dealing with offsets
    * and sequence numbers.
    */
-  def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber]
+  def translate[T](ehConf: EventHubsConf, partitionCount: Int): Map[PartitionId, SequenceNumber]
 
   /**
    * Returns the number of partitions in your EventHubs instance.

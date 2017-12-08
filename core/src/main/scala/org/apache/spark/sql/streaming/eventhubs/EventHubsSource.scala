@@ -96,7 +96,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       .get(0)
       .getOrElse {
         // translate starting points within ehConf to sequence numbers
-        val seqNos = ehClient.translate(ehConf).map {
+        val seqNos = ehClient.translate(ehConf, partitionCount).map {
           case (pId, seqNo) =>
             (NameAndPartition(ehConf.name.get, pId), seqNo)
         }

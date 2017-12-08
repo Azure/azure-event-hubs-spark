@@ -57,7 +57,7 @@ private[spark] class EventHubDirectDStream private[spark] (_ssc: StreamingContex
   private var fromSeqNos: Map[PartitionId, SequenceNumber] = _
 
   private def init(): Unit = {
-    fromSeqNos = ehClient.translate(ehConf)
+    fromSeqNos = ehClient.translate(ehConf, partitionCount)
   }
   init()
 

@@ -45,6 +45,8 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
 
   private val settings = new ConcurrentHashMap[String, String]()
 
+  private var _startSequenceNumbers: Map[PartitionId, Offset] = Map.empty
+
   private var _startOffsets: Map[PartitionId, Offset] = Map.empty
 
   private var _startEnqueueTimes: Map[PartitionId, EnqueueTime] = Map.empty
@@ -52,7 +54,7 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   private var _maxRatesPerPartition: Map[PartitionId, Rate] = Map.empty
 
   // Tracks what starting point was provided by the user
-  // (i.e. Offset, EnqueueTime, SequenceNumber, StartOfStream, EndOfStream)
+  // (i.e. SequenceNumbers, Offsets, EnqueueTimes, StartOfStreams, EndOfStreams)
   private var startingWith: String = _
 
   private[common] def set[T](key: String, value: T): EventHubsConf = {
@@ -96,6 +98,8 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     if (startOfStream.isDefined && startOfStream.get) {
       require(endOfStream.isEmpty || !endOfStream.get,
               "EventHubsConf is invalid. Don't set startOfStream and endOfStream.")
+      require(startSequenceNumbers.isEmpty,
+              "EventHubsConf is invalid. Don't set startOfStream and startSequenceNumbers")
       require(startOffsets.isEmpty,
               "EventHubsConf is invalid. Don't set startOfStream and startOffsets.")
       require(startEnqueueTimes.isEmpty,
@@ -103,6 +107,8 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
       logInfo(
         "validate: startOfStream is set to true. All partitions will start from the beginning of the stream.")
     } else if (endOfStream.isDefined && endOfStream.get) {
+      require(startSequenceNumbers.isEmpty,
+              "EventHubsConf is invalid. Don't set endOfStream and startSequenceNumbers")
       require(startOffsets.isEmpty,
               "EventHubsConf is invalid. Don't set endOfStream and startOffsets.")
       require(startEnqueueTimes.isEmpty,
@@ -110,13 +116,20 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
       logInfo(
         "validate: endOfStream is set to true. All partitions will start from the beginning of the stream.")
     } else if (startOffsets.nonEmpty) {
+      require(startSequenceNumbers.isEmpty,
+              "EventHubsConf is invalid. Don't set startOffsets and startSequenceNumbers")
       require(startEnqueueTimes.isEmpty,
               "EventHubsConf is invalid. Don't set startOffsets and startEnqueueTimes.")
       logInfo(
         s"validate: startOffsets $startOffsets will be used as starting points for your stream.")
     } else if (startEnqueueTimes.nonEmpty) {
+      require(startSequenceNumbers.isEmpty,
+              "EventHubsConf is invalid. Don't set startEnqueueTimes and startSequenceNumbers")
       logInfo(
         s"validate: startEnqueueTimes $startEnqueueTimes will be used as starting points for your stream.")
+    } else if (startSequenceNumbers.nonEmpty) {
+      logInfo(
+        s"validate: startSequenceNumbers $startSequenceNumbers will be used as starting points for your stream.")
     } else {
       throw new IllegalArgumentException(
         "You must set a starting point for your application. You can do this with one of the following methods: " +
@@ -130,6 +143,9 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     require(self.isValid)
     set("eventhubs.maxRates", EventHubsConf.maxRatesToString(_maxRatesPerPartition))
     startingWith match {
+      case "SequenceNumbers" =>
+        set("eventhubs.startSequenceNumbers",
+            EventHubsConf.sequenceNosToString(_startSequenceNumbers))
       case "Offsets" => set("eventhubs.startOffsets", EventHubsConf.offsetsToString(_startOffsets))
       case "EnqueueTimes" =>
         set("eventhubs.startEnqueueTimes", EventHubsConf.enqueueTimesToString(_startEnqueueTimes))
@@ -235,6 +251,15 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     this
   }
 
+  /** Behavior is the same as [[setStartOffsets(Range, Offset)]] (except with sequence numbers!) */
+  def setStartSequenceNumbers(range: Range, seqNo: SequenceNumber): EventHubsConf = {
+    setStartingWith("SequenceNumbers")
+    val newSeqNos: Map[PartitionId, SequenceNumber] =
+      (for { partitionId <- range } yield partitionId -> seqNo).toMap
+    _startSequenceNumbers ++= newSeqNos
+    this
+  }
+
   /** Behavior is the same as [[setStartOffsets(Range, Offset)]] (except with enqueue times!) */
   def setStartEnqueueTimes(range: Range, enqueueTime: EnqueueTime): EventHubsConf = {
     setStartingWith("EnqueueTimes")
@@ -324,6 +349,11 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     _startOffsets
   }
 
+  /** A map of partition/sequence number pairs that have been set by the user. */
+  def startSequenceNumbers: Map[PartitionId, SequenceNumber] = {
+    _startSequenceNumbers
+  }
+
   /** A map of partition/enqueue time pairs that have been set by the user. */
   def startEnqueueTimes: Map[PartitionId, EnqueueTime] = {
     _startEnqueueTimes
@@ -386,6 +416,8 @@ object EventHubsConf extends Logging {
 
     ehConf.startingWith = params("eventhubs.startingWith")
     params("eventhubs.startingWith") match {
+      case "SequenceNumbers" =>
+        ehConf._startSequenceNumbers = parseSequenceNos(params("eventhubs.startSequenceNumbers"))
       case "EnqueueTimes" =>
         ehConf._startEnqueueTimes = parseEnqueueTimes(params("eventhubs.startEnqueueTimes"))
       case "Offsets" => ehConf._startOffsets = parseOffsets(params("eventhubs.startOffsets"))
@@ -399,6 +431,11 @@ object EventHubsConf extends Logging {
 
   private[common] def parseOffsets(startOffsets: String): Map[PartitionId, Offset] = {
     for { (k, v) <- stringToMap(startOffsets) } yield k -> v.toOffset
+  }
+
+  private[common] def parseSequenceNos(
+      startSequenceNos: String): Map[PartitionId, SequenceNumber] = {
+    for { (k, v) <- stringToMap(startSequenceNos) } yield k -> v.toSequenceNumber
   }
 
   private[common] def parseEnqueueTimes(
@@ -425,6 +462,10 @@ object EventHubsConf extends Logging {
 
   private[common] def offsetsToString(offsets: Map[PartitionId, Offset]): String = {
     mapToString(offsets)
+  }
+
+  private[common] def sequenceNosToString(seqNos: Map[PartitionId, SequenceNumber]): String = {
+    mapToString(seqNos)
   }
 
   private[common] def enqueueTimesToString(enqueueTimes: Map[PartitionId, EnqueueTime]): String = {

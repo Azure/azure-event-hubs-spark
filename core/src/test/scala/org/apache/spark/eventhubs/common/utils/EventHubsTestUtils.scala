@@ -17,8 +17,6 @@
 
 package org.apache.spark.eventhubs.common.utils
 
-import java.lang.reflect.Constructor
-
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.qpid.proton.amqp.Binary
 import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
@@ -134,7 +132,8 @@ class SimulatedClient extends Client { self =>
     0L
   }
 
-  override def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber] = {
+  override def translate[T](ehConf: EventHubsConf,
+                            partitionCount: Int): Map[PartitionId, SequenceNumber] = {
     (for { partitionId <- 0 until PartitionCount } yield
       partitionId -> StartingSequenceNumber).toMap
   }

@@ -27,7 +27,8 @@ trait HasOffsetRanges {
 
 private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
                                        val fromSeqNo: SequenceNumber,
-                                       val untilSeqNo: SequenceNumber) {
+                                       val untilSeqNo: SequenceNumber)
+    extends Serializable {
   import OffsetRange.OffsetRangeTuple
 
   def name: String = nameAndPartition.ehName
@@ -44,6 +45,13 @@ private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
 
 private[spark] object OffsetRange {
   type OffsetRangeTuple = (NameAndPartition, SequenceNumber, SequenceNumber)
+
+  def apply(name: String,
+            partitionId: PartitionId,
+            fromSeq: SequenceNumber,
+            untilSeq: SequenceNumber): OffsetRange = {
+    OffsetRange(NameAndPartition(name, partitionId), fromSeq, untilSeq)
+  }
 
   def apply(nAndP: NameAndPartition,
             fromSeq: SequenceNumber,

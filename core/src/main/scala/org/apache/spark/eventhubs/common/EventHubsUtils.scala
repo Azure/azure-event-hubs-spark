@@ -17,8 +17,9 @@
 package org.apache.spark.eventhubs.common
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.SparkConf
+import org.apache.spark.{ SparkConf, SparkContext }
 import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubDirectDStream
 
@@ -43,5 +44,11 @@ object EventHubsUtils {
    */
   def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf): EventHubDirectDStream = {
     new EventHubDirectDStream(ssc, ehConf, EventHubsClientWrapper.apply)
+  }
+
+  def createRDD(sc: SparkContext,
+                ehConf: EventHubsConf,
+                offsetRanges: Array[OffsetRange]): EventHubsRDD = {
+    new EventHubsRDD(sc, ehConf, offsetRanges, EventHubsClientWrapper.apply)
   }
 }

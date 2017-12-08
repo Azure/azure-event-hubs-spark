@@ -17,7 +17,13 @@
 
 package org.apache.spark.eventhubs.common.utils
 
+import java.lang.reflect.Constructor
+
 import com.microsoft.azure.eventhubs.EventData
+import org.apache.qpid.proton.amqp.Binary
+import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
+import org.apache.qpid.proton.message.Message
+import org.apache.qpid.proton.message.Message.Factory
 import org.apache.spark.eventhubs.common.{
   EnqueueTime,
   EventHubsConf,
@@ -27,12 +33,13 @@ import org.apache.spark.eventhubs.common.{
 }
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.internal.Logging
+
 import scala.collection.JavaConverters._
 
 /**
  */
 private[spark] class EventHubsTestUtils extends Logging {
-  // gonna fill this in soon :)
+  //
 }
 
 private[spark] object EventHubsTestUtils {
@@ -44,13 +51,23 @@ private[spark] object EventHubsTestUtils {
 
 private[spark] class SimulatedEventHubsPartition {
   import EventHubsTestUtils._
+  import com.microsoft.azure.eventhubs.amqp.AmqpConstants._
 
   private var currentSeqNo = 0
 
+  // This allows us to invoke the EventData(Message) constructor
+  private val constructor = classOf[EventData].getDeclaredConstructor(classOf[Message])
+  constructor.setAccessible(true)
+
   private val data = for {
     id <- 0 until EventsPerPartition
-    body: Array[Byte] = s"${EventPayload}_$id".getBytes("UTF-8")
-  } yield new EventData(body)
+    obj: AnyRef = id.toLong.asInstanceOf[AnyRef]
+    msgAnnotations = new MessageAnnotations(Map(SEQUENCE_NUMBER -> obj).asJava)
+
+    body = new Data(new Binary(s"${EventPayload}_$id".getBytes("UTF-8")))
+
+    msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
+  } yield constructor.newInstance(msg)
 
   private[spark] def setStartingSeqNo(seqNo: SequenceNumber) = { currentSeqNo = seqNo.toInt }
 

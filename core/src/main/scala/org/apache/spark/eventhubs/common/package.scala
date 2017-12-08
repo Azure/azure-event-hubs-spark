@@ -30,6 +30,8 @@ package object common {
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(5)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
+  val PrefetchCountMinimum
+    : Int = 10 // Change this to PartitionReceiver.PREFETCH_COUNT_MINIMUM on next client release.
 
   type PartitionId = Int
   type Rate = Int

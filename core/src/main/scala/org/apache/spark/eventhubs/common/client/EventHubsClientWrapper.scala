@@ -39,15 +39,13 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
   import org.apache.spark.eventhubs.common._
 
-  override private[spark] var client: EventHubClient = _
-  private[spark] var partitionReceiver: PartitionReceiver = _
-
-  /* Extract relevant info from ehParams */
+  // Extract relevant info from ehParams
   private val ehNamespace = ehConf.namespace.get
   private val ehName = ehConf.name.get
   private val ehPolicyName = ehConf.keyName.get
   private val ehPolicy = ehConf.key.get
   private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+
   private val connectionString =
     Try {
       new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy)
@@ -56,11 +54,11 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     }.get
   connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
 
-  client = EventHubClient.createFromConnectionStringSync(connectionString.toString)
+  private var client: EventHubClient =
+    EventHubClient.createFromConnectionStringSync(connectionString.toString)
 
-  private[spark] override def receiver(partitionId: String,
-                                       seqNo: SequenceNumber): PartitionReceiver = {
-
+  private var receiver: PartitionReceiver = _
+  private[spark] def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
     // TODO: just so this build. Remove this once API is actually available.
     implicit class SeqNoAPI(val client: EventHubClient) extends AnyVal {
       def createReceiver(consumerGroup: String,
@@ -70,12 +68,20 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
         null
     }
 
-    if (partitionReceiver == null) {
-      logInfo(s"Starting receiver for partitionId $partitionId from seqNo $seqNo")
-      client.createReceiver(consumerGroup, partitionId, seqNo, inclusiveSeqNo = true)
-      partitionReceiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+    if (receiver == null) {
+      logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
+      receiver = client.createReceiver(consumerGroup, partitionId, startingSeqNo, true)
+      receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
-    partitionReceiver
+  }
+
+  override private[spark] def setPrefetchCount(count: Int): Unit = {
+    receiver.setPrefetchCount(count)
+  }
+
+  override private[spark] def receive(eventCount: Int): java.lang.Iterable[EventData] = {
+    require(receiver != null, "receive: PartitionReceiver has not been created.")
+    receiver.receive(eventCount).get
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
@@ -138,7 +144,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     }
   }
 
-  override def partitionCount(): Int = {
+  def partitionCount(): Int = {
     try {
       val runtimeInfo = client.getRuntimeInformation.get
       runtimeInfo.getPartitionCount
@@ -151,7 +157,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
   override def close(): Unit = {
     logInfo("close: Closing EventHubsClientWrapper.")
-    if (partitionReceiver != null) partitionReceiver.closeSync()
+    if (receiver != null) receiver.closeSync()
     if (client != null) client.closeSync()
   }
 
@@ -194,9 +200,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
                   .createReceiver(DefaultConsumerGroup, partitionId.toString, EndOfStream, true)
                   .get
             }
-            // TODO for now this is hardcoded. This needs to change to PartitionReceiver.PREFETCH_COUNT_MINIMUM.
-            // It will be available next EH Client release.
-            receiver.setPrefetchCount(10)
+            receiver.setPrefetchCount(PrefetchCountMinimum)
             val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
             receiver.close().get()
             result.put(partitionId, event.getSystemProperties.getSequenceNumber)

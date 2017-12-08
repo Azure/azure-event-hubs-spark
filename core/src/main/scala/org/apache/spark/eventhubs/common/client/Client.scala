@@ -17,14 +17,26 @@
 
 package org.apache.spark.eventhubs.common.client
 
-import com.microsoft.azure.eventhubs.{ EventData, EventHubClient, PartitionReceiver }
+import com.microsoft.azure.eventhubs.{ EventData }
 import org.apache.spark.eventhubs.common._
 
 private[spark] trait Client extends Serializable {
 
-  private[spark] var client: EventHubClient
+  /**
+   * Creates a receiver.
+   */
+  private[spark] def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit
 
-  private[spark] def receiver(partitionId: String, seqNo: SequenceNumber): PartitionReceiver
+  /**
+   * Receive events from your EventHubs instance.
+   */
+  private[spark] def receive(eventCount: Int): java.lang.Iterable[EventData]
+
+  /**
+   * When a connection with the service is established, the client will begin to prefetch EventData.
+   * This number specifies the number of events that we will prefetch.
+   */
+  private[spark] def setPrefetchCount(count: Int): Unit
 
   /**
    * Provides the earliest (lowest) sequence number that exists in the EventHubs instance
@@ -55,8 +67,6 @@ private[spark] trait Client extends Serializable {
    * and sequence numbers.
    */
   def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber]
-
-  def partitionCount(): Int
 
   /**
    * Closes the EventHubs client.

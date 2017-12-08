@@ -18,8 +18,8 @@
 package org.apache.spark.eventhubs.common.rdd
 
 import scala.collection.mutable.ArrayBuffer
-import com.microsoft.azure.eventhubs.{ EventData, PartitionReceiver }
-import org.apache.spark.eventhubs.common.{ EventHubsConf, SequenceNumber }
+import com.microsoft.azure.eventhubs.EventData
+import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.eventhubs.common.client.Client
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -32,6 +32,8 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     extends RDD[EventData](sc, Nil)
     with Logging
     with HasOffsetRanges {
+
+  import org.apache.spark.eventhubs.common._
 
   override def getPartitions: Array[Partition] = {
     for {
@@ -96,10 +98,12 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       s"Computing EventHubs ${part.name}, partitionId ${part.partitionId} " +
         s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
 
-    val receiver: PartitionReceiver =
-      receiverFactory(ehConf).receiver(part.partitionId.toString, part.fromSeqNo)
-    val prefetchCount = if (part.count.toInt < 10) 10 else part.count.toInt
-    receiver.setPrefetchCount(prefetchCount)
+    val client: Client = receiverFactory(ehConf)
+    client.createReceiver(part.partitionId.toString, part.fromSeqNo)
+
+    val prefetchCount =
+      if (part.count.toInt < PrefetchCountMinimum) PrefetchCountMinimum else part.count.toInt
+    client.setPrefetchCount(prefetchCount)
 
     var requestSeqNo: SequenceNumber = part.fromSeqNo
 
@@ -110,7 +114,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
     override def next(): EventData = {
       assert(hasNext(), "Can't call next() once untilSeqNo has been reached.")
-      val event = receiver.receive(1).get.iterator().next()
+      val event = client.receive(1).iterator().next()
       assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
              errWrongSeqNo(part, event.getSystemProperties.getSequenceNumber))
       requestSeqNo += 1
@@ -122,7 +126,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     }
 
     def closeIfNeeded(): Unit = {
-      if (receiver != null) receiver.close()
+      if (client != null) client.close()
     }
   }
 }

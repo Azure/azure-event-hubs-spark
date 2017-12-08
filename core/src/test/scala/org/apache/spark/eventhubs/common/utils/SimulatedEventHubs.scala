@@ -22,8 +22,8 @@ import org.apache.spark.eventhubs.common.NameAndPartition
 
 import scala.collection.mutable.ListBuffer
 
-class SimulatedEventHubs(eventHubsNamespace: String,
-                         initialData: Map[NameAndPartition, Array[EventData]])
+class FooSimulatedEventHubs(eventHubsNamespace: String,
+                            initialData: Map[NameAndPartition, Array[EventData]])
     extends Serializable {
 
   assert(initialData != null)

@@ -47,8 +47,6 @@ object StreamingWordCount {
       .setName(name)
       .setKeyName(keyName)
       .setKey(key)
-      .setProgressDirectory(progressDir)
-      .setPartitionCount("32")
       .setConsumerGroup("$Default")
 
     val ssc = new StreamingContext(new SparkContext(), Seconds(batchDuration))

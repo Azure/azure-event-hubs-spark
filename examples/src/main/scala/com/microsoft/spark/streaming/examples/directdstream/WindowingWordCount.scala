@@ -68,8 +68,7 @@ object WindowingWordCount {
       .setName(name)
       .setKeyName(keyName)
       .setKey(key)
-      .setMaxRatePerPartition(maxRate.toInt)
-      .setProgressDirectory(progressDir)
+      .setMaxRatePerPartition(0 until 32, maxRate.toInt)
       .setConsumerGroup("$Default")
 
     val ssc = StreamingContext.getOrCreate(sparkCheckpointDir,

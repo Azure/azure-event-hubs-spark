@@ -51,7 +51,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     with Logging {
   import EventHubsSource._
 
-  private lazy val partitionCount: Int = ehClient.partitionCount()
+  private lazy val partitionCount: Int = ehClient.partitionCount
   private val ehConf = EventHubsConf.toConf(options)
   private val sc = sqlContext.sparkContext
 
@@ -112,22 +112,15 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   override def schema: StructType = EventHubsSourceProvider.sourceSchema(options)
 
-  /**
-   * there are two things to do in this function, first is to collect the ending offsetsAndSeqNos of last
-   * batch, so that we know the starting offset of the current batch. And then, we calculate the
-   * target seq number of the current batch
-   *
-   * @return return the target seqNum of current batch
-   */
   override def getOffset: Option[Offset] = {
     // Make sure initialPartitionSeqNos is initialized
     initialPartitionSeqNos
 
-    val latest: Map[NameAndPartition, SequenceNumber] = for {
-      p <- partitionCount
+    val latest = (for {
+      p <- 0 until partitionCount
       n = ehConf.name.get
       seqNo = ehClient.latestSeqNo(p)
-    } yield NameAndPartition(n, p) -> seqNo
+    } yield NameAndPartition(n, p) -> seqNo).toMap
 
     currentSeqNos = Some(latest)
     logDebug(s"GetOffset: ${latest.toSeq.map(_.toString).sorted}")

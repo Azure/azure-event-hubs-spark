@@ -47,4 +47,13 @@ package object common {
     def toEnqueueTime: EnqueueTime = str.toLong
     def toSequenceNumber: SequenceNumber = str.toLong
   }
+
+  // TODO: just so this build. Remove this once API is actually available.
+  implicit class SeqNoAPI(val client: EventHubClient) extends AnyVal {
+    def createReceiver(consumerGroup: String,
+                       partitionId: String,
+                       seqNo: Long,
+                       inclusiveSeqNo: Boolean): PartitionReceiver =
+      null
+  }
 }

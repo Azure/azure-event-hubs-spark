@@ -69,6 +69,11 @@ private[spark] trait Client extends Serializable {
   def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber]
 
   /**
+   * Returns the number of partitions in your EventHubs instance.
+   */
+  def partitionCount: Int
+
+  /**
    * Closes the EventHubs client.
    */
   def close(): Unit

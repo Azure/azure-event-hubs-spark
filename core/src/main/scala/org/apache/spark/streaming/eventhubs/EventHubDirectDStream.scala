@@ -45,7 +45,7 @@ private[spark] class EventHubDirectDStream private[spark] (_ssc: StreamingContex
     with Logging {
   require(ehConf.isValid)
 
-  private lazy val partitionCount: Int = ehClient.partitionCount()
+  private lazy val partitionCount: Int = ehClient.partitionCount
   private lazy val ehName = ehConf.name.get
 
   @transient private var _client: Client = _
@@ -79,11 +79,11 @@ private[spark] class EventHubDirectDStream private[spark] (_ssc: StreamingContex
 
   protected def clamp(
       latestSeqNos: Map[PartitionId, SequenceNumber]): Map[PartitionId, SequenceNumber] = {
-    for {
+    (for {
       (partitionId, latestSeqNo) <- latestSeqNos
       maxRate = ehConf.maxRatesPerPartition.getOrElse(partitionId, DefaultMaxRatePerPartition)
       untilSeqNo = math.min(fromSeqNos(partitionId) + maxRate, latestSeqNo)
-    } yield partitionId -> untilSeqNo
+    } yield partitionId -> untilSeqNo).toMap
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {

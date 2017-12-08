@@ -32,8 +32,6 @@ class EventHubsConfSuite extends FunSuite {
       .setName("name")
       .setKeyName("keyName")
       .setKey("key")
-      .setPartitionCount("4")
-      .setProgressDirectory("dir")
       .setConsumerGroup("consumerGroup")
   }
 
@@ -66,12 +64,6 @@ class EventHubsConfSuite extends FunSuite {
     ehConf.setKey("key")
     intercept[IllegalArgumentException] { ehConf.isValid }
 
-    ehConf.setPartitionCount("2")
-    intercept[IllegalArgumentException] { ehConf.isValid }
-
-    ehConf.setProgressDirectory("dir")
-    intercept[IllegalArgumentException] { ehConf.isValid }
-
     ehConf.setConsumerGroup("consumerGroup")
     intercept[IllegalArgumentException] { ehConf.isValid }
 
@@ -90,11 +82,11 @@ class EventHubsConfSuite extends FunSuite {
     intercept[IllegalArgumentException] { ehConf.isValid }
 
     ehConf.setEndOfStream(false)
-    ehConf.setStartOffsets(50)
+    ehConf.setStartOffsets(0 to 7, 50)
     intercept[IllegalArgumentException] { ehConf.isValid }
 
     ehConf.clearStartOffsets()
-    ehConf.setStartEnqueueTimes(50)
+    ehConf.setStartEnqueueTimes(0 to 7, 50)
     intercept[IllegalArgumentException] { ehConf.isValid }
   }
 
@@ -104,20 +96,20 @@ class EventHubsConfSuite extends FunSuite {
     ehConf.setEndOfStream(true)
     assert(ehConf.isValid)
 
-    ehConf.setStartOffsets(50)
+    ehConf.setStartOffsets(0 to 7, 50)
     intercept[IllegalArgumentException] { ehConf.isValid }
 
     ehConf.clearStartOffsets()
-    ehConf.setStartEnqueueTimes(50)
+    ehConf.setStartEnqueueTimes(0 to 7, 50)
     intercept[IllegalArgumentException] { ehConf.isValid }
   }
 
   test("isValid doesn't return true when startOffsets and startEnqueueTimes are set.") {
     val ehConf = confWithTestValues
-    ehConf.setStartOffsets(50)
+    ehConf.setStartOffsets(0 to 7, 50)
     assert(ehConf.isValid)
 
-    ehConf.setStartEnqueueTimes(50)
+    ehConf.setStartEnqueueTimes(0 to 7, 50)
     intercept[IllegalArgumentException] { ehConf.isValid }
   }
 

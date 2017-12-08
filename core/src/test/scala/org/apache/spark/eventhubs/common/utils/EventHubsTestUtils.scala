@@ -104,7 +104,7 @@ class SimulatedClient extends Client { self =>
   }
 
   override def earliestSeqNo(eventHubNameAndPartition: NameAndPartition): SequenceNumber = {
-    0
+    0L
   }
 
   override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
@@ -114,13 +114,15 @@ class SimulatedClient extends Client { self =>
   override def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): EnqueueTime = {
     // We test the translate method in EventHubsClientWrapperSuite. We'll stick to SequenceNumbers
     // for other tests which will suffice if translate is working properly.
-    null
+    0L
   }
 
   override def translate[T](ehConf: EventHubsConf): Map[PartitionId, SequenceNumber] = {
     (for { partitionId <- 0 until PartitionCount } yield
       partitionId -> StartingSequenceNumber).toMap
   }
+
+  override def partitionCount: PartitionId = PartitionCount
 
   override def close(): Unit = {
     // nothing to close

@@ -205,8 +205,6 @@ class EventHubsConfSuite extends FunSuite {
     assert(map("eventhubs.name") == ehConf("eventhubs.name"))
     assert(map("eventhubs.keyName") == ehConf("eventhubs.keyName"))
     assert(map("eventhubs.key") == ehConf("eventhubs.key"))
-    assert(map("eventhubs.partitionCount") == ehConf("eventhubs.partitionCount"))
-    assert(map("eventhubs.progressDirectory") == ehConf("eventhubs.progressDirectory"))
     assert(map("eventhubs.consumerGroup") == ehConf("eventhubs.consumerGroup"))
     assert(map("eventhubs.maxRates") == EventHubsConf.maxRatesToString(ehConf.maxRatesPerPartition))
     assert(map("eventhubs.sql.containsProperties") == ehConf("eventhubs.sql.containsProperties"))
@@ -223,8 +221,6 @@ class EventHubsConfSuite extends FunSuite {
       "eventhubs.name" -> "name",
       "eventhubs.keyName" -> "keyName",
       "eventhubs.key" -> "key",
-      "eventhubs.partitionCount" -> "4",
-      "eventhubs.progressDirectory" -> "dir",
       "eventhubs.consumerGroup" -> "consumerGroup",
       "eventhubs.maxRates" -> "0:20",
       "eventhubs.startingWith" -> "Offsets",
@@ -236,8 +232,6 @@ class EventHubsConfSuite extends FunSuite {
     assert(actualConf("eventhubs.name") == expectedConf("eventhubs.name"))
     assert(actualConf("eventhubs.keyName") == expectedConf("eventhubs.keyName"))
     assert(actualConf("eventhubs.key") == expectedConf("eventhubs.key"))
-    assert(actualConf("eventhubs.partitionCount") == expectedConf("eventhubs.partitionCount"))
-    assert(actualConf("eventhubs.progressDirectory") == expectedConf("eventhubs.progressDirectory"))
     assert(actualConf("eventhubs.consumerGroup") == expectedConf("eventhubs.consumerGroup"))
     assert(actualConf.maxRatesPerPartition == expectedConf.maxRatesPerPartition)
     assert(actualConf("eventhubs.startingWith") == "Offsets")
@@ -251,8 +245,6 @@ class EventHubsConfSuite extends FunSuite {
         "eventhubs.name" -> "name",
         "eventhubs.keyName" -> "keyName",
         "eventhubs.key" -> "key",
-        "eventhubs.partitionCount" -> "4",
-        "eventhubs.progressDirectory" -> "dir",
         "eventhubs.consumerGroup" -> "consumerGroup",
         "eventhubs.maxRates" -> "0:20",
         "eventhubs.startingWith" -> "Offsets",
@@ -270,8 +262,6 @@ class EventHubsConfSuite extends FunSuite {
     assert(actualConf("eventhubs.name") == expectedConf("eventhubs.name"))
     assert(actualConf("eventhubs.keyName") == expectedConf("eventhubs.keyName"))
     assert(actualConf("eventhubs.key") == expectedConf("eventhubs.key"))
-    assert(actualConf("eventhubs.partitionCount") == expectedConf("eventhubs.partitionCount"))
-    assert(actualConf("eventhubs.progressDirectory") == expectedConf("eventhubs.progressDirectory"))
     assert(actualConf("eventhubs.consumerGroup") == expectedConf("eventhubs.consumerGroup"))
     assert(actualConf("eventhubs.startingWith") == expectedConf("eventhubs.startingWith"))
     assert(actualConf.maxRatesPerPartition == expectedConf.maxRatesPerPartition)

@@ -50,17 +50,83 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
   }
 
   test("basic usage") {
+    val fromSeqNo = 0
     val untilSeqNo = 50
     val ehConf = getEventHubsConf
 
     val offsetRanges = (for {
       partition <- 0 until PartitionCount
-    } yield OffsetRange(ehConf.name.get, partition, 0, untilSeqNo)).toArray
+    } yield OffsetRange(ehConf.name.get, partition, fromSeqNo, untilSeqNo)).toArray
 
     val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
       .map(_.getBytes.map(_.toChar).mkString)
 
-    assert(rdd.count == 50 * PartitionCount)
+    assert(rdd.count == (untilSeqNo - fromSeqNo) * PartitionCount)
     assert(!rdd.isEmpty)
+
+    // Make sure body is still intact
+    val event = rdd.take(1).head
+    assert(event contains EventPayload)
+  }
+
+  test("start from middle of instance") {
+    val fromSeqNo = 3000
+    val untilSeqNo = 4000
+    val ehConf = getEventHubsConf
+
+    val offsetRanges = (for {
+      partition <- 0 until PartitionCount
+    } yield OffsetRange(ehConf.name.get, partition, fromSeqNo, untilSeqNo)).toArray
+
+    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
+      .map(_.getBytes.map(_.toChar).mkString)
+
+    assert(rdd.count == (untilSeqNo - fromSeqNo) * PartitionCount)
+    assert(!rdd.isEmpty)
+
+    // Make sure body is still intact
+    val event = rdd.take(1).head
+    assert(event contains EventPayload)
+  }
+
+  test("single partition, make sure seqNos are consecutive") {
+    val fromSeqNo = 100
+    val untilSeqNo = 3200
+    val ehConf = getEventHubsConf
+
+    val offsetRanges = Array(OffsetRange(ehConf.name.get, 0, fromSeqNo, untilSeqNo))
+
+    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
+      .map(_.getSystemProperties.getSequenceNumber)
+
+    assert(rdd.count == (untilSeqNo - fromSeqNo)) // no PartitionCount multiplier b/c we only have one partition
+    assert(!rdd.isEmpty)
+
+    val received = rdd.collect().sorted.zipWithIndex
+
+    for ((seqNo, index) <- received) {
+      assert(fromSeqNo + index == seqNo)
+    }
+  }
+
+  test("repartition test") {
+    val fromSeqNo = 100
+    val untilSeqNo = 4200
+    val ehConf = getEventHubsConf
+
+    val offsetRanges = (for {
+      partition <- 0 until PartitionCount
+    } yield OffsetRange(ehConf.name.get, partition, fromSeqNo, untilSeqNo)).toArray
+
+    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
+      .map(_.getBytes.map(_.toChar).mkString)
+      .repartition(20)
+
+    assert(rdd.count == (untilSeqNo - fromSeqNo) * PartitionCount)
+    assert(!rdd.isEmpty)
+
+    // Make sure body is still intact
+    val event = rdd.take(1).head
+    assert(event contains EventPayload)
   }
 }

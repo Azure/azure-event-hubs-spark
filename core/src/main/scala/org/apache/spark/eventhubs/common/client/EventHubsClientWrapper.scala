@@ -59,15 +59,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
   private var receiver: PartitionReceiver = _
   private[spark] def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
-    // TODO: just so this build. Remove this once API is actually available.
-    implicit class SeqNoAPI(val client: EventHubClient) extends AnyVal {
-      def createReceiver(consumerGroup: String,
-                         partitionId: String,
-                         seqNo: Long,
-                         inclusiveSeqNo: Boolean): PartitionReceiver =
-        null
-    }
-
     if (receiver == null) {
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client.createReceiver(consumerGroup, partitionId, startingSeqNo, true)
@@ -144,7 +135,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     }
   }
 
-  def partitionCount(): Int = {
+  override def partitionCount: Int = {
     try {
       val runtimeInfo = client.getRuntimeInformation.get
       runtimeInfo.getPartitionCount

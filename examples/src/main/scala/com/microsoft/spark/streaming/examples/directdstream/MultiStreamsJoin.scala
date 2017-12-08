@@ -40,26 +40,12 @@ object MultiStreamsJoin {
     val Array(namespace1, namespace2) = namespaces.split(",")
     val Array(name1, name2) = names.split(",")
 
-    val eventhubParameters =
-      (name: String, namespace: String, policyName: String, policyKey: String) =>
-        Map(
-          name -> Map[String, String](
-            "eventhubs.policyname" -> policyName,
-            "eventhubs.policykey" -> policyKey,
-            "eventhubs.namespace" -> namespace,
-            "eventhubs.name" -> name,
-            "eventhubs.partition.count" -> "32",
-            "eventhubs.maxRate" -> s"$rate",
-            "eventhubs.consumergroup" -> "$Default"
-          ))
-
     val ehConf1 = EventHubsConf()
       .setNamespace(namespace1)
       .setName(name1)
       .setKeyName(policyName1)
       .setKey(key1)
-      .setPartitionCount("32")
-      .setMaxRatePerPartition(rate)
+      .setMaxRatePerPartition(0 until 32, rate)
       .setConsumerGroup("$Default")
 
     val ehConf2 =

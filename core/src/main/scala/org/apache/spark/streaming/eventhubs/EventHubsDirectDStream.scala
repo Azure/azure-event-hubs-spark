@@ -38,9 +38,10 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
  * @param ehConf the configurations related to your EventHubs. See [[EventHubsConf]] for detail.
  * @param clientFactory the factory method that creates an EventHubsClient
  */
-private[spark] class EventHubDirectDStream private[spark] (_ssc: StreamingContext,
-                                                           ehConf: EventHubsConf,
-                                                           clientFactory: (EventHubsConf => Client))
+private[spark] class EventHubsDirectDStream private[spark] (
+    _ssc: StreamingContext,
+    ehConf: EventHubsConf,
+    clientFactory: (EventHubsConf => Client))
     extends InputDStream[EventData](_ssc)
     with Logging {
   require(ehConf.isValid)
@@ -49,7 +50,7 @@ private[spark] class EventHubDirectDStream private[spark] (_ssc: StreamingContex
   private lazy val ehName = ehConf.name.get
 
   @transient private var _client: Client = _
-  private[eventhubs] def ehClient: Client = this.synchronized {
+  private[spark] def ehClient: Client = this.synchronized {
     if (_client == null) _client = clientFactory(ehConf)
     _client
   }

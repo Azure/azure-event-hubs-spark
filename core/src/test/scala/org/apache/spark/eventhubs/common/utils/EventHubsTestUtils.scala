@@ -30,21 +30,34 @@ import org.apache.spark.eventhubs.common.{
   SequenceNumber
 }
 import org.apache.spark.eventhubs.common.client.Client
-import org.apache.spark.internal.Logging
+import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
 
 import scala.collection.JavaConverters._
 
-/**
- */
-private[spark] class EventHubsTestUtils extends Logging {
-  //
-}
-
 private[spark] object EventHubsTestUtils {
-  val PartitionCount = 4
-  val EventsPerPartition = 5000
-  val EventPayload = "test_event"
-  val StartingSequenceNumber: SequenceNumber = 0
+  var eventHubs: SimulatedEventHubs = _
+  var PartitionCount = 4
+  var EventsPerPartition = 5000
+  var EventPayload = "test_event"
+  var StartingSequenceNumber: SequenceNumber = 0
+  var MaxRate = 5
+
+  def setDefaults(): Unit = {
+    PartitionCount = 4
+    EventsPerPartition = 5000
+    EventPayload = "test_event"
+    StartingSequenceNumber = 0
+    MaxRate = 5
+  }
+
+  def getEventId(event: EventData): Int = {
+    val str = event.getBytes.map(_.toChar).mkString
+    str.replaceAll("[^0-9]", "").toInt
+  }
+
+  def sendEvents(eventCount: Int, stream: EventHubsDirectDStream): Unit = {
+    stream.ehClient.asInstanceOf[SimulatedClient].eventHubs.send(eventCount)
+  }
 }
 
 private[spark] class SimulatedEventHubsPartition {
@@ -57,7 +70,7 @@ private[spark] class SimulatedEventHubsPartition {
   private val constructor = classOf[EventData].getDeclaredConstructor(classOf[Message])
   constructor.setAccessible(true)
 
-  private val data = for {
+  private var data: Seq[EventData] = for {
     id <- 0 until EventsPerPartition
     obj: AnyRef = id.toLong.asInstanceOf[AnyRef]
     msgAnnotations = new MessageAnnotations(Map(SEQUENCE_NUMBER -> obj).asJava)
@@ -66,6 +79,17 @@ private[spark] class SimulatedEventHubsPartition {
 
     msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
   } yield constructor.newInstance(msg)
+
+  private[spark] def send(events: Int): Unit = {
+    val newEvents: Seq[EventData] = for {
+      id <- data.size until data.size + events
+      obj: AnyRef = id.toLong.asInstanceOf[AnyRef]
+      msgAnnotations = new MessageAnnotations(Map(SEQUENCE_NUMBER -> obj).asJava)
+      body = new Data(new Binary(s"${EventPayload}_$id".getBytes("UTF-8")))
+      msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
+    } yield constructor.newInstance(msg)
+    data = data ++ newEvents
+  }
 
   private[spark] def setStartingSeqNo(seqNo: SequenceNumber) = { currentSeqNo = seqNo.toInt }
 
@@ -85,6 +109,11 @@ class SimulatedEventHubs {
   private val partitions: Map[PartitionId, SimulatedEventHubsPartition] =
     (for { p <- 0 until PartitionCount } yield p -> new SimulatedEventHubsPartition).toMap
 
+  def size: Int = partitions.head._2.size
+
+  def totalSize: Int = size * PartitionCount
+
+  // The receive method will return events starting from this sequence number.
   def setStartingSeqNos(seqNo: SequenceNumber): Unit = {
     for (partitionId <- partitions.keySet) {
       partitions(partitionId).setStartingSeqNo(seqNo)
@@ -93,6 +122,10 @@ class SimulatedEventHubs {
 
   def receive(eventCount: Int, partitionId: Int): java.lang.Iterable[EventData] = {
     (for { _ <- 0 until eventCount } yield partitions(partitionId).get).asJava
+  }
+
+  def send(eventCount: Int): Unit = {
+    for (p <- 0 until PartitionCount) { partitions(p).send(eventCount) }
   }
 }
 
@@ -123,7 +156,7 @@ class SimulatedClient extends Client { self =>
   }
 
   override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    EventsPerPartition
+    eventHubs.size
   }
 
   override def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): EnqueueTime = {

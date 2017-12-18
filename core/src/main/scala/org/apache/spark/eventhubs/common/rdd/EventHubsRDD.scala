@@ -50,7 +50,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       this.partitions.map(_.asInstanceOf[EventHubsRDDPartition]).filter(_.count > 0)
 
     if (num < 1 || nonEmptyPartitions.isEmpty) {
-      return new Array[EventData](0)
+      return Array()
     }
 
     val parts = nonEmptyPartitions.foldLeft(Map[Int, Int]()) { (result, part) =>

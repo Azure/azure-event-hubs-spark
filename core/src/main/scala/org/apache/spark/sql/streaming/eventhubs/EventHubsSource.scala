@@ -56,7 +56,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private var _client: Client = _
-  private[eventhubs] def ehClient = {
+  private[spark] def ehClient = {
     if (_client == null) _client = clientFactory(ehConf)
     _client
   }

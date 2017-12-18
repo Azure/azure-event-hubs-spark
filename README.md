@@ -4,14 +4,13 @@
 
 # Azure EventHubs + Apache Spark Connector 
 
+[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/azure-event-hubs-spark)
+
 |Branch|Status|
 |------|-------------|
 |master|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 |spark-2.1|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.1)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
-|spark-2.0|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=spark-2.0)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
-|databricks-3.3|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=databricks-3.3)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
-
-[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/azure-event-hubs-spark)
+|databricks-3.4|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=databricks-3.4)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
 
 This is the source code for the Azure Event Hubs and Apache Spark Connector. 
 

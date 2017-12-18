@@ -5,21 +5,21 @@
   <version>2.1.7-SNAPSHOT</version>
   <versioning>
     <snapshot>
-      <timestamp>20171207.231503</timestamp>
+      <timestamp>20171218.013205</timestamp>
       <buildNumber>1</buildNumber>
     </snapshot>
-    <lastUpdated>20171207231503</lastUpdated>
+    <lastUpdated>20171218013205</lastUpdated>
     <snapshotVersions>
       <snapshotVersion>
         <extension>pom</extension>
-        <value>2.1.7-20171207.231503-1</value>
-        <updated>20171207231503</updated>
+        <value>2.1.7-20171218.013205-1</value>
+        <updated>20171218013205</updated>
       </snapshotVersion>
       <snapshotVersion>
         <classifier>javadoc</classifier>
         <extension>jar</extension>
-        <value>2.1.7-20171207.231503-1</value>
-        <updated>20171207231503</updated>
+        <value>2.1.7-20171218.013205-1</value>
+        <updated>20171218013205</updated>
       </snapshotVersion>
     </snapshotVersions>
   </versioning>

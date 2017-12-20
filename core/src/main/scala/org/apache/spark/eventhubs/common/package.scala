@@ -35,10 +35,19 @@ package object common {
     : Int = 10 // Change this to PartitionReceiver.PREFETCH_COUNT_MINIMUM on next client release.
 
   type PartitionId = Int
+  val PartitionId = Int
+
   type Rate = Int
+  val Rate = Int
+
   type Offset = Long
+  val Offset = Long
+
   type EnqueueTime = Long
+  val EnqueueTime = Long
+
   type SequenceNumber = Long
+  val SequenceNumber = Long
 
   // Allow Strings to be converted to types defined in this library.
   implicit class EventHubsString(val str: String) extends AnyVal {

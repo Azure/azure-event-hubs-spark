@@ -18,6 +18,13 @@
 package org.apache.spark.eventhubs.common
 
 private[spark] case class NameAndPartition(ehName: String, partitionId: Int) {
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case that: NameAndPartition =>
+      this.ehName == that.ehName &&
+        this.partitionId == that.partitionId
+    case _ => false
+  }
+
   override def toString: String = s"$ehName-partition-$partitionId"
 }
 

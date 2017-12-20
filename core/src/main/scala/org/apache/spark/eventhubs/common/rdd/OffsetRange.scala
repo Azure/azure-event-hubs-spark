@@ -37,6 +37,19 @@ private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
 
   def count: Long = untilSeqNo - fromSeqNo
 
+  override def equals(obj: Any): Boolean = obj match {
+    case that: OffsetRange =>
+      this.name == that.name &&
+        this.partitionId == that.partitionId &&
+        this.fromSeqNo == that.fromSeqNo &&
+        this.untilSeqNo == that.untilSeqNo
+    case _ => false
+  }
+
+  override def hashCode(): Rate = {
+    toTuple.hashCode()
+  }
+
   def toTuple: OffsetRangeTuple = (nameAndPartition, fromSeqNo, untilSeqNo)
 
   override def toString =

@@ -82,7 +82,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       client.getPartitionRuntimeInformation(partitionId).get
     } catch {
       case e: Exception =>
-        e.printStackTrace()
         throw e
     }
   }
@@ -98,7 +97,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       runtimeInformation.getBeginSequenceNumber
     } catch {
       case e: Exception =>
-        e.printStackTrace()
         throw e
     }
   }
@@ -114,7 +112,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       runtimeInfo.getLastEnqueuedSequenceNumber
     } catch {
       case e: Exception =>
-        e.printStackTrace()
         throw e
     }
   }
@@ -130,7 +127,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond
     } catch {
       case e: Exception =>
-        e.printStackTrace()
         throw e
     }
   }
@@ -141,7 +137,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       runtimeInfo.getPartitionCount
     } catch {
       case e: Exception =>
-        e.printStackTrace()
         throw e
     }
   }

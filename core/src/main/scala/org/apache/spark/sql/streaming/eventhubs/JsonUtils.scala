@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.{ NameAndPartition, SequenceNumber }
+import org.apache.spark.eventhubs.common._
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
@@ -27,22 +27,78 @@ import scala.util.control.NonFatal
 private object JsonUtils {
   private implicit val formats = Serialization.formats(NoTypeHints)
 
-  def partitionSeqNos(seqNums: Map[NameAndPartition, SequenceNumber]): String = {
-    val convertedStringIndexedMap = new mutable.HashMap[String, SequenceNumber]
-    seqNums.foreach {
-      case (eventHubNameAndPartition, offsetAndSeqNum) =>
-        convertedStringIndexedMap += eventHubNameAndPartition.toString -> offsetAndSeqNum
+  /**
+   * Read NameAndPartitions from json string
+   */
+  def partitions(str: String): Array[NameAndPartition] = {
+    try {
+      Serialization
+        .read[Map[String, Seq[PartitionId]]](str)
+        .flatMap {
+          case (name, parts) =>
+            parts.map { part =>
+              new NameAndPartition(name, part)
+            }
+        }
+        .toArray
+    } catch {
+      case NonFatal(x) =>
+        throw new IllegalArgumentException(
+          s"""Expected e.g. {"ehNameA":[0,1],"ehNameB":[0,1]}, got $str""")
     }
-    Serialization.write(convertedStringIndexedMap.toMap)
   }
 
+  /**
+   * Write NameAndPartitions as json string
+   */
+  def partitions(partitions: Iterable[NameAndPartition]): String = {
+    val result = new mutable.HashMap[String, List[PartitionId]]
+    partitions.foreach { nAndP =>
+      val parts: List[PartitionId] = result.getOrElse(nAndP.ehName, Nil)
+      result += nAndP.ehName -> (nAndP.partitionId :: parts)
+    }
+    Serialization.write(result)
+  }
+
+  /**
+   * Write per-NameAndPartition seqNos as json string
+   */
+  def partitionSeqNos(partitionSeqNos: Map[NameAndPartition, SequenceNumber]): String = {
+    val result = new mutable.HashMap[String, mutable.HashMap[PartitionId, SequenceNumber]]()
+    implicit val ordering = new Ordering[NameAndPartition] {
+      override def compare(x: NameAndPartition, y: NameAndPartition): Int = {
+        Ordering
+          .Tuple2[String, PartitionId]
+          .compare((x.ehName, x.partitionId), (y.ehName, y.partitionId))
+      }
+    }
+    val partitions = partitionSeqNos.keySet.toSeq.sorted // sort for more determinism
+    partitions.foreach { nAndP =>
+      val seqNo = partitionSeqNos(nAndP)
+      val parts = result.getOrElse(nAndP.ehName, new mutable.HashMap[PartitionId, SequenceNumber])
+      parts += nAndP.partitionId -> seqNo
+      result += nAndP.ehName -> parts
+    }
+    Serialization.write(result)
+  }
+
+  /**
+   * Read per-NameAndPartition seqNos from json string
+   */
   def partitionSeqNos(jsonStr: String): Map[NameAndPartition, SequenceNumber] = {
     try {
-      val tuple = Serialization.read[Map[String, SequenceNumber]](jsonStr)
-      tuple.map { case (nAndP, seqNo) => (NameAndPartition.fromString(nAndP), seqNo) }
+      Serialization.read[Map[String, Map[PartitionId, SequenceNumber]]](jsonStr).flatMap {
+        case (name, partSeqNos) =>
+          partSeqNos.map {
+            case (part, seqNo) =>
+              NameAndPartition(name, part) -> seqNo
+          }
+      }
     } catch {
       case NonFatal(_) =>
-        throw new IllegalArgumentException(s"failed to parse $jsonStr")
+        throw new IllegalArgumentException(
+          s"failed to parse $jsonStr" +
+            s"""Expected e.g. {"ehName":{"0":23,"1":-1},"ehNameB":{"0":-2}}""")
     }
   }
 }

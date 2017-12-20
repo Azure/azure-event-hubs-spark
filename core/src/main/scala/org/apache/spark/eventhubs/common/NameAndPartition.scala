@@ -17,7 +17,8 @@
 
 package org.apache.spark.eventhubs.common
 
-private[spark] case class NameAndPartition(ehName: String, partitionId: Int) {
+private[spark] final class NameAndPartition(val ehName: String, val partitionId: PartitionId)
+    extends Serializable {
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: NameAndPartition =>
       this.ehName == that.ehName &&
@@ -25,12 +26,20 @@ private[spark] case class NameAndPartition(ehName: String, partitionId: Int) {
     case _ => false
   }
 
-  override def toString: String = s"$ehName-partition-$partitionId"
+  override def toString: String = s"$ehName-$partitionId"
+
+  override def hashCode(): Rate = {
+    toTuple.hashCode()
+  }
+
+  def toTuple: (String, PartitionId) = (ehName, partitionId)
 }
 
 private[spark] object NameAndPartition {
+  def apply(ehName: String, partitionId: PartitionId) = new NameAndPartition(ehName, partitionId)
+
   def fromString(str: String): NameAndPartition = {
-    val Array(name, partition) = str.split("-partition-")
+    val Array(name, partition) = str.split("-")
     NameAndPartition(name, partition.toInt)
   }
 }

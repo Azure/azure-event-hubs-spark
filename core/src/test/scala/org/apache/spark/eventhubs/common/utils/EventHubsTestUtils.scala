@@ -57,6 +57,7 @@ private[spark] object EventHubsTestUtils {
 
   def sendEvents(eventCount: Int, stream: EventHubsDirectDStream): Unit = {
     stream.ehClient.asInstanceOf[SimulatedClient].eventHubs.send(eventCount)
+    EventsPerPartition += eventCount
   }
 }
 

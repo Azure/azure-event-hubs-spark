@@ -17,6 +17,8 @@
 
 package org.apache.spark.eventhubs.common.utils
 
+import java.time.Instant
+
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.qpid.proton.amqp.Binary
 import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
@@ -34,6 +36,9 @@ import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
 
 import scala.collection.JavaConverters._
 
+/**
+ * Test classes used to simulated an EventHubs instance.
+ */
 private[spark] object EventHubsTestUtils {
   var eventHubs: SimulatedEventHubs = _
   var PartitionCount = 4
@@ -73,8 +78,12 @@ private[spark] class SimulatedEventHubsPartition {
 
   private var data: Seq[EventData] = for {
     id <- 0 until EventsPerPartition
-    obj: AnyRef = id.toLong.asInstanceOf[AnyRef]
-    msgAnnotations = new MessageAnnotations(Map(SEQUENCE_NUMBER -> obj).asJava)
+    seqNo = id.toLong.asInstanceOf[AnyRef]
+    offset = id.toString.asInstanceOf[AnyRef]
+    time = Instant.now.toEpochMilli.asInstanceOf[AnyRef]
+
+    msgAnnotations = new MessageAnnotations(
+      Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)
 
     body = new Data(new Binary(s"${EventPayload}_$id".getBytes("UTF-8")))
 
@@ -84,9 +93,15 @@ private[spark] class SimulatedEventHubsPartition {
   private[spark] def send(events: Int): Unit = {
     val newEvents: Seq[EventData] = for {
       id <- data.size until data.size + events
-      obj: AnyRef = id.toLong.asInstanceOf[AnyRef]
-      msgAnnotations = new MessageAnnotations(Map(SEQUENCE_NUMBER -> obj).asJava)
+      seqNo = id.toLong.asInstanceOf[AnyRef]
+      offset = id.toString.asInstanceOf[AnyRef]
+      time = Instant.now.toEpochMilli.asInstanceOf[AnyRef]
+
+      msgAnnotations = new MessageAnnotations(
+        Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)
+
       body = new Data(new Binary(s"${EventPayload}_$id".getBytes("UTF-8")))
+
       msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
     } yield constructor.newInstance(msg)
     data = data ++ newEvents
@@ -104,7 +119,7 @@ private[spark] class SimulatedEventHubsPartition {
   }
 }
 
-class SimulatedEventHubs {
+private[spark] class SimulatedEventHubs {
   import EventHubsTestUtils._
 
   private val partitions: Map[PartitionId, SimulatedEventHubsPartition] =
@@ -130,7 +145,7 @@ class SimulatedEventHubs {
   }
 }
 
-class SimulatedClient extends Client { self =>
+private[spark] class SimulatedClient extends Client { self =>
 
   import EventHubsTestUtils._
 
@@ -179,6 +194,6 @@ class SimulatedClient extends Client { self =>
   }
 }
 
-object SimulatedClient {
+private[spark] object SimulatedClient {
   def apply(ehConf: EventHubsConf): SimulatedClient = new SimulatedClient
 }

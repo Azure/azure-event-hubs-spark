@@ -178,9 +178,12 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // Calculate offset ranges
     val offsetRanges = (for {
       p <- partitions
-      fromSeqNo = newPartitionSeqNos.getOrElse(p, {
-        throw new IllegalStateException(s"$p doesn't have a fromSeqNo")
-      })
+      fromSeqNo = fromSeqNos.get(p).getOrElse {
+        newPartitionSeqNos.getOrElse(p, {
+          // This should never happen.
+          throw new IllegalStateException(s"$p doesn't have a fromSeqNo")
+        })
+      }
       untilSeqNo = untilSeqNos(p)
       // preferredLoc - coming soon
     } yield OffsetRange(p, fromSeqNo, untilSeqNo)).filter { range =>
@@ -211,7 +214,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     ).map(
       eventData =>
         InternalRow.fromSeq(Seq(
-          eventData.getBytes,
+          eventData.getBytes.map(_.toChar).mkString,
           eventData.getSystemProperties.getOffset.toLong,
           eventData.getSystemProperties.getSequenceNumber,
           eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,

@@ -296,7 +296,11 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   }
 
   def setFailOnDataLoss(b: Boolean): EventHubsConf = {
-    set("failOnDataLoss", b)
+    set("eventhubs.failOnDataLoss", b)
+  }
+
+  private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
+    set("eventhubs.useSimulatedClient", b)
   }
 
   /** The currently set namespace. */
@@ -381,7 +385,7 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   }
 
   def failOnDataLoss: Option[Boolean] = {
-    self.get("failOnDataLoss") map (str => str.toBoolean)
+    self.get("eventhubs.failOnDataLoss") map (str => str.toBoolean)
   }
 
   /** All max rates currently set will be erased. */

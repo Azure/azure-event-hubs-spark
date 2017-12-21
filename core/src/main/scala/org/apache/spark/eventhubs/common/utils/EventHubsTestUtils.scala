@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubs.common.utils
 
 import java.time.Instant
+import java.util.Date
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.qpid.proton.amqp.Binary
@@ -80,7 +81,7 @@ private[spark] class SimulatedEventHubsPartition {
     id <- 0 until EventsPerPartition
     seqNo = id.toLong.asInstanceOf[AnyRef]
     offset = id.toString.asInstanceOf[AnyRef]
-    time = Instant.now.toEpochMilli.asInstanceOf[AnyRef]
+    time = new Date().asInstanceOf[AnyRef]
 
     msgAnnotations = new MessageAnnotations(
       Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)
@@ -95,7 +96,7 @@ private[spark] class SimulatedEventHubsPartition {
       id <- data.size until data.size + events
       seqNo = id.toLong.asInstanceOf[AnyRef]
       offset = id.toString.asInstanceOf[AnyRef]
-      time = Instant.now.toEpochMilli.asInstanceOf[AnyRef]
+      time = new Date().asInstanceOf[AnyRef]
 
       msgAnnotations = new MessageAnnotations(
         Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)

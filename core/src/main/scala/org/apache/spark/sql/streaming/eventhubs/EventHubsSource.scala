@@ -19,6 +19,7 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
+import java.util.Date
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
@@ -214,10 +215,10 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     ).map(
       eventData =>
         InternalRow.fromSeq(Seq(
-          eventData.getBytes.map(_.toChar).mkString,
+          UTF8String.fromBytes(eventData.getBytes),
           eventData.getSystemProperties.getOffset.toLong,
           eventData.getSystemProperties.getSequenceNumber,
-          eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,
+          eventData.getSystemProperties.getEnqueuedTime.toEpochMilli,
           UTF8String.fromString(eventData.getSystemProperties.getPublisher),
           UTF8String.fromString(eventData.getSystemProperties.getPartitionKey)
         ) ++ {

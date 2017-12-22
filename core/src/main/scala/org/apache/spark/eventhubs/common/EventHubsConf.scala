@@ -28,7 +28,8 @@ import language.implicitConversions
 
 // TODO: Can we catch malformed configs at compile-time?
 // TODO: What if users are starting from a checkpoint? Currently it's mandated they specify some starting point
-// TODO: Add support for a starting sequence number. Should we deprecate start offset?
+// ^^ I suspect we'll check if a checkpoint dir has been set within the dstream and source.
+//    if that's the case, then maybe we shouldn't mandate users provide a starting point.
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *
@@ -296,11 +297,15 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   }
 
   def setFailOnDataLoss(b: Boolean): EventHubsConf = {
-    set("eventhubs.failOnDataLoss", b)
+    set("failOnDataLoss", b)
+  }
+
+  def setMaxSeqNosPerTrigger(limit: Long): EventHubsConf = {
+    set("maxSeqNosPerTrigger", limit)
   }
 
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
-    set("eventhubs.useSimulatedClient", b)
+    set("useSimulatedClient", b)
   }
 
   /** The currently set namespace. */

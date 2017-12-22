@@ -74,8 +74,8 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
-  private val FailOnDataLossOptionKey = "eventhubs.failondataloss"
-  private val UseSimulatedClientOptionKey = "eventhubs.usesimulatedclient"
+  private val FailOnDataLossOptionKey = "failondataloss"
+  private val UseSimulatedClientOptionKey = "usesimulatedclient"
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
     val containsProperties =

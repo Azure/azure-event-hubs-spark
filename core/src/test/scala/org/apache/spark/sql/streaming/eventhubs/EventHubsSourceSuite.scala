@@ -24,9 +24,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.execution.streaming._
-import org.apache.spark.sql.streaming.StreamTest
+import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
+import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
@@ -60,7 +62,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .setKeyName("keyName")
       .setKey("key")
       .setConsumerGroup("consumerGroup")
-      .setMaxRatePerPartition(0 until PartitionCount, MaxRate)
       .setUseSimulatedClient(true)
   }
 
@@ -145,4 +146,63 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     testStream(reader.load())(makeSureGetOffsetCalled, StopStream, StartStream(), StopStream)
   }
+
+  test("maxSeqNosPerTrigger") {
+    PartitionCount = 4
+    val eh = newEventHubs()
+    val parameters =
+      getEventHubsConf
+        .setName(eh)
+        .setStartSequenceNumbers(0 until PartitionCount, 0)
+        .setMaxSeqNosPerTrigger(4)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => getEventId(e))
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // we'll get one event per partition per trigger
+      CheckAnswer(0, 0, 0, 0),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1),
+      StopStream,
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3)
+    )
+  }
+
+  // TODO:
+  // test("maxSeqNosPerTrigger with empty partitions")
 }

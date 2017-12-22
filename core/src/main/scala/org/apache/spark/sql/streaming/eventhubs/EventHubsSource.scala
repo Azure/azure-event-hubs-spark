@@ -19,7 +19,6 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
-import java.util.Date
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
@@ -53,8 +52,13 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   import EventHubsSource._
 
   private lazy val partitionCount: Int = ehClient.partitionCount
+
   private val ehConf = EventHubsConf.toConf(options)
+
   private val sc = sqlContext.sparkContext
+
+  private val maxOffsetsPerTrigger =
+    options.get("maxSeqNosPerTrigger").map(_.toSequenceNumber)
 
   private var _client: Client = _
   private[spark] def ehClient = {
@@ -123,10 +127,65 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       seqNo = ehClient.latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap
 
-    currentSeqNos = Some(latest)
-    logDebug(s"GetOffset: ${latest.toSeq.map(_.toString).sorted}")
+    val seqNos = maxOffsetsPerTrigger match {
+      case None =>
+        latest
+      case Some(limit) if currentSeqNos.isEmpty =>
+        rateLimit(limit, initialPartitionSeqNos, latest)
+      case Some(limit) =>
+        rateLimit(limit, currentSeqNos.get, latest)
+    }
 
-    Some(EventHubsSourceOffset(latest))
+    currentSeqNos = Some(seqNos)
+    logDebug(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
+
+    Some(EventHubsSourceOffset(seqNos))
+  }
+
+  def fetchEarliestSeqNos(
+      nameAndPartitions: Seq[NameAndPartition]): Map[NameAndPartition, SequenceNumber] = {
+    (for {
+      nameAndPartition <- nameAndPartitions
+      seqNo = ehClient.earliestSeqNo(nameAndPartition)
+    } yield nameAndPartition -> seqNo).toMap
+  }
+
+  /** Proportionally distribute limit number of offsets among topicpartitions */
+  private def rateLimit(
+      limit: SequenceNumber,
+      from: Map[NameAndPartition, SequenceNumber],
+      until: Map[NameAndPartition, SequenceNumber]): Map[NameAndPartition, SequenceNumber] = {
+    val fromNew = fetchEarliestSeqNos(until.keySet.diff(from.keySet).toSeq)
+    val sizes = until.flatMap {
+      case (nameAndPartition, end) =>
+        // If begin isn't defined, something's wrong, but let alert logic in getBatch handle it
+        from.get(nameAndPartition).orElse(fromNew.get(nameAndPartition)).flatMap { begin =>
+          val size = end - begin
+          logDebug(s"rateLimit $nameAndPartition size is $size")
+          if (size > 0) Some(nameAndPartition -> size) else None
+        }
+    }
+    val total = sizes.values.sum.toDouble
+    if (total < 1) {
+      until
+    } else {
+      until.map {
+        case (nameAndPartition, end) =>
+          nameAndPartition -> sizes
+            .get(nameAndPartition)
+            .map { size =>
+              val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
+              val prorate = limit * (size / total)
+              logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
+              // Don't completely starve small topicpartitions
+              val off = begin + (if (prorate < 1) Math.ceil(prorate) else Math.floor(prorate)).toLong
+              logDebug(s"rateLimit $nameAndPartition new offset is $off")
+              // Paranoia, make sure not to return an offset that's past end
+              Math.min(end, off)
+            }
+            .getOrElse(end)
+      }
+    }
   }
 
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
@@ -144,10 +203,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // TODO: In what exact scenarios does this situation arise?
     // Find the new partitions, and get their earliest offsets
     val newPartitions = untilSeqNos.keySet.diff(fromSeqNos.keySet)
-    val newPartitionSeqNos = (for {
-      nameAndPartition <- newPartitions
-      seqNo = ehClient.earliestSeqNo(nameAndPartition)
-    } yield nameAndPartition -> seqNo).toMap
+    val newPartitionSeqNos = fetchEarliestSeqNos(newPartitions.toSeq)
     if (newPartitionSeqNos.keySet != newPartitions) {
       // We cannot get fromOffsets for some partitions. It means they got deleted.
       val deletedPartitions = newPartitions.diff(newPartitionSeqNos.keySet)

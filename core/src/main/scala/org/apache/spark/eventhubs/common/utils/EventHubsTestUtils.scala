@@ -61,6 +61,10 @@ private[spark] object EventHubsTestUtils {
     str.replaceAll("[^0-9]", "").toInt
   }
 
+  def getEventId(str: String): Int = {
+    str.replaceAll("[^0-9]", "").toInt
+  }
+
   def sendEvents(eventCount: Int, stream: EventHubsDirectDStream): Unit = {
     stream.ehClient.asInstanceOf[SimulatedClient].eventHubs.send(eventCount)
     EventsPerPartition += eventCount

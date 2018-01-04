@@ -205,4 +205,30 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   // TODO:
   // test("maxSeqNosPerTrigger with empty partitions")
+
+  test("cannot stop EventHubs stream") {
+    PartitionCount = 4
+    val eh = newEventHubs()
+    val parameters =
+      getEventHubsConf
+        .setName(eh)
+        .setStartSequenceNumbers(0 until PartitionCount, 0)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => getEventId(e) + 1)
+
+    testStream(mapped)(
+      makeSureGetOffsetCalled,
+      StopStream
+    )
+  }
 }

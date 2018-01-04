@@ -27,18 +27,8 @@ import org.scalatest.mock.MockitoSugar
  * Test suite for EventHubsClientWrapper
  */
 class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
-  var ehClientWrapperMock: EventHubsClientWrapper = _
-  val ehParams: Map[String, String] = Map(
-    "eventhubs.policyname" -> "policyname",
-    "eventhubs.policykey" -> "policykey",
-    "eventhubs.namespace" -> "namespace",
-    "eventhubs.name" -> "name",
-    "eventhubs.partition.count" -> "4"
-  )
+  // TODO: add tests for driver-side translation
 
-  before {}
-
-  // TODO: re-implement these tests. The previous tests were pointless after the client redesign.
   test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {}
 
   test("EventHubsClientWrapper converts parameters for consumergroup") {}

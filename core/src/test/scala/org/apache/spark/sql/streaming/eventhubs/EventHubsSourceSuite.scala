@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+/*
 package org.apache.spark.sql.streaming.eventhubs
 
 import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
@@ -41,6 +42,39 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
     // we don't know which data should be fetched when `startingOffsets` is latest.
     q.processAllAvailable()
     true
+  }
+
+  case class AddEventHubsData(conf: EventHubsConf, data: Int*)(
+      implicit ensureDataInMultiplePartitions: Boolean = false,
+      concurrent: Boolean = false,
+      message: String = "")
+      extends AddData {
+
+    override def addData(query: Option[StreamExecution]): (Source, Offset) = {
+      if (query.get.isActive) {
+        // Make sure no Spark job is running when deleting a topic
+        query.get.processAllAvailable()
+      }
+
+      // implementation here. Open question: does the data need to be added to our dummy EventHubs?
+      // OR, will the test suite submit this offset to the source? I assume the latter, but we'll see.
+
+      val sources = query.get.logicalPlan.collect {
+        case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
+          source.asInstanceOf[EventHubsSource]
+      }
+      if (sources.isEmpty) {
+        throw new Exception(
+          "Could not find EventHubs source in the StreamExecution logical plan to add data to")
+      } else if (sources.size > 1) {
+        throw new Exception(
+          "Could not select the EventHubs source in the StreamExecution logical plan as there" +
+            "are multiple EventHubs sources:\n\t" + sources.mkString("\n\t"))
+      }
+
+      val ehSource = sources.head
+      (ehSource, EventHubsSourceOffset())
+    }
   }
 }
 
@@ -232,3 +266,4 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 }
+ */

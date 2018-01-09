@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicLong
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.eventhubs.common.rdd.{ HasOffsetRanges, OffsetRange }
-import org.apache.spark.eventhubs.common.utils.SimulatedClient
+import org.apache.spark.eventhubs.common.utils.{ EventHubsTestUtils, SimulatedClient }
+import org.apache.spark.eventhubs.common.utils.EventHubsTestUtils._
 import org.apache.spark.{ SparkConf, SparkFunSuite }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -50,18 +51,33 @@ class EventHubsDirectDStreamSuite
     with BeforeAndAfter
     with Eventually
     with Logging {
-  import org.apache.spark.eventhubs.common.utils.EventHubsTestUtils._
+
+  import EventHubsDirectDStreamSuite._
+
+  private var testUtils: EventHubsTestUtils = _
 
   val sparkConf = new SparkConf().setMaster("local[4]").setAppName(this.getClass.getSimpleName)
 
   private var ssc: StreamingContext = _
   private var testDir: File = _
 
+  override def beforeAll(): Unit = {
+    testUtils = new EventHubsTestUtils
+  }
+
   before {
     setDefaults()
+    testUtils.createEventHubs()
+
+    // Send events to simulated EventHubs
+    for (i <- 0 until PartitionCount) {
+      EventHubsTestUtils.eventHubs.send(i, 0 until EventsPerPartition)
+    }
   }
 
   after {
+    testUtils.destroyEventHubs()
+
     if (ssc != null) {
       ssc.stop(stopSparkContext = true)
     }
@@ -135,6 +151,7 @@ class EventHubsDirectDStreamSuite
   }
 
   test("basic stream receiving from random sequence number") {
+    // We use 5000, because the EventHubs instance is populated with 5000 events in the beforeAll method.
     val startSeqNo = scala.util.Random.nextInt % EventsPerPartition
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, startSeqNo)
     val batchInterval = 1000
@@ -220,7 +237,12 @@ class EventHubsDirectDStreamSuite
   // Test to verify offset ranges can be recovered from the checkpoints
   test("offset recovery") {
     testDir = Utils.createTempDir()
-    EventsPerPartition = 25
+
+    testUtils.destroyEventHubs()
+    testUtils.createEventHubs()
+    for (i <- 0 until PartitionCount) {
+      EventHubsTestUtils.eventHubs.send(i, 0 until 25)
+    }
 
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, 0)
 
@@ -231,7 +253,7 @@ class EventHubsDirectDStreamSuite
       new EventHubsDirectDStream(ssc, ehConf, SimulatedClient.apply)
     }
     val keyedStream = stream.map { event =>
-      "key" -> getEventId(event)
+      "key" -> event.getSystemProperties.getSequenceNumber
     }
 
     ssc.checkpoint(testDir.getAbsolutePath)
@@ -298,7 +320,6 @@ class EventHubsDirectDStreamSuite
 
   test("Direct EventHubs stream report input information") {
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, 0)
-    EventsPerPartition = 100
     val totalSent = EventsPerPartition * PartitionCount
 
     import EventHubsDirectDStreamSuite._
@@ -344,6 +365,8 @@ class EventHubsDirectDStreamSuite
 }
 
 object EventHubsDirectDStreamSuite {
+  val EventsPerPartition: Int = 500
+
   class InputInfoCollector extends StreamingListener {
     val numRecordsSubmitted = new AtomicLong(0L)
     val numRecordsStarted = new AtomicLong(0L)

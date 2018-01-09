@@ -62,16 +62,18 @@ class EventHubsDirectDStreamSuite
   private var testDir: File = _
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     testUtils = new EventHubsTestUtils
   }
 
   before {
+    super.before()
     setDefaults()
     testUtils.createEventHubs()
 
     // Send events to simulated EventHubs
     for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 until EventsPerPartition)
+      EventHubsTestUtils.eventHubs.send(i, 0 to EventsPerPartition)
     }
   }
 
@@ -84,6 +86,7 @@ class EventHubsDirectDStreamSuite
     if (testDir != null) {
       Utils.deleteRecursively(testDir)
     }
+    super.after()
   }
 
   private def getEventHubsConf: EventHubsConf = {
@@ -152,7 +155,7 @@ class EventHubsDirectDStreamSuite
 
   test("basic stream receiving from random sequence number") {
     // We use 5000, because the EventHubs instance is populated with 5000 events in the beforeAll method.
-    val startSeqNo = scala.util.Random.nextInt % EventsPerPartition
+    val startSeqNo = scala.util.Random.nextInt % (EventsPerPartition / 2)
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, startSeqNo)
     val batchInterval = 1000
     val timeoutAfter = 100000
@@ -241,7 +244,7 @@ class EventHubsDirectDStreamSuite
     testUtils.destroyEventHubs()
     testUtils.createEventHubs()
     for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 until 25)
+      EventHubsTestUtils.eventHubs.send(i, 0 to 25)
     }
 
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, 0)
@@ -320,7 +323,14 @@ class EventHubsDirectDStreamSuite
 
   test("Direct EventHubs stream report input information") {
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, 0)
-    val totalSent = EventsPerPartition * PartitionCount
+
+    testUtils.destroyEventHubs()
+    testUtils.createEventHubs()
+    for (i <- 0 until PartitionCount) {
+      EventHubsTestUtils.eventHubs.send(i, 0 to 25)
+    }
+
+    val totalSent = 25 * PartitionCount
 
     import EventHubsDirectDStreamSuite._
     ssc = new StreamingContext(sparkConf, Milliseconds(200))
@@ -365,7 +375,7 @@ class EventHubsDirectDStreamSuite
 }
 
 object EventHubsDirectDStreamSuite {
-  val EventsPerPartition: Int = 500
+  val EventsPerPartition: Int = 5000
 
   class InputInfoCollector extends StreamingListener {
     val numRecordsSubmitted = new AtomicLong(0L)

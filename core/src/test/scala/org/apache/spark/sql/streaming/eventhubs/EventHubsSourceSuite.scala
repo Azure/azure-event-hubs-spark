@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-/*
 package org.apache.spark.sql.streaming.eventhubs
 
 import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
@@ -29,10 +28,26 @@ import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
+import org.scalatest.BeforeAndAfter
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
-abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
+abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext with BeforeAndAfter {
+
+  protected var testUtils: EventHubsTestUtils = _
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    testUtils = new EventHubsTestUtils
+  }
+
+  before {
+    testUtils.createEventHubs()
+  }
+
+  after {
+    testUtils.destroyEventHubs()
+  }
 
   override val streamingTimeout = 30.seconds
 
@@ -99,7 +114,15 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .setUseSimulatedClient(true)
   }
 
+  // Put 'count' events in every simulated EventHubs partition
+  private def populateUniformly(count: Int): Unit = {
+    for (i <- 0 until PartitionCount) {
+      EventHubsTestUtils.eventHubs.send(i, 0 to count)
+    }
+  }
+
   testWithUninterruptibleThread("deserialization of initial offset with Spark 2.1.0") {
+    populateUniformly(5000)
     withTempDir { metadataPath =>
       val parameters =
         getEventHubsConf
@@ -129,6 +152,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   testWithUninterruptibleThread("deserialization of initial offset written by future version") {
+    populateUniformly(5000)
     withTempDir { metadataPath =>
       val futureMetadataLog =
         new HDFSMetadataLog[EventHubsSourceOffset](sqlContext.sparkSession,
@@ -170,6 +194,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("(de)serialization of initial offsets") {
+    populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
       getEventHubsConf.setName(eh).setStartSequenceNumbers(0 until PartitionCount, 0).toMap
@@ -182,7 +207,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("maxSeqNosPerTrigger") {
-    PartitionCount = 4
+    populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
       getEventHubsConf
@@ -200,7 +225,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .select("body")
       .as[String]
 
-    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => getEventId(e))
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
 
     val clock = new StreamManualClock
 
@@ -241,7 +266,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   // test("maxSeqNosPerTrigger with empty partitions")
 
   test("cannot stop EventHubs stream") {
-    PartitionCount = 4
+    populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
       getEventHubsConf
@@ -258,7 +283,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .select("body")
       .as[String]
 
-    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => getEventId(e) + 1)
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt + 1)
 
     testStream(mapped)(
       makeSureGetOffsetCalled,
@@ -266,4 +291,3 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 }
- */

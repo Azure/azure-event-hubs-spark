@@ -32,6 +32,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
   private var sc: SparkContext = _
 
   override def beforeAll {
+    super.beforeAll()
     testUtils = new EventHubsTestUtils
     testUtils.createEventHubs()
 
@@ -50,6 +51,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
       sc.stop
       sc = null
     }
+    super.afterAll()
   }
 
   private def getEventHubsConf: EventHubsConf = {

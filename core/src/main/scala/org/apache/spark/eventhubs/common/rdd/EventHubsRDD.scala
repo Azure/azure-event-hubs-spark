@@ -98,14 +98,16 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       s"Computing EventHubs ${part.name}, partitionId ${part.partitionId} " +
         s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
 
+    val fromSeqNo = if (part.fromSeqNo == -1) 0L else part.fromSeqNo
+
     val client: Client = receiverFactory(ehConf)
-    client.createReceiver(part.partitionId.toString, part.fromSeqNo)
+    client.createReceiver(part.partitionId.toString, fromSeqNo)
 
     val prefetchCount =
       if (part.count.toInt < PrefetchCountMinimum) PrefetchCountMinimum else part.count.toInt
     client.setPrefetchCount(prefetchCount)
 
-    var requestSeqNo: SequenceNumber = part.fromSeqNo
+    var requestSeqNo: SequenceNumber = fromSeqNo
 
     override def hasNext(): Boolean = requestSeqNo < part.untilSeqNo
 

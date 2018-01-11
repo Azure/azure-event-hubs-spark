@@ -136,6 +136,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         rateLimit(limit, currentSeqNos.get, latest)
     }
 
+    //currentSeqNos = Some(seqNos.mapValues(_ + 1))
     currentSeqNos = Some(seqNos)
     logDebug(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
 
@@ -305,6 +306,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // On recovery, getBatch will get called before getOffset
     if (currentSeqNos.isEmpty) {
       currentSeqNos = Some(untilSeqNos)
+      //currentSeqNos = Some(untilSeqNos.mapValues(_ + 1))
     }
 
     sqlContext.internalCreateDataFrame(rdd, schema)

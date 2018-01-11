@@ -38,6 +38,26 @@ import scala.collection.JavaConverters._
 private[spark] class EventHubsTestUtils {
   import EventHubsTestUtils._
 
+  def send(data: Seq[Int]): Seq[Int] = {
+    var count = 0
+    for (event <- data) {
+      val part = count % PartitionCount
+      count += 1
+      EventHubsTestUtils.eventHubs.send(part, Seq(event))
+    }
+
+    data
+  }
+
+  def getLatestSeqNos(ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
+    val eventHubs = EventHubsTestUtils.eventHubs
+    (for {
+      p <- 0 until PartitionCount
+      n = ehConf.name.get
+      seqNo = eventHubs.latestSeqNo(p)
+    } yield NameAndPartition(n, p) -> seqNo).toMap
+  }
+
   def createEventHubs(): Unit = {
     if (EventHubsTestUtils.eventHubs == null) {
       EventHubsTestUtils.eventHubs = new SimulatedEventHubs(PartitionCount)
@@ -116,16 +136,15 @@ private[spark] class SimulatedEventHubs(val partitionCount: Int) {
   private[spark] class SimulatedEventHubsPartition {
     import com.microsoft.azure.eventhubs.amqp.AmqpConstants._
 
-    // This allows us to invoke the EventData(Message) constructor
-    private val constructor = classOf[EventData].getDeclaredConstructor(classOf[Message])
-    constructor.setAccessible(true)
-
     private var data: Seq[EventData] = Seq.empty
 
     def getEvents: Seq[EventData] = data
 
-    private[spark] def send(events: Seq[Int]): Unit = {
+    // This allows us to invoke the EventData(Message) constructor
+    private val constructor = classOf[EventData].getDeclaredConstructor(classOf[Message])
+    constructor.setAccessible(true)
 
+    private[spark] def send(events: Seq[Int]): Unit = {
       for (event <- events) {
         val seqNo = data.size.toLong.asInstanceOf[AnyRef]
 
@@ -153,11 +172,19 @@ private[spark] class SimulatedEventHubs(val partitionCount: Int) {
     }
 
     private[spark] def earliestSeqNo: SequenceNumber = {
-      data.head.getSystemProperties.getSequenceNumber
+      if (data.isEmpty) {
+        -1L
+      } else {
+        data.head.getSystemProperties.getSequenceNumber
+      }
     }
 
     private[spark] def latestSeqNo: SequenceNumber = {
-      data.last.getSystemProperties.getSequenceNumber
+      if (data.isEmpty) {
+        -1L
+      } else {
+        data.last.getSystemProperties.getSequenceNumber
+      }
     }
   }
 }

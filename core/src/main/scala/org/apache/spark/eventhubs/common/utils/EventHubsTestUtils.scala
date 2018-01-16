@@ -49,6 +49,11 @@ private[spark] class EventHubsTestUtils {
     data
   }
 
+  def send(partitionId: PartitionId, data: Int*): Seq[Int] = {
+    EventHubsTestUtils.eventHubs.send(partitionId, data)
+    data
+  }
+
   def getLatestSeqNos(ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
     val eventHubs = EventHubsTestUtils.eventHubs
     (for {

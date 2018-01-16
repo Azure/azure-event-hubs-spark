@@ -269,8 +269,69 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
-  // TODO:
-  // test("maxSeqNosPerTrigger with empty partitions")
+  test("maxOffsetsPerTrigger with non-uniform partitions") {
+    testUtils.send(0, 100 to 200: _*)
+    testUtils.send(1, 10 to 20: _*)
+    testUtils.send(2, 1)
+    // partition 3 of 3 remains empty.
+
+    val eh = newEventHubs()
+    val parameters =
+      getEventHubsConf
+        .setName(eh)
+        .setStartSequenceNumbers(0 until PartitionCount, 0)
+        .setMaxSeqNosPerTrigger(10)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(kv => kv.toInt)
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (!q.exception.isDefined) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // 1 from smallest, 1 from middle, 8 from biggest
+      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // smallest now empty, 1 more from middle, 9 more from biggest
+      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
+        114, 115, 116),
+      StopStream,
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // smallest now empty, 1 more from middle, 9 more from biggest
+      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
+        114, 115, 116, 12, 117, 118, 119, 120, 121, 122, 123, 124, 125),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // smallest now empty, 1 more from middle, 9 more from biggest
+      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
+        114, 115, 116, 12, 117, 118, 119, 120, 121, 122, 123, 124, 125, 13, 126, 127, 128, 129, 130,
+        131, 132, 133, 134)
+    )
+  }
 
   test("cannot stop EventHubs stream") {
     populateUniformly(5000)
@@ -301,11 +362,16 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   for (failOnDataLoss <- Seq(true, false)) {
     test(s"assign from latest offsets (failOnDataLoss: $failOnDataLoss)") {
       val eh = newEventHubs()
-      testFromLatestOffsets(eh, failOnDataLoss = failOnDataLoss)
+      testFromLatestSeqNos(eh, failOnDataLoss = failOnDataLoss)
+    }
+
+    test(s"assign from earliest offsets (failOnDataLoss: $failOnDataLoss)") {
+      val eh = newEventHubs()
+      testFromEarliestSeqNos(eh, failOnDataLoss = failOnDataLoss)
     }
   }
 
-  private def testFromLatestOffsets(eh: String, failOnDataLoss: Boolean): Unit = {
+  private def testFromLatestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
 
     EventHubsTestUtils.eventHubs.send(0, Seq(-1))
 
@@ -342,6 +408,45 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       StartStream(),
       CheckAnswer(2, 3, 4, 5, 6, 7), // Should get the added data
       AddEventHubsData(conf, 7, 8),
+      CheckAnswer(2, 3, 4, 5, 6, 7, 8, 9),
+      AddEventHubsData(conf, 9, 10, 11, 12, 13, 14, 15, 16),
+      CheckAnswer(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+    )
+  }
+
+  private def testFromEarliestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
+
+    require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
+    testUtils.send(1 to 3) // round robin events across partitions
+
+    val conf = getEventHubsConf
+      .setName(eh)
+      // In practice, we would use "setStartOfStream" which would
+      // translate to the configuration below.
+      .setStartSequenceNumbers(0 to 3, 0)
+      .setFailOnDataLoss(failOnDataLoss)
+
+    val reader = spark.readStream
+    reader
+      .format(classOf[EventHubsSourceProvider].getCanonicalName.stripSuffix("$"))
+      .options(conf.toMap)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped = eventhubs.map(kv => kv.toInt + 1)
+
+    testStream(mapped)(
+      AddEventHubsData(conf, 4, 5, 6), // Add data when stream is stopped
+      CheckAnswer(2, 3, 4, 5, 6, 7),
+      StopStream,
+      StartStream(),
+      CheckAnswer(2, 3, 4, 5, 6, 7),
+      StopStream,
+      AddEventHubsData(conf, 7, 8),
+      StartStream(),
       CheckAnswer(2, 3, 4, 5, 6, 7, 8, 9),
       AddEventHubsData(conf, 9, 10, 11, 12, 13, 14, 15, 16),
       CheckAnswer(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)

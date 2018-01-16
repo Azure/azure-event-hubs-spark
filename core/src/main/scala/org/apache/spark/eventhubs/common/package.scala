@@ -22,6 +22,7 @@ import java.time.Duration
 import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
 
 package object common {
+  val DefaultDomainName: String = "servicebus.windows.net"
   val DefaultEnqueueTime: EnqueueTime = Long.MinValue
   val StartOfStream = PartitionReceiver.START_OF_STREAM
   val EndOfStream = PartitionReceiver.END_OF_STREAM

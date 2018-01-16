@@ -45,13 +45,12 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   private val ehPolicyName = ehConf.keyName.get
   private val ehPolicy = ehConf.key.get
   private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+  private val domainName = ehConf.domainName.getOrElse(DefaultDomainName)
+  private val uri = ehNamespace + "." + domainName
 
   private val connectionString =
-    Try {
-      new ConnectionStringBuilder(ehNamespace, ehName, ehPolicyName, ehPolicy)
-    } getOrElse Try {
-      new ConnectionStringBuilder(new URI(ehNamespace), ehName, ehPolicyName, ehPolicy)
-    }.get
+    new ConnectionStringBuilder(new URI(uri), ehName, ehPolicyName, ehPolicy)
+
   connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
 
   private var client: EventHubClient =

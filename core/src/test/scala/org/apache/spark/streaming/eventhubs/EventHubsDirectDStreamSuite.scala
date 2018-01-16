@@ -67,14 +67,8 @@ class EventHubsDirectDStreamSuite
   }
 
   before {
-    super.before()
     setDefaults()
     testUtils.createEventHubs()
-
-    // Send events to simulated EventHubs
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 to EventsPerPartition)
-    }
   }
 
   after {
@@ -86,7 +80,6 @@ class EventHubsDirectDStreamSuite
     if (testDir != null) {
       Utils.deleteRecursively(testDir)
     }
-    super.after()
   }
 
   private def getEventHubsConf: EventHubsConf = {
@@ -99,7 +92,15 @@ class EventHubsDirectDStreamSuite
       .setMaxRatePerPartition(0 until PartitionCount, MaxRate)
   }
 
+  // Put 'count' events in every simulated EventHubs partition
+  private def populateUniformly(count: Int): Unit = {
+    for (i <- 0 until PartitionCount) {
+      EventHubsTestUtils.eventHubs.send(i, 0 to count)
+    }
+  }
+
   test("basic stream receiving with smallest starting sequence number") {
+    populateUniformly(EventsPerPartition)
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, 0)
     val batchInterval = 1000
     val timeoutAfter = 100000
@@ -154,7 +155,7 @@ class EventHubsDirectDStreamSuite
   }
 
   test("basic stream receiving from random sequence number") {
-    // We use 5000, because the EventHubs instance is populated with 5000 events in the beforeAll method.
+    populateUniformly(EventsPerPartition)
     val startSeqNo = scala.util.Random.nextInt % (EventsPerPartition / 2)
     val ehConf = getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, startSeqNo)
     val batchInterval = 1000
@@ -215,6 +216,7 @@ class EventHubsDirectDStreamSuite
   }
 
   test("receiving from largest starting offset") {
+    populateUniformly(EventsPerPartition)
     val ehConf =
       getEventHubsConf.setStartSequenceNumbers(0 until PartitionCount, EventsPerPartition)
     val batchInterval = 1000
@@ -305,9 +307,11 @@ class EventHubsDirectDStreamSuite
         earlierOffsetRanges + "\n" + recoveredOffsetRanges
     )
 
-    /* TODO: fix sendEvents, leaving for now. OffsetRanges are recovered correctly.
+    /*
     // Send 25 events to every partition
-    sendEvents(25, stream)
+    for (i <- 0 until PartitionCount) {
+      EventHubsTestUtils.eventHubs.send(i, 0 to 25)
+    }
 
     // Restart context, give more data and verify the total at the end
     // If the total is right that means each record has been received only once.

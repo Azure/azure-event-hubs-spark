@@ -19,7 +19,6 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
-import java.sql.Date
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext

@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.eventhubs.common.utils._
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.streaming.util.StreamManualClock
@@ -33,8 +34,6 @@ import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext with BeforeAndAfter {
-
-  import EventHubsTestUtils._
 
   protected var testUtils: EventHubsTestUtils = _
 
@@ -87,9 +86,10 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext with
       val ehSource = sources.head
       testUtils.send(data)
 
-      val e = EventHubsTestUtils.eventHubs
-
-      val offset = EventHubsSourceOffset(testUtils.getLatestSeqNos(conf))
+      val seqNos = testUtils.getLatestSeqNos(conf) mapValues { seqNo =>
+        seqNo
+      }
+      val offset = EventHubsSourceOffset(seqNos)
       logInfo(s"Added data, expected offset $offset")
       (ehSource, offset)
     }
@@ -200,7 +200,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
   }
 
-  ignore("(de)serialization of initial offsets") {
+  test("(de)serialization of initial offsets") {
     populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
@@ -213,7 +213,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     testStream(reader.load())(makeSureGetOffsetCalled, StopStream, StartStream(), StopStream)
   }
 
-  ignore("maxSeqNosPerTrigger") {
+  test("maxSeqNosPerTrigger") {
     populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
@@ -272,7 +272,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   // TODO:
   // test("maxSeqNosPerTrigger with empty partitions")
 
-  ignore("cannot stop EventHubs stream") {
+  test("cannot stop EventHubs stream") {
     populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
@@ -298,7 +298,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
-  for (failOnDataLoss <- Seq(false, true)) {
+  for (failOnDataLoss <- Seq(true, false)) {
     test(s"assign from latest offsets (failOnDataLoss: $failOnDataLoss)") {
       val eh = newEventHubs()
       testFromLatestOffsets(eh, failOnDataLoss = failOnDataLoss)
@@ -328,7 +328,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .selectExpr("body")
       .as[String]
 
-    val mapped = eventhubs.map(_.toInt + 1)
+    val mapped: Dataset[Int] = eventhubs.map(_.toInt + 1)
 
     testStream(mapped)(
       makeSureGetOffsetCalled,

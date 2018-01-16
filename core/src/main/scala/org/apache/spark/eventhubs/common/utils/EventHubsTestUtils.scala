@@ -173,7 +173,7 @@ private[spark] class SimulatedEventHubs(val partitionCount: Int) {
 
     private[spark] def earliestSeqNo: SequenceNumber = {
       if (data.isEmpty) {
-        -1L
+        0L
       } else {
         data.head.getSystemProperties.getSequenceNumber
       }
@@ -181,9 +181,9 @@ private[spark] class SimulatedEventHubs(val partitionCount: Int) {
 
     private[spark] def latestSeqNo: SequenceNumber = {
       if (data.isEmpty) {
-        -1L
+        0L
       } else {
-        data.last.getSystemProperties.getSequenceNumber
+        data.size
       }
     }
   }
@@ -228,10 +228,15 @@ private[spark] class SimulatedClient extends Client { self =>
     0L
   }
 
+  // TODO: implement simulated methods used in translate, and then remove this method.
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
     require(ehConf.startSequenceNumbers.nonEmpty)
-    ehConf.startSequenceNumbers
+    ehConf.startSequenceNumbers.mapValues { seqNo =>
+      {
+        if (seqNo == -1L) 0L else seqNo
+      }
+    }
   }
 
   override def partitionCount: PartitionId = EventHubsTestUtils.eventHubs.partitionCount

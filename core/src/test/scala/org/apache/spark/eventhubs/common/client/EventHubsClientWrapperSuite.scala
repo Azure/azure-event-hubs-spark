@@ -28,6 +28,7 @@ import org.scalatest.mock.MockitoSugar
  */
 class EventHubsClientWrapperSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
   // TODO: add tests for driver-side translation
+  // Seems we can implement "translate" in our EventHubsTestUtils. I'll do that soon!
 
   test("EventHubsClientWrapper converts parameters correctly when offset was previously saved") {}
 

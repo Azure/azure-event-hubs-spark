@@ -94,7 +94,8 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   override def earliestSeqNo(nameAndPartition: NameAndPartition): SequenceNumber = {
     try {
       val runtimeInformation = getRunTimeInfo(nameAndPartition)
-      runtimeInformation.getBeginSequenceNumber
+      val seqNo = runtimeInformation.getBeginSequenceNumber
+      if (seqNo == -1L) 0L else seqNo
     } catch {
       case e: Exception =>
         throw e
@@ -102,14 +103,14 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   }
 
   /**
-   * return the end point of each partition
+   * Returns the end point of each partition
    *
    * @return a map from eventhubName-partition to (offset, seq)
    */
   override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
     try {
       val runtimeInfo = getRunTimeInfo(NameAndPartition(ehName, partitionId))
-      runtimeInfo.getLastEnqueuedSequenceNumber
+      runtimeInfo.getLastEnqueuedSequenceNumber + 1
     } catch {
       case e: Exception =>
         throw e
@@ -155,7 +156,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     val startingWith = ehConf("eventhubs.startingWith")
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
 
-    if (startingWith equals "SequenceNumbers") {
+    val seqNos = if (startingWith equals "SequenceNumbers") {
       (for (partitionId <- 0 until partitionCount)
         yield
           partitionId -> ehConf.startSequenceNumbers.getOrElse(partitionId,
@@ -204,6 +205,9 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       threads.foreach(thread => thread.join())
       logInfo("translate: Translation complete.")
       result.asScala.toMap
+    }
+    seqNos.mapValues { seqNo =>
+      { if (seqNo == -1L) 0L else seqNo }
     }
   }
 }

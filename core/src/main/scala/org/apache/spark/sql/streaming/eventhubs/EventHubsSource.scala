@@ -124,10 +124,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val latest = (for {
       p <- 0 until partitionCount
       n = ehConf.name.get
+      nAndP = NameAndPartition(n, p)
       seqNo = ehClient.latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap
 
-    val seqNos = maxOffsetsPerTrigger match {
+    val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>
         latest
       case Some(limit) if currentSeqNos.isEmpty =>
@@ -136,7 +137,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         rateLimit(limit, currentSeqNos.get, latest)
     }
 
-    //currentSeqNos = Some(seqNos.mapValues(_ + 1))
     currentSeqNos = Some(seqNos)
     logDebug(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
 
@@ -198,10 +198,10 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       case Some(prevBatchEndOffset) =>
         EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
       case None =>
+        // we need to
         initialPartitionSeqNos
     }
 
-    // TODO: In what exact scenarios does this situation arise?
     // Find the new partitions, and get their earliest offsets
     val newPartitions = untilSeqNos.keySet.diff(fromSeqNos.keySet)
     val newPartitionSeqNos = fetchEarliestSeqNos(newPartitions.toSeq)
@@ -306,7 +306,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // On recovery, getBatch will get called before getOffset
     if (currentSeqNos.isEmpty) {
       currentSeqNos = Some(untilSeqNos)
-      //currentSeqNos = Some(untilSeqNos.mapValues(_ + 1))
     }
 
     sqlContext.internalCreateDataFrame(rdd, schema)

@@ -192,6 +192,15 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
     set("eventhubs.key", key)
   }
 
+  /**
+   * Set the domain name for your EventHubs connection string.
+   *
+   * Default: servicebus.windows.net
+   */
+  def setDomainName(domainName: String): EventHubsConf = {
+    set("eventhubs.domainName", key)
+  }
+
   /** Set the consumer group for your EventHubs instance. */
   def setConsumerGroup(consumerGroup: String): EventHubsConf = {
     set("eventhubs.consumerGroup", consumerGroup)
@@ -331,6 +340,11 @@ final class EventHubsConf private extends Serializable with Logging with Cloneab
   /** The currently set key. */
   def key: Option[String] = {
     self.get("eventhubs.key")
+  }
+
+  /** The currently set domain name. */
+  def domainName: Option[String] = {
+    self.get("eventhubs.domainName")
   }
 
   /** The currently set consumer group. */

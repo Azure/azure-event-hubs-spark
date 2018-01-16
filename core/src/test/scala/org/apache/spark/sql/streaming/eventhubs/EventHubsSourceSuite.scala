@@ -19,12 +19,14 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
 import java.nio.charset.StandardCharsets.UTF_8
+import java.util.Date
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.common.EventHubsConf
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
+import org.apache.spark.sql.functions.{ count, window }
 import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.test.SharedSQLContext
@@ -43,6 +45,7 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext with
   }
 
   before {
+    EventHubsTestUtils.setDefaults()
     testUtils.createEventHubs()
   }
 
@@ -292,7 +295,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .select("body")
       .as[String]
 
-    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(kv => kv.toInt)
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => e.toInt)
 
     val clock = new StreamManualClock
 
@@ -369,6 +372,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val eh = newEventHubs()
       testFromEarliestSeqNos(eh, failOnDataLoss = failOnDataLoss)
     }
+
+    test(s"assign from specific offsets (failOnDataLoss: $failOnDataLoss)") {
+      val eh = newEventHubs()
+      testFromSpecificSeqNos(eh, failOnDataLoss = failOnDataLoss)
+    }
   }
 
   private def testFromLatestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
@@ -436,7 +444,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .select("body")
       .as[String]
 
-    val mapped = eventhubs.map(kv => kv.toInt + 1)
+    val mapped = eventhubs.map(e => e.toInt + 1)
 
     testStream(mapped)(
       AddEventHubsData(conf, 4, 5, 6), // Add data when stream is stopped
@@ -451,5 +459,175 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       AddEventHubsData(conf, 9, 10, 11, 12, 13, 14, 15, 16),
       CheckAnswer(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
     )
+  }
+
+  private def testFromSpecificSeqNos(
+      eh: String,
+      failOnDataLoss: Boolean
+  ): Unit = {
+
+    testUtils.destroyEventHubs()
+    PartitionCount = 5
+    testUtils.createEventHubs()
+    require(EventHubsTestUtils.eventHubs.getPartitions.size === 5)
+
+    val conf = getEventHubsConf
+      .setName(eh)
+      .setStartSequenceNumbers(0 to 0, 0L)
+      .setStartSequenceNumbers(1 to 1, 3L)
+      .setStartSequenceNumbers(2 to 2, 0L)
+      .setStartSequenceNumbers(3 to 3, 1L)
+      .setStartSequenceNumbers(4 to 4, 2L)
+      .setFailOnDataLoss(failOnDataLoss)
+
+    // partition 0 starts at the earliest sequence numbers, these should all be seen
+    testUtils.send(0, -20, -21, -22)
+    // partition 1 starts at the latest sequence numbers, these should all be skipped
+    testUtils.send(1, -10, -11, -12)
+    // partition 2 starts at 0, these should all be seen
+    testUtils.send(2, 0, 1, 2)
+    // partition 3 starts at 1, first should be skipped
+    testUtils.send(3, 10, 11, 12)
+    // partition 4 starts at 2, first and second should be skipped
+    testUtils.send(4, 20, 21, 22)
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(conf.toMap)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => e.toInt)
+
+    testStream(mapped)(
+      makeSureGetOffsetCalled,
+      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22),
+      StopStream,
+      StartStream(),
+      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22), // Should get the data back on recovery
+      AddEventHubsData(conf, 30, 31, 32, 33, 34),
+      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22, 30, 31, 32, 33, 34),
+      StopStream
+    )
+  }
+
+  test("input row metrics") {
+    val eh = newEventHubs()
+    testUtils.send(Seq(-1))
+    require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
+
+    val conf = getEventHubsConf
+      .setName(eh)
+      .setStartSequenceNumbers(0 to 0, 1)
+      .setStartSequenceNumbers(1 to 3, 0)
+
+    val eventhubs = spark.readStream
+      .format("eventhubs")
+      .options(conf.toMap)
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped = eventhubs.map(e => e.toInt + 1)
+
+    testStream(mapped)(
+      StartStream(trigger = ProcessingTime(1)),
+      makeSureGetOffsetCalled,
+      AddEventHubsData(conf, 1, 2, 3),
+      CheckAnswer(2, 3, 4),
+      AssertOnQuery { query =>
+        val recordsRead = query.recentProgress.map(_.numInputRows).sum
+        recordsRead == 3
+      }
+    )
+  }
+
+  test("EventHubs column types") {
+    val now = new Date()
+    val eh = newEventHubs()
+
+    val conf = getEventHubsConf
+      .setName(eh)
+      .setStartSequenceNumbers(0 to 0, 0)
+
+    testUtils.destroyEventHubs()
+    PartitionCount = 1
+    testUtils.createEventHubs()
+    require(EventHubsTestUtils.eventHubs.getPartitions.size === 1)
+
+    testUtils.send(Seq(1))
+
+    val eventhubs = spark.readStream
+      .format("eventhubs")
+      .options(conf.toMap)
+      .load()
+
+    val query = eventhubs.writeStream
+      .format("memory")
+      .outputMode("append")
+      .queryName("eventhubsColumnTypes")
+      .start()
+
+    query.processAllAvailable()
+    val rows = spark.table("eventhubsColumnTypes").collect()
+    assert(rows.length === 1, s"Unexpected results: ${rows.toList}")
+    val row = rows(0)
+    assert(row.getAs[String]("body") === "1", s"Unexpected results: $row")
+    assert(row.getAs[Long]("offset") === 0L, s"Unexpected results: $row")
+    assert(row.getAs[Long]("seqNumber") === 0, s"Unexpected results: $row")
+    assert(row.getAs[String]("publisher") === null, s"Unexpected results: $row")
+    assert(row.getAs[String]("partitionKey") === null, s"Unexpected results: $row")
+    // We cannot check the exact timestamp as it's the time that messages were inserted by the
+    // producer. So here we just use a low bound to make sure the internal conversion works.
+    //assert(row.getAs[java.util.Date]("enqueuedTime").after(now), s"Unexpected results: $row")
+    query.stop()
+  }
+
+  test("EventHubsSource with watermark") {
+    val now = System.currentTimeMillis()
+    val eh = newEventHubs()
+
+    val conf = getEventHubsConf
+      .setName(eh)
+      .setStartSequenceNumbers(0 to 0, 0)
+
+    testUtils.destroyEventHubs()
+    PartitionCount = 1
+    testUtils.createEventHubs()
+    require(EventHubsTestUtils.eventHubs.getPartitions.size === 1)
+
+    testUtils.send(Seq(1))
+
+    val eventhubs = spark.readStream
+      .format("eventhubs")
+      .options(conf.toMap)
+      .load()
+
+    val windowedAggregation = eventhubs
+      .withWatermark("enqueuedTime", "10 seconds")
+      .groupBy(window($"enqueuedTime", "5 seconds") as 'window)
+      .agg(count("*") as 'count)
+      .select($"window".getField("start") as 'window, $"count")
+
+    val query = windowedAggregation.writeStream
+      .format("memory")
+      .outputMode("complete")
+      .queryName("eventhubsWatermark")
+      .start()
+    query.processAllAvailable()
+
+    val rows = spark.table("eventhubsWatermark").collect()
+    assert(rows.length === 1, s"Unexpected results: ${rows.toList}")
+    val row = rows(0)
+    // We cannot check the exact window start time as it depends on the time that messages were
+    // inserted by the producer. So here we just use a low bound to make sure the internal
+    // conversion works.
+    //assert(row.getAs[java.util.Date]("window").getTime >= now - 5 * 1000,
+    //       s"Unexpected results: $row")
+    assert(row.getAs[Int]("count") === 1, s"Unexpected results: $row")
+    query.stop()
   }
 }

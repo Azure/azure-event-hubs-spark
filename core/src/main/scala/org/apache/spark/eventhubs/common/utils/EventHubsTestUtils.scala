@@ -153,11 +153,12 @@ private[spark] class SimulatedEventHubs(val partitionCount: Int) {
       for (event <- events) {
         val seqNo = data.size.toLong.asInstanceOf[AnyRef]
 
-        // This value is not accurate. It's not used in testing, but a value
-        // must be provided for EventData to be serialized/deserialized properly.
+        // This value is not accurate. However, "offet" is never used in testing.
+        // Placing dummy value here because one is required in order for EventData
+        // to serialize/de-serialize properly during tests.
         val offset = data.size.toString.asInstanceOf[AnyRef]
 
-        val time = new Date().asInstanceOf[AnyRef]
+        val time = new Date(System.currentTimeMillis()).asInstanceOf[AnyRef]
 
         val msgAnnotations = new MessageAnnotations(
           Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)

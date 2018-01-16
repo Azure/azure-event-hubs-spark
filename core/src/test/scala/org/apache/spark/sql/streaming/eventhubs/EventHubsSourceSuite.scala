@@ -19,7 +19,6 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
 import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Date
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.common.EventHubsConf

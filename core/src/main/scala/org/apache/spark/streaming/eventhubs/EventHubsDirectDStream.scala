@@ -105,7 +105,6 @@ private[spark] class EventHubsDirectDStream private[spark] (
     val inputInfo = StreamInputInfo(id, rdd.count, metadata)
     ssc.scheduler.inputInfoTracker.reportInfo(validTime, inputInfo)
 
-    //fromSeqNos = untilSeqNos.mapValues(_ + 1)
     fromSeqNos = untilSeqNos
     Some(rdd)
   }

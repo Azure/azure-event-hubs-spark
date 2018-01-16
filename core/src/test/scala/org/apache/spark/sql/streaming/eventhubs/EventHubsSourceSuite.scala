@@ -546,7 +546,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("EventHubs column types") {
-    val now = new Date()
+    val now = System.currentTimeMillis()
     val eh = newEventHubs()
 
     val conf = getEventHubsConf
@@ -582,7 +582,8 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     assert(row.getAs[String]("partitionKey") === null, s"Unexpected results: $row")
     // We cannot check the exact timestamp as it's the time that messages were inserted by the
     // producer. So here we just use a low bound to make sure the internal conversion works.
-    //assert(row.getAs[java.util.Date]("enqueuedTime").after(now), s"Unexpected results: $row")
+    assert(row.getAs[java.sql.Timestamp]("enqueuedTime").getTime >= now,
+           s"Unexpected results: $row")
     query.stop()
   }
 
@@ -625,8 +626,8 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // We cannot check the exact window start time as it depends on the time that messages were
     // inserted by the producer. So here we just use a low bound to make sure the internal
     // conversion works.
-    //assert(row.getAs[java.util.Date]("window").getTime >= now - 5 * 1000,
-    //       s"Unexpected results: $row")
+    assert(row.getAs[java.util.Date]("window").getTime >= now - 5 * 1000,
+           s"Unexpected results: $row")
     assert(row.getAs[Int]("count") === 1, s"Unexpected results: $row")
     query.stop()
   }

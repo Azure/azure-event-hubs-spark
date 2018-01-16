@@ -19,6 +19,7 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
+import java.sql.Date
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
@@ -28,7 +29,7 @@ import org.apache.spark.eventhubs.common._
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.util.ArrayBasedMapData
+import org.apache.spark.sql.catalyst.util.{ ArrayBasedMapData, DateTimeUtils }
 import org.apache.spark.sql.execution.streaming.{
   HDFSMetadataLog,
   Offset,
@@ -275,7 +276,8 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
           UTF8String.fromBytes(eventData.getBytes),
           eventData.getSystemProperties.getOffset.toLong,
           eventData.getSystemProperties.getSequenceNumber,
-          eventData.getSystemProperties.getEnqueuedTime.toEpochMilli,
+          DateTimeUtils.fromJavaTimestamp(
+            new java.sql.Timestamp(eventData.getSystemProperties.getEnqueuedTime.toEpochMilli)),
           UTF8String.fromString(eventData.getSystemProperties.getPublisher),
           UTF8String.fromString(eventData.getSystemProperties.getPartitionKey)
         ) ++ {

@@ -17,22 +17,17 @@
 
 package org.apache.spark.eventhubscommon.progress
 
-import java.io.{ BufferedReader, InputStreamReader, IOException }
-import java.util.concurrent.{ ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit }
+import java.io.{BufferedReader, IOException, InputStreamReader}
+import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-
-import org.apache.spark.eventhubscommon.{
-  EventHubNameAndPartition,
-  EventHubsConnector,
-  OffsetRecord
-}
+import org.apache.spark.eventhubscommon.{EventHubNameAndPartition, EventHubsConnector, OffsetRecord}
 import org.apache.spark.internal.Logging
+import org.apache.spark.streaming.eventhubs.checkpoint.DirectDStreamProgressTracker
 
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String,
@@ -380,12 +375,14 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     ehConnectors
       .flatMap { ehConnector =>
         ehConnector.connectedInstances.map(
-          ehNameAndPartition =>
-            PathTools.makeTempFilePath(tempDirectoryStr,
+          ehNameAndPartition => {
+            PathTools.makeTempFilePath(PathTools.makeTempDirectoryStr(ehConnector.getProgressDir, appName),
                                        ehConnector.streamId,
                                        ehConnector.uid,
                                        ehNameAndPartition,
-                                       timestamp))
+                                       timestamp)
+          }
+        )
       }
       .filter(fs.exists)
   }
@@ -452,23 +449,31 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
       }
     }
     // clean temp directory
-    val allUselessTempFiles = fs
-      .listStatus(tempDirectoryPath, new PathFilter {
-        override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
-      })
-      .map(_.getPath)
-    if (allUselessTempFiles.nonEmpty) {
-      allUselessTempFiles
-        .groupBy(fromPathToTimestamp)
-        .toList
-        .sortWith((p1, p2) => p1._1 > p2._1)
-        .tail
-        .flatMap(_._2)
-        .foreach { filePath =>
+    cleanupTempFile(timestampToClean)
+  }
+
+  protected def cleanupTempFile(timestampToClean: Long) = {
+    val fs = progressDirectoryPath.getFileSystem(hadoopConfiguration)
+    val allEventDStreams = DirectDStreamProgressTracker.registeredConnectors
+    allEventDStreams.foreach((connector) => {
+      val allUselessTempFiles = fs
+        .listStatus(new Path(PathTools.makeTempDirectoryStr(connector.getProgressDir, appName)), new PathFilter {
+          override def accept(path: Path): Boolean = fromPathToTimestamp(path) <= timestampToClean
+        })
+        .map(_.getPath)
+      if (allUselessTempFiles.nonEmpty) {
+        val filesToDelete = allUselessTempFiles
+          .groupBy(fromPathToTimestamp)
+          .toList
+          .sortWith((p1, p2) => p1._1 > p2._1)
+          .tail
+          .flatMap(_._2)
+        filesToDelete.foreach { filePath =>
           logInfo(s"delete $filePath")
           fs.delete(filePath, true)
         }
-    }
+      }
+    })
   }
 
   private def scheduleMetadataCleanTask(): ScheduledFuture[_] = {

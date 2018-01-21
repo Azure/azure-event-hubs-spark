@@ -84,6 +84,8 @@ private[eventhubs] class EventHubDirectDStream private[eventhubs] (
   // uniquely identify the entities in eventhubs side, it can be the namespace or the name of a
   override def uid: String = eventHubNameSpace
 
+  override def getProgressDir: String = progressDir
+
   // the list of eventhubs partitions connecting with this connector
   override def connectedInstances: List[EventHubNameAndPartition] = eventhubNameAndPartitions.toList
 

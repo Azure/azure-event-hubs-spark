@@ -40,6 +40,8 @@ class ProgressTrackerSuite extends SharedUtils {
     override def uid: String = uniqueId
 
     override def connectedInstances: List[EventHubNameAndPartition] = connedInstances
+
+    override def getProgressDir: String = ""
   }
 
   override def beforeEach(): Unit = {

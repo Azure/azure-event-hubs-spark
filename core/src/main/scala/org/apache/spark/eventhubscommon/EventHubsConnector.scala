@@ -32,4 +32,6 @@ private[spark] trait EventHubsConnector {
 
   // the list of eventhubs partitions connecting with this connector
   def connectedInstances: List[EventHubNameAndPartition]
+
+  def getProgressDir: String
 }

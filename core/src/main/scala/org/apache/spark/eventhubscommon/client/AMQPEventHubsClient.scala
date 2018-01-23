@@ -18,9 +18,11 @@
 package org.apache.spark.eventhubscommon.client
 
 import scala.collection.mutable
-import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubPartitionRuntimeInformation }
+import com.microsoft.azure.eventhubs.{EventHubClient, EventHubPartitionRuntimeInformation}
 import org.apache.spark.eventhubscommon.EventHubNameAndPartition
 import org.apache.spark.internal.Logging
+
+import scala.util.{Failure, Success, Try}
 
 private[client] class AMQPEventHubsClient(ehNames: List[String],
                                           ehParams: Map[String, Map[String, String]])
@@ -36,14 +38,43 @@ private[client] class AMQPEventHubsClient(ehNames: List[String],
       targetEventHubNameAndPartitions: List[EventHubNameAndPartition]) = {
     val results = new mutable.HashMap[EventHubNameAndPartition, EventHubPartitionRuntimeInformation]
     try {
-      for (ehNameAndPartition <- targetEventHubNameAndPartitions) {
-        val ehName = ehNameAndPartition.eventHubName
-        val partitionId = ehNameAndPartition.partitionId
-        val client = nameToClient.get(ehName)
-        require(client.isDefined, "cannot find client for EventHubs instance " + ehName)
-        val runTimeInfo =
-          client.get.getPartitionRuntimeInformation(partitionId.toString).get()
-        results += ehNameAndPartition -> runTimeInfo
+      val retry = 3
+      var tried = 0
+      var exceptions: List[Throwable] = List[Throwable]()
+      logInfo("Start get runtime partition")
+      while(results.size < targetEventHubNameAndPartitions.size && tried < retry) {
+        val futures =
+          for (ehNameAndPartition <- targetEventHubNameAndPartitions if !results.contains(ehNameAndPartition)) yield {
+            val ehName = ehNameAndPartition.eventHubName
+            val partitionId = ehNameAndPartition.partitionId
+            val client = nameToClient.get(ehName)
+            require(client.isDefined, "cannot find client for EventHubs instance " + ehName)
+            (ehNameAndPartition, client.get.getPartitionRuntimeInformation(partitionId.toString))
+          }
+        exceptions = futures.flatMap{
+          case (ehNameAndPartition, future) =>
+            val ehName = ehNameAndPartition.eventHubName
+            val partitionId = ehNameAndPartition.partitionId
+            Try(future.get()) match {
+              case Success(eventHubPartitionRuntimeInformation: EventHubPartitionRuntimeInformation) =>
+                results += ehNameAndPartition -> eventHubPartitionRuntimeInformation
+                Seq[Throwable]()
+              case Failure(e) =>
+                val eventHubClient = new EventHubsClientWrapper(ehParams(ehName))
+                  .createClient(ehParams(ehName))
+                nameToClient.put(ehName, eventHubClient)
+                logWarning(s"Get EventHub: $ehName:$partitionId runtime information failed", e)
+                Seq[Throwable](e)
+            }
+        }
+        tried += 1
+      }
+      logInfo("End get runtime partition")
+      if (results.size < targetEventHubNameAndPartitions.size) {
+          exceptions.foreach((throwable) => logError(s"Get EventHub runtime information failed", throwable))
+          if (exceptions.nonEmpty) {
+            throw exceptions.head
+          }
       }
       results.toMap.view
     } catch {

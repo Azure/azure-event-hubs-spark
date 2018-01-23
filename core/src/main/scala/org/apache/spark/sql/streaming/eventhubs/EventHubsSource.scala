@@ -103,7 +103,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         // translate starting points within ehConf to sequence numbers
         val seqNos = ehClient.translate(ehConf, partitionCount).map {
           case (pId, seqNo) =>
-            (NameAndPartition(ehConf.name.get, pId), seqNo)
+            (NameAndPartition(ehConf.name, pId), seqNo)
         }
         val offset = EventHubsSourceOffset(seqNos)
         metadataLog.add(0, offset)
@@ -123,7 +123,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     val latest = (for {
       p <- 0 until partitionCount
-      n = ehConf.name.get
+      n = ehConf.name
       nAndP = NameAndPartition(n, p)
       seqNo = ehClient.latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap

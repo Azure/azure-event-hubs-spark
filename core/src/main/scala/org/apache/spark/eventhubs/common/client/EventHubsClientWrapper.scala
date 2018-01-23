@@ -17,16 +17,15 @@
 
 package org.apache.spark.eventhubs.common.client
 
-import java.net.URI
-import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.common.EventHubsConf
+import org.apache.spark.eventhubs.common.utils.ConnectionStringBuilder
 import org.apache.spark.internal.Logging
-
-import scala.util.Try
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -39,28 +38,25 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
   import org.apache.spark.eventhubs.common._
 
-  // Extract relevant info from ehParams
-  private val ehNamespace = ehConf.namespace.get
-  private val ehName = ehConf.name.get
-  private val ehPolicyName = ehConf.keyName.get
-  private val ehPolicy = ehConf.key.get
+  private implicit val formats = Serialization.formats(NoTypeHints)
+
   private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-  private val domainName = ehConf.domainName.getOrElse(DefaultDomainName)
-  private val uri = ehNamespace + "." + domainName
-
-  private val connectionString =
-    new ConnectionStringBuilder(new URI(uri), ehName, ehPolicyName, ehPolicy)
-
+  private val connectionString = ConnectionStringBuilder(ehConf.connectionString)
   connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
+  private val ehName = connectionString.getEventHubName
 
-  private var client: EventHubClient =
-    EventHubClient.createFromConnectionStringSync(connectionString.toString)
+  private val client: EventHubClient =
+    EventHubClient.createFromConnectionStringSync(connectionString.toString, new StandardExecutor)
 
   private var receiver: PartitionReceiver = _
   private[spark] def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
     if (receiver == null) {
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
-      receiver = client.createReceiver(consumerGroup, partitionId, startingSeqNo, true)
+      receiver = client
+        .createReceiver(consumerGroup,
+                        partitionId,
+                        EventPosition.fromSequenceNumber(startingSeqNo, true))
+        .get
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
   }
@@ -152,60 +148,37 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    */
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
-    val startingWith = ehConf("eventhubs.startingWith")
+
+    // TODO (if positions has a sequence number) OR (if positions is empty AND defaultPos has a sequence number) then we don't need to make an API call
+    // TODO is the first event guarunteed to have sequence number 0?
+    val defaultPos: EventPosition = ehConf.startingPosition.getOrElse(DefaultEventPosition).convert
+    val positions: Map[PartitionId, EventPosition] =
+      ehConf.startingPositions.getOrElse(Map.empty).mapValues(_.convert)
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
 
-    val seqNos = if (startingWith equals "SequenceNumbers") {
-      (for (partitionId <- 0 until partitionCount)
-        yield
-          partitionId -> ehConf.startSequenceNumbers.getOrElse(partitionId,
-                                                               DefaultStartSequenceNumber)).toMap
-    } else {
-      val threads = for (partitionId <- 0 until partitionCount)
-        yield
-          new Thread {
-            override def run(): Unit = {
-              // Pattern  match is to create the correct receiver based on what we're startingWith.
-              val receiver = startingWith match {
-                case "Offsets" =>
-                  val offsets = ehConf.startOffsets
-                  client
-                    .createReceiver(DefaultConsumerGroup,
-                                    partitionId.toString,
-                                    offsets.getOrElse(partitionId, DefaultStartOffset).toString,
-                                    true)
-                    .get
-                case "EnqueueTimes" =>
-                  val enqueueTimes = ehConf.startEnqueueTimes
-                  client
-                    .createReceiver(DefaultConsumerGroup,
-                                    partitionId.toString,
-                                    Instant.ofEpochSecond(
-                                      enqueueTimes.getOrElse(partitionId, DefaultEnqueueTime)))
-                    .get
-                case "StartOfStream" =>
-                  client
-                    .createReceiver(DefaultConsumerGroup, partitionId.toString, StartOfStream, true)
-                    .get
-                case "EndOfStream" =>
-                  client
-                    .createReceiver(DefaultConsumerGroup, partitionId.toString, EndOfStream, true)
-                    .get
-              }
-              receiver.setPrefetchCount(PrefetchCountMinimum)
-              val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
-              receiver.close().get()
-              result.put(partitionId, event.getSystemProperties.getSequenceNumber)
-            }
+    val threads = for (partitionId <- 0 until partitionCount)
+      yield
+        new Thread {
+          override def run(): Unit = {
+            // Pattern  match is to create the correct receiver based on what we're startingWith.
+            val receiver =
+              client
+                .createReceiver(DefaultConsumerGroup,
+                                partitionId.toString,
+                                positions.getOrElse(partitionId, defaultPos))
+                .get
+            receiver.setPrefetchCount(PrefetchCountMinimum)
+            val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
+            receiver.close().get()
+            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
           }
+        }
 
-      logInfo("translate: Starting threads to translate to (offset, sequence number) pairs.")
-      threads.foreach(thread => thread.start())
-      threads.foreach(thread => thread.join())
-      logInfo("translate: Translation complete.")
-      result.asScala.toMap
-    }
-    seqNos.mapValues { seqNo =>
+    logInfo("translate: Starting threads to translate to (offset, sequence number) pairs.")
+    threads.foreach(_.start())
+    threads.foreach(_.join())
+    logInfo("translate: Translation complete.")
+    result.asScala.toMap.mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }
     }
   }

@@ -18,18 +18,16 @@
 package org.apache.spark.eventhubs
 
 import java.time.Duration
+import java.util.concurrent.Executor
 
-import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+import com.microsoft.azure.eventhubs.EventHubClient
+import org.apache.spark.eventhubs.common.utils.Position
 
 package object common {
-  val DefaultDomainName: String = "servicebus.windows.net"
-  val DefaultEnqueueTime: EnqueueTime = Long.MinValue
-  val StartOfStream = PartitionReceiver.START_OF_STREAM
-  val EndOfStream = PartitionReceiver.END_OF_STREAM
+
+  val DefaultEventPosition: Position = Position.fromStartOfStream()
   val DefaultMaxRatePerPartition: Rate = 10000
-  val DefaultStartOffset: Offset = -1L
-  val DefaultStartSequenceNumber: SequenceNumber = 0L
-  val DefaultReceiverTimeout: Duration = Duration.ofSeconds(5)
+  val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum
@@ -59,12 +57,10 @@ package object common {
     def toSequenceNumber: SequenceNumber = str.toLong
   }
 
-  // TODO: just so this builds. Remove this once API is actually available from EH Java Client.
-  implicit class SeqNoAPI(val client: EventHubClient) extends AnyVal {
-    def createReceiver(consumerGroup: String,
-                       partitionId: String,
-                       seqNo: Long,
-                       inclusiveSeqNo: Boolean): PartitionReceiver =
-      null
+  // This class will replaced once thread pooling is implemented.
+  class StandardExecutor extends Executor {
+    override def execute(command: Runnable): Unit = {
+      command.run()
+    }
   }
 }

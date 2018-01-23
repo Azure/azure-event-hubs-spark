@@ -21,7 +21,7 @@ import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWrit
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.common.EventHubsConf
+import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
 import org.apache.spark.eventhubs.common.utils._
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
@@ -114,12 +114,13 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   private def getEventHubsConf: EventHubsConf = {
-    EventHubsConf()
-      .setNamespace("namespace")
-      .setName("name")
-      .setKeyName("keyName")
-      .setKey("key")
+    val positions: Map[PartitionId, Position] = (for {
+      partitionId <- 0 until PartitionCount
+    } yield partitionId -> Position.fromSequenceNumber(0L, isInclusive = true)).toMap
+
+    EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
+      .setStartingPositions(positions)
       .setUseSimulatedClient(true)
   }
 
@@ -136,7 +137,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val parameters =
         getEventHubsConf
           .setName(newEventHubs())
-          .setStartSequenceNumbers(0 until PartitionCount, 0)
           .toMap
 
       val source = new EventHubsSource(sqlContext,
@@ -177,7 +177,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val eh = newEventHubs()
       val parameters = getEventHubsConf
         .setName(eh)
-        .setStartSequenceNumbers(0 until PartitionCount, 0)
         .toMap
 
       val offset = EventHubsSourceOffset((eh, 0, 0L), (eh, 1, 0L), (eh, 2, 0L))
@@ -206,7 +205,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     populateUniformly(5000)
     val eh = newEventHubs()
     val parameters =
-      getEventHubsConf.setName(eh).setStartSequenceNumbers(0 until PartitionCount, 0).toMap
+      getEventHubsConf.setName(eh).toMap
 
     val reader = spark.readStream
       .format("eventhubs")
@@ -221,7 +220,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val parameters =
       getEventHubsConf
         .setName(eh)
-        .setStartSequenceNumbers(0 until PartitionCount, 0)
         .setMaxSeqNosPerTrigger(4)
         .toMap
 
@@ -281,7 +279,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val parameters =
       getEventHubsConf
         .setName(eh)
-        .setStartSequenceNumbers(0 until PartitionCount, 0)
         .setMaxSeqNosPerTrigger(10)
         .toMap
 
@@ -300,7 +297,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val waitUntilBatchProcessed = AssertOnQuery { q =>
       eventually(Timeout(streamingTimeout)) {
-        if (!q.exception.isDefined) {
+        if (q.exception.isEmpty) {
           assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
         }
       }
@@ -341,7 +338,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val parameters =
       getEventHubsConf
         .setName(eh)
-        .setStartSequenceNumbers(0 until PartitionCount, 0)
         .toMap
 
     val reader = spark.readStream
@@ -384,12 +380,18 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
 
+    // In practice, we would use Position.fromEndOfStream which would
+    // translate to the configuration below.
+    val positions = Map(
+      0 -> Position.fromSequenceNumber(1, isInclusive = true),
+      1 -> Position.fromSequenceNumber(0, isInclusive = true),
+      2 -> Position.fromSequenceNumber(0, isInclusive = true),
+      3 -> Position.fromSequenceNumber(0, isInclusive = true)
+    )
+
     val conf = getEventHubsConf
       .setName(eh)
-      // In practice, we would use "setEndOfStream" which would
-      // translate to the configuration below.
-      .setStartSequenceNumbers(0 to 0, 1)
-      .setStartSequenceNumbers(1 to 3, 0)
+      .setStartingPositions(positions)
       .setFailOnDataLoss(failOnDataLoss)
 
     val reader = spark.readStream
@@ -428,9 +430,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf
       .setName(eh)
-      // In practice, we would use "setStartOfStream" which would
-      // translate to the configuration below.
-      .setStartSequenceNumbers(0 to 3, 0)
       .setFailOnDataLoss(failOnDataLoss)
 
     val reader = spark.readStream
@@ -470,13 +469,17 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     testUtils.createEventHubs()
     require(EventHubsTestUtils.eventHubs.getPartitions.size === 5)
 
+    val positions = Map(
+      0 -> Position.fromSequenceNumber(0L, isInclusive = true),
+      1 -> Position.fromSequenceNumber(3L, isInclusive = true),
+      2 -> Position.fromSequenceNumber(0L, isInclusive = true),
+      3 -> Position.fromSequenceNumber(1L, isInclusive = true),
+      4 -> Position.fromSequenceNumber(2L, isInclusive = true)
+    )
+
     val conf = getEventHubsConf
       .setName(eh)
-      .setStartSequenceNumbers(0 to 0, 0L)
-      .setStartSequenceNumbers(1 to 1, 3L)
-      .setStartSequenceNumbers(2 to 2, 0L)
-      .setStartSequenceNumbers(3 to 3, 1L)
-      .setStartSequenceNumbers(4 to 4, 2L)
+      .setStartingPositions(positions)
       .setFailOnDataLoss(failOnDataLoss)
 
     // partition 0 starts at the earliest sequence numbers, these should all be seen
@@ -518,10 +521,16 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     testUtils.send(Seq(-1))
     require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
 
+    val positions = Map(
+      0 -> Position.fromSequenceNumber(1L, isInclusive = true),
+      1 -> Position.fromSequenceNumber(0L, isInclusive = true),
+      2 -> Position.fromSequenceNumber(0L, isInclusive = true),
+      3 -> Position.fromSequenceNumber(0L, isInclusive = true)
+    )
+
     val conf = getEventHubsConf
       .setName(eh)
-      .setStartSequenceNumbers(0 to 0, 1)
-      .setStartSequenceNumbers(1 to 3, 0)
+      .setStartingPositions(positions)
 
     val eventhubs = spark.readStream
       .format("eventhubs")
@@ -550,7 +559,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf
       .setName(eh)
-      .setStartSequenceNumbers(0 to 0, 0)
 
     testUtils.destroyEventHubs()
     PartitionCount = 1
@@ -592,7 +600,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf
       .setName(eh)
-      .setStartSequenceNumbers(0 to 0, 0)
 
     testUtils.destroyEventHubs()
     PartitionCount = 1

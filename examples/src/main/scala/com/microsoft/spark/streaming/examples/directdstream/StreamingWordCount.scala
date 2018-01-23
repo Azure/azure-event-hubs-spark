@@ -18,6 +18,7 @@
 package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
+import org.apache.spark.eventhubs.common.utils.ConnectionStringBuilder
 import org.apache.spark.streaming.{ Seconds, StreamingContext }
 import org.apache.spark.eventhubs.common.{ EventHubsConf, EventHubsUtils }
 
@@ -42,11 +43,14 @@ object StreamingWordCount {
     val name = args(4)
     val batchDuration = args(5).toInt
 
-    val ehConf = EventHubsConf()
-      .setNamespace(namespace)
-      .setName(name)
-      .setKeyName(keyName)
-      .setKey(key)
+    val connectionString = ConnectionStringBuilder()
+      .setNamespaceName(namespace)
+      .setEventHubName(name)
+      .setSasKeyName(keyName)
+      .setSasKey(key)
+      .build
+
+    val ehConf = EventHubsConf(connectionString)
       .setConsumerGroup("$Default")
 
     val ssc = new StreamingContext(new SparkContext(), Seconds(batchDuration))
@@ -55,8 +59,11 @@ object StreamingWordCount {
 
     inputDirectStream.foreachRDD { rdd =>
       rdd
-        .flatMap(eventData =>
-          new String(eventData.getBody).split(" ").map(_.replaceAll("[^A-Za-z0-9 ]", "")))
+        .flatMap(
+          eventData =>
+            new String(eventData.getBytes.map(_.toChar)).mkString
+              .split(" ")
+              .map(_.replaceAll("[^A-Za-z0-9 ]", "")))
         .map(word => (word, 1))
         .reduceByKey(_ + _)
         .collect()

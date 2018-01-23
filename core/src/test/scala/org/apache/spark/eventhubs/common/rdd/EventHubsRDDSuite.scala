@@ -17,8 +17,8 @@
 
 package org.apache.spark.eventhubs.common.rdd
 
-import org.apache.spark.eventhubs.common.EventHubsConf
-import org.apache.spark.eventhubs.common.utils.{ EventHubsTestUtils, SimulatedClient }
+import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
+import org.apache.spark.eventhubs.common.utils.{ EventHubsTestUtils, Position, SimulatedClient }
 import org.apache.spark.{ SparkConf, SparkContext, SparkFunSuite }
 import org.scalatest.BeforeAndAfterAll
 
@@ -55,13 +55,13 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
   }
 
   private def getEventHubsConf: EventHubsConf = {
-    EventHubsConf()
-      .setNamespace("namespace")
-      .setName("name")
-      .setKeyName("keyName")
-      .setKey("key")
+    val positions: Map[PartitionId, Position] = (for {
+      partitionId <- 0 until PartitionCount
+    } yield partitionId -> Position.fromSequenceNumber(0L, isInclusive = true)).toMap
+
+    EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
-      .setStartSequenceNumbers(0 until PartitionCount, 0)
+      .setStartingPositions(positions)
   }
 
   test("basic usage") {
@@ -71,7 +71,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
 
     val offsetRanges = (for {
       partition <- 0 until PartitionCount
-    } yield OffsetRange(ehConf.name.get, partition, fromSeqNo, untilSeqNo)).toArray
+    } yield OffsetRange(ehConf.name, partition, fromSeqNo, untilSeqNo)).toArray
 
     val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
       .map(_.getBytes.map(_.toChar).mkString)
@@ -91,7 +91,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
 
     val offsetRanges = (for {
       partition <- 0 until PartitionCount
-    } yield OffsetRange(ehConf.name.get, partition, fromSeqNo, untilSeqNo)).toArray
+    } yield OffsetRange(ehConf.name, partition, fromSeqNo, untilSeqNo)).toArray
 
     val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
       .map(_.getBytes.map(_.toChar).mkString)
@@ -109,7 +109,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
     val untilSeqNo = 3200
     val ehConf = getEventHubsConf
 
-    val offsetRanges = Array(OffsetRange(ehConf.name.get, 0, fromSeqNo, untilSeqNo))
+    val offsetRanges = Array(OffsetRange(ehConf.name, 0, fromSeqNo, untilSeqNo))
 
     val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
       .map(_.getSystemProperties.getSequenceNumber)
@@ -131,7 +131,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
 
     val offsetRanges = (for {
       partition <- 0 until PartitionCount
-    } yield OffsetRange(ehConf.name.get, partition, fromSeqNo, untilSeqNo)).toArray
+    } yield OffsetRange(ehConf.name, partition, fromSeqNo, untilSeqNo)).toArray
 
     val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, SimulatedClient.apply)
       .map(_.getBytes.map(_.toChar).mkString)

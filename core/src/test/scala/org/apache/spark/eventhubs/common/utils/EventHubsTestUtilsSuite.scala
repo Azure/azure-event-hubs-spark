@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubs.common.utils
 
-import org.apache.spark.eventhubs.common.EventHubsConf
+import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
 
@@ -47,14 +47,14 @@ class EventHubsTestUtilsSuite
   }
 
   private def getEventHubsConf: EventHubsConf = {
-    EventHubsConf()
-      .setNamespace("namespace")
-      .setName("name")
-      .setKeyName("keyName")
-      .setKey("key")
+    val positions: Map[PartitionId, Position] = (for {
+      partitionId <- 0 until PartitionCount
+    } yield partitionId -> Position.fromSequenceNumber(0L, isInclusive = true)).toMap
+
+    EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
       .setMaxRatePerPartition(0 until PartitionCount, MaxRate)
-      .setStartSequenceNumbers(0 until PartitionCount, 0)
+      .setStartingPositions(positions)
   }
 
   test("Send one event to one partition") {
@@ -102,7 +102,9 @@ class EventHubsTestUtilsSuite
   test("translate") {
     val conf = getEventHubsConf
     val client = SimulatedClient(conf)
-    assert(client.translate(conf, client.partitionCount) === conf.startSequenceNumbers)
+    assert(
+      client.translate(conf, client.partitionCount) === conf.startingPositions.get
+        .mapValues(_.seqNo))
   }
 
   test("Test simulated receiver") {

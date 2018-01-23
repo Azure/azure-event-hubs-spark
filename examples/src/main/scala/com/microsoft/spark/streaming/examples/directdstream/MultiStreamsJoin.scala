@@ -18,6 +18,7 @@
 package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
+import org.apache.spark.eventhubs.common.utils.ConnectionStringBuilder
 import org.apache.spark.streaming.{ Seconds, StreamingContext }
 import org.apache.spark.eventhubs.common.{ EventHubsConf, EventHubsUtils }
 
@@ -40,16 +41,23 @@ object MultiStreamsJoin {
     val Array(namespace1, namespace2) = namespaces.split(",")
     val Array(name1, name2) = names.split(",")
 
-    val ehConf1 = EventHubsConf()
-      .setNamespace(namespace1)
-      .setName(name1)
-      .setKeyName(policyName1)
-      .setKey(key1)
-      .setMaxRatePerPartition(0 until 32, rate)
-      .setConsumerGroup("$Default")
+    val connectionString = ConnectionStringBuilder()
+      .setNamespaceName(namespace1)
+      .setEventHubName(name1)
+      .setSasKeyName(policyName1)
+      .setSasKey(key1)
 
-    val ehConf2 =
-      ehConf1.clone.setNamespace(namespace2).setName(name2).setKeyName(policyName2).setKey(key2)
+    val ehConf1 = EventHubsConf(connectionString.build)
+      .setConsumerGroup("$Default")
+      .setMaxRatePerPartition(0 until 32, rate)
+
+    connectionString
+      .setNamespaceName(namespace2)
+      .setEventHubName(name2)
+      .setSasKeyName(policyName2)
+      .setSasKey(key2)
+
+    val ehConf2 = ehConf1.clone.setConnectionString(connectionString.build)
 
     val inputDirectStream1 = EventHubsUtils.createDirectStream(ssc, ehConf1)
 

@@ -47,7 +47,7 @@ private[spark] class EventHubsDirectDStream private[spark] (
   require(ehConf.isValid)
 
   private lazy val partitionCount: Int = ehClient.partitionCount
-  private lazy val ehName = ehConf.name.get
+  private lazy val ehName = ehConf.name
 
   @transient private var _client: Client = _
   private[spark] def ehClient: Client = this.synchronized {

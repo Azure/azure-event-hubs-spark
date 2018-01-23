@@ -18,6 +18,7 @@
 package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
+import org.apache.spark.eventhubs.common.utils.ConnectionStringBuilder
 import org.apache.spark.streaming.{ Seconds, StreamingContext }
 import org.apache.spark.eventhubs.common.{ EventHubsConf, EventHubsUtils }
 
@@ -35,7 +36,7 @@ object WindowingWordCount {
       EventHubsUtils.createDirectStream(ssc, ehConf)
 
     inputDirectStream
-      .map(receivedRecord => (new String(receivedRecord.getBody), 1))
+      .map(receivedRecord => (new String(receivedRecord.getBytes), 1))
       .reduceByKeyAndWindow((v1, v2) => v1 + v2,
                             (v1, v2) => v1 - v2,
                             Seconds(batchDuration * 3),
@@ -63,11 +64,14 @@ object WindowingWordCount {
     val sparkCheckpointDir = args(6)
     val maxRate = args(7)
 
-    val ehConf = EventHubsConf()
-      .setNamespace(namespace)
-      .setName(name)
-      .setKeyName(keyName)
-      .setKey(key)
+    val connectionString = ConnectionStringBuilder()
+      .setNamespaceName(namespace)
+      .setEventHubName(name)
+      .setSasKeyName(keyName)
+      .setSasKey(key)
+      .build
+
+    val ehConf = EventHubsConf(connectionString)
       .setMaxRatePerPartition(0 until 32, maxRate.toInt)
       .setConsumerGroup("$Default")
 

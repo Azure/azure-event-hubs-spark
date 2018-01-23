@@ -26,6 +26,7 @@ import org.apache.qpid.proton.message.Message
 import org.apache.qpid.proton.message.Message.Factory
 import org.apache.spark.eventhubs.common._
 import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.common.utils.Position.FilterType
 
 import scala.collection.JavaConverters._
 
@@ -58,7 +59,7 @@ private[spark] class EventHubsTestUtils {
     val eventHubs = EventHubsTestUtils.eventHubs
     (for {
       p <- 0 until PartitionCount
-      n = ehConf.name.get
+      n = ehConf.name
       seqNo = eventHubs.latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap
   }
@@ -81,6 +82,12 @@ private[spark] class EventHubsTestUtils {
 private[spark] object EventHubsTestUtils {
   var PartitionCount: Int = 4
   var MaxRate: Rate = 5
+  var ConnectionString = ConnectionStringBuilder()
+    .setNamespaceName("namespace")
+    .setEventHubName("name")
+    .setSasKeyName("keyName")
+    .setSasKey("key")
+    .toString
 
   private[spark] var eventHubs: SimulatedEventHubs = _
 
@@ -237,11 +244,12 @@ private[spark] class SimulatedClient extends Client { self =>
   // TODO: implement simulated methods used in translate, and then remove this method.
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
-    require(ehConf.startSequenceNumbers.nonEmpty)
-    ehConf.startSequenceNumbers.mapValues { seqNo =>
-      {
-        if (seqNo == -1L) 0L else seqNo
-      }
+    val positions = ehConf.startingPositions.getOrElse(Map.empty)
+    require(positions.size == partitionCount)
+    require(positions.forall(x => x._2.getFilterType == FilterType.SequenceNumber))
+
+    positions.mapValues(_.seqNo).mapValues { seqNo =>
+      { if (seqNo == -1L) 0L else seqNo }
     }
   }
 

@@ -147,7 +147,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       nameAndPartitions: Seq[NameAndPartition]): Map[NameAndPartition, SequenceNumber] = {
     (for {
       nameAndPartition <- nameAndPartitions
-      seqNo = ehClient.earliestSeqNo(nameAndPartition)
+      seqNo = ehClient.earliestSeqNo(nameAndPartition.partitionId)
     } yield nameAndPartition -> seqNo).toMap
   }
 

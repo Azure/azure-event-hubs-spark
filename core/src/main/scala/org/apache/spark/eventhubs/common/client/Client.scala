@@ -44,7 +44,7 @@ private[spark] trait Client extends Serializable {
    *
    * @return a map from eventhubName-partition to seq
    */
-  def earliestSeqNo(eventHubNameAndPartition: NameAndPartition): SequenceNumber
+  def earliestSeqNo(partitionId: PartitionId): SequenceNumber
 
   /**
    * Provides the last (highest) sequence number and offset that exists in the EventHubs
@@ -53,13 +53,6 @@ private[spark] trait Client extends Serializable {
    * @return a map from eventhubName-partition to (offset, seq)
    */
   def latestSeqNo(partitionId: PartitionId): SequenceNumber
-
-  /**
-   * Provides the last (highest) enqueue time of an event for a given partition.
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): EnqueueTime
 
   /**
    * Translates any starting point provided by a user to the specific offset and sequence number

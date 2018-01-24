@@ -71,10 +71,9 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
-  private def getRunTimeInfo(nameAndPartition: NameAndPartition) = {
+  private def getRunTimeInfo(partitionId: PartitionId): EventHubPartitionRuntimeInformation = {
     try {
-      val partitionId = nameAndPartition.partitionId.toString
-      client.getPartitionRuntimeInformation(partitionId).get
+      client.getPartitionRuntimeInformation(partitionId.toString).get
     } catch {
       case e: Exception =>
         throw e
@@ -86,9 +85,9 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    *
    * @return a map from eventhubName-partition to seq
    */
-  override def earliestSeqNo(nameAndPartition: NameAndPartition): SequenceNumber = {
+  override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
     try {
-      val runtimeInformation = getRunTimeInfo(nameAndPartition)
+      val runtimeInformation = getRunTimeInfo(partitionId)
       val seqNo = runtimeInformation.getBeginSequenceNumber
       if (seqNo == -1L) 0L else seqNo
     } catch {
@@ -104,23 +103,8 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    */
   override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
     try {
-      val runtimeInfo = getRunTimeInfo(NameAndPartition(ehName, partitionId))
+      val runtimeInfo = getRunTimeInfo(partitionId)
       runtimeInfo.getLastEnqueuedSequenceNumber + 1
-    } catch {
-      case e: Exception =>
-        throw e
-    }
-  }
-
-  /**
-   * return the last enqueueTime of each partition
-   *
-   * @return a map from eventHubsNamePartition to EnqueueTime
-   */
-  override def lastEnqueuedTime(nameAndPartition: NameAndPartition): EnqueueTime = {
-    try {
-      val runtimeInfo = getRunTimeInfo(nameAndPartition)
-      runtimeInfo.getLastEnqueuedTimeUtc.getEpochSecond
     } catch {
       case e: Exception =>
         throw e

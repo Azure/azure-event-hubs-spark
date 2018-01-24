@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.rdd
+package org.apache.spark.eventhubs.rdd
 
 import org.apache.spark.Partition
-import org.apache.spark.eventhubs.common.{ NameAndPartition, SequenceNumber, PartitionId }
+import org.apache.spark.eventhubs.NameAndPartition
+import org.apache.spark.eventhubs.{ PartitionId, SequenceNumber }
 
 private class EventHubsRDDPartition(val index: Int,
                                     val nameAndPartition: NameAndPartition,

@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.utils
+package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.PartitionId
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
 

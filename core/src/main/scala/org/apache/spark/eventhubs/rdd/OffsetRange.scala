@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.rdd
+package org.apache.spark.eventhubs.rdd
 
-import org.apache.spark.eventhubs.common._
+import org.apache.spark.eventhubs.NameAndPartition
+import org.apache.spark.eventhubs._
 
-import language.implicitConversions
+import scala.language.implicitConversions
 
 trait HasOffsetRanges {
   def offsetRanges: Array[OffsetRange]

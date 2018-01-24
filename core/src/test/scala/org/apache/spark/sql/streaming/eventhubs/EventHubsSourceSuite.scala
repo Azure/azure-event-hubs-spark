@@ -21,8 +21,9 @@ import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWrit
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
-import org.apache.spark.eventhubs.common.utils._
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.PartitionId
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, Position, SimulatedClient }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{ count, window }

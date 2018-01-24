@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.utils
+package org.apache.spark.eventhubs.utils
 
 import java.net.{ URI, URISyntaxException }
 import java.time.Duration

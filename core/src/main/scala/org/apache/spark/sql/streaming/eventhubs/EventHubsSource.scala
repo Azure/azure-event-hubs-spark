@@ -22,9 +22,10 @@ import java.nio.charset.StandardCharsets
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
-import org.apache.spark.eventhubs.common.client.Client
-import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange }
-import org.apache.spark.eventhubs.common._
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
+import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.catalyst.InternalRow

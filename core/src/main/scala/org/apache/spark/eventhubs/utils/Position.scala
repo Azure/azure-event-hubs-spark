@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.utils
+package org.apache.spark.eventhubs.utils
 
-import com.microsoft.azure.eventhubs.EventPosition
 import java.time.Instant
 
-import org.apache.spark.eventhubs.common.{ EventHubsConf, SequenceNumber }
-import org.apache.spark.eventhubs.common.utils.Position.FilterType.FilterType
+import com.microsoft.azure.eventhubs.EventPosition
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.SequenceNumber
 
 /**
  * Defines a position of an event in an event hub partition.
@@ -32,6 +32,7 @@ import org.apache.spark.eventhubs.common.utils.Position.FilterType.FilterType
 class Position extends Serializable {
 
   import Position._
+  import Position.FilterType.FilterType
 
   private def this(o: String, i: Boolean) {
     this
@@ -55,11 +56,11 @@ class Position extends Serializable {
 
   private var filterType: FilterType = _
   private var offset: String = _
-  private[common] var seqNo: SequenceNumber = _
+  private[eventhubs] var seqNo: SequenceNumber = _
   private var enqueuedTime: Instant = _
   private var isInclusive: Boolean = _
 
-  private[common] def convert: EventPosition = {
+  private[eventhubs] def convert: EventPosition = {
     filterType match {
       case FilterType.Offset         => EventPosition.fromOffset(offset, isInclusive)
       case FilterType.SequenceNumber => EventPosition.fromSequenceNumber(seqNo, isInclusive)
@@ -67,7 +68,7 @@ class Position extends Serializable {
     }
   }
 
-  private[common] def getFilterType: FilterType = filterType
+  private[eventhubs] def getFilterType: FilterType = filterType
 }
 
 object Position {

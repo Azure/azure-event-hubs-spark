@@ -17,7 +17,8 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common._
+import org.apache.spark.eventhubs.NameAndPartition
+import org.apache.spark.eventhubs._
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 

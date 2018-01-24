@@ -30,6 +30,7 @@ import scala.collection.JavaConverters._
 import language.implicitConversions
 
 /*
+TODO:
 Need to change:
 - Expose connection string builder.
 - Construct EventHubsConf with a connection string. Be sure to parse the event hub name and namespace out if it b/c it's used for logging purposes.
@@ -98,13 +99,8 @@ final class EventHubsConf private (connectionStr: String)
     Option(settings.get(key.toLowerCase))
   }
 
-  private[spark] def isValid: Boolean = {
-    true
-  }
-
   /** Get your config in the form of a string to string map. */
   def toMap: Map[String, String] = {
-    require(self.isValid)
     set("eventhubs.maxRates", EventHubsConf.maxRatesToString(_maxRatesPerPartition))
 
     CaseInsensitiveMap(settings.asScala.toMap)

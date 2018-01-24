@@ -44,7 +44,6 @@ private[spark] class EventHubsDirectDStream private[spark] (
     clientFactory: (EventHubsConf => Client))
     extends InputDStream[EventData](_ssc)
     with Logging {
-  require(ehConf.isValid)
 
   private lazy val partitionCount: Int = ehClient.partitionCount
   private lazy val ehName = ehConf.name

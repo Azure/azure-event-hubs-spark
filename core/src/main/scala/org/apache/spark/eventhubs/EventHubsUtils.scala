@@ -14,14 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.spark.eventhubs.common
+package org.apache.spark.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.{ SparkConf, SparkContext }
-import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
-import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange }
+import org.apache.spark.eventhubs.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
+import org.apache.spark.{ SparkConf, SparkContext }
 
 object EventHubsUtils {
 

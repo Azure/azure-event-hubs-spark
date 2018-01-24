@@ -19,9 +19,10 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.util.Locale
 
-import org.apache.spark.eventhubs.common.client.{ Client, EventHubsClientWrapper }
-import org.apache.spark.eventhubs.common.EventHubsConf
-import org.apache.spark.eventhubs.common.utils.SimulatedClient
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source

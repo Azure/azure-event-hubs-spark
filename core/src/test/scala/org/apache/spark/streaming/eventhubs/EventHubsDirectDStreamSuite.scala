@@ -23,10 +23,11 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
-import org.apache.spark.eventhubs.common.rdd.{ HasOffsetRanges, OffsetRange }
-import org.apache.spark.eventhubs.common.utils.{ EventHubsTestUtils, Position, SimulatedClient }
-import org.apache.spark.eventhubs.common.utils.EventHubsTestUtils._
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.PartitionId
+import org.apache.spark.eventhubs.utils.EventHubsTestUtils._
+import org.apache.spark.eventhubs.rdd.{ HasOffsetRanges, OffsetRange }
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, Position, SimulatedClient }
 import org.apache.spark.{ SparkConf, SparkFunSuite }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD

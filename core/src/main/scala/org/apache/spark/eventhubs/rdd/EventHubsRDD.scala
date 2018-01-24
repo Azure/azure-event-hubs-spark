@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.rdd
+package org.apache.spark.eventhubs.rdd
 
-import scala.collection.mutable.ArrayBuffer
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.common.EventHubsConf
-import org.apache.spark.eventhubs.common.client.Client
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
+
+import scala.collection.mutable.ArrayBuffer
 
 private[spark] class EventHubsRDD(sc: SparkContext,
                                   val ehConf: EventHubsConf,
@@ -33,7 +34,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     with Logging
     with HasOffsetRanges {
 
-  import org.apache.spark.eventhubs.common._
+  import org.apache.spark.eventhubs._
 
   override def getPartitions: Array[Partition] = {
     for {

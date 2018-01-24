@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs
+package org.apache.spark
 
 import java.time.Duration
 import java.util.concurrent.Executor
 
 import com.microsoft.azure.eventhubs.EventHubClient
-import org.apache.spark.eventhubs.common.utils.Position
+import org.apache.spark.eventhubs.utils.Position
 
-package object common {
+package object eventhubs {
 
   val DefaultEventPosition: Position = Position.fromStartOfStream()
   val DefaultMaxRatePerPartition: Rate = 10000

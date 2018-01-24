@@ -15,19 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common
+package org.apache.spark.eventhubs
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import org.apache.spark.eventhubs.common.utils.{ ConnectionStringBuilder, Position }
+import org.apache.spark.eventhubs.utils.{ ConnectionStringBuilder, Position }
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
-import language.implicitConversions
+import scala.language.implicitConversions
 
 /*
 TODO:
@@ -75,7 +75,7 @@ final class EventHubsConf private (val connectionString: String)
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionString)
 
-  private[common] def set[T](key: String, value: T): EventHubsConf = {
+  private[eventhubs] def set[T](key: String, value: T): EventHubsConf = {
     if (key == null) {
       throw new NullPointerException("set: null key")
     }
@@ -255,22 +255,5 @@ object EventHubsConf extends Logging {
     for ((k, v) <- params) { ehConf.set(k, v) }
 
     ehConf
-  }
-
-  private[common] def parseMaxRatesPerPartition(maxRates: String): Map[PartitionId, Rate] = {
-    for { (k, v) <- stringToMap(maxRates) } yield k -> v.toRate
-  }
-
-  private def stringToMap(str: String): Map[PartitionId, String] = {
-    if (str == "" || str == null) {
-      Map.empty
-    } else {
-      val partitionsAndValues = str.split(",")
-      (for {
-        partitionAndValue <- partitionsAndValues
-        partition = partitionAndValue.split(":")(0)
-        value = partitionAndValue.split(":")(1)
-      } yield partition.toPartitionId -> value) toMap
-    }
   }
 }

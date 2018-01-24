@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common
+package org.apache.spark.eventhubs
 
 private[spark] final class NameAndPartition(val ehName: String, val partitionId: PartitionId)
     extends Serializable {

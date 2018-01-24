@@ -15,17 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.client
+package org.apache.spark.eventhubs.client
 
 import java.util.concurrent.ConcurrentHashMap
 
-import scala.collection.JavaConverters._
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubs.common.EventHubsConf
-import org.apache.spark.eventhubs.common.utils.ConnectionStringBuilder
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.utils.ConnectionStringBuilder
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
+
+import scala.collection.JavaConverters._
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -36,7 +37,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     with Client
     with Logging {
 
-  import org.apache.spark.eventhubs.common._
+  import org.apache.spark.eventhubs._
 
   private implicit val formats = Serialization.formats(NoTypeHints)
 

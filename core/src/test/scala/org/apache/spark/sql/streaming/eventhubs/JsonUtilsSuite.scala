@@ -18,7 +18,7 @@
 package org.apache.spark.sql.streaming.eventhubs
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.eventhubs.common.NameAndPartition
+import org.apache.spark.eventhubs.NameAndPartition
 
 class JsonUtilsSuite extends SparkFunSuite {
 

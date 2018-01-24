@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.rdd
+package org.apache.spark.eventhubs.rdd
 
-import org.apache.spark.eventhubs.common.{ EventHubsConf, PartitionId }
-import org.apache.spark.eventhubs.common.utils.{ EventHubsTestUtils, Position, SimulatedClient }
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.PartitionId
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, Position, SimulatedClient }
 import org.apache.spark.{ SparkConf, SparkContext, SparkFunSuite }
 import org.scalatest.BeforeAndAfterAll
 
 class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
-  import org.apache.spark.eventhubs.common.utils.EventHubsTestUtils._
+  import org.apache.spark.eventhubs.utils.EventHubsTestUtils._
 
   private var testUtils: EventHubsTestUtils = _
 

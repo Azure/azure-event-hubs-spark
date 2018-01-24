@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common.utils
+package org.apache.spark.eventhubs.utils
 
 import java.util.Date
 
@@ -24,9 +24,10 @@ import org.apache.qpid.proton.amqp.Binary
 import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
 import org.apache.qpid.proton.message.Message
 import org.apache.qpid.proton.message.Message.Factory
-import org.apache.spark.eventhubs.common._
-import org.apache.spark.eventhubs.common.client.Client
-import org.apache.spark.eventhubs.common.utils.Position.FilterType
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
+import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.utils.Position.FilterType
 
 import scala.collection.JavaConverters._
 

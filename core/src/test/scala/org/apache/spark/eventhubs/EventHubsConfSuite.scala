@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.common
+package org.apache.spark.eventhubs
 
-import org.apache.spark.eventhubs.common.utils.EventHubsTestUtils
+import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.scalatest.FunSuite
 
 /**

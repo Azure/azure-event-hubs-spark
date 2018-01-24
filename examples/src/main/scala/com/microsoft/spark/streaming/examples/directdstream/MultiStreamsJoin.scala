@@ -49,7 +49,7 @@ object MultiStreamsJoin {
 
     val ehConf1 = EventHubsConf(connectionString.build)
       .setConsumerGroup("$Default")
-      .setMaxRatePerPartition(0 until 32, rate)
+      .setMaxRatePerPartition(rate)
 
     connectionString
       .setNamespaceName(namespace2)

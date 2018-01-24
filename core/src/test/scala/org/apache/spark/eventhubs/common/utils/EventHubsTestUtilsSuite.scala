@@ -53,7 +53,7 @@ class EventHubsTestUtilsSuite
 
     EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
-      .setMaxRatePerPartition(0 until PartitionCount, MaxRate)
+      .setMaxRatePerPartition(MaxRate)
       .setStartingPositions(positions)
   }
 

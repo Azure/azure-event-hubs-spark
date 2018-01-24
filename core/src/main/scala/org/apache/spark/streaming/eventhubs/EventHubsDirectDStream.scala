@@ -81,7 +81,9 @@ private[spark] class EventHubsDirectDStream private[spark] (
       latestSeqNos: Map[PartitionId, SequenceNumber]): Map[PartitionId, SequenceNumber] = {
     (for {
       (partitionId, latestSeqNo) <- latestSeqNos
-      maxRate = ehConf.maxRatesPerPartition.getOrElse(partitionId, DefaultMaxRatePerPartition)
+      defaultMaxRate = ehConf.maxRatePerPartition.getOrElse(DefaultMaxRatePerPartition)
+      partitionRates = ehConf.maxRatesPerPartition.getOrElse(Map.empty)
+      maxRate = partitionRates.getOrElse(partitionId, defaultMaxRate)
       upperBound = math.min(fromSeqNos(partitionId) + maxRate, latestSeqNo)
       untilSeqNo = math.max(fromSeqNos(partitionId), upperBound)
     } yield partitionId -> untilSeqNo).toMap

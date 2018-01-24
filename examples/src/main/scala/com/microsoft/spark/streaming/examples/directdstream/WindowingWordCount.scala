@@ -72,7 +72,7 @@ object WindowingWordCount {
       .build
 
     val ehConf = EventHubsConf(connectionString)
-      .setMaxRatePerPartition(0 until 32, maxRate.toInt)
+      .setMaxRatePerPartition(maxRate.toInt)
       .setConsumerGroup("$Default")
 
     val ssc = StreamingContext.getOrCreate(sparkCheckpointDir,

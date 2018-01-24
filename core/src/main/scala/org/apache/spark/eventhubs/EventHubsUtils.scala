@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.spark.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
@@ -21,34 +22,66 @@ import org.apache.spark.eventhubs.client.EventHubsClientWrapper
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
-import org.apache.spark.{ SparkConf, SparkContext }
+import org.apache.spark.SparkContext
+import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
+import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
 
 object EventHubsUtils {
 
   /**
-   * Return an initialized SparkConf that registered
-   * Azure Eventhubs client's internal classes with Kryo serializer
-   *
-   * @return SparkConf
-   */
-  def initializeSparkStreamingConfigurations: SparkConf = {
-    new SparkConf().registerKryoClasses(Array(classOf[EventData]))
-  }
-
-  /**
-   * Creates a Direct DStream that consumes from multiple Event Hubs instances within a namespace.
+   * Creates a Direct DStream which consumes from  the Event Hubs instance
+   * specified in the [[EventHubsConf]].
    *
    * @param ssc the StreamingContext this DStream belongs to
    * @param ehConf the parameters for your EventHubs instance
-   * @return An EventHubsDirectDStream
+   * @return An [[EventHubsDirectDStream]]
    */
   def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf): EventHubsDirectDStream = {
     new EventHubsDirectDStream(ssc, ehConf, EventHubsClientWrapper.apply)
   }
 
+  /**
+   * Creates a Direct DStream which consumes from  the Event Hubs instance
+   * specified in the [[EventHubsConf]].
+   *
+   * @param jssc the JavaStreamingContext this DStream belongs to
+   * @param ehConf the parameters for your EventHubs instance
+   * @return A [[JavaInputDStream]] containing [[EventData]]
+   */
+  def createDirectStream(jssc: JavaStreamingContext,
+                         ehConf: EventHubsConf): JavaInputDStream[EventData] = {
+    new JavaInputDStream(createDirectStream(jssc.ssc, ehConf))
+  }
+
+  /**
+   * Creates an RDD which is contains events from an EventHubs instance.
+   * Starting and ending offsets are specified in advance.
+   *
+   * @param sc the SparkContext the RDD belongs to
+   * @param ehConf contains EventHubs-specific configurations
+   * @param offsetRanges offset ranges that define the EventHubs data belonging to this RDD
+   * @return An [[EventHubsRDD]]
+   *
+   */
   def createRDD(sc: SparkContext,
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): EventHubsRDD = {
     new EventHubsRDD(sc, ehConf, offsetRanges, EventHubsClientWrapper.apply)
+  }
+
+  /**
+   * Creates an RDD which is contains events from an EventHubs instance.
+   * Starting and ending offsets are specified in advance.
+   *
+   * @param jsc the JavaSparkContext the RDD belongs to
+   * @param ehConf contains EventHubs-specific configurations
+   * @param offsetRanges offset ranges that define the EventHubs data belonging to this RDD
+   * @return A [[JavaRDD]] containing [[EventData]]
+   *
+   */
+  def createRDD(jsc: JavaSparkContext,
+                ehConf: EventHubsConf,
+                offsetRanges: Array[OffsetRange]): JavaRDD[EventData] = {
+    new JavaRDD(createRDD(jsc.sc, ehConf, offsetRanges))
   }
 }

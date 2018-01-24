@@ -63,15 +63,17 @@ Need to change:
  * particular enqueue times. If none of those are provided, we will start from the beginning of your stream.
  * If more than one of those are provided, you will get a runtime error.
  */
-final class EventHubsConf private (connectionStr: String)
+final class EventHubsConf private (val connectionString: String)
     extends Serializable
     with Logging
     with Cloneable { self =>
 
+  import EventHubsConf._
+
   private implicit val formats = Serialization.formats(NoTypeHints)
 
   private val settings = new ConcurrentHashMap[String, String]()
-  settings.put("eventhubs.connectionString", connectionStr)
+  this.setConnectionString(connectionString)
 
   private[common] def set[T](key: String, value: T): EventHubsConf = {
     if (key == null) {
@@ -110,11 +112,7 @@ final class EventHubsConf private (connectionStr: String)
   }
 
   def setConnectionString(connectionString: String): EventHubsConf = {
-    set("eventhubs.connectionString", connectionString)
-  }
-
-  def connectionString: String = {
-    self.get("eventhubs.connectionString").get
+    set(ConnectionStringKey, connectionString)
   }
 
   def setName(name: String): EventHubsConf = {
@@ -126,45 +124,45 @@ final class EventHubsConf private (connectionStr: String)
 
   /** Set the consumer group for your EventHubs instance. */
   def setConsumerGroup(consumerGroup: String): EventHubsConf = {
-    set("eventhubs.consumerGroup", consumerGroup)
+    set(ConsumerGroupKey, consumerGroup)
   }
 
   /** The currently set consumer group. */
   def consumerGroup: Option[String] = {
-    self.get("eventhubs.consumerGroup")
+    self.get(ConsumerGroupKey)
   }
 
   def setStartingPosition(eventPosition: Position): EventHubsConf = {
-    set("eventhubs.startingPosition", Serialization.write(eventPosition))
+    set(StartingPositionKey, Serialization.write(eventPosition))
   }
 
   def startingPosition: Option[Position] = {
-    self.get("eventhubs.startingPosition") map Serialization.read[Position]
+    self.get(StartingPositionKey) map Serialization.read[Position]
   }
 
   def setStartingPositions(eventPositions: Map[PartitionId, Position]): EventHubsConf = {
-    set("eventhubs.startingPositions", Serialization.write(eventPositions))
+    set(StartingPositionsKey, Serialization.write(eventPositions))
   }
 
   def startingPositions: Option[Map[PartitionId, Position]] = {
-    self.get("eventhubs.startingPositions") map Serialization.read[Map[PartitionId, Position]]
+    self.get(StartingPositionsKey) map Serialization.read[Map[PartitionId, Position]]
   }
 
   def setMaxRatePerPartition(rate: Rate): EventHubsConf = {
-    set("eventhubs.maxRatePerPartition", rate)
+    set(MaxRatePerPartitionKey, rate)
   }
 
   /** A map of partition/max rate pairs that have been set by the user.  */
   def maxRatePerPartition: Option[Rate] = {
-    self.get("eventhubs.maxRatePerPartition") map (_.toRate)
+    self.get(MaxRatePerPartitionKey) map (_.toRate)
   }
 
   def setMaxRatesPerPartition(rates: Map[PartitionId, Rate]): EventHubsConf = {
-    set("eventhubs.maxRatesPerPartition", Serialization.write(rates))
+    set(MaxRatesPerPartitionKey, Serialization.write(rates))
   }
 
   def maxRatesPerPartition: Option[Map[PartitionId, Rate]] = {
-    self.get("eventhubs.maxRatesPerPartition") map Serialization.read[Map[PartitionId, Rate]]
+    self.get(MaxRatesPerPartitionKey) map Serialization.read[Map[PartitionId, Rate]]
   }
 
   /**
@@ -172,12 +170,12 @@ final class EventHubsConf private (connectionStr: String)
    * Default: [[DefaultReceiverTimeout]]
    */
   def setReceiverTimeout(d: Duration): EventHubsConf = {
-    set("eventhubs.receiverTimeout", d)
+    set(ReceiverTimeoutKey, d)
   }
 
   /** The current receiver timeout.  */
   def receiverTimeout: Option[Duration] = {
-    self.get("eventhubs.receiverTimeout") map (str => Duration.parse(str))
+    self.get(ReceiverTimeoutKey) map (str => Duration.parse(str))
 
   }
 
@@ -186,52 +184,67 @@ final class EventHubsConf private (connectionStr: String)
    * Default: [[DefaultOperationTimeout]]
    */
   def setOperationTimeout(d: Duration): EventHubsConf = {
-    set("eventhubs.operationTimeout", d)
+    set(OperationTimeoutKey, d)
   }
 
   /** The current operation timeout. */
   def operationTimeout: Option[Duration] = {
-    self.get("eventhubs.operationTimeout") map (str => Duration.parse(str))
+    self.get(OperationTimeoutKey) map (str => Duration.parse(str))
   }
 
   /** Set to true if you want EventHubs properties to be included in your DataFrame.  */
   def setSqlContainsProperties(b: Boolean): EventHubsConf = {
-    set("eventhubs.sql.containsProperties", b)
+    set(ContainsPropertiesKey, b)
   }
 
   /** Whether EventHubsConf currently contains sql properties. */
   def sqlContainsProperties: Option[Boolean] = {
-    self.get("eventhubs.sql.containsProperties") map (str => str.toBoolean)
+    self.get(ContainsPropertiesKey) map (str => str.toBoolean)
   }
 
   /** If your EventHubs data has user-defined keys, set them here.  */
   def setSqlUserDefinedKeys(keys: String*): EventHubsConf = {
-    set("eventhubs.sql.userDefinedKeys", keys.toSet.mkString(","))
+    set(UserDefinedKeysKey, keys.toSet.mkString(","))
   }
 
   /** Current user defined keys. */
   def sqlUserDefinedKeys: Option[Array[String]] = {
-    self.get("eventhubs.sql.userDefinedKeys") map (str => str.split(","))
+    self.get(UserDefinedKeysKey) map (str => str.split(","))
   }
 
   def setFailOnDataLoss(b: Boolean): EventHubsConf = {
-    set("failOnDataLoss", b)
+    set(FailOnDataLossKey, b)
   }
 
   def failOnDataLoss: Option[Boolean] = {
-    self.get("eventhubs.failOnDataLoss") map (str => str.toBoolean)
+    self.get(FailOnDataLossKey) map (str => str.toBoolean)
   }
 
   def setMaxSeqNosPerTrigger(limit: Long): EventHubsConf = {
-    set("maxSeqNosPerTrigger", limit)
+    set(MaxSeqNosPerTriggerKey, limit)
   }
 
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
-    set("useSimulatedClient", b)
+    set(UseSimulatedClientKey, b)
   }
 }
 
 object EventHubsConf extends Logging {
+
+  // Option key values
+  val ConnectionStringKey = "eventhubs.connectionString"
+  val ConsumerGroupKey = "eventhubs.consumerGroup"
+  val StartingPositionKey = "eventhubs.startingPosition"
+  val StartingPositionsKey = "eventhubs.startingPositions"
+  val MaxRatePerPartitionKey = "eventhubs.maxRatePerPartition"
+  val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
+  val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
+  val OperationTimeoutKey = "eventhubs.operationTimeout"
+  val ContainsPropertiesKey = "eventhubs.sql.containsProperties"
+  val UserDefinedKeysKey = "eventhubs.sql.userDefinedKeys"
+  val FailOnDataLossKey = "failOnDataLoss"
+  val MaxSeqNosPerTriggerKey = "maxSeqNosPerTrigger"
+  val UseSimulatedClientKey = "useSimulatedClient"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

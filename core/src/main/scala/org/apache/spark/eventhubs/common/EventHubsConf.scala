@@ -73,8 +73,6 @@ final class EventHubsConf private (connectionStr: String)
   private val settings = new ConcurrentHashMap[String, String]()
   settings.put("eventhubs.connectionString", connectionStr)
 
-  private var _maxRatesPerPartition: Map[PartitionId, Rate] = Map.empty
-
   private[common] def set[T](key: String, value: T): EventHubsConf = {
     if (key == null) {
       throw new NullPointerException("set: null key")
@@ -101,8 +99,6 @@ final class EventHubsConf private (connectionStr: String)
 
   /** Get your config in the form of a string to string map. */
   def toMap: Map[String, String] = {
-    set("eventhubs.maxRates", EventHubsConf.maxRatesToString(_maxRatesPerPartition))
-
     CaseInsensitiveMap(settings.asScala.toMap)
   }
 
@@ -110,7 +106,6 @@ final class EventHubsConf private (connectionStr: String)
   override def clone: EventHubsConf = {
     val newConf = EventHubsConf(self.connectionString)
     newConf.settings.putAll(self.settings)
-    newConf._maxRatesPerPartition ++= self._maxRatesPerPartition
     newConf
   }
 
@@ -143,7 +138,7 @@ final class EventHubsConf private (connectionStr: String)
     set("eventhubs.startingPosition", Serialization.write(eventPosition))
   }
 
-  private[spark] def startingPosition: Option[Position] = {
+  def startingPosition: Option[Position] = {
     self.get("eventhubs.startingPosition") map Serialization.read[Position]
   }
 
@@ -151,34 +146,25 @@ final class EventHubsConf private (connectionStr: String)
     set("eventhubs.startingPositions", Serialization.write(eventPositions))
   }
 
-  private[spark] def startingPositions: Option[Map[PartitionId, Position]] = {
+  def startingPositions: Option[Map[PartitionId, Position]] = {
     self.get("eventhubs.startingPositions") map Serialization.read[Map[PartitionId, Position]]
   }
 
-  /**
-   * Set the max rate per partition. This allows you to set rates on a per partition basis.
-   * If you don't specify a max rate for a specific partition, we'll use [[DefaultMaxRatePerPartition]].
-   *
-   * Example:
-   * {{{
-   * // Set rate to 20 for partition 1.
-   * ehConf.setMaxRatePerPartition(1 to 1, 20) // inclusive option
-   * ehConf.setMaxRatePerPartition(1 until 2, 20) // exclusive option
-   *
-   * // Set rate to 50 for partition 4, 5, and 6.
-   * ehConf.setMaxRatePerPartition(4 to 6, 50) // inclusive option
-   * ehConf.setMaxRatePerPartition(4 until 7, 50) // exclusive option }}}
-   */
-  def setMaxRatePerPartition(range: Range, rate: Rate): EventHubsConf = {
-    val newRates: Map[PartitionId, Rate] =
-      (for { partitionId <- range } yield partitionId -> rate).toMap
-    _maxRatesPerPartition ++= newRates
-    this
+  def setMaxRatePerPartition(rate: Rate): EventHubsConf = {
+    set("eventhubs.maxRatePerPartition", rate)
   }
 
   /** A map of partition/max rate pairs that have been set by the user.  */
-  def maxRatesPerPartition: Map[PartitionId, Rate] = {
-    _maxRatesPerPartition
+  def maxRatePerPartition: Option[Rate] = {
+    self.get("eventhubs.maxRatePerPartition") map (_.toRate)
+  }
+
+  def setMaxRatesPerPartition(rates: Map[PartitionId, Rate]): EventHubsConf = {
+    set("eventhubs.maxRatesPerPartition", Serialization.write(rates))
+  }
+
+  def maxRatesPerPartition: Option[Map[PartitionId, Rate]] = {
+    self.get("eventhubs.maxRatesPerPartition") map Serialization.read[Map[PartitionId, Rate]]
   }
 
   /**
@@ -243,12 +229,6 @@ final class EventHubsConf private (connectionStr: String)
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
     set("useSimulatedClient", b)
   }
-
-  /** All max rates currently set will be erased. */
-  def clearMaxRates(): EventHubsConf = {
-    self._maxRatesPerPartition = Map.empty
-    this
-  }
 }
 
 object EventHubsConf extends Logging {
@@ -258,11 +238,8 @@ object EventHubsConf extends Logging {
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
     val ehConf = EventHubsConf(params("eventhubs.connectionString"))
-    for ((k, v) <- params) {
-      ehConf.set(k, v)
-    }
 
-    ehConf._maxRatesPerPartition = parseMaxRatesPerPartition(params("eventhubs.maxRates"))
+    for ((k, v) <- params) { ehConf.set(k, v) }
 
     ehConf
   }
@@ -282,14 +259,5 @@ object EventHubsConf extends Logging {
         value = partitionAndValue.split(":")(1)
       } yield partition.toPartitionId -> value) toMap
     }
-  }
-
-  private[common] def maxRatesToString(maxRates: Map[PartitionId, Rate]): String = {
-    mapToString(maxRates)
-  }
-
-  private def mapToString(m: Map[PartitionId, _]): String = {
-    val ordered = m.toSeq.sortBy(_._1)
-    (for { (partition, value) <- ordered } yield s"$partition:$value").mkString(",")
   }
 }

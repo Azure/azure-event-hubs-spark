@@ -90,7 +90,7 @@ class EventHubsDirectDStreamSuite
     EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
       .setStartingPositions(positions)
-      .setMaxRatePerPartition(0 until PartitionCount, MaxRate)
+      .setMaxRatePerPartition(MaxRate)
   }
 
   // Put 'count' events in every simulated EventHubs partition

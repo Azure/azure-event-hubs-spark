@@ -226,19 +226,12 @@ private[spark] class SimulatedClient extends Client { self =>
     // not prefetching anything in tests
   }
 
-  override def earliestSeqNo(nameAndPartition: NameAndPartition): SequenceNumber = {
-    EventHubsTestUtils.eventHubs.earliestSeqNo(nameAndPartition.partitionId)
+  override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
+    EventHubsTestUtils.eventHubs.earliestSeqNo(partitionId)
   }
 
   override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
     eventHubs.latestSeqNo(partitionId)
-  }
-
-  override def lastEnqueuedTime(eventHubNameAndPartition: NameAndPartition): EnqueueTime = {
-    // We test the translate method in EventHubsClientWrapperSuite. We'll stick to SequenceNumbers
-    // for all other tests. If the translate method works properly, then omitting EnqueueTime and
-    // Byte Offsets from our RDD, DStream, and Sources tests is perfectly OK.
-    0L
   }
 
   // TODO: implement simulated methods used in translate, and then remove this method.

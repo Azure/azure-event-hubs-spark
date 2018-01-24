@@ -47,6 +47,5 @@ class EventHubsConfSuite extends FunSuite {
   // TODO revist isValid
   ignore("isValid doesn't return true until all required data is provided") {
     val ehConf = confWithTestValues
-    assert(ehConf.isValid)
   }
 }

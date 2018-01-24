@@ -26,7 +26,7 @@ import org.apache.spark.eventhubs.utils.Position
 package object eventhubs {
 
   val DefaultEventPosition: Position = Position.fromStartOfStream()
-  val DefaultMaxRatePerPartition: Rate = 10000
+  val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME

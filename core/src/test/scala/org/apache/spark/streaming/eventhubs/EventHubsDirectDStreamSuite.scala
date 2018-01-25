@@ -27,7 +27,7 @@ import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.PartitionId
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils._
 import org.apache.spark.eventhubs.rdd.{ HasOffsetRanges, OffsetRange }
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, Position, SimulatedClient }
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, EventPosition, SimulatedClient }
 import org.apache.spark.{ SparkConf, SparkFunSuite }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -84,9 +84,9 @@ class EventHubsDirectDStreamSuite
   }
 
   private def getEventHubsConf: EventHubsConf = {
-    val positions: Map[PartitionId, Position] = (for {
+    val positions: Map[PartitionId, EventPosition] = (for {
       partitionId <- 0 until PartitionCount
-    } yield partitionId -> Position.fromSequenceNumber(0L, isInclusive = true)).toMap
+    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
 
     EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
@@ -161,7 +161,7 @@ class EventHubsDirectDStreamSuite
     val startSeqNo = scala.util.Random.nextInt % (EventsPerPartition / 2)
     val ehConf = getEventHubsConf
       .setStartingPositions(Map.empty)
-      .setStartingPosition(Position.fromSequenceNumber(startSeqNo, isInclusive = true))
+      .setStartingPosition(EventPosition.fromSequenceNumber(startSeqNo, isInclusive = true))
     val batchInterval = 1000
     val timeoutAfter = 100000
     val expectedTotal =
@@ -224,7 +224,7 @@ class EventHubsDirectDStreamSuite
 
     val positions = (for {
       id <- 0 until PartitionCount
-    } yield id -> Position.fromSequenceNumber(EventsPerPartition, isInclusive = true)).toMap
+    } yield id -> EventPosition.fromSequenceNumber(EventsPerPartition, isInclusive = true)).toMap
 
     val ehConf =
       getEventHubsConf.setStartingPositions(positions)

@@ -48,9 +48,9 @@ class EventHubsTestUtilsSuite
   }
 
   private def getEventHubsConf: EventHubsConf = {
-    val positions: Map[PartitionId, Position] = (for {
+    val positions: Map[PartitionId, EventPosition] = (for {
       partitionId <- 0 until PartitionCount
-    } yield partitionId -> Position.fromSequenceNumber(0L, isInclusive = true)).toMap
+    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
 
     EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")

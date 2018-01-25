@@ -20,7 +20,7 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import org.apache.spark.eventhubs.utils.{ ConnectionStringBuilder, Position }
+import org.apache.spark.eventhubs.utils.{ ConnectionStringBuilder, EventPosition }
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.json4s.NoTypeHints
@@ -132,20 +132,20 @@ final class EventHubsConf private (val connectionString: String)
     self.get(ConsumerGroupKey)
   }
 
-  def setStartingPosition(eventPosition: Position): EventHubsConf = {
+  def setStartingPosition(eventPosition: EventPosition): EventHubsConf = {
     set(StartingPositionKey, Serialization.write(eventPosition))
   }
 
-  def startingPosition: Option[Position] = {
-    self.get(StartingPositionKey) map Serialization.read[Position]
+  def startingPosition: Option[EventPosition] = {
+    self.get(StartingPositionKey) map Serialization.read[EventPosition]
   }
 
-  def setStartingPositions(eventPositions: Map[PartitionId, Position]): EventHubsConf = {
+  def setStartingPositions(eventPositions: Map[PartitionId, EventPosition]): EventHubsConf = {
     set(StartingPositionsKey, Serialization.write(eventPositions))
   }
 
-  def startingPositions: Option[Map[PartitionId, Position]] = {
-    self.get(StartingPositionsKey) map Serialization.read[Map[PartitionId, Position]]
+  def startingPositions: Option[Map[PartitionId, EventPosition]] = {
+    self.get(StartingPositionsKey) map Serialization.read[Map[PartitionId, EventPosition]]
   }
 
   def setMaxRatePerPartition(rate: Rate): EventHubsConf = {

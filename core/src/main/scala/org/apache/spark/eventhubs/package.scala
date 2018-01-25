@@ -21,11 +21,11 @@ import java.time.Duration
 import java.util.concurrent.Executor
 
 import com.microsoft.azure.eventhubs.EventHubClient
-import org.apache.spark.eventhubs.utils.Position
+import org.apache.spark.eventhubs.utils.EventPosition
 
 package object eventhubs {
 
-  val DefaultEventPosition: Position = Position.fromStartOfStream()
+  val DefaultEventPosition: EventPosition = EventPosition.fromStartOfStream()
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)

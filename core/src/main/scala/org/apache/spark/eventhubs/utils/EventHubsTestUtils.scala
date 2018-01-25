@@ -27,7 +27,7 @@ import org.apache.qpid.proton.message.Message.Factory
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs._
-import org.apache.spark.eventhubs.utils.Position.FilterType
+import org.apache.spark.eventhubs.utils.EventPosition.FilterType
 
 import scala.collection.JavaConverters._
 

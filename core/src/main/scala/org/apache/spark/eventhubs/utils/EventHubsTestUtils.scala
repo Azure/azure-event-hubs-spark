@@ -83,7 +83,7 @@ private[spark] class EventHubsTestUtils {
 private[spark] object EventHubsTestUtils {
   var PartitionCount: Int = 4
   var MaxRate: Rate = 5
-  var ConnectionString = ConnectionStringBuilder()
+  val ConnectionString = ConnectionStringBuilder()
     .setNamespaceName("namespace")
     .setEventHubName("name")
     .setSasKeyName("keyName")

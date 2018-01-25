@@ -125,7 +125,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val latest = (for {
       p <- 0 until partitionCount
       n = ehConf.name
-      nAndP = NameAndPartition(n, p)
       seqNo = ehClient.latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap
 

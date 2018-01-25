@@ -44,7 +44,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
   private val connectionString = ConnectionStringBuilder(ehConf.connectionString)
   connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
-  private val ehName = connectionString.getEventHubName
 
   private val client: EventHubClient =
     EventHubClient.createFromConnectionStringSync(connectionString.toString, new StandardExecutor)

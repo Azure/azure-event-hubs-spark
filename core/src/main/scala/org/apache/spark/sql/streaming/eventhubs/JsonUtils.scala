@@ -43,7 +43,7 @@ private object JsonUtils {
         }
         .toArray
     } catch {
-      case NonFatal(x) =>
+      case NonFatal(_) =>
         throw new IllegalArgumentException(
           s"""Expected e.g. {"ehNameA":[0,1],"ehNameB":[0,1]}, got $str""")
     }

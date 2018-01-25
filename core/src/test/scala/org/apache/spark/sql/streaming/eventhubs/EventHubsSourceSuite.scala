@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.PartitionId
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, Position, SimulatedClient }
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, EventPosition, SimulatedClient }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{ count, window }
@@ -115,9 +115,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   private def getEventHubsConf: EventHubsConf = {
-    val positions: Map[PartitionId, Position] = (for {
+    val positions: Map[PartitionId, EventPosition] = (for {
       partitionId <- 0 until PartitionCount
-    } yield partitionId -> Position.fromSequenceNumber(0L, isInclusive = true)).toMap
+    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
 
     EventHubsConf(ConnectionString)
       .setConsumerGroup("consumerGroup")
@@ -384,10 +384,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // In practice, we would use Position.fromEndOfStream which would
     // translate to the configuration below.
     val positions = Map(
-      0 -> Position.fromSequenceNumber(1, isInclusive = true),
-      1 -> Position.fromSequenceNumber(0, isInclusive = true),
-      2 -> Position.fromSequenceNumber(0, isInclusive = true),
-      3 -> Position.fromSequenceNumber(0, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(1, isInclusive = true),
+      1 -> EventPosition.fromSequenceNumber(0, isInclusive = true),
+      2 -> EventPosition.fromSequenceNumber(0, isInclusive = true),
+      3 -> EventPosition.fromSequenceNumber(0, isInclusive = true)
     )
 
     val conf = getEventHubsConf
@@ -471,11 +471,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     require(EventHubsTestUtils.eventHubs.getPartitions.size === 5)
 
     val positions = Map(
-      0 -> Position.fromSequenceNumber(0L, isInclusive = true),
-      1 -> Position.fromSequenceNumber(3L, isInclusive = true),
-      2 -> Position.fromSequenceNumber(0L, isInclusive = true),
-      3 -> Position.fromSequenceNumber(1L, isInclusive = true),
-      4 -> Position.fromSequenceNumber(2L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
+      1 -> EventPosition.fromSequenceNumber(3L, isInclusive = true),
+      2 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
+      3 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
+      4 -> EventPosition.fromSequenceNumber(2L, isInclusive = true)
     )
 
     val conf = getEventHubsConf
@@ -523,10 +523,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
 
     val positions = Map(
-      0 -> Position.fromSequenceNumber(1L, isInclusive = true),
-      1 -> Position.fromSequenceNumber(0L, isInclusive = true),
-      2 -> Position.fromSequenceNumber(0L, isInclusive = true),
-      3 -> Position.fromSequenceNumber(0L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
+      1 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
+      2 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
+      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
     )
 
     val conf = getEventHubsConf

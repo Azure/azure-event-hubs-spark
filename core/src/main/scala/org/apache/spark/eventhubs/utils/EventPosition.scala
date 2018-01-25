@@ -19,7 +19,7 @@ package org.apache.spark.eventhubs.utils
 
 import java.time.Instant
 
-import com.microsoft.azure.eventhubs.EventPosition
+import com.microsoft.azure.eventhubs.{ EventPosition => ehep }
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.SequenceNumber
 
@@ -29,10 +29,10 @@ import org.apache.spark.eventhubs.SequenceNumber
  *
  * This event is passed to the EventHubsConf to define a starting point for your Spark job.
  */
-class Position extends Serializable {
+class EventPosition extends Serializable {
 
-  import Position._
-  import Position.FilterType.FilterType
+  import EventPosition._
+  import FilterType.FilterType
 
   private def this(o: String, i: Boolean) {
     this
@@ -60,18 +60,18 @@ class Position extends Serializable {
   private var enqueuedTime: Instant = _
   private var isInclusive: Boolean = _
 
-  private[eventhubs] def convert: EventPosition = {
+  private[eventhubs] def convert: ehep = {
     filterType match {
-      case FilterType.Offset         => EventPosition.fromOffset(offset, isInclusive)
-      case FilterType.SequenceNumber => EventPosition.fromSequenceNumber(seqNo, isInclusive)
-      case FilterType.EnqueuedTime   => EventPosition.fromEnqueuedTime(enqueuedTime)
+      case FilterType.Offset         => ehep.fromOffset(offset, isInclusive)
+      case FilterType.SequenceNumber => ehep.fromSequenceNumber(seqNo, isInclusive)
+      case FilterType.EnqueuedTime   => ehep.fromEnqueuedTime(enqueuedTime)
     }
   }
 
   private[eventhubs] def getFilterType: FilterType = filterType
 }
 
-object Position {
+object EventPosition {
   private val StartOfStream: String = "-1"
   private val EndOfStream: String = "@latest"
 
@@ -86,10 +86,10 @@ object Position {
    *
    * @param offset is the byte offset of the event.
    * @param isInclusive will include the specified event when set to true; otherwise, the next event is returned.
-   * @return An [[Position]] instance.
+   * @return An [[EventPosition]] instance.
    */
-  def fromOffset(offset: String, isInclusive: Boolean = false): Position = {
-    new Position(offset, isInclusive)
+  def fromOffset(offset: String, isInclusive: Boolean = false): EventPosition = {
+    new EventPosition(offset, isInclusive)
   }
 
   /**
@@ -98,39 +98,39 @@ object Position {
    *
    * @param seqNo is the sequence number of the event.
    * @param isInclusive will include the specified event when set to true; otherwise, the next event is returned.
-   * @return An [[Position]] instance.
+   * @return An [[EventPosition]] instance.
    */
-  def fromSequenceNumber(seqNo: SequenceNumber, isInclusive: Boolean = false): Position = {
-    new Position(seqNo, isInclusive)
+  def fromSequenceNumber(seqNo: SequenceNumber, isInclusive: Boolean = false): EventPosition = {
+    new EventPosition(seqNo, isInclusive)
   }
 
   /**
    * Creates a position at the given [[Instant]]
    *
    * @param enqueuedTime is the enqueued time of the specified event.
-   * @return An [[Position]] instance.
+   * @return An [[EventPosition]] instance.
    */
-  def fromEnqueuedTime(enqueuedTime: Instant): Position = {
-    new Position(enqueuedTime)
+  def fromEnqueuedTime(enqueuedTime: Instant): EventPosition = {
+    new EventPosition(enqueuedTime)
   }
 
   /**
    * Returns the position for the start of a stream. Provide this position to your [[EventHubsConf]] to start
    * receiving from the first available event in the partition.
    *
-   * @return An [[Position]] instance.
+   * @return An [[EventPosition]] instance.
    */
-  def fromStartOfStream(): Position = {
-    new Position(StartOfStream, true)
+  def fromStartOfStream(): EventPosition = {
+    new EventPosition(StartOfStream, true)
   }
 
   /**
    * Returns the position for the end of a stream. Provide this position to your [[EventHubsConf]] to start
    * receiving from the next available event in the partition after the receiver is created.
    *
-   * @return An [[Position]] instance.
+   * @return An [[EventPosition]] instance.
    */
-  def fromEndOfStream(): Position = {
-    new Position(EndOfStream, false)
+  def fromEndOfStream(): EventPosition = {
+    new EventPosition(EndOfStream, false)
   }
 }

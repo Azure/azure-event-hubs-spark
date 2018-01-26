@@ -79,34 +79,14 @@ private[sql] object EventHubsSourceProvider extends Serializable {
   private val UseSimulatedClientOptionKey = "usesimulatedclient"
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
-    val containsProperties =
-      parameters.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
-
-    val userDefinedKeys = {
-      if (parameters.contains("eventhubs.sql.userDefinedKeys")) {
-        parameters("eventhubs.sql.userDefinedKeys").split(",").toSeq
-      } else {
-        Seq()
-      }
-    }
-
-    val defaultProps = Seq(
-      StructField("body", StringType),
-      StructField("offset", LongType),
-      StructField("seqNumber", LongType),
-      StructField("enqueuedTime", TimestampType),
-      StructField("publisher", StringType),
-      StructField("partitionKey", StringType)
-    )
-
-    val additionalProps = if (containsProperties && userDefinedKeys.nonEmpty) {
-      userDefinedKeys.map(key => StructField(key, StringType))
-    } else if (containsProperties && userDefinedKeys.isEmpty) {
-      Seq(StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
-    } else {
-      Seq()
-    }
-
-    StructType(defaultProps ++ additionalProps)
+    StructType(
+      Seq(
+        StructField("body", StringType),
+        StructField("offset", LongType),
+        StructField("seqNumber", LongType),
+        StructField("enqueuedTime", TimestampType),
+        StructField("publisher", StringType),
+        StructField("partitionKey", StringType)
+      ))
   }
 }

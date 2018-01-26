@@ -31,7 +31,6 @@ import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
 import scala.collection.parallel.immutable.ParVector
-import scala.collection.parallel.mutable.ParSeq
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests

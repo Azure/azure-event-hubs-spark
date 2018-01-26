@@ -68,7 +68,7 @@ class EventPosition extends Serializable {
     }
   }
 
-  private[eventhubs] def getFilterType: FilterType = filterType
+  private[eventhubs] def isSeqNo: Boolean = filterType == FilterType.SequenceNumber
 }
 
 object EventPosition {

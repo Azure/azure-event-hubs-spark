@@ -255,50 +255,17 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       }
     }.toArray
 
-    val containsProperties =
-      options.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
-    val userDefinedKeys = {
-      if (options.contains("eventhubs.sql.userDefinedKeys")) {
-        options("eventhubs.sql.userDefinedKeys").split(",").toSeq
-      } else {
-        Seq()
-      }
+    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, clientFactory).map { ed =>
+      InternalRow(
+        UTF8String.fromBytes(ed.getBytes),
+        ed.getSystemProperties.getOffset.toLong,
+        ed.getSystemProperties.getSequenceNumber,
+        DateTimeUtils.fromJavaTimestamp(
+          new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
+        UTF8String.fromString(ed.getSystemProperties.getPublisher),
+        UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
+      )
     }
-    val rdd = new EventHubsRDD(
-      sc,
-      ehConf,
-      offsetRanges,
-      clientFactory
-    ).map(
-      eventData =>
-        InternalRow.fromSeq(Seq(
-          UTF8String.fromBytes(eventData.getBytes),
-          eventData.getSystemProperties.getOffset.toLong,
-          eventData.getSystemProperties.getSequenceNumber,
-          DateTimeUtils.fromJavaTimestamp(
-            new java.sql.Timestamp(eventData.getSystemProperties.getEnqueuedTime.toEpochMilli)),
-          UTF8String.fromString(eventData.getSystemProperties.getPublisher),
-          UTF8String.fromString(eventData.getSystemProperties.getPartitionKey)
-        ) ++ {
-          if (containsProperties) {
-            if (userDefinedKeys.nonEmpty) {
-              userDefinedKeys.map(k => {
-                UTF8String.fromString(eventData.getProperties.asScala.getOrElse(k, "").toString)
-              })
-            } else {
-              val keys = ArrayBuffer[UTF8String]()
-              val values = ArrayBuffer[UTF8String]()
-              for ((k, v) <- eventData.getProperties.asScala) {
-                keys.append(UTF8String.fromString(k))
-                if (v == null) values.append(null)
-                else values.append(UTF8String.fromString(v.toString))
-              }
-              Seq(ArrayBasedMapData(keys.toArray, values.toArray))
-            }
-          } else {
-            Seq()
-          }
-        }))
 
     logInfo(
       "GetBatch generating RDD of offset range: " +

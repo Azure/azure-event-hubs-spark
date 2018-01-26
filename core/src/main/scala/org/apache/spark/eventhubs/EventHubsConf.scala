@@ -192,26 +192,6 @@ final class EventHubsConf private (val connectionString: String)
     self.get(OperationTimeoutKey) map (str => Duration.parse(str))
   }
 
-  /** Set to true if you want EventHubs properties to be included in your DataFrame.  */
-  def setSqlContainsProperties(b: Boolean): EventHubsConf = {
-    set(ContainsPropertiesKey, b)
-  }
-
-  /** Whether EventHubsConf currently contains sql properties. */
-  def sqlContainsProperties: Option[Boolean] = {
-    self.get(ContainsPropertiesKey) map (str => str.toBoolean)
-  }
-
-  /** If your EventHubs data has user-defined keys, set them here.  */
-  def setSqlUserDefinedKeys(keys: String*): EventHubsConf = {
-    set(UserDefinedKeysKey, keys.toSet.mkString(","))
-  }
-
-  /** Current user defined keys. */
-  def sqlUserDefinedKeys: Option[Array[String]] = {
-    self.get(UserDefinedKeysKey) map (str => str.split(","))
-  }
-
   def setFailOnDataLoss(b: Boolean): EventHubsConf = {
     set(FailOnDataLossKey, b)
   }
@@ -240,8 +220,6 @@ object EventHubsConf extends Logging {
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
-  val ContainsPropertiesKey = "eventhubs.sql.containsProperties"
-  val UserDefinedKeysKey = "eventhubs.sql.userDefinedKeys"
   val FailOnDataLossKey = "failOnDataLoss"
   val MaxSeqNosPerTriggerKey = "maxSeqNosPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"

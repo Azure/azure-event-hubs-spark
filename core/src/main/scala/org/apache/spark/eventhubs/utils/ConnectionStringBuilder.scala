@@ -241,6 +241,11 @@ class ConnectionStringBuilder private () {
   }
 
   /**
+   * Identical to [[build]].
+   */
+  override def toString: String = build
+
+  /**
    * Returns an inter-operable connection string that can be used to connect to EventHubs instances.
    *
    * @return connection string

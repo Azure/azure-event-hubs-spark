@@ -30,6 +30,7 @@ import org.apache.spark.eventhubs._
 import org.apache.spark.eventhubs.utils.EventPosition.FilterType
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 
 /**
  * Test classes used to simulate an EventHubs instance.
@@ -38,75 +39,91 @@ import scala.collection.JavaConverters._
  * in our DStream and Source tests.
  */
 private[spark] class EventHubsTestUtils {
+
   import EventHubsTestUtils._
 
-  def send(data: Seq[Int]): Seq[Int] = {
+  def send(ehName: String, data: Seq[Int]): Seq[Int] = {
     var count = 0
+    val eventHub = eventHubs(ehName)
     for (event <- data) {
-      val part = count % PartitionCount
+      val part = count % eventHub.partitionCount
       count += 1
-      EventHubsTestUtils.eventHubs.send(part, Seq(event))
+      eventHub.send(part, Seq(event))
     }
 
     data
   }
 
-  def send(partitionId: PartitionId, data: Int*): Seq[Int] = {
-    EventHubsTestUtils.eventHubs.send(partitionId, data)
+  def send(ehName: String, partitionId: PartitionId, data: Seq[Int]): Seq[Int] = {
+    eventHubs(ehName).send(partitionId, data)
     data
   }
 
   def getLatestSeqNos(ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
     val eventHubs = EventHubsTestUtils.eventHubs
     (for {
-      p <- 0 until PartitionCount
+      p <- 0 until DefaultPartitionCount
       n = ehConf.name
-      seqNo = eventHubs.latestSeqNo(p)
+      seqNo = eventHubs(n).latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap
   }
 
-  def createEventHubs(): Unit = {
-    if (EventHubsTestUtils.eventHubs == null) {
-      EventHubsTestUtils.eventHubs = new SimulatedEventHubs(PartitionCount)
-    } else {
-      throw new IllegalStateException
-    }
+  def getEventHubs(ehName: String): SimulatedEventHubs = {
+    eventHubs(ehName)
   }
 
-  def destroyEventHubs(): Unit = {
-    if (EventHubsTestUtils.eventHubs != null) {
-      EventHubsTestUtils.eventHubs = null
+  def createEventHubs(ehName: String, partitionCount: Int): SimulatedEventHubs = {
+    EventHubsTestUtils.eventHubs.put("ehName", new SimulatedEventHubs(ehName, partitionCount))
+    eventHubs(ehName)
+  }
+
+  def destroyEventHubs(ehName: String): Unit = {
+    eventHubs.remove(ehName)
+  }
+
+  def destroyAllEventHubs(): Unit = {
+    eventHubs.clear
+  }
+
+  def getEventHubsConf(ehName: String = "name"): EventHubsConf = {
+    val connectionString = ConnectionStringBuilder()
+      .setNamespaceName("namespace")
+      .setEventHubName(ehName)
+      .setSasKeyName("keyName")
+      .setSasKey("key")
+      .build
+
+    val positions: Map[PartitionId, EventPosition] = (for {
+      partitionId <- 0 until DefaultPartitionCount
+    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
+
+    EventHubsConf(connectionString)
+      .setConsumerGroup("consumerGroup")
+      .setStartingPositions(positions)
+      .setMaxRatePerPartition(DefaultMaxRate)
+  }
+
+  // Put 'count' events in every simulated EventHubs partition
+  def populateUniformly(ehName: String, count: Int): Unit = {
+    val eventHub = eventHubs(ehName)
+    for (i <- 0 until eventHub.partitionCount) {
+      eventHub.send(i, 0 until count)
     }
   }
 }
 
 private[spark] object EventHubsTestUtils {
-  var PartitionCount: Int = 4
-  var MaxRate: Rate = 5
-  val ConnectionString = ConnectionStringBuilder()
-    .setNamespaceName("namespace")
-    .setEventHubName("name")
-    .setSasKeyName("keyName")
-    .setSasKey("key")
-    .toString
+  val DefaultPartitionCount: Int = 4
+  val DefaultMaxRate: Rate = 5
+  val DefaultName = "name"
 
-  private[spark] var eventHubs: SimulatedEventHubs = _
-
-  def setDefaults(): Unit = {
-    PartitionCount = 4
-    MaxRate = 5
-  }
-
-  def sendEvents(partitionId: PartitionId, events: Int*): Unit = {
-    eventHubs.send(partitionId, events)
-  }
+  private[utils] val eventHubs: mutable.Map[String, SimulatedEventHubs] = mutable.Map.empty
 }
 
 /**
- * Simulated EventHubs instance. All partitions are empty on creation. Must use
- * [[EventHubsTestUtils.sendEvents()]] in order to populate the instance.
+ * Simulated EventHubs instance. All partitions are empty on creation.
  */
-private[spark] class SimulatedEventHubs(val partitionCount: Int) {
+private[spark] class SimulatedEventHubs(val name: String, val partitionCount: Int) {
 
   private val partitions: Map[PartitionId, SimulatedEventHubsPartition] =
     (for { p <- 0 until partitionCount } yield p -> new SimulatedEventHubsPartition).toMap
@@ -204,12 +221,13 @@ private[spark] class SimulatedEventHubs(val partitionCount: Int) {
 }
 
 /** A simulated EventHubs client. */
-private[spark] class SimulatedClient extends Client { self =>
+private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { self =>
 
   import EventHubsTestUtils._
 
-  var partitionId: Int = _
-  var currentSeqNo: SequenceNumber = _
+  private var partitionId: Int = _
+  private var currentSeqNo: SequenceNumber = _
+  private val eventHub = eventHubs(ehConf.name)
 
   override private[spark] def createReceiver(partitionId: String,
                                              startingSeqNo: SequenceNumber): Unit = {
@@ -218,7 +236,7 @@ private[spark] class SimulatedClient extends Client { self =>
   }
 
   override private[spark] def receive(eventCount: Int): java.lang.Iterable[EventData] = {
-    val events = eventHubs.receive(eventCount, self.partitionId, currentSeqNo)
+    val events = eventHub.receive(eventCount, self.partitionId, currentSeqNo)
     currentSeqNo += eventCount
     events
   }
@@ -228,11 +246,11 @@ private[spark] class SimulatedClient extends Client { self =>
   }
 
   override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    EventHubsTestUtils.eventHubs.earliestSeqNo(partitionId)
+    eventHub.earliestSeqNo(partitionId)
   }
 
   override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    eventHubs.latestSeqNo(partitionId)
+    eventHub.latestSeqNo(partitionId)
   }
 
   // TODO: implement simulated methods used in translate, and then remove this method.
@@ -247,7 +265,7 @@ private[spark] class SimulatedClient extends Client { self =>
     }
   }
 
-  override def partitionCount: PartitionId = EventHubsTestUtils.eventHubs.partitionCount
+  override def partitionCount: PartitionId = eventHub.partitionCount
 
   override def close(): Unit = {
     // nothing to close
@@ -255,5 +273,5 @@ private[spark] class SimulatedClient extends Client { self =>
 }
 
 private[spark] object SimulatedClient {
-  def apply(ehConf: EventHubsConf): SimulatedClient = new SimulatedClient
+  def apply(ehConf: EventHubsConf): SimulatedClient = new SimulatedClient(ehConf)
 }

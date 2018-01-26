@@ -20,11 +20,10 @@ package org.apache.spark.streaming.eventhubs
 import java.io.File
 import java.util
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{ AtomicInteger, AtomicLong }
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.PartitionId
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils._
 import org.apache.spark.eventhubs.rdd.{ HasOffsetRanges, OffsetRange }
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, EventPosition, SimulatedClient }
@@ -62,19 +61,20 @@ class EventHubsDirectDStreamSuite
   private var ssc: StreamingContext = _
   private var testDir: File = _
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
+  override def beforeAll: Unit = {
+    super.beforeAll
     testUtils = new EventHubsTestUtils
   }
 
-  before {
-    setDefaults()
-    testUtils.createEventHubs()
+  override def afterAll(): Unit = {
+    if (testUtils != null) {
+      testUtils.destroyAllEventHubs()
+      testUtils = null
+    }
+    super.afterAll()
   }
 
   after {
-    testUtils.destroyEventHubs()
-
     if (ssc != null) {
       ssc.stop(stopSparkContext = true)
     }
@@ -83,30 +83,22 @@ class EventHubsDirectDStreamSuite
     }
   }
 
-  private def getEventHubsConf: EventHubsConf = {
-    val positions: Map[PartitionId, EventPosition] = (for {
-      partitionId <- 0 until PartitionCount
-    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
+  private val eventHubsId = new AtomicInteger(0)
 
-    EventHubsConf(ConnectionString)
-      .setConsumerGroup("consumerGroup")
-      .setStartingPositions(positions)
-      .setMaxRatePerPartition(MaxRate)
+  def newEventHubs(): String = {
+    s"eh-${eventHubsId.getAndIncrement()}"
   }
 
-  // Put 'count' events in every simulated EventHubs partition
-  private def populateUniformly(count: Int): Unit = {
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 to count)
-    }
-  }
+  private def getEventHubsConf(ehName: String): EventHubsConf = testUtils.getEventHubsConf(ehName)
 
   test("basic stream receiving with smallest starting sequence number") {
-    populateUniformly(EventsPerPartition)
-    val ehConf = getEventHubsConf
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, EventsPerPartition)
+
+    val ehConf = getEventHubsConf(eventHub.name)
     val batchInterval = 1000
     val timeoutAfter = 100000
-    val expectedTotal = (timeoutAfter / batchInterval) * MaxRate
+    val expectedTotal = (timeoutAfter / batchInterval) * DefaultMaxRate
 
     ssc = new StreamingContext(sparkConf, Milliseconds(batchInterval))
     val stream = withClue("Error creating direct stream") {
@@ -157,18 +149,22 @@ class EventHubsDirectDStreamSuite
   }
 
   test("basic stream receiving from random sequence number") {
-    populateUniformly(EventsPerPartition)
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, EventsPerPartition)
+
     val startSeqNo = scala.util.Random.nextInt % (EventsPerPartition / 2)
-    val ehConf = getEventHubsConf
+
+    val ehConf = getEventHubsConf(eventHub.name)
       .setStartingPositions(Map.empty)
       .setStartingPosition(EventPosition.fromSequenceNumber(startSeqNo, isInclusive = true))
+
     val batchInterval = 1000
     val timeoutAfter = 100000
     val expectedTotal =
-      if (EventsPerPartition - startSeqNo + 1 < (timeoutAfter / batchInterval) * MaxRate) {
+      if (EventsPerPartition - startSeqNo + 1 < (timeoutAfter / batchInterval) * DefaultMaxRate) {
         EventsPerPartition - startSeqNo + 1
       } else {
-        (timeoutAfter / batchInterval) * MaxRate
+        (timeoutAfter / batchInterval) * DefaultMaxRate
       }
 
     ssc = new StreamingContext(sparkConf, Milliseconds(batchInterval))
@@ -220,14 +216,15 @@ class EventHubsDirectDStreamSuite
   }
 
   test("receiving from largest starting offset") {
-    populateUniformly(EventsPerPartition)
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, EventsPerPartition)
 
     val positions = (for {
-      id <- 0 until PartitionCount
+      id <- 0 until DefaultPartitionCount
     } yield id -> EventPosition.fromSequenceNumber(EventsPerPartition, isInclusive = true)).toMap
 
     val ehConf =
-      getEventHubsConf.setStartingPositions(positions)
+      getEventHubsConf(eventHub.name).setStartingPositions(positions)
     val batchInterval = 1000
     val timeoutAfter = 10000
 
@@ -252,13 +249,10 @@ class EventHubsDirectDStreamSuite
   test("offset recovery") {
     testDir = Utils.createTempDir()
 
-    testUtils.destroyEventHubs()
-    testUtils.createEventHubs()
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 to 25)
-    }
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 25)
 
-    val ehConf = getEventHubsConf
+    val ehConf = getEventHubsConf(eventHub.name)
 
     // Setup the streaming context
     ssc = new StreamingContext(sparkConf, Milliseconds(100))
@@ -335,15 +329,12 @@ class EventHubsDirectDStreamSuite
   }
 
   test("Direct EventHubs stream report input information") {
-    val ehConf = getEventHubsConf
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 25)
 
-    testUtils.destroyEventHubs()
-    testUtils.createEventHubs()
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 to 25)
-    }
+    val ehConf = getEventHubsConf(eventHub.name)
 
-    val totalSent = 25 * PartitionCount
+    val totalSent = 25 * eventHub.partitionCount
 
     import EventHubsDirectDStreamSuite._
     ssc = new StreamingContext(sparkConf, Milliseconds(200))

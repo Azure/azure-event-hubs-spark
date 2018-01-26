@@ -18,34 +18,40 @@
 package org.apache.spark.eventhubs
 
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils
-import org.scalatest.FunSuite
+import org.scalatest.{ BeforeAndAfterAll, FunSuite }
 
 /**
  * Tests [[EventHubsConf]] for correctness.
  */
-class EventHubsConfSuite extends FunSuite {
+class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
-  // Return an EventHubsConf with dummy data
-  private def confWithTestValues: EventHubsConf = {
-    EventHubsConf(EventHubsTestUtils.ConnectionString)
-      .setConsumerGroup("consumerGroup")
+  private var testUtils: EventHubsTestUtils = _
+
+  override def beforeAll: Unit = {
+    testUtils = new EventHubsTestUtils
+  }
+
+  override def afterAll(): Unit = {
+    if (testUtils != null) {
+      testUtils = null
+    }
   }
 
   // Tests for get, set, and isValid
   test("set throws NullPointerException for null key and value") {
-    val ehConf = confWithTestValues
+    val ehConf = testUtils.getEventHubsConf()
     intercept[NullPointerException] { ehConf.set(null, "value") }
     intercept[NullPointerException] { ehConf.set("key", null) }
     intercept[NullPointerException] { ehConf.set(null, null) }
   }
 
   test("set/apply/get are properly working") {
-    val ehConf = confWithTestValues.set("some key", "some value")
+    val ehConf = testUtils.getEventHubsConf().set("some key", "some value")
     assert(ehConf("some key") == "some value")
   }
 
   // TODO revist isValid
   ignore("isValid doesn't return true until all required data is provided") {
-    val ehConf = confWithTestValues
+    val ehConf = testUtils.getEventHubsConf()
   }
 }

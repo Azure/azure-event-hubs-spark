@@ -17,8 +17,9 @@
 
 package org.apache.spark.eventhubs.utils
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.PartitionId
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
 
@@ -35,33 +36,30 @@ class EventHubsTestUtilsSuite
 
   private var testUtils: EventHubsTestUtils = _
 
-  override def beforeAll(): Unit = {
+  override def beforeAll: Unit = {
     testUtils = new EventHubsTestUtils
   }
 
-  before {
-    testUtils.createEventHubs()
+  override def afterAll(): Unit = {
+    if (testUtils != null) {
+      testUtils.destroyAllEventHubs()
+      testUtils = null
+    }
   }
 
-  after {
-    testUtils.destroyEventHubs()
-  }
+  private def getEventHubsConf: EventHubsConf = testUtils.getEventHubsConf()
 
-  private def getEventHubsConf: EventHubsConf = {
-    val positions: Map[PartitionId, EventPosition] = (for {
-      partitionId <- 0 until PartitionCount
-    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
+  private val eventHubsId = new AtomicInteger(0)
 
-    EventHubsConf(ConnectionString)
-      .setConsumerGroup("consumerGroup")
-      .setMaxRatePerPartition(MaxRate)
-      .setStartingPositions(positions)
+  def newEventHubs(): String = {
+    s"eh-${eventHubsId.getAndIncrement()}"
   }
 
   test("Send one event to one partition") {
-    EventHubsTestUtils.eventHubs.send(0, Seq(0))
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    eventHub.send(0, Seq(0))
 
-    val data = EventHubsTestUtils.eventHubs.getPartitions
+    val data = eventHub.getPartitions
 
     assert(data(0).getEvents.size == 1, "Partition 0 didn't have an event.")
 
@@ -71,13 +69,12 @@ class EventHubsTestUtilsSuite
   }
 
   test("Send 500 events to all partitions") {
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 until 500)
-    }
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 500)
 
-    val data = EventHubsTestUtils.eventHubs.getPartitions
+    val data = eventHub.getPartitions
 
-    for (i <- 0 until PartitionCount) {
+    for (i <- 0 until eventHub.partitionCount) {
       assert(data(i).getEvents.size === 500)
       for (j <- 0 to 499) {
         assert(data(i).get(j).getSystemProperties.getSequenceNumber == j,
@@ -87,12 +84,13 @@ class EventHubsTestUtilsSuite
   }
 
   test("All partitions have different data.") {
-    EventHubsTestUtils.eventHubs.send(0, Seq(1, 2, 3))
-    EventHubsTestUtils.eventHubs.send(1, Seq(4, 5, 6))
-    EventHubsTestUtils.eventHubs.send(2, Seq(7, 8, 9))
-    EventHubsTestUtils.eventHubs.send(3, Seq(10, 11, 12))
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    eventHub.send(0, Seq(1, 2, 3))
+    eventHub.send(1, Seq(4, 5, 6))
+    eventHub.send(2, Seq(7, 8, 9))
+    eventHub.send(3, Seq(10, 11, 12))
 
-    val data = EventHubsTestUtils.eventHubs.getPartitions
+    val data = eventHub.getPartitions
 
     assert(data(0).getEvents.map(_.getBytes.map(_.toChar).mkString.toInt) == Seq(1, 2, 3))
     assert(data(1).getEvents.map(_.getBytes.map(_.toChar).mkString.toInt) == Seq(4, 5, 6))
@@ -109,13 +107,12 @@ class EventHubsTestUtilsSuite
   }
 
   test("Test simulated receiver") {
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 until 500)
-    }
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 500)
 
-    val data = EventHubsTestUtils.eventHubs.getPartitions
+    val data = eventHub.getPartitions
 
-    for (i <- 0 until PartitionCount) {
+    for (i <- 0 until eventHub.partitionCount) {
       assert(data(i).getEvents.size === 500)
       for (j <- 0 to 499) {
         assert(data(i).get(j).getSystemProperties.getSequenceNumber == j,
@@ -123,7 +120,7 @@ class EventHubsTestUtilsSuite
       }
     }
 
-    val conf = getEventHubsConf
+    val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
     client.createReceiver(partitionId = "0", 20)
     val event = client.receive(1)
@@ -131,12 +128,14 @@ class EventHubsTestUtilsSuite
   }
 
   test("latestSeqNo") {
-    EventHubsTestUtils.eventHubs.send(0, Seq(1))
-    EventHubsTestUtils.eventHubs.send(1, Seq(2, 3))
-    EventHubsTestUtils.eventHubs.send(2, Seq(4, 5, 6))
-    EventHubsTestUtils.eventHubs.send(3, Seq(7))
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
 
-    val conf = getEventHubsConf
+    eventHub.send(0, Seq(1))
+    eventHub.send(1, Seq(2, 3))
+    eventHub.send(2, Seq(4, 5, 6))
+    eventHub.send(3, Seq(7))
+
+    val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
     assert(client.latestSeqNo(0) == 0)
     assert(client.latestSeqNo(1) == 1)
@@ -145,30 +144,34 @@ class EventHubsTestUtilsSuite
   }
 
   test("partitionSize") {
-    assert(EventHubsTestUtils.eventHubs.partitionSize(0) == 0)
-    assert(EventHubsTestUtils.eventHubs.partitionSize(1) == 0)
-    assert(EventHubsTestUtils.eventHubs.partitionSize(2) == 0)
-    assert(EventHubsTestUtils.eventHubs.partitionSize(3) == 0)
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
 
-    EventHubsTestUtils.eventHubs.send(0, Seq(1))
-    EventHubsTestUtils.eventHubs.send(1, Seq(2, 3))
-    EventHubsTestUtils.eventHubs.send(2, Seq(4, 5, 6))
-    EventHubsTestUtils.eventHubs.send(3, Seq(7))
+    assert(eventHub.partitionSize(0) == 0)
+    assert(eventHub.partitionSize(1) == 0)
+    assert(eventHub.partitionSize(2) == 0)
+    assert(eventHub.partitionSize(3) == 0)
 
-    assert(EventHubsTestUtils.eventHubs.partitionSize(0) == 1)
-    assert(EventHubsTestUtils.eventHubs.partitionSize(1) == 2)
-    assert(EventHubsTestUtils.eventHubs.partitionSize(2) == 3)
-    assert(EventHubsTestUtils.eventHubs.partitionSize(3) == 1)
+    eventHub.send(0, Seq(1))
+    eventHub.send(1, Seq(2, 3))
+    eventHub.send(2, Seq(4, 5, 6))
+    eventHub.send(3, Seq(7))
+
+    assert(eventHub.partitionSize(0) == 1)
+    assert(eventHub.partitionSize(1) == 2)
+    assert(eventHub.partitionSize(2) == 3)
+    assert(eventHub.partitionSize(3) == 1)
   }
 
   test("totalSize") {
-    assert(EventHubsTestUtils.eventHubs.totalSize == 0)
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
 
-    EventHubsTestUtils.eventHubs.send(0, Seq(1))
-    EventHubsTestUtils.eventHubs.send(1, Seq(2, 3))
-    EventHubsTestUtils.eventHubs.send(2, Seq(4, 5, 6))
-    EventHubsTestUtils.eventHubs.send(3, Seq(7))
+    assert(eventHub.totalSize == 0)
 
-    assert(EventHubsTestUtils.eventHubs.totalSize == 7)
+    eventHub.send(0, Seq(1))
+    eventHub.send(1, Seq(2, 3))
+    eventHub.send(2, Seq(4, 5, 6))
+    eventHub.send(3, Seq(7))
+
+    assert(eventHub.totalSize == 7)
   }
 }

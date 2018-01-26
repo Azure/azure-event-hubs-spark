@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.PartitionId
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, EventPosition, SimulatedClient }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
@@ -31,26 +30,24 @@ import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
-import org.scalatest.BeforeAndAfter
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
-abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext with BeforeAndAfter {
+abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
   protected var testUtils: EventHubsTestUtils = _
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
+  override def beforeAll: Unit = {
+    super.beforeAll
     testUtils = new EventHubsTestUtils
   }
 
-  before {
-    EventHubsTestUtils.setDefaults()
-    testUtils.createEventHubs()
-  }
-
-  after {
-    testUtils.destroyEventHubs()
+  override def afterAll(): Unit = {
+    if (testUtils != null) {
+      testUtils.destroyAllEventHubs()
+      testUtils = null
+    }
+    super.afterAll()
   }
 
   override val streamingTimeout = 30.seconds
@@ -87,7 +84,7 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext with
       }
 
       val ehSource = sources.head
-      testUtils.send(data)
+      testUtils.send(conf.name, data)
 
       val seqNos = testUtils.getLatestSeqNos(conf) mapValues { seqNo =>
         seqNo
@@ -114,31 +111,15 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     s"eh-${eventHubsId.getAndIncrement()}"
   }
 
-  private def getEventHubsConf: EventHubsConf = {
-    val positions: Map[PartitionId, EventPosition] = (for {
-      partitionId <- 0 until PartitionCount
-    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
-
-    EventHubsConf(ConnectionString)
-      .setConsumerGroup("consumerGroup")
-      .setStartingPositions(positions)
-      .setUseSimulatedClient(true)
-  }
-
-  // Put 'count' events in every simulated EventHubs partition
-  private def populateUniformly(count: Int): Unit = {
-    for (i <- 0 until PartitionCount) {
-      EventHubsTestUtils.eventHubs.send(i, 0 to count)
-    }
-  }
+  private def getEventHubsConf(ehName: String): EventHubsConf = testUtils.getEventHubsConf(ehName)
 
   testWithUninterruptibleThread("deserialization of initial offset with Spark 2.1.0") {
-    populateUniformly(5000)
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 5000)
+
     withTempDir { metadataPath =>
       val parameters =
-        getEventHubsConf
-          .setName(newEventHubs())
-          .toMap
+        getEventHubsConf(eventHub.name).toMap
 
       val source = new EventHubsSource(sqlContext,
                                        parameters,
@@ -162,7 +143,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   testWithUninterruptibleThread("deserialization of initial offset written by future version") {
-    populateUniformly(5000)
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 5000)
+
     withTempDir { metadataPath =>
       val futureMetadataLog =
         new HDFSMetadataLog[EventHubsSourceOffset](sqlContext.sparkSession,
@@ -176,9 +159,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
         }
 
       val eh = newEventHubs()
-      val parameters = getEventHubsConf
-        .setName(eh)
-        .toMap
+      val parameters = getEventHubsConf(eh).toMap
 
       val offset = EventHubsSourceOffset((eh, 0, 0L), (eh, 1, 0L), (eh, 2, 0L))
       futureMetadataLog.add(0, offset)
@@ -203,10 +184,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("(de)serialization of initial offsets") {
-    populateUniformly(5000)
-    val eh = newEventHubs()
-    val parameters =
-      getEventHubsConf.setName(eh).toMap
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 5000)
+
+    val parameters = getEventHubsConf(eventHub.name).toMap
 
     val reader = spark.readStream
       .format("eventhubs")
@@ -216,11 +197,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("maxSeqNosPerTrigger") {
-    populateUniformly(5000)
-    val eh = newEventHubs()
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 5000)
+
     val parameters =
-      getEventHubsConf
-        .setName(eh)
+      getEventHubsConf(eventHub.name)
         .setMaxSeqNosPerTrigger(4)
         .toMap
 
@@ -271,15 +252,16 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("maxOffsetsPerTrigger with non-uniform partitions") {
-    testUtils.send(0, 100 to 200: _*)
-    testUtils.send(1, 10 to 20: _*)
-    testUtils.send(2, 1)
+    val name = newEventHubs()
+    val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)
+
+    testUtils.send(name, 0, 100 to 200)
+    testUtils.send(name, 1, 10 to 20)
+    testUtils.send(name, 2, Seq(1))
     // partition 3 of 3 remains empty.
 
-    val eh = newEventHubs()
     val parameters =
-      getEventHubsConf
-        .setName(eh)
+      getEventHubsConf(name)
         .setMaxSeqNosPerTrigger(10)
         .toMap
 
@@ -334,12 +316,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   test("cannot stop EventHubs stream") {
-    populateUniformly(5000)
     val eh = newEventHubs()
-    val parameters =
-      getEventHubsConf
-        .setName(eh)
-        .toMap
+    val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
+    testUtils.populateUniformly(eh, 5000)
+
+    val parameters = getEventHubsConf(eh).toMap
 
     val reader = spark.readStream
       .format("eventhubs")
@@ -376,10 +357,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   private def testFromLatestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
+    val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
+    testUtils.send(eh, 0, Seq(-1))
 
-    EventHubsTestUtils.eventHubs.send(0, Seq(-1))
-
-    require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
+    require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
     // In practice, we would use Position.fromEndOfStream which would
     // translate to the configuration below.
@@ -390,8 +371,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       3 -> EventPosition.fromSequenceNumber(0, isInclusive = true)
     )
 
-    val conf = getEventHubsConf
-      .setName(eh)
+    val conf = getEventHubsConf(eh)
       .setStartingPositions(positions)
       .setFailOnDataLoss(failOnDataLoss)
 
@@ -425,12 +405,12 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   private def testFromEarliestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
+    val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
 
-    require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
-    testUtils.send(1 to 3) // round robin events across partitions
+    require(testUtils.getEventHubs(eh).getPartitions.size === 4)
+    testUtils.send(eh, 1 to 3) // round robin events across partitions
 
-    val conf = getEventHubsConf
-      .setName(eh)
+    val conf = getEventHubsConf(eh)
       .setFailOnDataLoss(failOnDataLoss)
 
     val reader = spark.readStream
@@ -464,11 +444,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       eh: String,
       failOnDataLoss: Boolean
   ): Unit = {
+    val eventHub = testUtils.createEventHubs(eh, partitionCount = 5)
 
-    testUtils.destroyEventHubs()
-    PartitionCount = 5
-    testUtils.createEventHubs()
-    require(EventHubsTestUtils.eventHubs.getPartitions.size === 5)
+    require(testUtils.getEventHubs(eh).getPartitions.size === 5)
 
     val positions = Map(
       0 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
@@ -478,21 +456,20 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       4 -> EventPosition.fromSequenceNumber(2L, isInclusive = true)
     )
 
-    val conf = getEventHubsConf
-      .setName(eh)
+    val conf = getEventHubsConf(eh)
       .setStartingPositions(positions)
       .setFailOnDataLoss(failOnDataLoss)
 
     // partition 0 starts at the earliest sequence numbers, these should all be seen
-    testUtils.send(0, -20, -21, -22)
+    testUtils.send(eh, 0, Seq(-20, -21, -22))
     // partition 1 starts at the latest sequence numbers, these should all be skipped
-    testUtils.send(1, -10, -11, -12)
+    testUtils.send(eh, 1, Seq(-10, -11, -12))
     // partition 2 starts at 0, these should all be seen
-    testUtils.send(2, 0, 1, 2)
+    testUtils.send(eh, 2, Seq(0, 1, 20))
     // partition 3 starts at 1, first should be skipped
-    testUtils.send(3, 10, 11, 12)
+    testUtils.send(eh, 3, Seq(10, 11, 12))
     // partition 4 starts at 2, first and second should be skipped
-    testUtils.send(4, 20, 21, 22)
+    testUtils.send(eh, 4, Seq(20, 21, 22))
 
     val reader = spark.readStream
       .format("eventhubs")
@@ -519,8 +496,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   test("input row metrics") {
     val eh = newEventHubs()
-    testUtils.send(Seq(-1))
-    require(EventHubsTestUtils.eventHubs.getPartitions.size === 4)
+    val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
+
+    testUtils.send(eh, Seq(-1))
+    require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
     val positions = Map(
       0 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
@@ -529,8 +508,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
     )
 
-    val conf = getEventHubsConf
-      .setName(eh)
+    val conf = getEventHubsConf(eh)
       .setStartingPositions(positions)
 
     val eventhubs = spark.readStream
@@ -557,16 +535,13 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   test("EventHubs column types") {
     val now = System.currentTimeMillis()
     val eh = newEventHubs()
+    val eventHub = testUtils.createEventHubs(eh, partitionCount = 1)
 
-    val conf = getEventHubsConf
-      .setName(eh)
+    val conf = getEventHubsConf(eh)
 
-    testUtils.destroyEventHubs()
-    PartitionCount = 1
-    testUtils.createEventHubs()
-    require(EventHubsTestUtils.eventHubs.getPartitions.size === 1)
+    require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 
-    testUtils.send(Seq(1))
+    testUtils.send(eh, Seq(1))
 
     val eventhubs = spark.readStream
       .format("eventhubs")
@@ -598,16 +573,13 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   test("EventHubsSource with watermark") {
     val now = System.currentTimeMillis()
     val eh = newEventHubs()
+    val eventHub = testUtils.createEventHubs(eh, partitionCount = 1)
 
-    val conf = getEventHubsConf
-      .setName(eh)
+    val conf = getEventHubsConf(eh)
 
-    testUtils.destroyEventHubs()
-    PartitionCount = 1
-    testUtils.createEventHubs()
-    require(EventHubsTestUtils.eventHubs.getPartitions.size === 1)
+    require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 
-    testUtils.send(Seq(1))
+    testUtils.send(eh, Seq(1))
 
     val eventhubs = spark.readStream
       .format("eventhubs")

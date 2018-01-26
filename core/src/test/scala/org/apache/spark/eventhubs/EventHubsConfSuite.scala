@@ -49,9 +49,4 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val ehConf = testUtils.getEventHubsConf().set("some key", "some value")
     assert(ehConf("some key") == "some value")
   }
-
-  // TODO revist isValid
-  ignore("isValid doesn't return true until all required data is provided") {
-    val ehConf = testUtils.getEventHubsConf()
-  }
 }

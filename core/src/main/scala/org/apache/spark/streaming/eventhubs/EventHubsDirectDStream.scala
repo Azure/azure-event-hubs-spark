@@ -31,8 +31,6 @@ import org.apache.spark.streaming.dstream.{ DStreamCheckpointData, InputDStream 
 import org.apache.spark.streaming.scheduler.{ RateController, StreamInputInfo }
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
 
-// TODO do we check for checkpoint data on startup? So far we're only checking in restore (line 140)
-
 /**
  * A DStream where each EventHubs partition corresponds to an RDD partition.
  *

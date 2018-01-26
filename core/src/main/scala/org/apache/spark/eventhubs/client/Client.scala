@@ -24,34 +24,39 @@ import org.apache.spark.eventhubs._
 private[spark] trait Client extends Serializable {
 
   /**
-   * Creates a receiver.
+   * Creates an EventHub receiver.
+   *
+   * @param partitionId the partitionId the receiver will consume from.
+   * @param startingSeqNo the sequence number the receiver will start from.
    */
-  private[spark] def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit
+  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit
 
   /**
    * Receive events from your EventHubs instance.
+   *
+   * @param eventCount the number of events that will be requested from the EventHub partition.
    */
-  private[spark] def receive(eventCount: Int): java.lang.Iterable[EventData]
+  def receive(eventCount: Int): java.lang.Iterable[EventData]
 
   /**
    * When a connection with the service is established, the client will begin to prefetch EventData.
-   * This number specifies the number of events that we will prefetch.
+   * This number specifies the max number of events that will prefetched.
    */
-  private[spark] def setPrefetchCount(count: Int): Unit
+  def setPrefetchCount(count: Int): Unit
 
   /**
    * Provides the earliest (lowest) sequence number that exists in the EventHubs instance
    * for the given partition.
    *
-   * @return a map from eventhubName-partition to seq
+   * @return the earliest sequence number for the specified partition
    */
   def earliestSeqNo(partitionId: PartitionId): SequenceNumber
 
   /**
-   * Provides the last (highest) sequence number and offset that exists in the EventHubs
+   * Provides the latest (highest) sequence number that exists in the EventHubs
    * instance for the given partition.
    *
-   * @return a map from eventhubName-partition to (offset, seq)
+   * @return the leatest sequence number for the specified partition
    */
   def latestSeqNo(partitionId: PartitionId): SequenceNumber
 

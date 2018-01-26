@@ -229,19 +229,18 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   private var currentSeqNo: SequenceNumber = _
   private val eventHub = eventHubs(ehConf.name)
 
-  override private[spark] def createReceiver(partitionId: String,
-                                             startingSeqNo: SequenceNumber): Unit = {
+  override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
     self.partitionId = partitionId.toInt
     self.currentSeqNo = startingSeqNo
   }
 
-  override private[spark] def receive(eventCount: Int): java.lang.Iterable[EventData] = {
+  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
     val events = eventHub.receive(eventCount, self.partitionId, currentSeqNo)
     currentSeqNo += eventCount
     events
   }
 
-  override private[spark] def setPrefetchCount(count: Int): Unit = {
+  override def setPrefetchCount(count: Int): Unit = {
     // not prefetching anything in tests
   }
 

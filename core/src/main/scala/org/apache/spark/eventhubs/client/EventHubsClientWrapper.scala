@@ -66,11 +66,11 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     }
   }
 
-  override private[spark] def setPrefetchCount(count: Int): Unit = {
+  override def setPrefetchCount(count: Int): Unit = {
     receiver.setPrefetchCount(count)
   }
 
-  override private[spark] def receive(eventCount: Int): java.lang.Iterable[EventData] = {
+  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
     require(receiver != null, "receive: PartitionReceiver has not been created.")
     receiver.receive(eventCount).get
   }

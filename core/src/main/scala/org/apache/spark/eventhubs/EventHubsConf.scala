@@ -29,29 +29,6 @@ import org.json4s.jackson.Serialization
 import scala.collection.JavaConverters._
 import scala.language.implicitConversions
 
-/*
-TODO:
-Need to change:
-- Expose connection string builder.
-- Construct EventHubsConf with a connection string. Be sure to parse the event hub name and namespace out if it b/c it's used for logging purposes.
-- Remove name, namespace, key, key name APIs
-
----
-
-- We should have a setStartingPositions API
-  - setStartingPositions(EventPosition)
-  - setStartingPositions(Map[PartitionId -> EventPosition])
-    - serialize this and put it in the map.
-    - Should we expose NameAndPartition?
-- Remove all sequence number, offset, and enqueued time APIs.
-
-
- */
-
-// TODO: Can we catch malformed configs at compile-time?
-// TODO: What if users are starting from a checkpoint? Currently it's mandated they specify some starting point
-// ^^ I suspect we'll check if a checkpoint dir has been set within the dstream and source.
-//    if that's the case, then maybe we shouldn't mandate users provide a starting point.
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *

@@ -253,12 +253,11 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     eventHub.latestSeqNo(partitionId)
   }
 
-  // TODO: implement simulated methods used in translate, and then remove this method.
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
     val positions = ehConf.startingPositions.getOrElse(Map.empty)
     require(positions.size == partitionCount)
-    require(positions.forall(x => x._2.getFilterType == FilterType.SequenceNumber))
+    require(positions.forall(x => x._2.isSeqNo))
 
     positions.mapValues(_.seqNo).mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }

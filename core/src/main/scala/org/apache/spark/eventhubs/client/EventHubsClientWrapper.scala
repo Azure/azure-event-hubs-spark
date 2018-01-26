@@ -21,12 +21,17 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.utils.ConnectionStringBuilder
+import org.apache.spark.eventhubs.utils.{
+  ConnectionStringBuilder,
+  EventPosition => utilEventPosition
+}
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
+import scala.collection.parallel.immutable.ParVector
+import scala.collection.parallel.mutable.ParSeq
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -133,24 +138,31 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
 
-    // TODO (if positions has a sequence number) OR (if positions is empty AND defaultPos has a sequence number) then we don't need to make an API call
-    // TODO is the first event guarunteed to have sequence number 0?
-    val defaultPos: EventPosition = ehConf.startingPosition.getOrElse(DefaultEventPosition).convert
-    val positions: Map[PartitionId, EventPosition] =
-      ehConf.startingPositions.getOrElse(Map.empty).mapValues(_.convert)
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
+    val needsTranslation = ParVector[Int]()
 
-    val threads = for (partitionId <- 0 until partitionCount)
+    val positions: Map[PartitionId, utilEventPosition] =
+      ehConf.startingPositions.getOrElse(Map.empty)
+    val defaultPos = ehConf.startingPosition.getOrElse(DefaultEventPosition)
+
+    (0 until partitionCount).par.foreach { id =>
+      val position = positions.getOrElse(id, defaultPos)
+      if (position.isSeqNo) {
+        result.put(id, position.seqNo)
+      } else {
+        needsTranslation :+ id
+      }
+    }
+
+    val threads = for (partitionId <- needsTranslation)
       yield
         new Thread {
           override def run(): Unit = {
-            // Pattern  match is to create the correct receiver based on what we're startingWith.
-            val receiver =
-              client
-                .createReceiver(DefaultConsumerGroup,
-                                partitionId.toString,
-                                positions.getOrElse(partitionId, defaultPos))
-                .get
+            val receiver = client
+              .createReceiver(DefaultConsumerGroup,
+                              partitionId.toString,
+                              positions.getOrElse(partitionId, defaultPos).convert)
+              .get
             receiver.setPrefetchCount(PrefetchCountMinimum)
             val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
             receiver.close().get()

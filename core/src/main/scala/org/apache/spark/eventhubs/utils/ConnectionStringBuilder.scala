@@ -371,8 +371,8 @@ class ConnectionStringBuilder private () {
     }
   }
 
-  private class IllegalConnectionStringFormatException(private val msg: String = "",
-                                                       private val cause: Throwable = None.orNull)
+  class IllegalConnectionStringFormatException(private val msg: String = "",
+                                               private val cause: Throwable = None.orNull)
       extends IllegalArgumentException(msg, cause)
 
 }

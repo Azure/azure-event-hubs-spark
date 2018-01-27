@@ -40,11 +40,11 @@ import scala.language.implicitConversions
  * particular enqueue times. If none of those are provided, we will start from the beginning of your stream.
  * If more than one of those are provided, you will get a runtime error.
  *
- * @param connectionString a valid connection string which will be used to connect to
+ * @param connectionStr a valid connection string which will be used to connect to
  *                         an EventHubs instance. A connection string can be obtained from
  *                         the Azure portal or by using [[ConnectionStringBuilder]].
  */
-final class EventHubsConf private (val connectionString: String)
+final class EventHubsConf private (private val connectionStr: String)
     extends Serializable
     with Logging
     with Cloneable { self =>
@@ -54,7 +54,7 @@ final class EventHubsConf private (val connectionString: String)
   private implicit val formats = Serialization.formats(NoTypeHints)
 
   private val settings = new ConcurrentHashMap[String, String]()
-  this.setConnectionString(connectionString)
+  this.setConnectionString(connectionStr)
 
   private[eventhubs] def set[T](key: String, value: T): EventHubsConf = {
     if (key == null) {
@@ -101,6 +101,19 @@ final class EventHubsConf private (val connectionString: String)
   }
 
   /**
+   * Indicates if some EventHubsConf is equal to this one.
+   * @param obj the object being compared
+   * @return true if they are equal; otherwise, return false
+   */
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case that: EventHubsConf => self.settings.equals(that.settings)
+      case _                   => false
+    }
+
+  }
+
+  /**
    * Sets the connection string which will be used to connect to
    * an EventHubs instance. Connection strings can be obtained from
    * the Azure portal or using the [[ConnectionStringBuilder]].
@@ -110,6 +123,11 @@ final class EventHubsConf private (val connectionString: String)
    */
   def setConnectionString(connectionString: String): EventHubsConf = {
     set(ConnectionStringKey, connectionString)
+  }
+
+  /** The currently set connection string */
+  def connectionString: String = {
+    self.get(ConnectionStringKey).get
   }
 
   /**

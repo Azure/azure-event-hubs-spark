@@ -27,7 +27,6 @@ import org.apache.qpid.proton.message.Message.Factory
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs._
-import org.apache.spark.eventhubs.utils.EventPosition.FilterType
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -73,7 +72,7 @@ private[spark] class EventHubsTestUtils {
   }
 
   def createEventHubs(ehName: String, partitionCount: Int): SimulatedEventHubs = {
-    EventHubsTestUtils.eventHubs.put("ehName", new SimulatedEventHubs(ehName, partitionCount))
+    EventHubsTestUtils.eventHubs.put(ehName, new SimulatedEventHubs(ehName, partitionCount))
     eventHubs(ehName)
   }
 
@@ -254,12 +253,21 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
 
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
-    val positions = ehConf.startingPositions.getOrElse(Map.empty)
-    require(positions.size == partitionCount)
-    require(positions.forall(x => x._2.isSeqNo))
 
-    positions.mapValues(_.seqNo).mapValues { seqNo =>
-      { if (seqNo == -1L) 0L else seqNo }
+    val positions = ehConf.startingPositions.getOrElse(Map.empty)
+
+    if (positions.isEmpty) {
+      val position = ehConf.startingPosition.get
+      require(position.seqNo >= 0L)
+
+      (for { id <- 0 until partitionCount } yield id -> position.seqNo).toMap
+    } else {
+      require(positions.forall(x => x._2.seqNo >= 0L))
+      require(positions.size == partitionCount)
+
+      positions.mapValues(_.seqNo).mapValues { seqNo =>
+        { if (seqNo == -1L) 0L else seqNo }
+      }
     }
   }
 

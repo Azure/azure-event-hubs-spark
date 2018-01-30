@@ -35,38 +35,38 @@ class ConnectionStringBuilderSuite extends FunSuite {
 
   test("parse invalid connection string") {
     intercept[Exception] {
-      new ConnectionStringBuilder("something")
+      ConnectionStringBuilder("something")
     }
   }
 
   test("throw on unrecognized parts") {
     intercept[Exception] {
-      new ConnectionStringBuilder(correctConnectionString + ";" + "something")
+      ConnectionStringBuilder(correctConnectionString + ";" + "something")
     }
   }
 
   test("parse valid connection string") {
-    val connStrBuilder = new ConnectionStringBuilder(correctConnectionString)
+    val connStrBuilder = ConnectionStringBuilder(correctConnectionString)
     validateConnStrBuilder(connStrBuilder)
   }
 
   test("exchange connection string across constructors") {
-    val connStrBuilder = new ConnectionStringBuilder(correctConnectionString)
-    val secondConnStr = new ConnectionStringBuilder()
+    val connStrBuilder = ConnectionStringBuilder(correctConnectionString)
+    val secondConnStr = ConnectionStringBuilder()
       .setEndpoint(connStrBuilder.getEndpoint)
       .setEventHubName(connStrBuilder.getEventHubName)
       .setSasKeyName(connStrBuilder.getSasKeyName)
       .setSasKey(connStrBuilder.getSasKey)
     secondConnStr.setOperationTimeout(connStrBuilder.getOperationTimeout)
-    validateConnStrBuilder(new ConnectionStringBuilder(secondConnStr.toString))
+    validateConnStrBuilder(ConnectionStringBuilder(secondConnStr.toString))
   }
 
   test("property setters") {
-    val connStrBuilder = new ConnectionStringBuilder(correctConnectionString)
-    val testConnStrBuilder = new ConnectionStringBuilder(connStrBuilder.toString)
+    val connStrBuilder = ConnectionStringBuilder(correctConnectionString)
+    val testConnStrBuilder = ConnectionStringBuilder(connStrBuilder.toString)
     validateConnStrBuilder(testConnStrBuilder)
     connStrBuilder.setOperationTimeout(Duration.ofSeconds(8))
-    val testConnStrBuilder1 = new ConnectionStringBuilder(connStrBuilder.toString)
+    val testConnStrBuilder1 = ConnectionStringBuilder(connStrBuilder.toString)
     assert(testConnStrBuilder1.getOperationTimeout.getSeconds == 8)
   }
 }

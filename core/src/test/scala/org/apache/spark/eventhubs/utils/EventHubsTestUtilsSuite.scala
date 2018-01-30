@@ -100,6 +100,7 @@ class EventHubsTestUtilsSuite
 
   test("translate") {
     val conf = getEventHubsConf
+    testUtils.createEventHubs(conf.name, DefaultPartitionCount)
     val client = SimulatedClient(conf)
     assert(
       client.translate(conf, client.partitionCount) === conf.startingPositions.get
@@ -137,10 +138,10 @@ class EventHubsTestUtilsSuite
 
     val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
-    assert(client.latestSeqNo(0) == 0)
-    assert(client.latestSeqNo(1) == 1)
-    assert(client.latestSeqNo(2) == 2)
-    assert(client.latestSeqNo(3) == 0)
+    assert(client.latestSeqNo(0) == 1)
+    assert(client.latestSeqNo(1) == 2)
+    assert(client.latestSeqNo(2) == 3)
+    assert(client.latestSeqNo(3) == 1)
   }
 
   test("partitionSize") {

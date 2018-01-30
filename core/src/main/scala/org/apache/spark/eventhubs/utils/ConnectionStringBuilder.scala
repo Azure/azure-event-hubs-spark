@@ -291,7 +291,12 @@ class ConnectionStringBuilder private () {
       throw new IllegalConnectionStringFormatException("connectionString cannot be empty")
     }
 
-    val connection = KeyValuePairDelimiter + connectionString
+    val connection = if (connectionString takeRight 1 equals ";") {
+      KeyValuePairDelimiter + connectionString dropRight 1
+    } else {
+      KeyValuePairDelimiter + connectionString
+    }
+
     val keyValuePattern = Pattern.compile(KeysWithDelimitersRegex, Pattern.CASE_INSENSITIVE)
     val values = keyValuePattern.split(connection)
     val keys = keyValuePattern.matcher(connection)

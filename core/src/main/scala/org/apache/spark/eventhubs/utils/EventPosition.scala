@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubs.utils
 
 import java.time.Instant
+import java.util.Date
 
 import com.microsoft.azure.eventhubs.{ EventPosition => ehep }
 import org.apache.spark.eventhubs.EventHubsConf
@@ -29,56 +30,39 @@ import org.apache.spark.eventhubs.SequenceNumber
  *
  * This event is passed to the EventHubsConf to define a starting point for your Spark job.
  */
-class EventPosition extends Serializable {
-
-  import EventPosition._
-  import FilterType.FilterType
-
-  private def this(o: String, i: Boolean) {
-    this
-    offset = o
-    isInclusive = i
-    filterType = FilterType.Offset
-  }
-
-  private def this(s: SequenceNumber, i: Boolean) {
-    this
-    seqNo = s
-    isInclusive = i
-    filterType = FilterType.SequenceNumber
-  }
-
-  private def this(e: Instant) {
-    this
-    enqueuedTime = e
-    filterType = FilterType.EnqueuedTime
-  }
-
-  private var filterType: FilterType = _
-  private var offset: String = _
-  private[eventhubs] var seqNo: SequenceNumber = _
-  private var enqueuedTime: Instant = _
-  private var isInclusive: Boolean = _
+case class EventPosition private (offset: String = null,
+                                  seqNo: Long = -1L,
+                                  enqueuedTime: Date = null,
+                                  isInclusive: Boolean = false)
+    extends Serializable {
 
   private[eventhubs] def convert: ehep = {
-    filterType match {
-      case FilterType.Offset         => ehep.fromOffset(offset, isInclusive)
-      case FilterType.SequenceNumber => ehep.fromSequenceNumber(seqNo, isInclusive)
-      case FilterType.EnqueuedTime   => ehep.fromEnqueuedTime(enqueuedTime)
+    if (offset != null) {
+      ehep.fromOffset(offset, isInclusive)
+    } else if (seqNo < 0L) {
+      ehep.fromSequenceNumber(seqNo, isInclusive)
+    } else if (enqueuedTime != null) {
+      ehep.fromEnqueuedTime(enqueuedTime.toInstant)
+    } else {
+      throw new IllegalStateException("No position has been set.")
     }
   }
 
-  private[eventhubs] def isSeqNo: Boolean = filterType == FilterType.SequenceNumber
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case that: EventPosition =>
+        this.offset == that.offset &&
+          this.seqNo == that.seqNo &&
+          this.enqueuedTime == that.enqueuedTime &&
+          this.isInclusive == that.isInclusive
+      case _ => false
+    }
+  }
 }
 
 object EventPosition {
   private val StartOfStream: String = "-1"
   private val EndOfStream: String = "@latest"
-
-  object FilterType extends Enumeration {
-    type FilterType = Value
-    val Offset, SequenceNumber, EnqueuedTime = Value
-  }
 
   /**
    * Creates a position at the given offset. By default, the specified event is not included.
@@ -89,7 +73,7 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromOffset(offset: String, isInclusive: Boolean = false): EventPosition = {
-    new EventPosition(offset, isInclusive)
+    EventPosition(offset = offset, isInclusive = isInclusive)
   }
 
   /**
@@ -101,7 +85,8 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromSequenceNumber(seqNo: SequenceNumber, isInclusive: Boolean = false): EventPosition = {
-    new EventPosition(seqNo, isInclusive)
+    require(seqNo >= 0L, "Please pass a positive sequence number.")
+    EventPosition(seqNo = seqNo, isInclusive = isInclusive)
   }
 
   /**
@@ -111,7 +96,7 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromEnqueuedTime(enqueuedTime: Instant): EventPosition = {
-    new EventPosition(enqueuedTime)
+    EventPosition(enqueuedTime = Date.from(enqueuedTime))
   }
 
   /**
@@ -121,7 +106,7 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromStartOfStream(): EventPosition = {
-    new EventPosition(StartOfStream, true)
+    EventPosition.fromOffset(StartOfStream, isInclusive = true)
   }
 
   /**
@@ -131,6 +116,6 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromEndOfStream(): EventPosition = {
-    new EventPosition(EndOfStream, false)
+    EventPosition.fromOffset(EndOfStream)
   }
 }

@@ -51,8 +51,6 @@ final class EventHubsConf private (private val connectionStr: String)
 
   import EventHubsConf._
 
-  private implicit val formats = Serialization.formats(NoTypeHints)
-
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionStr)
 
@@ -175,7 +173,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * @see [[EventPosition]]
    */
   def setStartingPosition(eventPosition: EventPosition): EventHubsConf = {
-    set(StartingPositionKey, Serialization.write(eventPosition))
+    set(StartingPositionKey, EventHubsConf.write(eventPosition))
   }
 
   /**
@@ -183,7 +181,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * @see [[EventPosition]]
    */
   def startingPosition: Option[EventPosition] = {
-    self.get(StartingPositionKey) map Serialization.read[EventPosition]
+    self.get(StartingPositionKey) map EventHubsConf.read[EventPosition]
   }
 
   /**
@@ -197,7 +195,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * @see [[EventPosition]]
    */
   def setStartingPositions(eventPositions: Map[PartitionId, EventPosition]): EventHubsConf = {
-    set(StartingPositionsKey, Serialization.write(eventPositions))
+    set(StartingPositionsKey, EventHubsConf.write(eventPositions))
   }
 
   /**
@@ -205,7 +203,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * @see [[EventPosition]]
    */
   def startingPositions: Option[Map[PartitionId, EventPosition]] = {
-    self.get(StartingPositionsKey) map Serialization.read[Map[PartitionId, EventPosition]]
+    self.get(StartingPositionsKey) map EventHubsConf.read[Map[PartitionId, EventPosition]]
   }
 
   /**
@@ -243,12 +241,12 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return
    */
   def setMaxRatesPerPartition(rates: Map[PartitionId, Rate]): EventHubsConf = {
-    set(MaxRatesPerPartitionKey, Serialization.write(rates))
+    set(MaxRatesPerPartitionKey, EventHubsConf.write(rates))
   }
 
   /** A map of partition/max rate pairs that have been set by the user.  */
   def maxRatesPerPartition: Option[Map[PartitionId, Rate]] = {
-    self.get(MaxRatesPerPartitionKey) map Serialization.read[Map[PartitionId, Rate]]
+    self.get(MaxRatesPerPartitionKey) map EventHubsConf.read[Map[PartitionId, Rate]]
   }
 
   /**
@@ -313,6 +311,16 @@ final class EventHubsConf private (private val connectionStr: String)
 }
 
 object EventHubsConf extends Logging {
+
+  private implicit val formats = Serialization.formats(NoTypeHints)
+
+  private def read[T: Manifest](json: String): T = {
+    Serialization.read[T](json)
+  }
+
+  private def write[T <: AnyRef](value: T): String = {
+    Serialization.write[T](value)
+  }
 
   // Option key values
   val ConnectionStringKey = "eventhubs.connectionString"

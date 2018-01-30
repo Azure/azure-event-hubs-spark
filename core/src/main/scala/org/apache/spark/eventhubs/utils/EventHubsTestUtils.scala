@@ -100,6 +100,7 @@ private[spark] class EventHubsTestUtils {
       .setConsumerGroup("consumerGroup")
       .setStartingPositions(positions)
       .setMaxRatePerPartition(DefaultMaxRate)
+      .setUseSimulatedClient(true)
   }
 
   // Put 'count' events in every simulated EventHubs partition

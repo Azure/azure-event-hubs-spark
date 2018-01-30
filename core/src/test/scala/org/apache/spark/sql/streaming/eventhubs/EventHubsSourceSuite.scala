@@ -444,7 +444,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       eh: String,
       failOnDataLoss: Boolean
   ): Unit = {
-    val eventHub = testUtils.createEventHubs(eh, partitionCount = 5)
+    testUtils.createEventHubs(eh, partitionCount = 5)
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 5)
 
@@ -484,10 +484,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     testStream(mapped)(
       makeSureGetOffsetCalled,
-      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22),
+      CheckAnswer(-20, -21, -22, 0, 1, 20, 11, 12, 22),
       StopStream,
       StartStream(),
-      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22), // Should get the data back on recovery
+      CheckAnswer(-20, -21, -22, 0, 1, 20, 11, 12, 22), // Should get the data back on recovery
       AddEventHubsData(conf, 30, 31, 32, 33, 34),
       CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22, 30, 31, 32, 33, 34),
       StopStream
@@ -535,9 +535,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   test("EventHubs column types") {
     val now = System.currentTimeMillis()
     val eh = newEventHubs()
-    val eventHub = testUtils.createEventHubs(eh, partitionCount = 1)
+    testUtils.createEventHubs(eh, partitionCount = 1)
 
     val conf = getEventHubsConf(eh)
+      .setStartingPositions(Map.empty)
+      .setStartingPosition(EventPosition.fromSequenceNumber(0L, isInclusive = true))
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 
@@ -573,9 +575,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   test("EventHubsSource with watermark") {
     val now = System.currentTimeMillis()
     val eh = newEventHubs()
-    val eventHub = testUtils.createEventHubs(eh, partitionCount = 1)
+    testUtils.createEventHubs(eh, partitionCount = 1)
 
     val conf = getEventHubsConf(eh)
+      .setStartingPositions(Map.empty)
+      .setStartingPosition(EventPosition.fromSequenceNumber(0L, isInclusive = true))
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 

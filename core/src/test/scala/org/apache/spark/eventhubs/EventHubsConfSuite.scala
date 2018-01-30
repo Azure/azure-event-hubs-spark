@@ -24,6 +24,8 @@ import org.apache.spark.eventhubs.utils.{
 }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
+import org.json4s.jackson.Serialization.{ read => sread }
+import org.json4s.jackson.Serialization.{ write => swrite }
 import org.scalatest.{ BeforeAndAfterAll, FunSuite }
 
 /**
@@ -132,7 +134,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val conf = testUtils.getEventHubsConf()
     val cloned = conf.clone
     assert(conf.equals(cloned))
-    assert(conf != cloned)
+    assert(conf ne cloned)
   }
 
   test("name") {
@@ -148,5 +150,54 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     conf.setName("bar")
     assert(conf.connectionString == expected)
+  }
+
+  test("EventPosition serialization") {
+    implicit val formats = Serialization.formats(NoTypeHints)
+
+    val expected = EventPosition.fromSequenceNumber(10L, isInclusive = true)
+    val actual = sread[EventPosition](swrite[EventPosition](expected))
+    assert(actual.equals(expected))
+  }
+
+  test("EventPosition is serialized correctly in EventHubsConf") {
+    implicit val formats = Serialization.formats(NoTypeHints)
+
+    val expected = EventPosition.fromSequenceNumber(10L, isInclusive = true)
+    val conf = testUtils.getEventHubsConf().setStartingPosition(expected)
+    val actual = conf.startingPosition.get
+    assert(actual.equals(expected))
+  }
+
+  test("Map of EventPositions can be serialized") {
+    implicit val formats = Serialization.formats(NoTypeHints)
+
+    val expected = Map(
+      0 -> EventPosition.fromSequenceNumber(3L, isInclusive = true),
+      1 -> EventPosition.fromSequenceNumber(2L, isInclusive = true),
+      2 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
+      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+    )
+
+    val ser = swrite[Map[PartitionId, EventPosition]](expected)
+    val actual = sread[Map[PartitionId, EventPosition]](ser)
+
+    assert(actual.equals(expected))
+  }
+
+  test("EventPosition Map is serialized in EventHubsConf") {
+    implicit val formats = Serialization.formats(NoTypeHints)
+
+    val expected = Map(
+      0 -> EventPosition.fromSequenceNumber(3L, isInclusive = true),
+      1 -> EventPosition.fromSequenceNumber(2L, isInclusive = true),
+      2 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
+      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+    )
+
+    val conf = testUtils.getEventHubsConf().setStartingPositions(expected)
+    val actual = conf.startingPositions.get
+
+    assert(actual.equals(expected))
   }
 }

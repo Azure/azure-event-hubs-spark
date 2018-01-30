@@ -53,7 +53,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     EventHubClient.createFromConnectionStringSync(connectionString.toString, new StandardExecutor)
 
   private var receiver: PartitionReceiver = _
-  private[spark] def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
+  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
     if (receiver == null) {
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
@@ -146,7 +146,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
 
     (0 until partitionCount).par.foreach { id =>
       val position = positions.getOrElse(id, defaultPos)
-      if (position.isSeqNo) {
+      if (position.seqNo >= 0L) {
         result.put(id, position.seqNo)
       } else {
         needsTranslation :+ id

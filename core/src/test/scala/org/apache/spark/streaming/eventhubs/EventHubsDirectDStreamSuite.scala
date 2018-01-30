@@ -152,20 +152,16 @@ class EventHubsDirectDStreamSuite
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
     testUtils.populateUniformly(eventHub.name, EventsPerPartition)
 
-    val startSeqNo = scala.util.Random.nextInt % (EventsPerPartition / 2)
+    val startSeqNo = Math.abs(scala.util.Random.nextInt) % (EventsPerPartition / 2)
 
     val ehConf = getEventHubsConf(eventHub.name)
       .setStartingPositions(Map.empty)
       .setStartingPosition(EventPosition.fromSequenceNumber(startSeqNo, isInclusive = true))
 
     val batchInterval = 1000
-    val timeoutAfter = 100000
+    val timeoutAfter = 10000
     val expectedTotal =
-      if (EventsPerPartition - startSeqNo + 1 < (timeoutAfter / batchInterval) * DefaultMaxRate) {
-        EventsPerPartition - startSeqNo + 1
-      } else {
-        (timeoutAfter / batchInterval) * DefaultMaxRate
-      }
+      (timeoutAfter / batchInterval) * DefaultMaxRate * DefaultPartitionCount
 
     ssc = new StreamingContext(sparkConf, Milliseconds(batchInterval))
     val stream = withClue("Error creating direct stream") {
@@ -247,21 +243,19 @@ class EventHubsDirectDStreamSuite
 
   // Test to verify offset ranges can be recovered from the checkpoints
   test("offset recovery") {
-    testDir = Utils.createTempDir()
-
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
     testUtils.populateUniformly(eventHub.name, 25)
+    testDir = Utils.createTempDir()
 
     val ehConf = getEventHubsConf(eventHub.name)
+      .setStartingPositions(Map.empty)
+      .setStartingPosition(EventPosition.fromSequenceNumber(0L, isInclusive = true))
 
     // Setup the streaming context
     ssc = new StreamingContext(sparkConf, Milliseconds(100))
     ssc.remember(Seconds(20))
     val stream = withClue("Error creating direct stream") {
       new EventHubsDirectDStream(ssc, ehConf, SimulatedClient.apply)
-    }
-    val keyedStream = stream.map { event =>
-      "key" -> event.getSystemProperties.getSequenceNumber
     }
 
     ssc.checkpoint(testDir.getAbsolutePath)

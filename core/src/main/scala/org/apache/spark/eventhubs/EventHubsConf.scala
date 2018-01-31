@@ -20,7 +20,6 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import org.apache.spark.eventhubs.utils.{ ConnectionStringBuilder, EventPosition }
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.json4s.NoTypeHints

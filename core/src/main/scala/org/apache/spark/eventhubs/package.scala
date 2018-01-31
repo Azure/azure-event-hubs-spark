@@ -21,7 +21,6 @@ import java.time.Duration
 import java.util.concurrent.Executor
 
 import com.microsoft.azure.eventhubs.EventHubClient
-import org.apache.spark.eventhubs.utils.EventPosition
 
 package object eventhubs {
 

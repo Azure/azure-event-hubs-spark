@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubs.rdd
 
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, EventPosition, SimulatedClient }
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
 import org.apache.spark.{ SparkConf, SparkContext, SparkFunSuite }
 import org.scalatest.BeforeAndAfterAll
 

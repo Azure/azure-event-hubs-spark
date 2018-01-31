@@ -15,14 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.utils
+package org.apache.spark.eventhubs
 
 import java.time.Instant
 import java.util.Date
 
 import com.microsoft.azure.eventhubs.{ EventPosition => ehep }
-import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.SequenceNumber
 
 /**
  * Defines a position of an event in an event hub partition.

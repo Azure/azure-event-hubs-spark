@@ -18,9 +18,8 @@
 package com.microsoft.spark.streaming.examples.directdstream
 
 import org.apache.spark.SparkContext
-import org.apache.spark.eventhubs.{ EventHubsConf, EventHubsUtils }
+import org.apache.spark.eventhubs.{ ConnectionStringBuilder, EventHubsConf, EventHubsUtils }
 import org.apache.spark.streaming.{ Seconds, StreamingContext }
-import org.apache.spark.eventhubs.utils.ConnectionStringBuilder
 
 /**
  * an example application of Streaming WordCount

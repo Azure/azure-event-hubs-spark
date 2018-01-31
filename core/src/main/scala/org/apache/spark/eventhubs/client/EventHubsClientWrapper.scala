@@ -21,10 +21,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.utils.{
-  ConnectionStringBuilder,
-  EventPosition => utilEventPosition
-}
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -140,7 +136,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
     val needsTranslation = ParVector[Int]()
 
-    val positions: Map[PartitionId, utilEventPosition] =
+    val positions: Map[PartitionId, EventPosition] =
       ehConf.startingPositions.getOrElse(Map.empty)
     val defaultPos = ehConf.startingPosition.getOrElse(DefaultEventPosition)
 

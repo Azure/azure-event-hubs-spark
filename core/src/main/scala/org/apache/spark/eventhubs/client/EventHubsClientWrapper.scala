@@ -55,7 +55,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       receiver = client
         .createReceiver(consumerGroup,
                         partitionId,
-                        EventPosition.fromSequenceNumber(startingSeqNo, true))
+                        EventPosition.fromSequenceNumber(startingSeqNo, isInclusive = true).convert)
         .get
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }

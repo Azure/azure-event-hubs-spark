@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubs.client
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ ConcurrentHashMap, Executors }
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.EventHubsConf
@@ -46,7 +46,8 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
 
   private val client: EventHubClient =
-    EventHubClient.createFromConnectionStringSync(connectionString.toString, new StandardExecutor)
+    EventHubClient.createFromConnectionStringSync(connectionString.toString,
+                                                  Executors.newFixedThreadPool(100))
 
   private var receiver: PartitionReceiver = _
   def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {

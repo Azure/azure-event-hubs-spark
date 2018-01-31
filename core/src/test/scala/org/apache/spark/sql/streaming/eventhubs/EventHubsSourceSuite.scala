@@ -87,7 +87,7 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
       testUtils.send(conf.name, data)
 
       val seqNos = testUtils.getLatestSeqNos(conf) mapValues { seqNo =>
-        seqNo
+        seqNo - 1
       }
       val offset = EventHubsSourceOffset(seqNos)
       logInfo(s"Added data, expected offset $offset")
@@ -356,6 +356,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
   }
 
+  test("assign from specific offsets (failOnDataLoss: failOnDataLoss)") {
+    val eh = newEventHubs()
+    testFromSpecificSeqNos(eh, failOnDataLoss = false)
+  }
+
   private def testFromLatestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
     testUtils.send(eh, 0, Seq(-1))
@@ -465,7 +470,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // partition 1 starts at the latest sequence numbers, these should all be skipped
     testUtils.send(eh, 1, Seq(-10, -11, -12))
     // partition 2 starts at 0, these should all be seen
-    testUtils.send(eh, 2, Seq(0, 1, 20))
+    testUtils.send(eh, 2, Seq(0, 1, 2))
     // partition 3 starts at 1, first should be skipped
     testUtils.send(eh, 3, Seq(10, 11, 12))
     // partition 4 starts at 2, first and second should be skipped
@@ -484,10 +489,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     testStream(mapped)(
       makeSureGetOffsetCalled,
-      CheckAnswer(-20, -21, -22, 0, 1, 20, 11, 12, 22),
+      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22),
       StopStream,
       StartStream(),
-      CheckAnswer(-20, -21, -22, 0, 1, 20, 11, 12, 22), // Should get the data back on recovery
+      CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22), // Should get the data back on recovery
       AddEventHubsData(conf, 30, 31, 32, 33, 34),
       CheckAnswer(-20, -21, -22, 0, 1, 2, 11, 12, 22, 30, 31, 32, 33, 34),
       StopStream

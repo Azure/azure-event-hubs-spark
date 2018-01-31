@@ -25,7 +25,7 @@
       "eventhubs.namespace" -> <EventHub-compatible Namespace name>,	
       "eventhubs.name" -> <EventHub-compatible name>,					
       "eventhubs.partition.count" -> "4",			// 4 is the default value! 
-      "eventhubs.consumergroup" -> "$Default",		// Check your partition count and consumer groups in the same place you found the EventHub name.
+      "eventhubs.consumergroup" -> "$Default"		// Check your partition count and consumer groups in the same place you found the EventHub name.
     )
     ```
    

@@ -86,9 +86,9 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
       val ehSource = sources.head
       testUtils.send(conf.name, data)
 
-      val seqNos = testUtils.getLatestSeqNos(conf) mapValues { seqNo =>
-        seqNo
-      }
+      val seqNos = testUtils.getLatestSeqNos(conf)
+      require(seqNos.size == testUtils.getEventHubs(conf.name).partitionCount)
+
       val offset = EventHubsSourceOffset(seqNos)
       logInfo(s"Added data, expected offset $offset")
       (ehSource, offset)
@@ -202,7 +202,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val parameters =
       getEventHubsConf(eventHub.name)
-        .setMaxSeqNosPerTrigger(4)
+        .setMaxEventsPerTrigger(4)
         .toMap
 
     val reader = spark.readStream
@@ -262,7 +262,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val parameters =
       getEventHubsConf(name)
-        .setMaxSeqNosPerTrigger(10)
+        .setMaxEventsPerTrigger(10)
         .toMap
 
     val reader = spark.readStream
@@ -440,10 +440,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
-  private def testFromSpecificSeqNos(
-      eh: String,
-      failOnDataLoss: Boolean
-  ): Unit = {
+  private def testFromSpecificSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
     testUtils.createEventHubs(eh, partitionCount = 5)
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 5)

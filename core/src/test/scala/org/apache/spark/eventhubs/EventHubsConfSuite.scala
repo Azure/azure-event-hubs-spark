@@ -87,7 +87,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[Exception] { map(ReceiverTimeoutKey) }
     intercept[Exception] { map(OperationTimeoutKey) }
     intercept[Exception] { map(FailOnDataLossKey) }
-    intercept[Exception] { map(MaxSeqNosPerTriggerKey) }
+    intercept[Exception] { map(MaxEventsPerTriggerKey) }
     intercept[Exception] { map(UseSimulatedClientKey) }
   }
 
@@ -106,14 +106,14 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         ConsumerGroupKey -> "consumerGroup",
         StartingPositionKey -> Serialization.write(expectedPosition),
         StartingPositionsKey -> Serialization.write(expectedPositions),
-        MaxSeqNosPerTriggerKey -> 4.toString
+        MaxEventsPerTriggerKey -> 4.toString
       ))
 
     val expectedConf = EventHubsConf(expectedConnStr)
       .setConsumerGroup("consumerGroup")
       .setStartingPosition(expectedPosition)
       .setStartingPositions(expectedPositions)
-      .setMaxSeqNosPerTrigger(4L)
+      .setMaxEventsPerTrigger(4L)
 
     assert(expectedConf.equals(actualConf))
   }

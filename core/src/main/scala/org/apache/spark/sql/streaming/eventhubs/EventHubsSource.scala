@@ -47,7 +47,9 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                          failOnDataLoss: Boolean)
     extends Source
     with Logging {
+
   import EventHubsSource._
+  import EventHubsConf._
 
   private lazy val partitionCount: Int = ehClient.partitionCount
 
@@ -56,7 +58,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger =
-    options.get("maxSeqNosPerTrigger").map(_.toSequenceNumber)
+    options.get(MaxEventsPerTriggerKey).map(_.toSequenceNumber)
 
   private var _client: Client = _
   private[spark] def ehClient = {
@@ -191,6 +193,13 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     logInfo(s"getBatch called with start = $start and end = $end")
     val untilSeqNos = EventHubsSourceOffset.getPartitionSeqNos(end)
+    // On recovery, getBatch will be called before getOffset
+    if (currentSeqNos.isEmpty) {
+      currentSeqNos = Some(untilSeqNos)
+    }
+    if (start.isDefined && start.get == end) {
+      return sqlContext.internalCreateDataFrame(sqlContext.sparkContext.emptyRDD, schema)
+    }
     val fromSeqNos = start match {
       case Some(prevBatchEndOffset) =>
         EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
@@ -267,11 +276,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     logInfo(
       "GetBatch generating RDD of offset range: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
-
-    // On recovery, getBatch will get called before getOffset
-    if (currentSeqNos.isEmpty) {
-      currentSeqNos = Some(untilSeqNos)
-    }
 
     sqlContext.internalCreateDataFrame(rdd, schema)
   }

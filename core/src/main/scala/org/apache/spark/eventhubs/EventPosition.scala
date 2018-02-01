@@ -103,7 +103,7 @@ object EventPosition {
    *
    * @return An [[EventPosition]] instance.
    */
-  def fromStartOfStream(): EventPosition = {
+  def fromStartOfStream: EventPosition = {
     EventPosition.fromOffset(StartOfStream, isInclusive = true)
   }
 
@@ -113,7 +113,7 @@ object EventPosition {
    *
    * @return An [[EventPosition]] instance.
    */
-  def fromEndOfStream(): EventPosition = {
+  def fromEndOfStream: EventPosition = {
     EventPosition.fromOffset(EndOfStream)
   }
 }

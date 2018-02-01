@@ -37,7 +37,7 @@ case class EventPosition private (offset: String = null,
   private[eventhubs] def convert: ehep = {
     if (offset != null) {
       ehep.fromOffset(offset, isInclusive)
-    } else if (seqNo < 0L) {
+    } else if (seqNo >= 0L) {
       ehep.fromSequenceNumber(seqNo, isInclusive)
     } else if (enqueuedTime != null) {
       ehep.fromEnqueuedTime(enqueuedTime.toInstant)

@@ -24,7 +24,7 @@ import com.microsoft.azure.eventhubs.EventHubClient
 
 package object eventhubs {
 
-  val DefaultEventPosition: EventPosition = EventPosition.fromStartOfStream()
+  val DefaultEventPosition: EventPosition = EventPosition.fromStartOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)

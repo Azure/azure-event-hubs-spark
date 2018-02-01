@@ -61,7 +61,7 @@ private[spark] class EventHubsTestUtils {
   def getLatestSeqNos(ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
     val eventHubs = EventHubsTestUtils.eventHubs
     (for {
-      p <- 0 until DefaultPartitionCount
+      p <- 0 until eventHubs(ehConf.name).partitionCount
       n = ehConf.name
       seqNo = eventHubs(n).latestSeqNo(p)
     } yield NameAndPartition(n, p) -> seqNo).toMap

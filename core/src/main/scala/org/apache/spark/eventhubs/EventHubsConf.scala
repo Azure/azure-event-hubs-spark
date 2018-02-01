@@ -298,8 +298,8 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param limit the maximum number of events to be processed per trigger interval
    * @return the updated [[EventHubsConf]] instance
    */
-  def setMaxSeqNosPerTrigger(limit: Long): EventHubsConf = {
-    set(MaxSeqNosPerTriggerKey, limit)
+  def setMaxEventsPerTrigger(limit: Long): EventHubsConf = {
+    set(MaxEventsPerTriggerKey, limit)
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -331,7 +331,7 @@ object EventHubsConf extends Logging {
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
   val FailOnDataLossKey = "failOnDataLoss"
-  val MaxSeqNosPerTriggerKey = "maxSeqNosPerTrigger"
+  val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
 
   /** Creates an EventHubsConf */

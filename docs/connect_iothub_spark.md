@@ -2,14 +2,14 @@
 
 ### From your IoT Hub instance, get the ```SasKeyName```, ```SasKey```, ```EventHub-compatible name```, and ```EventHub-compatible Namespace name```. 
    - ```SasKeyName``` and ```SasKey``` 
-     1. Go to the [Azure Portal](www.ms.portal.azure.com) and find your IoT Hub instance
+     1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
      2. Click on **Shared access policies** under **Settings**
      3. Click on **iothubowner**
      4. In the blade that opens up, you'll see your **Primary key**. That is your ```SasKey```. 
      5. **iothubowner** is your ```SasKeyName```.
     
    - ```EventHub-compatible name``` and ```EventHub-compatible Namepsace name```
-     1. Still on your IoT Hub instance within the [Azure Portal](www.ms.portal.azure.com), click on **Endpoints** under **Messaging**
+     1. Still on your IoT Hub instance within the [Azure Portal](https://ms.portal.azure.com), click on **Endpoints** under **Messaging**
      2. Click on **Events**
      3. In the blade that opens up, you'll see your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.
      4. Your ```EventHub-compatible endpoint``` will have the following form: 

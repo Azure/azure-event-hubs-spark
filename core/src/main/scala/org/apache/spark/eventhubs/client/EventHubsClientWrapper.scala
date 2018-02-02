@@ -45,9 +45,9 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   private val connectionString = ConnectionStringBuilder(ehConf.connectionString)
   connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
 
-  private val client: EventHubClient =
+  private lazy val client: EventHubClient =
     EventHubClient.createFromConnectionStringSync(connectionString.toString,
-                                                  Executors.newFixedThreadPool(100))
+                                                  Executors.newFixedThreadPool(1))
 
   private var receiver: PartitionReceiver = _
   def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
@@ -112,14 +112,24 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     }
   }
 
+  private var _partitionCount = 0
+
+  /**
+   * The number of partitions in the EventHubs instance.
+   *
+   * @return partition count
+   */
   override def partitionCount: Int = {
-    try {
-      val runtimeInfo = client.getRuntimeInformation.get
-      runtimeInfo.getPartitionCount
-    } catch {
-      case e: Exception =>
-        throw e
+    if (_partitionCount == 0) {
+      try {
+        val runtimeInfo = client.getRuntimeInformation.get
+        _partitionCount = runtimeInfo.getPartitionCount
+      } catch {
+        case e: Exception =>
+          throw e
+      }
     }
+    _partitionCount
   }
 
   override def close(): Unit = {

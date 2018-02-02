@@ -115,7 +115,12 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
     override def next(): EventData = {
       assert(hasNext(), "Can't call next() once untilSeqNo has been reached.")
-      val event = client.receive(1).iterator().next()
+
+      var event: EventData = null
+      while (event == null) {
+        event = client.receive(1).iterator().next()
+      }
+
       assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
              errWrongSeqNo(part, event.getSystemProperties.getSequenceNumber))
       requestSeqNo += 1

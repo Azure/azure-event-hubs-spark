@@ -17,7 +17,12 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import org.apache.spark.eventhubs.common.client.EventHubsClientWrapper
+import java.util.Locale
+
+import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source
@@ -28,6 +33,7 @@ private[sql] class EventHubsSourceProvider
     extends DataSourceRegister
     with StreamSourceProvider
     with Logging {
+  import EventHubsSourceProvider._
 
   override def shortName(): String = "eventhubs"
 
@@ -43,50 +49,44 @@ private[sql] class EventHubsSourceProvider
                             schema: Option[StructType],
                             providerName: String,
                             parameters: Map[String, String]): Source = {
-    // TODO: use serviceLoader EH client dependency injection
     EventHubsClientWrapper.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
-    new EventHubsSource(sqlContext, parameters, EventHubsClientWrapper.apply)
+
+    val caseInsensitiveParameters = parameters.map {
+      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
+    }
+
+    new EventHubsSource(sqlContext,
+                        parameters,
+                        clientFactory(caseInsensitiveParameters),
+                        metadataPath,
+                        failOnDataLoss(caseInsensitiveParameters))
   }
+
+  private def failOnDataLoss(caseInsensitiveParams: Map[String, String]) =
+    caseInsensitiveParams.getOrElse(FailOnDataLossOptionKey, "true").toBoolean
+
+  private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client =
+    if (caseInsensitiveParams.getOrElse(UseSimulatedClientOptionKey, "false").toBoolean) {
+      SimulatedClient.apply
+    } else {
+      EventHubsClientWrapper.apply
+    }
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
-
-  private[eventhubs] def ifContainsPropertiesAndUserDefinedKeys(
-      parameters: Map[String, String]): (Boolean, Seq[String]) = {
-    val containsProperties =
-      parameters.getOrElse("eventhubs.sql.containsProperties", "false").toBoolean
-    val userDefinedKeys = {
-      if (parameters.contains("eventhubs.sql.userDefinedKeys")) {
-        parameters("eventhubs.sql.userDefinedKeys").split(",").toSeq
-      } else {
-        Seq()
-      }
-    }
-    (containsProperties, userDefinedKeys)
-  }
+  private val FailOnDataLossOptionKey = "failondataloss"
+  private val UseSimulatedClientOptionKey = "usesimulatedclient"
 
   def sourceSchema(parameters: Map[String, String]): StructType = {
-    val (containsProperties, userDefinedKeys) = ifContainsPropertiesAndUserDefinedKeys(parameters)
     StructType(
       Seq(
-        StructField("body", BinaryType),
+        StructField("body", StringType),
         StructField("offset", LongType),
         StructField("seqNumber", LongType),
-        StructField("enqueuedTime", LongType),
+        StructField("enqueuedTime", TimestampType),
         StructField("publisher", StringType),
         StructField("partitionKey", StringType)
-      ) ++ {
-        if (containsProperties) {
-          if (userDefinedKeys.nonEmpty) {
-            userDefinedKeys.map(key => StructField(key, StringType))
-          } else {
-            Seq(
-              StructField("properties", MapType(StringType, StringType, valueContainsNull = true)))
-          }
-        } else {
-          Seq()
-        }
-      })
+      ))
   }
 }

@@ -17,331 +17,316 @@
 
 package org.apache.spark.sql.streaming.eventhubs
 
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
+import java.io._
+import java.nio.charset.StandardCharsets
 
-import org.apache.spark.eventhubs.common.client.Client
-import org.apache.spark.eventhubs.common.client.EventHubsOffsetTypes.EventHubsOffsetType
-import org.apache.spark.eventhubs.common.rdd.{ EventHubsRDD, OffsetRange, ProgressTrackerParams }
-import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, RateControlUtils }
+import org.apache.commons.io.IOUtils
+import org.apache.spark.SparkContext
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
+import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset, Source }
-import org.apache.spark.sql.streaming.eventhubs.checkpoint.StructuredStreamingProgressTracker
+import org.apache.spark.scheduler.ExecutorCacheTaskLocation
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.execution.streaming.{
+  HDFSMetadataLog,
+  Offset,
+  SerializedOffset,
+  Source
+}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{ DataFrame, Row, SQLContext }
+import org.apache.spark.sql.{ DataFrame, SQLContext }
+import org.apache.spark.unsafe.types.UTF8String
 
-import scala.collection.mutable
-import scala.concurrent.{ ExecutionContext, Future }
-import scala.util.{ Failure, Success }
-
-private[spark] class EventHubsSource private[eventhubs] (
-    sqlContext: SQLContext,
-    eventHubsParams: Map[String, String],
-    clientFactory: (Map[String, String]) => Client)
+private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
+                                                         options: Map[String, String],
+                                                         clientFactory: (EventHubsConf => Client),
+                                                         metadataPath: String,
+                                                         failOnDataLoss: Boolean)
     extends Source
-    with EventHubsConnector
     with Logging {
 
-  case class EventHubsOffset(batchId: Long, offsets: Map[NameAndPartition, (Long, Long)])
+  import EventHubsSource._
+  import EventHubsConf._
 
-  override val streamId: Int = EventHubsSource.streamIdGenerator.getAndIncrement()
+  private lazy val partitionCount: Int = ehClient.partitionCount
 
-  private val ehNamespace = eventHubsParams("eventhubs.namespace")
-  private val ehName = eventHubsParams("eventhubs.name")
+  private val ehConf = EventHubsConf.toConf(options)
+
+  private val sc = sqlContext.sparkContext
+
+  private val maxOffsetsPerTrigger =
+    options.get(MaxEventsPerTriggerKey).map(_.toSequenceNumber)
 
   private var _client: Client = _
-  private[eventhubs] def ehClient = {
-    if (_client == null) {
-      _client = clientFactory(eventHubsParams)
-    }
+  private[spark] def ehClient = {
+    if (_client == null) _client = clientFactory(ehConf)
     _client
   }
-  private[spark] def ehClient_=(eventHubClient: Client) = {
-    _client = eventHubClient
-    this
-  }
 
-  private var _receiver: (Map[String, String]) => Client = _
-  private[eventhubs] def receiverFactory = {
-    if (_receiver == null) {
-      _receiver = clientFactory
-    }
-    _receiver
-  }
-  private[spark] def receiverFactory_=(f: (Map[String, String]) => Client) = {
-    _receiver = f
-    this
-  }
-
-  override def namesAndPartitions: List[NameAndPartition] = {
-    val partitionCount = eventHubsParams("eventhubs.partition.count").toInt
-    (for (partitionId <- 0 until partitionCount)
-      yield NameAndPartition(ehName, partitionId)).toList
-  }
-
-  private implicit val cleanupExecutorService =
-    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(1))
-
-  // EventHubsSource is created for each instance of program, that means it is different with
-  // DStream which will load the serialized Direct DStream instance from checkpoint
-  StructuredStreamingProgressTracker.registeredConnectors += uid -> this
-
-  // initialize ProgressTracker
-  private val progressTracker = StructuredStreamingProgressTracker.initInstance(
-    uid,
-    eventHubsParams("eventhubs.progressTrackingDir"),
-    sqlContext.sparkContext.appName,
-    sqlContext.sparkContext.hadoopConfiguration)
-
-  // the flag to avoid committing in the first batch
-  private[spark] var firstBatch = true
-
-  // the offsetsAndSeqNos which have been to the self-managed offset store
-  private[eventhubs] var committedOffsetsAndSeqNums: EventHubsOffset =
-    EventHubsOffset(-1L, namesAndPartitions.map((_, (-1L, -1L))).toMap)
-
-  // Highest Offsets and Sequence Numbers that exist in EventHubs (API call is made to get this)
-  private var highestOffsetsAndSeqNums: EventHubsOffset =
-    EventHubsOffset(-1L, namesAndPartitions.map((_, (-1L, -1L))).toMap)
-
-  override def schema: StructType = EventHubsSourceProvider.sourceSchema(eventHubsParams)
-
-  private def cleanupFiles(batchIdToClean: Long): Unit = {
-    Future {
-      progressTracker.cleanProgressFile(batchIdToClean)
-    }.onComplete {
-      case Success(_) =>
-        logInfo(s"finished cleanup for batch $batchIdToClean")
-      case Failure(exception) =>
-        logWarning(s"error happened when clean up for batch $batchIdToClean, $exception")
-    }
-  }
-
-  // TODO revisit this once RateControlUtils is cleaned up.
-  def updatedHighest(): EventHubsOffset = {
-    EventHubsOffset(
-      committedOffsetsAndSeqNums.batchId,
-      (for {
-        nameAndPartition <- highestOffsetsAndSeqNums.offsets.keySet
-        endPoint = ehClient.lastOffsetAndSeqNo(nameAndPartition)
-      } yield nameAndPartition -> endPoint).toMap
-    )
-  }
-
-  /**
-   * there are two things to do in this function, first is to collect the ending offsetsAndSeqNos of last
-   * batch, so that we know the starting offset of the current batch. And then, we calculate the
-   * target seq number of the current batch
-   *
-   * @return return the target seqNum of current batch
-   */
-  override def getOffset: Option[Offset] = {
-    highestOffsetsAndSeqNums = updatedHighest()
-    if (!firstBatch) {
-      // committedOffsetsAndSeqNums.batchId is always no larger than the latest finished batch id
-      val lastCommittedBatchId = committedOffsetsAndSeqNums.batchId
-      collectFinishedBatchOffsetsAndCommit(lastCommittedBatchId + 1)
-      cleanupFiles(lastCommittedBatchId)
-    } else {
-      firstBatch = false
-    }
-    val targetOffsets = RateControlUtils.clamp(committedOffsetsAndSeqNums.offsets,
-                                               highestOffsetsAndSeqNums.offsets.toList,
-                                               eventHubsParams)
-    Some(
-      EventHubsBatchRecord(
-        committedOffsetsAndSeqNums.batchId + 1,
-        for { (nameAndPartition, seqNum) <- targetOffsets } yield
-          (nameAndPartition,
-           math.min(seqNum, highestOffsetsAndSeqNums.offsets(nameAndPartition)._2))
-      ))
-  }
-
-  /**
-   * collect the ending offsetsAndSeqNos/seq from executors to driver and commit
-   */
-  private[eventhubs] def collectFinishedBatchOffsetsAndCommit(committedBatchId: Long): Unit = {
-    committedOffsetsAndSeqNums = fetchEndingOffsetOfLastBatch(committedBatchId)
-    // we have two ways to handle the failure of commit and precommit:
-    // First, we will validate the progress file and overwrite the corrupted progress file when
-    // progressTracker is created; Second, to handle the case that we fail before we create
-    // a file, we need to read the latest progress file in the directory and see if we have commit
-    // the offsests (check if the timestamp matches) and then collect the files if necessary
-    progressTracker.commit(Map(uid -> committedOffsetsAndSeqNums.offsets), committedBatchId)
-    logInfo(
-      s"committed offsetsAndSeqNos of batch $committedBatchId, collectedCommits: $committedOffsetsAndSeqNums")
-  }
-
-  private def fetchEndingOffsetOfLastBatch(committedBatchId: Long) = {
-    val startOffsetOfUndergoingBatch =
-      progressTracker.collectProgressRecordsForBatch(committedBatchId, List(this))
-    if (startOffsetOfUndergoingBatch.isEmpty) {
-      // first batch, take the initial value of the offset, -1
-      EventHubsOffset(committedBatchId, committedOffsetsAndSeqNums.offsets)
-    } else {
-      EventHubsOffset(
-        committedBatchId,
-        startOffsetOfUndergoingBatch
-          .filter {
-            case (connectorUID, _) =>
-              connectorUID == uid
-          }
-          .values
-          .head
-          .filter(_._1.ehName == eventHubsParams("eventhubs.name"))
-      )
-    }
-  }
-
-  private def composeOffsetRange(endOffset: EventHubsBatchRecord): List[OffsetRange] = {
-    val filterOffsetAndType = {
-      if (committedOffsetsAndSeqNums.batchId == -1) {
-        val startSeqs = new mutable.HashMap[NameAndPartition, Long].empty
-        for (nameAndPartition <- namesAndPartitions) {
-          val seqNo = ehClient.earliestSeqNo(nameAndPartition).get
-          startSeqs += nameAndPartition -> seqNo
+  private lazy val initialPartitionSeqNos = {
+    val metadataLog =
+      new HDFSMetadataLog[EventHubsSourceOffset](sqlContext.sparkSession, metadataPath) {
+        override def serialize(metadata: EventHubsSourceOffset, out: OutputStream): Unit = {
+          out.write(0) // SPARK-19517
+          val writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8))
+          writer.write("v" + VERSION + "\n")
+          writer.write(metadata.json)
+          writer.flush()
         }
 
-        committedOffsetsAndSeqNums = EventHubsOffset(-1, committedOffsetsAndSeqNums.offsets.map {
-          case (ehNameAndPartition, (offset, _)) =>
-            (ehNameAndPartition, (offset, startSeqs(ehNameAndPartition)))
-        })
-        RateControlUtils.validateFilteringParams(Map(ehName -> ehClient),
-                                                 eventHubsParams,
-                                                 namesAndPartitions)
-        RateControlUtils.composeFromOffsetWithFilteringParams(eventHubsParams,
-                                                              committedOffsetsAndSeqNums.offsets)
-      } else {
-        Map[NameAndPartition, (EventHubsOffsetType, Long)]()
-      }
-    }
-
-    for {
-      (nameAndPartition, seqNo) <- endOffset.targetSeqNums.toList
-      (offsetType, fromOffset) = RateControlUtils.calculateStartOffset(
-        nameAndPartition,
-        filterOffsetAndType,
-        committedOffsetsAndSeqNums.offsets)
-    } yield
-      (nameAndPartition,
-       fromOffset,
-       committedOffsetsAndSeqNums.offsets(nameAndPartition)._2,
-       seqNo,
-       offsetType)
-  }
-
-  private def buildEventHubsRDD(endOffset: EventHubsBatchRecord): EventHubsRDD = {
-    val offsetRanges = composeOffsetRange(endOffset)
-    new EventHubsRDD(
-      sqlContext.sparkContext,
-      Map(eventHubsParams("eventhubs.name") -> eventHubsParams),
-      offsetRanges,
-      committedOffsetsAndSeqNums.batchId + 1,
-      ProgressTrackerParams(eventHubsParams("eventhubs.progressTrackingDir"),
-                            streamId,
-                            uid = uid,
-                            subDirs = sqlContext.sparkContext.appName,
-                            uid),
-      receiverFactory
-    )
-  }
-
-  private def convertEventHubsRDDToDataFrame(eventHubsRDD: EventHubsRDD): DataFrame = {
-    import scala.collection.JavaConverters._
-    val (containsProperties, userDefinedKeys) =
-      EventHubsSourceProvider.ifContainsPropertiesAndUserDefinedKeys(eventHubsParams)
-    val rowRDD = eventHubsRDD.map(
-      eventData =>
-        Row.fromSeq(Seq(
-          eventData.getBytes,
-          eventData.getSystemProperties.getOffset.toLong,
-          eventData.getSystemProperties.getSequenceNumber,
-          eventData.getSystemProperties.getEnqueuedTime.getEpochSecond,
-          eventData.getSystemProperties.getPublisher,
-          eventData.getSystemProperties.getPartitionKey
-        ) ++ {
-          if (containsProperties) {
-            if (userDefinedKeys.nonEmpty) {
-              userDefinedKeys.map(k => {
-                eventData.getProperties.asScala.getOrElse(k, "").toString
-              })
+        override def deserialize(in: InputStream): EventHubsSourceOffset = {
+          in.read() // zero byte is read (SPARK-19517)
+          val content = IOUtils.toString(new InputStreamReader(in, StandardCharsets.UTF_8))
+          // HDFSMetadataLog guarantees that it never creates a partial file.
+          assert(content.length != 0)
+          if (content(0) == 'v') {
+            val indexOfNewLine = content.indexOf("\n")
+            if (indexOfNewLine > 0) {
+              val version =
+                parseVersion(content.substring(0, indexOfNewLine), VERSION)
+              EventHubsSourceOffset(SerializedOffset(content.substring(indexOfNewLine + 1)))
             } else {
-              Seq(eventData.getProperties.asScala.map {
-                case (k, v) =>
-                  k -> (if (v == null) null else v.toString)
-              })
+              throw new IllegalStateException("Log file was malformed.")
             }
           } else {
-            Seq()
+            EventHubsSourceOffset(SerializedOffset(content)) // Spark 2.1 log file
           }
-        }))
-    sqlContext.createDataFrame(rowRDD, schema)
+        }
+      }
+
+    metadataLog
+      .get(0)
+      .getOrElse {
+        // translate starting points within ehConf to sequence numbers
+        val seqNos = ehClient.translate(ehConf, partitionCount).map {
+          case (pId, seqNo) =>
+            (NameAndPartition(ehConf.name, pId), seqNo)
+        }
+        val offset = EventHubsSourceOffset(seqNos)
+        metadataLog.add(0, offset)
+        logInfo(s"Initial sequence numbers: $seqNos")
+        offset
+      }
+      .partitionToSeqNos
   }
 
-  private def readProgress(batchId: Long): EventHubsOffset = {
-    val nextBatchId = batchId + 1
-    val progress = progressTracker.read(uid, nextBatchId, fallBack = false)
+  private var currentSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
 
-    val validateReadResults = progress.offsetsAndSeqNos.keySet == namesAndPartitions.toSet
-    if (progress.timestamp == -1 || !validateReadResults) {
-      // next batch hasn't been committed successfully
-      val lastCommittedOffset = progressTracker.read(uid, batchId, fallBack = false)
-      EventHubsOffset(batchId, lastCommittedOffset.offsetsAndSeqNos)
-    } else {
-      EventHubsOffset(nextBatchId, progress.offsetsAndSeqNos)
+  override def schema: StructType = EventHubsSourceProvider.sourceSchema(options)
+
+  override def getOffset: Option[Offset] = {
+    // Make sure initialPartitionSeqNos is initialized
+    initialPartitionSeqNos
+
+    val latest = (for {
+      p <- 0 until partitionCount
+      n = ehConf.name
+      seqNo = ehClient.latestSeqNo(p)
+    } yield NameAndPartition(n, p) -> seqNo).toMap
+
+    val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
+      case None =>
+        latest
+      case Some(limit) if currentSeqNos.isEmpty =>
+        rateLimit(limit, initialPartitionSeqNos, latest)
+      case Some(limit) =>
+        rateLimit(limit, currentSeqNos.get, latest)
     }
+
+    currentSeqNos = Some(seqNos)
+    logDebug(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
+
+    Some(EventHubsSourceOffset(seqNos))
   }
 
-  private def recoverFromFailure(start: Option[Offset], end: Offset): Unit = {
-    val recoveredCommittedBatchId = {
-      if (start.isEmpty) {
-        -1
-      } else {
-        start.map {
-          case so: SerializedOffset =>
-            val batchRecord = JsonUtils.partitionAndSeqNum(so.json)
-            batchRecord.asInstanceOf[EventHubsBatchRecord].batchId
-          case batchRecord: EventHubsBatchRecord =>
-            batchRecord.batchId
-        }.get
+  def fetchEarliestSeqNos(
+      nameAndPartitions: Seq[NameAndPartition]): Map[NameAndPartition, SequenceNumber] = {
+    (for {
+      nameAndPartition <- nameAndPartitions
+      seqNo = ehClient.earliestSeqNo(nameAndPartition.partitionId)
+    } yield nameAndPartition -> seqNo).toMap
+  }
+
+  /** Proportionally distribute limit number of offsets among topicpartitions */
+  private def rateLimit(
+      limit: SequenceNumber,
+      from: Map[NameAndPartition, SequenceNumber],
+      until: Map[NameAndPartition, SequenceNumber]): Map[NameAndPartition, SequenceNumber] = {
+    val fromNew = fetchEarliestSeqNos(until.keySet.diff(from.keySet).toSeq)
+    val sizes = until.flatMap {
+      case (nameAndPartition, end) =>
+        // If begin isn't defined, something's wrong, but let alert logic in getBatch handle it
+        from.get(nameAndPartition).orElse(fromNew.get(nameAndPartition)).flatMap { begin =>
+          val size = end - begin
+          logDebug(s"rateLimit $nameAndPartition size is $size")
+          if (size > 0) Some(nameAndPartition -> size) else None
+        }
+    }
+    val total = sizes.values.sum.toDouble
+    if (total < 1) {
+      until
+    } else {
+      until.map {
+        case (nameAndPartition, end) =>
+          nameAndPartition -> sizes
+            .get(nameAndPartition)
+            .map { size =>
+              val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
+              val prorate = limit * (size / total)
+              logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
+              // Don't completely starve small topicpartitions
+              val off = begin + (if (prorate < 1) Math.ceil(prorate) else Math.floor(prorate)).toLong
+              logDebug(s"rateLimit $nameAndPartition new offset is $off")
+              // Paranoia, make sure not to return an offset that's past end
+              Math.min(end, off)
+            }
+            .getOrElse(end)
       }
     }
-    val latestProgress = readProgress(recoveredCommittedBatchId)
-    if (latestProgress.offsets.isEmpty && start.isDefined) {
-      // we shall not commit when start is empty, otherwise, we will have a duplicate processing
-      // of the first batch
-      collectFinishedBatchOffsetsAndCommit(recoveredCommittedBatchId)
-    } else {
-      committedOffsetsAndSeqNums = latestProgress
-    }
-    logInfo(s"recovered from a failure, startOffset: $start, endOffset: $end")
-    highestOffsetsAndSeqNums = updatedHighest()
-    firstBatch = false
   }
 
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
-    if (firstBatch) {
-      // in this case, we are just recovering from a failure; the committedOffsets and
-      // availableOffsets are fetched from in populateStartOffset() of StreamExecution
-      // convert (committedOffsetsAndSeqNums is in initial state)
-      recoverFromFailure(start, end)
+    initialPartitionSeqNos
+
+    logInfo(s"getBatch called with start = $start and end = $end")
+    val untilSeqNos = EventHubsSourceOffset.getPartitionSeqNos(end)
+    // On recovery, getBatch will be called before getOffset
+    if (currentSeqNos.isEmpty) {
+      currentSeqNos = Some(untilSeqNos)
     }
-    val eventhubsRDD = buildEventHubsRDD({
-      end match {
-        case so: SerializedOffset =>
-          JsonUtils.partitionAndSeqNum(so.json)
-        case batchRecord: EventHubsBatchRecord =>
-          batchRecord
+    if (start.isDefined && start.get == end) {
+      return sqlContext.internalCreateDataFrame(sqlContext.sparkContext.emptyRDD, schema)
+    }
+    val fromSeqNos = start match {
+      case Some(prevBatchEndOffset) =>
+        EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+      case None =>
+        // we need to
+        initialPartitionSeqNos
+    }
+
+    // Find the new partitions, and get their earliest offsets
+    val newPartitions = untilSeqNos.keySet.diff(fromSeqNos.keySet)
+    val newPartitionSeqNos = fetchEarliestSeqNos(newPartitions.toSeq)
+    if (newPartitionSeqNos.keySet != newPartitions) {
+      // We cannot get fromOffsets for some partitions. It means they got deleted.
+      val deletedPartitions = newPartitions.diff(newPartitionSeqNos.keySet)
+      reportDataLoss(
+        s"Cannot find earliest sequence numbers of $deletedPartitions. Some data may have been missed")
+    }
+    logInfo(s"Partitions added: $newPartitionSeqNos")
+    newPartitionSeqNos.filter(_._2 != 0).foreach {
+      case (p, s) =>
+        reportDataLoss(
+          s"Added partition $p starts from $s instead of 0. Some data may have been missed")
+    }
+
+    val deletedPartitions = fromSeqNos.keySet.diff(untilSeqNos.keySet)
+    if (deletedPartitions.nonEmpty) {
+      reportDataLoss(s"$deletedPartitions are gone. Some data may have been missed")
+    }
+
+    val partitions = untilSeqNos.keySet.filter { p =>
+      // Ignore partitions that we don't know the from offsets.
+      newPartitionSeqNos.contains(p) || fromSeqNos.contains(p)
+    }.toSeq
+    logDebug("Partitions: " + partitions.mkString(", "))
+
+    val sortedExecutors = getSortedExecutorList(sc)
+    val numExecutors = sortedExecutors.length
+    logDebug("Sorted executors: " + sortedExecutors.mkString(", "))
+
+    // Calculate offset ranges
+    val offsetRanges = (for {
+      p <- partitions
+      fromSeqNo = fromSeqNos.get(p).getOrElse {
+        newPartitionSeqNos.getOrElse(p, {
+          // This should never happen.
+          throw new IllegalStateException(s"$p doesn't have a fromSeqNo")
+        })
       }
-    })
-    convertEventHubsRDDToDataFrame(eventhubsRDD)
+      untilSeqNo = untilSeqNos(p)
+      // preferredLoc - coming soon
+    } yield OffsetRange(p, fromSeqNo, untilSeqNo)).filter { range =>
+      if (range.untilSeqNo < range.fromSeqNo) {
+        reportDataLoss(
+          s"Partition ${range.nameAndPartition}'s sequence number was changed from " +
+            s"${range.fromSeqNo} to ${range.untilSeqNo}, some data may have been missed")
+        false
+      } else {
+        true
+      }
+    }.toArray
+
+    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, clientFactory).map { ed =>
+      InternalRow(
+        UTF8String.fromBytes(ed.getBytes),
+        ed.getSystemProperties.getOffset.toLong,
+        ed.getSystemProperties.getSequenceNumber,
+        DateTimeUtils.fromJavaTimestamp(
+          new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
+        UTF8String.fromString(ed.getSystemProperties.getPublisher),
+        UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
+      )
+    }
+
+    logInfo(
+      "GetBatch generating RDD of offset range: " +
+        offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
+
+    sqlContext.internalCreateDataFrame(rdd, schema)
   }
 
-  override def stop(): Unit = {}
+  override def stop(): Unit = synchronized {
+    ehClient.close()
+  }
 
-  override def uid: String = s"${ehNamespace}_${ehName}_$streamId"
+  /**
+   * If 'failOnDataLoss' is true, this method will throw an 'IllegalStateException'.
+   * Otherwise, just log a warning.
+   */
+  private def reportDataLoss(message: String): Unit = {
+    if (failOnDataLoss) {
+      throw new IllegalStateException(message + s". $InstructionsForFailOnDataLossTrue")
+    } else {
+      logWarning(message + s". $InstructionsForFailOnDataLossFalse")
+    }
+  }
 }
 
-private object EventHubsSource {
-  val streamIdGenerator = new AtomicInteger(0)
+private[eventhubs] object EventHubsSource {
+  val InstructionsForFailOnDataLossFalse =
+    """
+      |Some data may have been lost because they are not available in EventHubs any more; either the
+      | data was aged out by EventHubs or the EventHubs instance may have been deleted before all the data in the
+      | instance was processed. If you want your streaming query to fail on such cases, set the source
+      | option "failOnDataLoss" to "true".
+    """.stripMargin
+
+  val InstructionsForFailOnDataLossTrue =
+    """
+      |Some data may have been lost because they are not available in EventHubs any more; either the
+      | data was aged out by EventHubs or the EventHubs instance may have been deleted before all the data in the
+      | instance was processed. If you don't want your streaming query to fail on such cases, set the
+      | source option "failOnDataLoss" to "false".
+    """.stripMargin
+
+  private[eventhubs] val VERSION = 1
+
+  def getSortedExecutorList(sc: SparkContext): Array[String] = {
+    val bm = sc.env.blockManager
+    bm.master
+      .getPeers(bm.blockManagerId)
+      .toArray
+      .map(x => ExecutorCacheTaskLocation(x.host, x.executorId))
+      .sortWith(compare)
+      .map(_.toString)
+  }
+
+  private def compare(a: ExecutorCacheTaskLocation, b: ExecutorCacheTaskLocation): Boolean = {
+    if (a.host == b.host) { a.executorId > b.executorId } else { a.host > b.host }
+  }
 }

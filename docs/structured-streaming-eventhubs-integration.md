@@ -23,6 +23,7 @@ in our library.
 
 #### IoT Hub
 If using IoT Hub, follow these instructions to get your EventHubs-compatible connection string: 
+
     1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
     2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
     3. Find your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.

@@ -20,6 +20,7 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
+import org.apache.http.annotation.Experimental
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.json4s.NoTypeHints
@@ -118,11 +119,13 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param connectionString a valid connection string
    * @return the updated [[EventHubsConf]] instance
    */
+  @Experimental
   def setConnectionString(connectionString: String): EventHubsConf = {
     set(ConnectionStringKey, connectionString)
   }
 
   /** The currently set connection string */
+  @Experimental
   def connectionString: String = {
     self.get(ConnectionStringKey).get
   }
@@ -134,12 +137,14 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param name the name of an EventHub instance
    * @return the updated [[EventHubsConf]] instance
    */
+  @Experimental
   def setName(name: String): EventHubsConf = {
     val newConnStr = ConnectionStringBuilder(connectionString).setEventHubName(name).toString
     setConnectionString(newConnStr)
   }
 
   /** The currently set EventHub name */
+  @Experimental
   def name: String = ConnectionStringBuilder(connectionString).getEventHubName
 
   /** Set the consumer group for your EventHubs instance. If no consumer

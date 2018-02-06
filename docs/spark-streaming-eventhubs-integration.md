@@ -22,7 +22,19 @@ for your Event Hubs instance from the [Azure Portal](https://portal.azure.com) o
 in our library. 
 
 #### IoT Hub
-If using IoT Hub, you need to get your EventHubs-equivalent connection string. A guide to do that can be found [here](#).
+If using IoT Hub, follow these instructions to get your EventHubs-compatible connection string: 
+    1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
+    2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
+    3. Find your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.
+
+```scala
+import org.apache.spark.eventhubs.ConnectionStringBuilder
+
+// Build connection string with the above information 
+val connectionString = ConnectionStringBuilder("YOUR.EVENTHUB.COMPATIBLE.ENDPOINT")
+  .setEventHubName("YOUR.EVENTHUB.COMPATIBLE.NAME")
+  .build
+```
 
 ### EventPosition
 The `EventPosition` defines a position of an event in an event hub partition. The position can be an enqueued time, offset,

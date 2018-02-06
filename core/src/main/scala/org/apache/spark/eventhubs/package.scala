@@ -20,7 +20,7 @@ package org.apache.spark
 import java.time.Duration
 import java.util.concurrent.Executor
 
-import com.microsoft.azure.eventhubs.EventHubClient
+import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
 
 package object eventhubs {
 
@@ -29,8 +29,10 @@ package object eventhubs {
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
-  val PrefetchCountMinimum
-    : Int = 10 // Change this to PartitionReceiver.PREFETCH_COUNT_MINIMUM on next client release.
+  val PrefetchCountMinimum: Int = 10
+  // Change this to PartitionReceiver.PREFETCH_COUNT_MINIMUM on next client release.
+  val DefaultFailOnDataLoss = "true"
+  val DefaultUseSimulatedClient = "false"
 
   type PartitionId = Int
   val PartitionId = Int

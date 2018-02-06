@@ -19,6 +19,7 @@ package org.apache.spark.sql.streaming.eventhubs
 
 import java.util.Locale
 
+import org.apache.spark.eventhubs._
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.client.EventHubsClientWrapper
@@ -33,7 +34,8 @@ private[sql] class EventHubsSourceProvider
     extends DataSourceRegister
     with StreamSourceProvider
     with Logging {
-  import EventHubsSourceProvider._
+
+  import EventHubsConf._
 
   override def shortName(): String = "eventhubs"
 
@@ -64,10 +66,12 @@ private[sql] class EventHubsSourceProvider
   }
 
   private def failOnDataLoss(caseInsensitiveParams: Map[String, String]) =
-    caseInsensitiveParams.getOrElse(FailOnDataLossOptionKey, "true").toBoolean
+    caseInsensitiveParams.getOrElse(FailOnDataLossKey, DefaultFailOnDataLoss).toBoolean
 
   private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client =
-    if (caseInsensitiveParams.getOrElse(UseSimulatedClientOptionKey, "false").toBoolean) {
+    if (caseInsensitiveParams
+          .getOrElse(UseSimulatedClientKey, DefaultUseSimulatedClient)
+          .toBoolean) {
       SimulatedClient.apply
     } else {
       EventHubsClientWrapper.apply
@@ -75,15 +79,12 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
-  private val FailOnDataLossOptionKey = "failondataloss"
-  private val UseSimulatedClientOptionKey = "usesimulatedclient"
-
   def sourceSchema(parameters: Map[String, String]): StructType = {
     StructType(
       Seq(
         StructField("body", StringType),
         StructField("offset", LongType),
-        StructField("seqNumber", LongType),
+        StructField("sequenceNumber", LongType),
         StructField("enqueuedTime", TimestampType),
         StructField("publisher", StringType),
         StructField("partitionKey", StringType)

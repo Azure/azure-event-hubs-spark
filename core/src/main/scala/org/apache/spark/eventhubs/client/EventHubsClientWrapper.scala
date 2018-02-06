@@ -139,7 +139,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   }
 
   /**
-   * Translate will take any starting point, and then return the corresponding Offset and SequenceNumber.
+   * Convert any starting positions to the corresponding sequence number.
    */
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int): Map[PartitionId, SequenceNumber] = {
@@ -147,10 +147,11 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
     val needsTranslation = ParVector[Int]()
 
-    val positions: Map[PartitionId, EventPosition] =
-      ehConf.startingPositions.getOrElse(Map.empty)
+    val positions = ehConf.startingPositions.getOrElse(Map.empty).par
     val defaultPos = ehConf.startingPosition.getOrElse(DefaultEventPosition)
 
+    // Partitions which have a sequence number position are put in result.
+    // All other partitions need to be translated into sequence numbers by the service.
     (0 until partitionCount).par.foreach { id =>
       val position = positions.getOrElse(id, defaultPos)
       if (position.seqNo >= 0L) {
@@ -160,26 +161,30 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
       }
     }
 
-    val threads = for (partitionId <- needsTranslation)
-      yield
-        new Thread {
-          override def run(): Unit = {
-            val receiver = client
-              .createReceiver(DefaultConsumerGroup,
-                              partitionId.toString,
-                              positions.getOrElse(partitionId, defaultPos).convert)
-              .get
-            receiver.setPrefetchCount(PrefetchCountMinimum)
-            val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
-            receiver.close().get()
-            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
-          }
+    val threads = ParVector[Thread]()
+    needsTranslation.foreach(partitionId => {
+      threads :+ new Thread {
+        override def run(): Unit = {
+          val receiver = client
+            .createReceiver(DefaultConsumerGroup,
+                            partitionId.toString,
+                            positions.getOrElse(partitionId, defaultPos).convert)
+            .get
+          receiver.setPrefetchCount(PrefetchCountMinimum)
+          val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
+          receiver.close().get()
+          result.put(partitionId, event.getSystemProperties.getSequenceNumber)
         }
+      }
+    })
 
-    logInfo("translate: Starting threads to translate to (offset, sequence number) pairs.")
+    logInfo("translate: Starting threads to translate to sequence number.")
     threads.foreach(_.start())
     threads.foreach(_.join())
     logInfo("translate: Translation complete.")
+
+    require(partitionCount == result.size)
+
     result.asScala.toMap.mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }
     }

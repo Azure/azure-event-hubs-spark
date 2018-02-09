@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming.eventhubs
+package org.apache.spark.sql.eventhubs
 
-import org.apache.spark.eventhubs.NameAndPartition
-import org.apache.spark.eventhubs.SequenceNumber
+import org.apache.spark.eventhubs.{ NameAndPartition, SequenceNumber }
 import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset }
 
 private[eventhubs] case class EventHubsSourceOffset(

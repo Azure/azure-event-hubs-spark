@@ -15,24 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming.eventhubs
+package org.apache.spark.sql.eventhubs
 
 import java.util.Locale
 
-import org.apache.spark.eventhubs._
-import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.client.Client
-import org.apache.spark.eventhubs.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.{ EventHubsConf, _ }
+import org.apache.spark.eventhubs.client.{ Client, EventHubsClientWrapper }
 import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.execution.streaming.Source
-import org.apache.spark.sql.sources.{ DataSourceRegister, StreamSourceProvider }
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 
+/**
+ * The provider class for the [[EventHubsSource]].
+ */
 private[sql] class EventHubsSourceProvider
     extends DataSourceRegister
     with StreamSourceProvider
+    with RelationProvider
     with Logging {
 
   import EventHubsConf._
@@ -43,7 +45,7 @@ private[sql] class EventHubsSourceProvider
                             schema: Option[StructType],
                             providerName: String,
                             parameters: Map[String, String]): (String, StructType) = {
-    (shortName(), EventHubsSourceProvider.sourceSchema(parameters))
+    (shortName(), EventHubsSourceProvider.eventhubSchema)
   }
 
   override def createSource(sqlContext: SQLContext,
@@ -65,21 +67,35 @@ private[sql] class EventHubsSourceProvider
                         failOnDataLoss(caseInsensitiveParameters))
   }
 
-  private def failOnDataLoss(caseInsensitiveParams: Map[String, String]) =
-    caseInsensitiveParams.getOrElse(FailOnDataLossKey, DefaultFailOnDataLoss).toBoolean
+  override def createRelation(sqlContext: SQLContext,
+                              parameters: Map[String, String]): BaseRelation = {
+    EventHubsClientWrapper.userAgent =
+      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
 
-  private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client =
+    val caseInsensitiveMap = parameters.map { case (k, v) => (k.toLowerCase(Locale.ROOT), v) }
+
+    new EventHubsRelation(sqlContext,
+                          parameters,
+                          failOnDataLoss(caseInsensitiveMap),
+                          clientFactory(caseInsensitiveMap))
+  }
+
+  private def failOnDataLoss(caseInsensitiveParams: Map[String, String]) =
+    caseInsensitiveParams.getOrElse(FailOnDataLossKey.toLowerCase, DefaultFailOnDataLoss).toBoolean
+
+  private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client = {
     if (caseInsensitiveParams
-          .getOrElse(UseSimulatedClientKey, DefaultUseSimulatedClient)
+          .getOrElse(UseSimulatedClientKey.toLowerCase, DefaultUseSimulatedClient)
           .toBoolean) {
       SimulatedClient.apply
     } else {
       EventHubsClientWrapper.apply
     }
+  }
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
-  def sourceSchema(parameters: Map[String, String]): StructType = {
+  def eventhubSchema: StructType = {
     StructType(
       Seq(
         StructField("body", StringType),

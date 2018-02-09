@@ -84,6 +84,8 @@ private[spark] class EventHubsTestUtils {
   }
 
   def getEventHubsConf(ehName: String = "name"): EventHubsConf = {
+    val partitionCount = getEventHubs(ehName).partitionCount
+
     val connectionString = ConnectionStringBuilder()
       .setNamespaceName("namespace")
       .setEventHubName(ehName)
@@ -92,7 +94,7 @@ private[spark] class EventHubsTestUtils {
       .build
 
     val positions: Map[PartitionId, EventPosition] = (for {
-      partitionId <- 0 until DefaultPartitionCount
+      partitionId <- 0 until partitionCount
     } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
 
     EventHubsConf(connectionString)
@@ -252,19 +254,29 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   }
 
   override def translate[T](ehConf: EventHubsConf,
-                            partitionCount: Int): Map[PartitionId, SequenceNumber] = {
+                            partitionCount: Int,
+                            useStarting: Boolean = true): Map[PartitionId, SequenceNumber] = {
 
-    val positions = ehConf.startingPositions.getOrElse(Map.empty)
+    if (useStarting) {
+      val positions = ehConf.startingPositions.getOrElse(Map.empty)
 
-    if (positions.isEmpty) {
-      val position = ehConf.startingPosition.get
-      require(position.seqNo >= 0L)
+      if (positions.isEmpty) {
+        val position = ehConf.startingPosition.get
+        require(position.seqNo >= 0L)
 
-      (for { id <- 0 until partitionCount } yield id -> position.seqNo).toMap
+        (for { id <- 0 until partitionCount } yield id -> position.seqNo).toMap
+      } else {
+        require(positions.forall(x => x._2.seqNo >= 0L))
+        require(positions.size == partitionCount)
+
+        positions.mapValues(_.seqNo).mapValues { seqNo =>
+          { if (seqNo == -1L) 0L else seqNo }
+        }
+      }
     } else {
-      require(positions.forall(x => x._2.seqNo >= 0L))
-      require(positions.size == partitionCount)
+      val positions = ehConf.endingPositions.getOrElse(Map.empty)
 
+      assert(positions.nonEmpty)
       positions.mapValues(_.seqNo).mapValues { seqNo =>
         { if (seqNo == -1L) 0L else seqNo }
       }

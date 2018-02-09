@@ -38,10 +38,12 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
   override def beforeAll: Unit = {
     testUtils = new EventHubsTestUtils
+    testUtils.createEventHubs("name", partitionCount = 4)
   }
 
   override def afterAll(): Unit = {
     if (testUtils != null) {
+      testUtils.destroyAllEventHubs()
       testUtils = null
     }
   }
@@ -134,12 +136,12 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   }
 
   test("name") {
-    val conf = testUtils.getEventHubsConf("foo")
-    assert(conf.name == "foo")
+    val conf = testUtils.getEventHubsConf()
+    assert(conf.name == "name")
   }
 
   test("setName") {
-    val conf = testUtils.getEventHubsConf("foo")
+    val conf = testUtils.getEventHubsConf()
     val expected = ConnectionStringBuilder(expectedConnStr)
       .setEventHubName("bar")
       .build

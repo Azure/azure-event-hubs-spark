@@ -142,13 +142,23 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
    * Convert any starting positions to the corresponding sequence number.
    */
   override def translate[T](ehConf: EventHubsConf,
-                            partitionCount: Int): Map[PartitionId, SequenceNumber] = {
+                            partitionCount: Int,
+                            useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
 
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
     val needsTranslation = ParVector[Int]()
 
-    val positions = ehConf.startingPositions.getOrElse(Map.empty).par
-    val defaultPos = ehConf.startingPosition.getOrElse(DefaultEventPosition)
+    val positions = if (useStart) {
+      ehConf.startingPositions.getOrElse(Map.empty).par
+    } else {
+      ehConf.endingPositions.getOrElse(Map.empty).par
+    }
+
+    val defaultPos = if (useStart) {
+      ehConf.startingPosition.getOrElse(DefaultEventPosition)
+    } else {
+      ehConf.endingPosition.getOrElse(DefaultEndingPosition)
+    }
 
     // Partitions which have a sequence number position are put in result.
     // All other partitions need to be translated into sequence numbers by the service.

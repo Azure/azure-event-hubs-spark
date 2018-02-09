@@ -15,19 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming.eventhubs
+package org.apache.spark.sql.eventhubs
 
 import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition }
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
+import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{ count, window }
-import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.streaming.util.StreamManualClock
+import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -102,8 +102,8 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
 class EventHubsSourceSuite extends EventHubsSourceTest {
 
-  import testImplicits._
   import EventHubsTestUtils._
+  import testImplicits._
 
   private val eventHubsId = new AtomicInteger(0)
 
@@ -143,9 +143,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   testWithUninterruptibleThread("deserialization of initial offset written by future version") {
-    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    testUtils.populateUniformly(eventHub.name, 5000)
-
     withTempDir { metadataPath =>
       val futureMetadataLog =
         new HDFSMetadataLog[EventHubsSourceOffset](sqlContext.sparkSession,
@@ -159,6 +156,8 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
         }
 
       val eh = newEventHubs()
+      testUtils.createEventHubs(eh, DefaultPartitionCount)
+      testUtils.populateUniformly(eh, 5000)
       val parameters = getEventHubsConf(eh).toMap
 
       val offset = EventHubsSourceOffset((eh, 0, 0L), (eh, 1, 0L), (eh, 2, 0L))
@@ -559,7 +558,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val row = rows(0)
     assert(row.getAs[String]("body") === "1", s"Unexpected results: $row")
     assert(row.getAs[Long]("offset") === 0L, s"Unexpected results: $row")
-    assert(row.getAs[Long]("seqNumber") === 0, s"Unexpected results: $row")
+    assert(row.getAs[Long]("sequenceNumber") === 0, s"Unexpected results: $row")
     assert(row.getAs[String]("publisher") === null, s"Unexpected results: $row")
     assert(row.getAs[String]("partitionKey") === null, s"Unexpected results: $row")
     // We cannot check the exact timestamp as it's the time that messages were inserted by the

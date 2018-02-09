@@ -47,7 +47,7 @@ class EventHubsTestUtilsSuite
     }
   }
 
-  private def getEventHubsConf: EventHubsConf = testUtils.getEventHubsConf()
+  private def getEventHubsConf(name: String): EventHubsConf = testUtils.getEventHubsConf(name)
 
   private val eventHubsId = new AtomicInteger(0)
 
@@ -99,8 +99,9 @@ class EventHubsTestUtilsSuite
   }
 
   test("translate") {
-    val conf = getEventHubsConf
-    testUtils.createEventHubs(conf.name, DefaultPartitionCount)
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, DefaultPartitionCount)
+    val conf = getEventHubsConf(eh)
     val client = SimulatedClient(conf)
     assert(
       client.translate(conf, client.partitionCount) === conf.startingPositions.get

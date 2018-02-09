@@ -211,6 +211,51 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
+   * Sets the default ending position for all partitions. Only relevant for batch style queries
+   * in Structured Streaming.
+   *
+   * Per partition configuration is allowed using [[setEndingPositions()]]. If nothing is set
+   * in [[setEndingPositions()]], then the value set here (in [[setEndingPosition()]]) is used.
+   * If nothing is set here, then we will use the default value (which is the end of the stream).
+   *
+   * @param eventPosition the default position to start receiving events from.
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setEndingPosition(eventPosition: EventPosition): EventHubsConf = {
+    set(EndingPositionKey, EventHubsConf.write(eventPosition))
+  }
+
+  /**
+   * The currently set starting position.
+   * @see [[EventPosition]]
+   */
+  def endingPosition: Option[EventPosition] = {
+    self.get(EndingPositionKey) map EventHubsConf.read[EventPosition]
+  }
+
+  /**
+   * Sets ending positions on a per partition basis. This is only relevant for batch-styled
+   * queries in Structured Streaming. If nothing is set here, then the position set in
+   * [[setEndingPosition]] is used. If nothing is set in [[setEndingPosition]], then the default
+   * value is used. The default value is the end of the stream.
+   *
+   * @param eventPositions a map of partition ids (ints) to [[EventPosition]]s
+   * @return the updated [[EventHubsConf]] instance
+   * @see [[EventPosition]]
+   */
+  def setEndingPositions(eventPositions: Map[PartitionId, EventPosition]): EventHubsConf = {
+    set(EndingPositionsKey, EventHubsConf.write(eventPositions))
+  }
+
+  /**
+   * the currently set positions for particular partitions.
+   * @see [[EventPosition]]
+   */
+  def endingPositions: Option[Map[PartitionId, EventPosition]] = {
+    self.get(EndingPositionsKey) map EventHubsConf.read[Map[PartitionId, EventPosition]]
+  }
+
+  /**
    * maxRatePerPartition defines an upper bound for how many events will be
    * in a partition per batch. This method sets a max rate per partition for
    * all partitions.
@@ -331,6 +376,8 @@ object EventHubsConf extends Logging {
   val ConsumerGroupKey = "eventhubs.consumerGroup"
   val StartingPositionKey = "eventhubs.startingPosition"
   val StartingPositionsKey = "eventhubs.startingPositions"
+  val EndingPositionKey = "eventhubs.endingPosition"
+  val EndingPositionsKey = "eventhubs.endingPositions"
   val MaxRatePerPartitionKey = "eventhubs.maxRatePerPartition"
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"

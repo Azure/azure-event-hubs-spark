@@ -15,17 +15,16 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming.eventhubs
+package org.apache.spark.sql.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
-import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.eventhubs.client.Client
-import org.apache.spark.eventhubs._
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.catalyst.InternalRow
@@ -48,8 +47,8 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     extends Source
     with Logging {
 
-  import EventHubsSource._
   import EventHubsConf._
+  import EventHubsSource._
 
   private lazy val partitionCount: Int = ehClient.partitionCount
 
@@ -115,7 +114,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private var currentSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
 
-  override def schema: StructType = EventHubsSourceProvider.sourceSchema(options)
+  override def schema: StructType = EventHubsSourceProvider.eventhubSchema
 
   override def getOffset: Option[Offset] = {
     // Make sure initialPartitionSeqNos is initialized

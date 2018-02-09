@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming.eventhubs
+package org.apache.spark.sql.eventhubs
 
 import java.io.File
 

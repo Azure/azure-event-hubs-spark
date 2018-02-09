@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.streaming.eventhubs
+package org.apache.spark.sql.eventhubs
 
-import org.apache.spark.eventhubs.NameAndPartition
-import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.{ NameAndPartition, _ }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 

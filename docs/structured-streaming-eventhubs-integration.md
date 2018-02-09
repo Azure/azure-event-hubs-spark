@@ -119,7 +119,36 @@ val df = spark
 ```
 
 ### Creating an Event Hubs Source for Batch Queries 
-Coming soon
+
+```scala
+// Simple batch query
+val df = spark
+  .read
+  .format("eventhubs")
+  .options(ehConf.toMap)
+  .load()
+df.select("body").as[String]
+
+// start from same place across all partitions. end at the same place accross all partitions.
+val ehConf = EventHubsConf("VALID.CONNECTION.STRING")
+  .setStartingPosition(EventPosition.fromSequenceNumber(1000L)
+  .setEndingPosition(EventPosition.fromEnqueuedTime(Instant.now)
+
+// per partition config
+val start = Map(
+  0 -> EventPosition.fromSequenceNumber(1000L),
+  1 -> EventPosition.fromOffset("100")
+)
+
+val end = Map(
+  0 -> EventPosition.fromEnqueuedTime(Instant.now),
+  1 -> EventPosition.fromSequenceNumber(1000L)
+)
+
+val ehConf = EventHubsConf("VALID.CONNECTION.STRING")
+  .setStartingPositions(start)
+  .setEndingPositions(end)
+```
 
 
 Each row in the source has the following schema:

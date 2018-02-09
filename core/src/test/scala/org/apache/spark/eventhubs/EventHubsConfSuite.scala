@@ -73,10 +73,10 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     val expectedPositions = Serialization.write(
       Map(
-        0 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-        1 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-        2 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-        3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+        0 -> EventPosition.fromSequenceNumber(0L),
+        1 -> EventPosition.fromSequenceNumber(0L),
+        2 -> EventPosition.fromSequenceNumber(0L),
+        3 -> EventPosition.fromSequenceNumber(0L)
       )
     )
 
@@ -94,12 +94,12 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   }
 
   test("toConf") {
-    val expectedPosition = EventPosition.fromSequenceNumber(20L, isInclusive = true)
+    val expectedPosition = EventPosition.fromSequenceNumber(20L)
 
     val expectedPositions = Map(
-      0 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-      2 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(0L),
+      2 -> EventPosition.fromSequenceNumber(0L),
+      3 -> EventPosition.fromSequenceNumber(0L)
     )
 
     val actualConf = EventHubsConf.toConf(
@@ -153,7 +153,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   test("EventPosition serialization") {
     implicit val formats = Serialization.formats(NoTypeHints)
 
-    val expected = EventPosition.fromSequenceNumber(10L, isInclusive = true)
+    val expected = EventPosition.fromSequenceNumber(10L)
     val actual = sread[EventPosition](swrite[EventPosition](expected))
     assert(actual.equals(expected))
   }
@@ -161,7 +161,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   test("EventPosition is serialized correctly in EventHubsConf") {
     implicit val formats = Serialization.formats(NoTypeHints)
 
-    val expected = EventPosition.fromSequenceNumber(10L, isInclusive = true)
+    val expected = EventPosition.fromSequenceNumber(10L)
     val conf = testUtils.getEventHubsConf().setStartingPosition(expected)
     val actual = conf.startingPosition.get
     assert(actual.equals(expected))
@@ -171,10 +171,10 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     implicit val formats = Serialization.formats(NoTypeHints)
 
     val expected = Map(
-      0 -> EventPosition.fromSequenceNumber(3L, isInclusive = true),
-      1 -> EventPosition.fromSequenceNumber(2L, isInclusive = true),
-      2 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
-      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(3L),
+      1 -> EventPosition.fromSequenceNumber(2L),
+      2 -> EventPosition.fromSequenceNumber(1L),
+      3 -> EventPosition.fromSequenceNumber(0L)
     )
 
     val ser = swrite[Map[PartitionId, EventPosition]](expected)
@@ -187,10 +187,10 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     implicit val formats = Serialization.formats(NoTypeHints)
 
     val expected = Map(
-      0 -> EventPosition.fromSequenceNumber(3L, isInclusive = true),
-      1 -> EventPosition.fromSequenceNumber(2L, isInclusive = true),
-      2 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
-      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(3L),
+      1 -> EventPosition.fromSequenceNumber(2L),
+      2 -> EventPosition.fromSequenceNumber(1L),
+      3 -> EventPosition.fromSequenceNumber(0L)
     )
 
     val conf = testUtils.getEventHubsConf().setStartingPositions(expected)

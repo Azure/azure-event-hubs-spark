@@ -364,10 +364,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // In practice, we would use Position.fromEndOfStream which would
     // translate to the configuration below.
     val positions = Map(
-      0 -> EventPosition.fromSequenceNumber(1, isInclusive = true),
-      1 -> EventPosition.fromSequenceNumber(0, isInclusive = true),
-      2 -> EventPosition.fromSequenceNumber(0, isInclusive = true),
-      3 -> EventPosition.fromSequenceNumber(0, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(1L),
+      1 -> EventPosition.fromSequenceNumber(0L),
+      2 -> EventPosition.fromSequenceNumber(0L),
+      3 -> EventPosition.fromSequenceNumber(0L)
     )
 
     val conf = getEventHubsConf(eh)
@@ -445,11 +445,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     require(testUtils.getEventHubs(eh).getPartitions.size === 5)
 
     val positions = Map(
-      0 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-      1 -> EventPosition.fromSequenceNumber(3L, isInclusive = true),
-      2 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-      3 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
-      4 -> EventPosition.fromSequenceNumber(2L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(0L),
+      1 -> EventPosition.fromSequenceNumber(3L),
+      2 -> EventPosition.fromSequenceNumber(0L),
+      3 -> EventPosition.fromSequenceNumber(1L),
+      4 -> EventPosition.fromSequenceNumber(2L)
     )
 
     val conf = getEventHubsConf(eh)
@@ -498,10 +498,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
     val positions = Map(
-      0 -> EventPosition.fromSequenceNumber(1L, isInclusive = true),
-      1 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-      2 -> EventPosition.fromSequenceNumber(0L, isInclusive = true),
-      3 -> EventPosition.fromSequenceNumber(0L, isInclusive = true)
+      0 -> EventPosition.fromSequenceNumber(1L),
+      1 -> EventPosition.fromSequenceNumber(0L),
+      2 -> EventPosition.fromSequenceNumber(0L),
+      3 -> EventPosition.fromSequenceNumber(0L)
     )
 
     val conf = getEventHubsConf(eh)
@@ -535,7 +535,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf(eh)
       .setStartingPositions(Map.empty)
-      .setStartingPosition(EventPosition.fromSequenceNumber(0L, isInclusive = true))
+      .setStartingPosition(EventPosition.fromSequenceNumber(0L))
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 
@@ -575,7 +575,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf(eh)
       .setStartingPositions(Map.empty)
-      .setStartingPosition(EventPosition.fromSequenceNumber(0L, isInclusive = true))
+      .setStartingPosition(EventPosition.fromSequenceNumber(0L))
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 

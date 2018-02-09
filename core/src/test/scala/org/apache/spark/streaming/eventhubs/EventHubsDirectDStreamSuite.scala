@@ -156,7 +156,7 @@ class EventHubsDirectDStreamSuite
 
     val ehConf = getEventHubsConf(eventHub.name)
       .setStartingPositions(Map.empty)
-      .setStartingPosition(EventPosition.fromSequenceNumber(startSeqNo, isInclusive = true))
+      .setStartingPosition(EventPosition.fromSequenceNumber(startSeqNo))
 
     val batchInterval = 1000
     val timeoutAfter = 10000
@@ -217,7 +217,7 @@ class EventHubsDirectDStreamSuite
 
     val positions = (for {
       id <- 0 until DefaultPartitionCount
-    } yield id -> EventPosition.fromSequenceNumber(EventsPerPartition, isInclusive = true)).toMap
+    } yield id -> EventPosition.fromSequenceNumber(EventsPerPartition)).toMap
 
     val ehConf =
       getEventHubsConf(eventHub.name).setStartingPositions(positions)
@@ -249,7 +249,7 @@ class EventHubsDirectDStreamSuite
 
     val ehConf = getEventHubsConf(eventHub.name)
       .setStartingPositions(Map.empty)
-      .setStartingPosition(EventPosition.fromSequenceNumber(0L, isInclusive = true))
+      .setStartingPosition(EventPosition.fromSequenceNumber(0L))
 
     // Setup the streaming context
     ssc = new StreamingContext(sparkConf, Milliseconds(100))

@@ -31,7 +31,7 @@ import com.microsoft.azure.eventhubs.{ EventPosition => ehep }
 case class EventPosition private (offset: String = null,
                                   seqNo: Long = -1L,
                                   enqueuedTime: Date = null,
-                                  isInclusive: Boolean = false)
+                                  isInclusive: Boolean = true)
     extends Serializable {
 
   private[eventhubs] def convert: ehep = {
@@ -67,11 +67,10 @@ object EventPosition {
    * Set isInclusive to true for the specified event to be included.
    *
    * @param offset is the byte offset of the event.
-   * @param isInclusive will include the specified event when set to true; otherwise, the next event is returned.
    * @return An [[EventPosition]] instance.
    */
-  def fromOffset(offset: String, isInclusive: Boolean = false): EventPosition = {
-    EventPosition(offset = offset, isInclusive = isInclusive)
+  def fromOffset(offset: String): EventPosition = {
+    EventPosition(offset = offset, isInclusive = true)
   }
 
   /**
@@ -79,12 +78,11 @@ object EventPosition {
    * Set isInclusive to true for the specified event to be included.
    *
    * @param seqNo is the sequence number of the event.
-   * @param isInclusive will include the specified event when set to true; otherwise, the next event is returned.
    * @return An [[EventPosition]] instance.
    */
-  def fromSequenceNumber(seqNo: SequenceNumber, isInclusive: Boolean = false): EventPosition = {
+  def fromSequenceNumber(seqNo: SequenceNumber): EventPosition = {
     require(seqNo >= 0L, "Please pass a positive sequence number.")
-    EventPosition(seqNo = seqNo, isInclusive = isInclusive)
+    EventPosition(seqNo = seqNo, isInclusive = true)
   }
 
   /**
@@ -104,7 +102,7 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromStartOfStream: EventPosition = {
-    EventPosition.fromOffset(StartOfStream, isInclusive = true)
+    EventPosition(StartOfStream)
   }
 
   /**
@@ -114,6 +112,6 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromEndOfStream: EventPosition = {
-    EventPosition.fromOffset(EndOfStream)
+    EventPosition(EndOfStream)
   }
 }

@@ -61,7 +61,7 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
   private def createPositions(seqNo: Long, partitionCount: Int) = {
     (for {
       p <- 0 until partitionCount
-    } yield p -> EventPosition.fromSequenceNumber(seqNo, isInclusive = true)).toMap
+    } yield p -> EventPosition.fromSequenceNumber(seqNo)).toMap
   }
 
   test("explicit earliest to latest events") {

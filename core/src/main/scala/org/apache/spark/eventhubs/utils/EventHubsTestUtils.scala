@@ -95,7 +95,7 @@ private[spark] class EventHubsTestUtils {
 
     val positions: Map[PartitionId, EventPosition] = (for {
       partitionId <- 0 until partitionCount
-    } yield partitionId -> EventPosition.fromSequenceNumber(0L, isInclusive = true)).toMap
+    } yield partitionId -> EventPosition.fromSequenceNumber(0L)).toMap
 
     EventHubsConf(connectionString)
       .setConsumerGroup("consumerGroup")

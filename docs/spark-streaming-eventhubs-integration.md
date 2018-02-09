@@ -24,9 +24,9 @@ in our library.
 #### IoT Hub
 If using IoT Hub, follow these instructions to get your EventHubs-compatible connection string: 
 
-    1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
-    2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
-    3. Find your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.
+1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
+2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
+3. Find your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.
 
 ```scala
 import org.apache.spark.eventhubs.ConnectionStringBuilder
@@ -69,14 +69,13 @@ Additionally, the follow configurations are optional:
 
 | Option | value | default | query type | meaning |
 | ------ | ----- | ------- | ---------- | ------- |
-| consumerGroup | `String` | "$Default" | N/A | A consuer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
-| startingPositions | `Map[PartitionId, EventPosition]` | start of stream | N/A | Starting positions for specific partitions. If any positions are set in this option, they take priority when starting the Structured Streaming job. If nothing is configured for a specific partition, then the `EventPosition` set in startingPosition is used. If no position set there, we will start consuming from the beginning of the partition. |
-| startingPosition | `EventPosition` | start of stream | N/A | The starting position for your Structured Streaming job. If a specific EventPosition is *not* set for a partition using startingPositions, then we use the `EventPosition` set in startingPosition. If nothing is set in either option, we will begin consuming from the beginning of the partition. |
-| failOnDataLoss | `true` or `false` | true | N/A | Whether to fail the query when it's possible that data is lost (e.g. when sequence numbers are out of range). This may be a false alarm. You can disable it when it doesn't work as you expected. | 
-| maxRatesPerPartition | `Map[PartitionId, Long]` | None | N/A | Rate limits on a per partition basis. Specify the maximum number of events to be processed on a certain partition within a batch interval. If nothing is set here, `maxRatePerPartition` is used. If nothing is set in there, the default value (1000) is used. | 
-| maxRatePerPartition | `long` | 1000 | N/A | Rate limit on maximum number of events processed per partition per batch interval. | 
-| receiverTimeout | `java.time.Duration` | 60 seconds | N/A | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
-| operationTimeout | `java.time.Duration` | 60 seconds | N/A | The amount of time Event Hub API calls will be retried before throwing an exception. |
+| consumerGroup | `String` | "$Default" | RDD and DStream | A consuer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
+| startingPositions | `Map[PartitionId, EventPosition]` | start of stream | RDD and DStream | Starting positions for specific partitions. If any positions are set in this option, they take priority when starting the Structured Streaming job. If nothing is configured for a specific partition, then the `EventPosition` set in startingPosition is used. If no position set there, we will start consuming from the beginning of the partition. |
+| startingPosition | `EventPosition` | start of stream | DStream only | The starting position for your Structured Streaming job. If a specific EventPosition is *not* set for a partition using startingPositions, then we use the `EventPosition` set in startingPosition. If nothing is set in either option, we will begin consuming from the beginning of the partition. |
+| maxRatesPerPartition | `Map[PartitionId, Long]` | None | DStream only | Rate limits on a per partition basis. Specify the maximum number of events to be processed on a certain partition within a batch interval. If nothing is set here, `maxRatePerPartition` is used. If nothing is set in there, the default value (1000) is used. | 
+| maxRatePerPartition | `long` | 1000 | DStream only | Rate limit on maximum number of events processed per partition per batch interval. | 
+| receiverTimeout | `java.time.Duration` | 60 seconds | RDD and DStream | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
+| operationTimeout | `java.time.Duration` | 60 seconds | RDD and DStream | The amount of time Event Hub API calls will be retried before throwing an exception. |
 
 ## Creating a Direct Stream
 

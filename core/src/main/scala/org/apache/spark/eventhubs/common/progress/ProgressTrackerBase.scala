@@ -17,16 +17,18 @@
 
 package org.apache.spark.eventhubs.common.progress
 
-import java.io.{ BufferedReader, IOException, InputStreamReader }
-import java.util.concurrent.{ ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit }
+import java.io.{BufferedReader, IOException, InputStreamReader}
+import java.util.concurrent.{ScheduledFuture, ScheduledThreadPoolExecutor, TimeUnit}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import com.microsoft.azure.eventhubs.PartitionReceiver
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
-import org.apache.spark.eventhubs.common.{ NameAndPartition, EventHubsConnector, OffsetRecord }
+import org.apache.spark.eventhubs.common.{EventHubsConnector, NameAndPartition, OffsetRecord}
 import org.apache.spark.internal.Logging
+
+import scala.util.{Failure, Try}
 
 private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
     progressDir: String,
@@ -467,14 +469,21 @@ private[spark] abstract class ProgressTrackerBase[T <: EventHubsConnector](
   private def scheduleMetadataCleanTask(): ScheduledFuture[_] = {
     val metadataCleanTask = new Runnable {
       override def run(): Unit = {
-        val fs = metadataDirectoryPath.getFileSystem(new Configuration())
-        val allMetadataFiles = fs.listStatus(metadataDirectoryPath)
-        val sortedMetadataFiles = allMetadataFiles.sortWith(
-          (f1, f2) =>
-            f1.getPath.getName.toLong <
-              f2.getPath.getName.toLong)
-        sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map { file =>
-          fs.delete(file.getPath, true)
+        Try {
+          val fs = metadataDirectoryPath.getFileSystem(new Configuration())
+          if (fs.exists(metadataDirectoryPath)) {
+            val allMetadataFiles = fs.listStatus(metadataDirectoryPath)
+            val sortedMetadataFiles = allMetadataFiles.sortWith(
+              (f1, f2) =>
+                f1.getPath.getName.toLong <
+                  f2.getPath.getName.toLong)
+            sortedMetadataFiles.take(math.max(sortedMetadataFiles.length - 1, 0)).map { file =>
+              fs.delete(file.getPath, true)
+            }
+          }
+        } match {
+          case Failure(exception) => logError("clean metadata failed", exception)
+          case _ =>
         }
       }
     }

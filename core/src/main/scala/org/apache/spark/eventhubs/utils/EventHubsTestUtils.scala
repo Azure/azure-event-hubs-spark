@@ -93,9 +93,9 @@ private[spark] class EventHubsTestUtils {
       .setSasKey("key")
       .build
 
-    val positions: Map[PartitionId, EventPosition] = (for {
+    val positions: Map[NameAndPartition, EventPosition] = (for {
       partitionId <- 0 until partitionCount
-    } yield partitionId -> EventPosition.fromSequenceNumber(0L)).toMap
+    } yield NameAndPartition(ehName, partitionId) -> EventPosition.fromSequenceNumber(0L)).toMap
 
     EventHubsConf(connectionString)
       .setConsumerGroup("consumerGroup")
@@ -269,7 +269,7 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
         require(positions.forall(x => x._2.seqNo >= 0L))
         require(positions.size == partitionCount)
 
-        positions.mapValues(_.seqNo).mapValues { seqNo =>
+        positions.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues { seqNo =>
           { if (seqNo == -1L) 0L else seqNo }
         }
       }
@@ -277,7 +277,7 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
       val positions = ehConf.endingPositions.getOrElse(Map.empty)
 
       assert(positions.nonEmpty)
-      positions.mapValues(_.seqNo).mapValues { seqNo =>
+      positions.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues { seqNo =>
         { if (seqNo == -1L) 0L else seqNo }
       }
     }

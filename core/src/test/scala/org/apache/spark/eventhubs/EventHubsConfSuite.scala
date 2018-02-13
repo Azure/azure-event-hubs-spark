@@ -70,14 +70,15 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
   test("toMap") {
     val map = testUtils.getEventHubsConf().toMap
+    val eh = "name"
 
     val expectedPositions = Serialization.write(
       Map(
-        0 -> EventPosition.fromSequenceNumber(0L),
-        1 -> EventPosition.fromSequenceNumber(0L),
-        2 -> EventPosition.fromSequenceNumber(0L),
-        3 -> EventPosition.fromSequenceNumber(0L)
-      )
+        NameAndPartition(eh, 0) -> EventPosition.fromSequenceNumber(0L),
+        NameAndPartition(eh, 1) -> EventPosition.fromSequenceNumber(0L),
+        NameAndPartition(eh, 2) -> EventPosition.fromSequenceNumber(0L),
+        NameAndPartition(eh, 3) -> EventPosition.fromSequenceNumber(0L)
+      ).map { case (k, v) => k.toString -> v }
     )
 
     assert(map(ConnectionStringKey) == expectedConnStr)
@@ -97,9 +98,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val expectedPosition = EventPosition.fromSequenceNumber(20L)
 
     val expectedPositions = Map(
-      0 -> EventPosition.fromSequenceNumber(0L),
-      2 -> EventPosition.fromSequenceNumber(0L),
-      3 -> EventPosition.fromSequenceNumber(0L)
+      NameAndPartition("name", 0) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition("name", 2) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition("name", 3) -> EventPosition.fromSequenceNumber(0L)
     )
 
     val actualConf = EventHubsConf.toConf(
@@ -107,7 +108,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         ConnectionStringKey -> expectedConnStr,
         ConsumerGroupKey -> "consumerGroup",
         StartingPositionKey -> Serialization.write(expectedPosition),
-        StartingPositionsKey -> Serialization.write(expectedPositions),
+        StartingPositionsKey -> Serialization.write(expectedPositions.map {
+          case (k, v) => k.toString -> v
+        }),
         MaxEventsPerTriggerKey -> 4.toString
       ))
 
@@ -171,15 +174,18 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     implicit val formats = Serialization.formats(NoTypeHints)
 
     val expected = Map(
-      0 -> EventPosition.fromSequenceNumber(3L),
-      1 -> EventPosition.fromSequenceNumber(2L),
-      2 -> EventPosition.fromSequenceNumber(1L),
-      3 -> EventPosition.fromSequenceNumber(0L)
+      NameAndPartition("name", 0) -> EventPosition.fromSequenceNumber(3L),
+      NameAndPartition("name", 1) -> EventPosition.fromSequenceNumber(2L),
+      NameAndPartition("name", 2) -> EventPosition.fromSequenceNumber(1L),
+      NameAndPartition("name", 3) -> EventPosition.fromSequenceNumber(0L)
     )
 
-    val ser = swrite[Map[PartitionId, EventPosition]](expected)
-    val actual = sread[Map[PartitionId, EventPosition]](ser)
+    val stringKeys = expected.map { case (k, v) => k.toString -> v }
 
+    val ser = swrite[Map[String, EventPosition]](stringKeys)
+    val deser = sread[Map[String, EventPosition]](ser)
+
+    val actual = deser map { case (k, v) => NameAndPartition.fromString(k) -> v }
     assert(actual.equals(expected))
   }
 
@@ -187,10 +193,10 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     implicit val formats = Serialization.formats(NoTypeHints)
 
     val expected = Map(
-      0 -> EventPosition.fromSequenceNumber(3L),
-      1 -> EventPosition.fromSequenceNumber(2L),
-      2 -> EventPosition.fromSequenceNumber(1L),
-      3 -> EventPosition.fromSequenceNumber(0L)
+      NameAndPartition("name", 0) -> EventPosition.fromSequenceNumber(3L),
+      NameAndPartition("name", 1) -> EventPosition.fromSequenceNumber(2L),
+      NameAndPartition("name", 2) -> EventPosition.fromSequenceNumber(1L),
+      NameAndPartition("name", 3) -> EventPosition.fromSequenceNumber(0L)
     )
 
     val conf = testUtils.getEventHubsConf().setStartingPositions(expected)

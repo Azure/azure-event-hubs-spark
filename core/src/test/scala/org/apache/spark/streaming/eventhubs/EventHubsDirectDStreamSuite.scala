@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.{ AtomicInteger, AtomicLong }
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition }
+import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils._
 import org.apache.spark.eventhubs.rdd.{ HasOffsetRanges, OffsetRange }
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
@@ -212,15 +212,15 @@ class EventHubsDirectDStreamSuite
   }
 
   test("receiving from largest starting offset") {
-    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    testUtils.populateUniformly(eventHub.name, EventsPerPartition)
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, DefaultPartitionCount)
+    testUtils.populateUniformly(eh, EventsPerPartition)
 
     val positions = (for {
       id <- 0 until DefaultPartitionCount
-    } yield id -> EventPosition.fromSequenceNumber(EventsPerPartition)).toMap
+    } yield NameAndPartition(eh, id) -> EventPosition.fromSequenceNumber(EventsPerPartition)).toMap
 
-    val ehConf =
-      getEventHubsConf(eventHub.name).setStartingPositions(positions)
+    val ehConf = getEventHubsConf(eh).setStartingPositions(positions)
     val batchInterval = 1000
     val timeoutAfter = 10000
 

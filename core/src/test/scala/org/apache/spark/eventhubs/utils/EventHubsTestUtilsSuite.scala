@@ -103,9 +103,11 @@ class EventHubsTestUtilsSuite
     testUtils.createEventHubs(eh, DefaultPartitionCount)
     val conf = getEventHubsConf(eh)
     val client = SimulatedClient(conf)
-    assert(
-      client.translate(conf, client.partitionCount) === conf.startingPositions.get
-        .mapValues(_.seqNo))
+
+    val actual = client.translate(conf, client.partitionCount)
+    val expected = conf.startingPositions.get.map { case (k, v) => k.partitionId -> v.seqNo }
+
+    assert(actual === expected)
   }
 
   test("Test simulated receiver") {

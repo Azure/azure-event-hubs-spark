@@ -19,7 +19,7 @@ package org.apache.spark.sql.eventhubs
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition }
+import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.apache.spark.sql.{ DataFrame, QueryTest }
 import org.apache.spark.sql.test.SharedSQLContext
@@ -58,10 +58,10 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
       .select("body")
   }
 
-  private def createPositions(seqNo: Long, partitionCount: Int) = {
+  private def createPositions(seqNo: Long, ehName: String, partitionCount: Int) = {
     (for {
       p <- 0 until partitionCount
-    } yield p -> EventPosition.fromSequenceNumber(seqNo)).toMap
+    } yield NameAndPartition(ehName, p) -> EventPosition.fromSequenceNumber(seqNo)).toMap
   }
 
   test("explicit earliest to latest events") {
@@ -71,8 +71,8 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
     testUtils.send(eh, 1, 10 to 19)
     testUtils.send(eh, 2, 20 to 29)
 
-    val start = createPositions(0L, partitionCount = 3)
-    val end = createPositions(10L, partitionCount = 3)
+    val start = createPositions(0L, eh, partitionCount = 3)
+    val end = createPositions(10L, eh, partitionCount = 3)
 
     val ehConf = getEventHubsConf(eh)
       .setStartingPositions(start)

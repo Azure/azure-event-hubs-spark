@@ -198,16 +198,19 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    * @see [[EventPosition]]
    */
-  def setStartingPositions(eventPositions: Map[PartitionId, EventPosition]): EventHubsConf = {
-    set(StartingPositionsKey, EventHubsConf.write(eventPositions))
+  def setStartingPositions(eventPositions: Map[NameAndPartition, EventPosition]): EventHubsConf = {
+    val m = eventPositions.map { case (k, v) => k.toString -> v }
+    set(StartingPositionsKey, EventHubsConf.write[Map[String, EventPosition]](m))
   }
 
   /**
    * The currently set positions for particular partitions.
    * @see [[EventPosition]]
    */
-  def startingPositions: Option[Map[PartitionId, EventPosition]] = {
-    self.get(StartingPositionsKey) map EventHubsConf.read[Map[PartitionId, EventPosition]]
+  def startingPositions: Option[Map[NameAndPartition, EventPosition]] = {
+    val m = self.get(StartingPositionsKey) map EventHubsConf
+      .read[Map[String, EventPosition]] getOrElse Map.empty
+    if (m.isEmpty) None else Some(m.map { case (k, v) => NameAndPartition.fromString(k) -> v })
   }
 
   /**
@@ -243,16 +246,19 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    * @see [[EventPosition]]
    */
-  def setEndingPositions(eventPositions: Map[PartitionId, EventPosition]): EventHubsConf = {
-    set(EndingPositionsKey, EventHubsConf.write(eventPositions))
+  def setEndingPositions(eventPositions: Map[NameAndPartition, EventPosition]): EventHubsConf = {
+    val m = eventPositions.map { case (k, v) => k.toString -> v }
+    set(EndingPositionsKey, EventHubsConf.write[Map[String, EventPosition]](m))
   }
 
   /**
    * the currently set positions for particular partitions.
    * @see [[EventPosition]]
    */
-  def endingPositions: Option[Map[PartitionId, EventPosition]] = {
-    self.get(EndingPositionsKey) map EventHubsConf.read[Map[PartitionId, EventPosition]]
+  def endingPositions: Option[Map[NameAndPartition, EventPosition]] = {
+    val m = self.get(EndingPositionsKey) map EventHubsConf
+      .read[Map[String, EventPosition]] getOrElse Map.empty
+    if (m.isEmpty) None else Some(m.map { case (k, v) => NameAndPartition.fromString(k) -> v })
   }
 
   /**
@@ -289,13 +295,16 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param rates a map of partition ids (ints) to their desired rates.
    * @return
    */
-  def setMaxRatesPerPartition(rates: Map[PartitionId, Rate]): EventHubsConf = {
-    set(MaxRatesPerPartitionKey, EventHubsConf.write(rates))
+  def setMaxRatesPerPartition(rates: Map[NameAndPartition, Rate]): EventHubsConf = {
+    val m = rates.map { case (k, v) => k.toString -> v }
+    set(MaxRatesPerPartitionKey, EventHubsConf.write[Map[String, Rate]](m))
   }
 
   /** A map of partition/max rate pairs that have been set by the user.  */
-  def maxRatesPerPartition: Option[Map[PartitionId, Rate]] = {
-    self.get(MaxRatesPerPartitionKey) map EventHubsConf.read[Map[PartitionId, Rate]]
+  def maxRatesPerPartition: Option[Map[NameAndPartition, Rate]] = {
+    val m = self.get(MaxRatesPerPartitionKey) map EventHubsConf
+      .read[Map[String, Rate]] getOrElse Map.empty
+    if (m.isEmpty) None else Some(m.map { case (k, v) => NameAndPartition.fromString(k) -> v })
   }
 
   /**

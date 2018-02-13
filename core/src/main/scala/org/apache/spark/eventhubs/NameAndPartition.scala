@@ -17,8 +17,10 @@
 
 package org.apache.spark.eventhubs
 
-private[spark] final class NameAndPartition(val ehName: String, val partitionId: PartitionId)
-    extends Serializable {
+import org.json4s.jackson.Serialization
+
+case class NameAndPartition(ehName: String, partitionId: Int) extends Serializable { self =>
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: NameAndPartition =>
       this.ehName == that.ehName &&
@@ -26,20 +28,19 @@ private[spark] final class NameAndPartition(val ehName: String, val partitionId:
     case _ => false
   }
 
-  override def toString: String = s"$ehName-$partitionId"
+  override def toString: String = {
+    Serialization.write(self)
+  }
 
   override def hashCode(): Rate = {
     toTuple.hashCode()
   }
 
-  def toTuple: (String, PartitionId) = (ehName, partitionId)
+  def toTuple: (String, Int) = (ehName, partitionId)
 }
 
-private[spark] object NameAndPartition {
-  def apply(ehName: String, partitionId: PartitionId) = new NameAndPartition(ehName, partitionId)
-
+private[eventhubs] object NameAndPartition {
   def fromString(str: String): NameAndPartition = {
-    val Array(name, partition) = str.split("-")
-    NameAndPartition(name, partition.toInt)
+    Serialization.read[NameAndPartition](str)
   }
 }

@@ -21,8 +21,12 @@ import java.time.Duration
 import java.util.concurrent.Executor
 
 import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
 
 package object eventhubs {
+
+  implicit val formats = Serialization.formats(NoTypeHints)
 
   val DefaultEventPosition: EventPosition = EventPosition.fromStartOfStream
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream

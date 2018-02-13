@@ -22,7 +22,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
-import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition }
+import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{ count, window }
@@ -364,10 +364,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // In practice, we would use Position.fromEndOfStream which would
     // translate to the configuration below.
     val positions = Map(
-      0 -> EventPosition.fromSequenceNumber(1L),
-      1 -> EventPosition.fromSequenceNumber(0L),
-      2 -> EventPosition.fromSequenceNumber(0L),
-      3 -> EventPosition.fromSequenceNumber(0L)
+      NameAndPartition(eh, 0) -> EventPosition.fromSequenceNumber(1L),
+      NameAndPartition(eh, 1) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition(eh, 2) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition(eh, 3) -> EventPosition.fromSequenceNumber(0L)
     )
 
     val conf = getEventHubsConf(eh)
@@ -445,11 +445,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     require(testUtils.getEventHubs(eh).getPartitions.size === 5)
 
     val positions = Map(
-      0 -> EventPosition.fromSequenceNumber(0L),
-      1 -> EventPosition.fromSequenceNumber(3L),
-      2 -> EventPosition.fromSequenceNumber(0L),
-      3 -> EventPosition.fromSequenceNumber(1L),
-      4 -> EventPosition.fromSequenceNumber(2L)
+      NameAndPartition(eh, 0) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition(eh, 1) -> EventPosition.fromSequenceNumber(3L),
+      NameAndPartition(eh, 2) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition(eh, 3) -> EventPosition.fromSequenceNumber(1L),
+      NameAndPartition(eh, 4) -> EventPosition.fromSequenceNumber(2L)
     )
 
     val conf = getEventHubsConf(eh)
@@ -498,10 +498,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
     val positions = Map(
-      0 -> EventPosition.fromSequenceNumber(1L),
-      1 -> EventPosition.fromSequenceNumber(0L),
-      2 -> EventPosition.fromSequenceNumber(0L),
-      3 -> EventPosition.fromSequenceNumber(0L)
+      NameAndPartition(eh, 0) -> EventPosition.fromSequenceNumber(1L),
+      NameAndPartition(eh, 1) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition(eh, 2) -> EventPosition.fromSequenceNumber(0L),
+      NameAndPartition(eh, 3) -> EventPosition.fromSequenceNumber(0L)
     )
 
     val conf = getEventHubsConf(eh)

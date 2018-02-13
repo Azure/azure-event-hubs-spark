@@ -146,7 +146,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
                             useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
 
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
-    val needsTranslation = ParVector[Int]()
+    val needsTranslation = ParVector[NameAndPartition]()
 
     val positions = if (useStart) {
       ehConf.startingPositions.getOrElse(Map.empty).par
@@ -163,22 +163,24 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     // Partitions which have a sequence number position are put in result.
     // All other partitions need to be translated into sequence numbers by the service.
     (0 until partitionCount).par.foreach { id =>
-      val position = positions.getOrElse(id, defaultPos)
+      val nAndP = NameAndPartition(ehConf.name, id)
+      val position = positions.getOrElse(nAndP, defaultPos)
       if (position.seqNo >= 0L) {
         result.put(id, position.seqNo)
       } else {
-        needsTranslation :+ id
+        needsTranslation :+ nAndP
       }
     }
 
     val threads = ParVector[Thread]()
-    needsTranslation.foreach(partitionId => {
+    needsTranslation.foreach(nAndP => {
+      val partitionId = nAndP.partitionId
       threads :+ new Thread {
         override def run(): Unit = {
           val receiver = client
             .createReceiver(DefaultConsumerGroup,
                             partitionId.toString,
-                            positions.getOrElse(partitionId, defaultPos).convert)
+                            positions.getOrElse(nAndP, defaultPos).convert)
             .get
           receiver.setPrefetchCount(PrefetchCountMinimum)
           val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
@@ -192,8 +194,6 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
     threads.foreach(_.start())
     threads.foreach(_.join())
     logInfo("translate: Translation complete.")
-
-    require(partitionCount == result.size)
 
     result.asScala.toMap.mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }

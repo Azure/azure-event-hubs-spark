@@ -63,9 +63,8 @@ object EventPosition {
   private val EndOfStream: String = "@latest"
 
   /**
-   * Creates a position at the given offset. By default, the specified event is not included.
-   * Set isInclusive to true for the specified event to be included.
-   *
+   * Creates a position at the given offset. When using EventHubs with Spark,
+   * starting positions are always inclusive. Ending positions are always exclusive.
    * @param offset is the byte offset of the event.
    * @return An [[EventPosition]] instance.
    */
@@ -74,8 +73,8 @@ object EventPosition {
   }
 
   /**
-   * Creates a position at the given sequence number. By default, the specified event is not included.
-   * Set isInclusive to true for the specified event to be included.
+   * Creates a position at the given sequence number. When using EventHubs with Spark,
+   * starting positions are always inclusive. Ending positions are always exclusive.
    *
    * @param seqNo is the sequence number of the event.
    * @return An [[EventPosition]] instance.

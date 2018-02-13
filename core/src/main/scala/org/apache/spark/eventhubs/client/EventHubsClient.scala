@@ -32,7 +32,7 @@ import scala.collection.parallel.immutable.ParVector
  * Wraps a raw EventHubReceiver to make it easier for unit tests
  */
 @SerialVersionUID(1L)
-private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
+private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     extends Serializable
     with Client
     with Logging {
@@ -133,7 +133,7 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   }
 
   override def close(): Unit = {
-    logInfo("close: Closing EventHubsClientWrapper.")
+    logInfo("close: Closing EventHubsClient.")
     if (receiver != null) receiver.closeSync()
     if (client != null) client.closeSync()
   }
@@ -201,9 +201,9 @@ private[spark] class EventHubsClientWrapper(private val ehConf: EventHubsConf)
   }
 }
 
-private[spark] object EventHubsClientWrapper {
-  private[spark] def apply(ehConf: EventHubsConf): EventHubsClientWrapper =
-    new EventHubsClientWrapper(ehConf)
+private[spark] object EventHubsClient {
+  private[spark] def apply(ehConf: EventHubsConf): EventHubsClient =
+    new EventHubsClient(ehConf)
 
   def userAgent: String = { EventHubClient.userAgent }
 

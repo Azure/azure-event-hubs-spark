@@ -20,7 +20,7 @@ package org.apache.spark.sql.eventhubs
 import java.util.Locale
 
 import org.apache.spark.eventhubs.{ EventHubsConf, _ }
-import org.apache.spark.eventhubs.client.{ Client, EventHubsClientWrapper }
+import org.apache.spark.eventhubs.client.{ Client, EventHubsClient }
 import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
@@ -53,7 +53,7 @@ private[sql] class EventHubsSourceProvider
                             schema: Option[StructType],
                             providerName: String,
                             parameters: Map[String, String]): Source = {
-    EventHubsClientWrapper.userAgent =
+    EventHubsClient.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
 
     val caseInsensitiveParameters = parameters.map {
@@ -69,7 +69,7 @@ private[sql] class EventHubsSourceProvider
 
   override def createRelation(sqlContext: SQLContext,
                               parameters: Map[String, String]): BaseRelation = {
-    EventHubsClientWrapper.userAgent =
+    EventHubsClient.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
 
     val caseInsensitiveMap = parameters.map { case (k, v) => (k.toLowerCase(Locale.ROOT), v) }
@@ -89,7 +89,7 @@ private[sql] class EventHubsSourceProvider
           .toBoolean) {
       SimulatedClient.apply
     } else {
-      EventHubsClientWrapper.apply
+      EventHubsClient.apply
     }
   }
 }

@@ -22,7 +22,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs._
-import org.apache.spark.eventhubs.client.EventHubsClientWrapper
+import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -116,7 +116,7 @@ private[spark] class EventHubsDirectDStream private[spark] (
     require(
       concurrentJobs == 1,
       "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
-    EventHubsClientWrapper.userAgent = s"Spark-Streaming-${ssc.sc.version}"
+    EventHubsClient.userAgent = s"Spark-Streaming-${ssc.sc.version}"
   }
 
   override def stop(): Unit = {

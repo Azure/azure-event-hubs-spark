@@ -11,33 +11,36 @@
 
 ## Code of Conduct
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/). 
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information 
+see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/). 
 
 ## Getting Started
 
 This library is relatively easy to build. To build and test this locally, make sure you've done the following:
 - Java 1.8 SDK is installed
 - Maven 3.x is installed
-- Scala 2.11.8 is installed
+- Scala 2.11.X is installed
 - A supported version of Apache Spark is installed (see [Latest Releases](/README.md#latest-releases) for supported versions). 
 
-After that, clone the code, import it into a Maven project in your favorite IDE. If the above tools are installed, everything should be build. If that's not the case for you OR you need additional help, just contact us by opening an issue in this repo! 
+After that, clone the code, import it into a Maven project in your favorite IDE. If the above tools are installed, everything should
+build. If that's not the case for you OR you need additional help, just contact us on our [gitter chat](https://gitter.im/azure-event-hubs-spark)! 
  
 ## Filing Issues
 
 You can find all of the issues that have been filed in the [Issues](https://github.com/Azure/spark-eventhubs/issues) section of the repository.
 
-If you encounter any bugs, would like to request a feature, or have general questions/concerns/comments, feel free to file an issue [here](https://github.com/Azure/spark-eventhubs/issues/new). **Don't hesitate to reach out!**
+If you encounter any bugs, would like to request a feature, or have general questions/concerns/comments, feel free to file an issue 
+[here](https://github.com/Azure/spark-eventhubs/issues/new). **Don't hesitate to reach out!**
 
 ## Pull Requests
 
-If you would like to make changes to this library, **break up the change into small, logical, testable chunks, and organize your pull requests accordingly**. This makes for a cleaner, less error-prone development process. 
+If you would like to make changes to this library, **break up the change into small, logical, testable chunks, and organize your pull 
+requests accordingly**. This makes for a cleaner, less error-prone development process. 
 
 If you'd like to get involved, but don't know what to work on, then just reach out to us by opening an issue! All contributions/efforts are welcome :) 
 
-You can find all of the pull requests that have been opened in the [Pull Request](https://github.com/Azure/azure-event-hubs-java/pulls) section of the repository.
-
-To open your own pull request, click [here](https://github.com/Azure/spark-eventhubs/compare). Please do your best to detail what's being changed and why! The more detail, the easier it is to review and merge into existing code. 
+To open your own pull request, click [here](https://github.com/Azure/spark-eventhubs/compare). Please do your best to detail what's being changed 
+and why! The more detail, the easier it is to review and merge into existing code. 
 
 #### General guidelines
 
@@ -49,7 +52,8 @@ If you're new to opening pull requests - or would like some additional guidance 
 
 #### Testing guidelines
 
-In addition to what has been mentioned, it's important to mention tests! If you add code, make sure you add enough to tests to validate your changes. Again, below is a list of best practices when contributing: 
+In addition to what has been mentioned, it's important to mention tests! If you add code, make sure you add enough to tests to validate 
+your changes. Again, below is a list of best practices when contributing: 
 
 - Pull request includes test coverage for the included changes
 - Test code should not contain hard coded values for resource names or similar values

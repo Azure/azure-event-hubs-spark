@@ -87,7 +87,7 @@ class EventHubsSourceOffsetSuite extends OffsetSuite with SharedSQLContext {
   }
 
   test("read Spark 2.1.0 offset format") {
-    val offset = readFromResource("src/test/resources/eventhubs-source-offset-version-2.1.0.txt")
+    val offset = readFromResource("eventhubs-source-offset-version-2.1.0.txt")
     assert(
       EventHubsSourceOffset(offset) ===
         EventHubsSourceOffset(("ehName1", 0, 456L), ("ehName1", 1, 789L), ("ehName2", 0, 0L)))

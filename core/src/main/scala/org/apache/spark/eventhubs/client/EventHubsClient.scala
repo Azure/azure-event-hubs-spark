@@ -145,6 +145,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                             partitionCount: Int,
                             useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
 
+    logInfo(s"translate: useStart is set to $useStart.")
+
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
     val needsTranslation = ParVector[NameAndPartition]()
 
@@ -160,6 +162,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       ehConf.endingPosition.getOrElse(DefaultEndingPosition)
     }
 
+    logInfo(s"translate: PerPartitionPositions = $positions")
+    logInfo(s"translate: Default position = $defaultPos")
+
     // Partitions which have a sequence number position are put in result.
     // All other partitions need to be translated into sequence numbers by the service.
     (0 until partitionCount).par.foreach { id =>
@@ -171,6 +176,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         needsTranslation :+ nAndP
       }
     }
+
+    logInfo(s"translate: needsTranslation = $needsTranslation")
 
     val threads = ParVector[Thread]()
     needsTranslation.foreach(nAndP => {
@@ -194,6 +201,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     threads.foreach(_.start())
     threads.foreach(_.join())
     logInfo("translate: Translation complete.")
+    logInfo(s"translate: result = $result")
 
     result.asScala.toMap.mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }

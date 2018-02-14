@@ -20,6 +20,7 @@ package org.apache.spark.eventhubs.utils
 import java.util.Date
 
 import com.microsoft.azure.eventhubs.EventData
+import com.microsoft.azure.eventhubs.impl.EventDataImpl
 import org.apache.qpid.proton.amqp.Binary
 import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
 import org.apache.qpid.proton.message.Message
@@ -165,14 +166,14 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
 
   /** Specifies the contents of each partition. */
   private[spark] class SimulatedEventHubsPartition {
-    import com.microsoft.azure.eventhubs.amqp.AmqpConstants._
+    import com.microsoft.azure.eventhubs.impl.AmqpConstants._
 
     private var data: Seq[EventData] = Seq.empty
 
     def getEvents: Seq[EventData] = data
 
     // This allows us to invoke the EventData(Message) constructor
-    private val constructor = classOf[EventData].getDeclaredConstructor(classOf[Message])
+    private val constructor = classOf[EventDataImpl].getDeclaredConstructor(classOf[Message])
     constructor.setAccessible(true)
 
     private[spark] def send(events: Seq[Int]): Unit = {
@@ -193,7 +194,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
 
         val msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
 
-        data = data :+ constructor.newInstance(msg)
+        data = data :+ constructor.newInstance(msg).asInstanceOf[EventData]
       }
     }
 
@@ -235,10 +236,10 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     self.currentSeqNo = startingSeqNo
   }
 
-  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
+  override def receive(eventCount: Int): Iterable[EventData] = {
     val events = eventHub.receive(eventCount, self.partitionId, currentSeqNo)
     currentSeqNo += eventCount
-    events
+    events.asScala
   }
 
   override def setPrefetchCount(count: Int): Unit = {

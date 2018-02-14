@@ -118,7 +118,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
       var event: EventData = null
       while (event == null) {
-        event = client.receive(1).iterator().next()
+        event = client.receive(1).iterator.next
       }
 
       assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,

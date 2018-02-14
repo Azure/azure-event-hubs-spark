@@ -23,7 +23,7 @@ import java.time.format.DateTimeParseException
 import java.util.Locale
 import java.util.regex.Pattern
 
-import com.microsoft.azure.eventhubs.{ MessagingFactory, StringUtil }
+import com.microsoft.azure.eventhubs.impl.{ MessagingFactory, StringUtil }
 
 /**
  * [[ConnectionStringBuilder]] can be used to construct a connection string which can establish communication with EventHub instances.

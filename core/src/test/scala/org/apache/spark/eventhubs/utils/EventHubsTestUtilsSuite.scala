@@ -128,7 +128,7 @@ class EventHubsTestUtilsSuite
     val client = SimulatedClient(conf)
     client.createReceiver(partitionId = "0", 20)
     val event = client.receive(1)
-    assert(event.iterator().next().getSystemProperties.getSequenceNumber === 20)
+    assert(event.iterator.next.getSystemProperties.getSequenceNumber === 20)
   }
 
   test("latestSeqNo") {

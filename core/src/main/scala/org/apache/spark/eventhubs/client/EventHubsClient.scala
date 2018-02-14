@@ -66,9 +66,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     receiver.setPrefetchCount(count)
   }
 
-  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
+  override def receive(eventCount: Int): Iterable[EventData] = {
     require(receiver != null, "receive: PartitionReceiver has not been created.")
-    receiver.receive(eventCount).get
+    receiver.receive(eventCount).get.asScala
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
@@ -183,7 +183,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                             positions.getOrElse(nAndP, defaultPos).convert)
             .get
           receiver.setPrefetchCount(PrefetchCountMinimum)
-          val event = receiver.receive(1).get.iterator().next() // get the first event that was received.
+          val event = receiver.receive(1).get.iterator.next // get the first event that was received.
           receiver.close().get()
           result.put(partitionId, event.getSystemProperties.getSequenceNumber)
         }
@@ -205,7 +205,12 @@ private[spark] object EventHubsClient {
   private[spark] def apply(ehConf: EventHubsConf): EventHubsClient =
     new EventHubsClient(ehConf)
 
-  def userAgent: String = { EventHubClient.userAgent }
+  def userAgent: String = {
+    //EventHubClient.getUserAgent
+    ""
+  }
 
-  def userAgent_=(str: String) { EventHubClient.userAgent = str }
+  def userAgent_=(str: String) {
+    //EventHubClient.setUserAgent(str)
+  }
 }

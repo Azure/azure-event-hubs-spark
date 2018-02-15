@@ -17,9 +17,10 @@
 
 package org.apache.spark.eventhubs.client
 
-import java.util.concurrent.{ ConcurrentHashMap, Executors }
+import java.util.concurrent.ConcurrentHashMap
 
 import com.microsoft.azure.eventhubs._
+import com.microsoft.azure.eventhubs.impl.EventHubClientImpl
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
@@ -41,16 +42,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   private implicit val formats = Serialization.formats(NoTypeHints)
 
-  private val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-  private val connectionString = ConnectionStringBuilder(ehConf.connectionString)
-  connectionString.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
-
-  private lazy val client: EventHubClient =
-    EventHubClient.createFromConnectionStringSync(connectionString.toString,
-                                                  Executors.newFixedThreadPool(1))
+  private var client = ClientConnectionPool.borrowClient(ehConf)
 
   private var receiver: PartitionReceiver = _
-  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber) = {
+  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (receiver == null) {
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
@@ -72,7 +68,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
-  private def getRunTimeInfo(partitionId: PartitionId): EventHubPartitionRuntimeInformation = {
+  private def getRunTimeInfo(partitionId: PartitionId): PartitionRuntimeInformation = {
     try {
       client.getPartitionRuntimeInformation(partitionId.toString).get
     } catch {
@@ -112,7 +108,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
   }
 
-  private var _partitionCount = 0
+  private var _partitionCount = -1
 
   /**
    * The number of partitions in the EventHubs instance.
@@ -120,7 +116,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return partition count
    */
   override def partitionCount: Int = {
-    if (_partitionCount == 0) {
+    if (_partitionCount == -1) {
       try {
         val runtimeInfo = client.getRuntimeInformation.get
         _partitionCount = runtimeInfo.getPartitionCount
@@ -135,7 +131,10 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   override def close(): Unit = {
     logInfo("close: Closing EventHubsClient.")
     if (receiver != null) receiver.closeSync()
-    if (client != null) client.closeSync()
+    if (client != null) {
+      ClientConnectionPool.returnClient(client)
+      client = null
+    }
   }
 
   /**
@@ -214,11 +213,10 @@ private[spark] object EventHubsClient {
     new EventHubsClient(ehConf)
 
   def userAgent: String = {
-    //EventHubClient.getUserAgent
-    ""
+    EventHubClientImpl.USER_AGENT
   }
 
   def userAgent_=(str: String) {
-    //EventHubClient.setUserAgent(str)
+    EventHubClientImpl.USER_AGENT = str
   }
 }

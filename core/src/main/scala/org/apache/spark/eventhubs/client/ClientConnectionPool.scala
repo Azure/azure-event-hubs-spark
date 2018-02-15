@@ -27,7 +27,7 @@ import org.apache.spark.internal.Logging
 /**
  *
  *
- * @param ehConf The configurations corresponding to this specific connection pool.
+ * @param ehConf The Event Hubs configurations corresponding to this specific connection pool.
  */
 private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
 
@@ -35,8 +35,8 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   private[this] val count = new AtomicInteger(0)
 
   private def borrowClient: EventHubClient = {
-    val client = Some(pool.poll())
-    if (client.isEmpty) {
+    val client = pool.poll()
+    if (client == null) {
       logInfo(
         s"No clients left to borrow. EventHub name: ${ehConf.name}. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
@@ -44,7 +44,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubClient.createFromConnectionStringSync(connStr.toString, ClientThreadPool.pool)
     } else {
       logInfo(s"Borrowing client. EventHub name: ${ehConf.name}")
-      client.get
+      client
     }
   }
 

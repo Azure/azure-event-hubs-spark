@@ -42,8 +42,7 @@ import org.apache.spark.unsafe.types.UTF8String
 private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                          options: Map[String, String],
                                                          clientFactory: (EventHubsConf => Client),
-                                                         metadataPath: String,
-                                                         failOnDataLoss: Boolean)
+                                                         metadataPath: String)
     extends Source
     with Logging {
 
@@ -243,12 +242,8 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // Calculate offset ranges
     val offsetRanges = (for {
       p <- partitions
-      fromSeqNo = fromSeqNos.get(p).getOrElse {
-        newPartitionSeqNos.getOrElse(p, {
-          // This should never happen.
-          throw new IllegalStateException(s"$p doesn't have a fromSeqNo")
-        })
-      }
+      fromSeqNo = fromSeqNos
+        .getOrElse(p, throw new IllegalStateException(s"$p doesn't have a fromSeqNo"))
       untilSeqNo = untilSeqNos(p)
       // preferredLoc - coming soon
     } yield OffsetRange(p, fromSeqNo, untilSeqNo)).filter { range =>
@@ -290,29 +285,17 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
    * Otherwise, just log a warning.
    */
   private def reportDataLoss(message: String): Unit = {
-    if (failOnDataLoss) {
-      throw new IllegalStateException(message + s". $InstructionsForFailOnDataLossTrue")
-    } else {
-      logWarning(message + s". $InstructionsForFailOnDataLossFalse")
-    }
+    logWarning(message + s". $InstructionsForPotentialDataLoss")
   }
 }
 
 private[eventhubs] object EventHubsSource {
-  val InstructionsForFailOnDataLossFalse =
+  val InstructionsForPotentialDataLoss =
     """
       |Some data may have been lost because they are not available in EventHubs any more; either the
       | data was aged out by EventHubs or the EventHubs instance may have been deleted before all the data in the
       | instance was processed. If you want your streaming query to fail on such cases, set the source
       | option "failOnDataLoss" to "true".
-    """.stripMargin
-
-  val InstructionsForFailOnDataLossTrue =
-    """
-      |Some data may have been lost because they are not available in EventHubs any more; either the
-      | data was aged out by EventHubs or the EventHubs instance may have been deleted before all the data in the
-      | instance was processed. If you don't want your streaming query to fail on such cases, set the
-      | source option "failOnDataLoss" to "false".
     """.stripMargin
 
   private[eventhubs] val VERSION = 1

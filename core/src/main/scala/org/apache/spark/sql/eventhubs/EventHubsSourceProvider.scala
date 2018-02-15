@@ -63,8 +63,7 @@ private[sql] class EventHubsSourceProvider
     new EventHubsSource(sqlContext,
                         parameters,
                         clientFactory(caseInsensitiveParameters),
-                        metadataPath,
-                        failOnDataLoss(caseInsensitiveParameters))
+                        metadataPath)
   }
 
   override def createRelation(sqlContext: SQLContext,
@@ -74,14 +73,8 @@ private[sql] class EventHubsSourceProvider
 
     val caseInsensitiveMap = parameters.map { case (k, v) => (k.toLowerCase(Locale.ROOT), v) }
 
-    new EventHubsRelation(sqlContext,
-                          parameters,
-                          failOnDataLoss(caseInsensitiveMap),
-                          clientFactory(caseInsensitiveMap))
+    new EventHubsRelation(sqlContext, parameters, clientFactory(caseInsensitiveMap))
   }
-
-  private def failOnDataLoss(caseInsensitiveParams: Map[String, String]) =
-    caseInsensitiveParams.getOrElse(FailOnDataLossKey.toLowerCase, DefaultFailOnDataLoss).toBoolean
 
   private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client = {
     if (caseInsensitiveParams

@@ -124,8 +124,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val source = new EventHubsSource(sqlContext,
                                        parameters,
                                        SimulatedClient.apply,
-                                       metadataPath.getAbsolutePath,
-                                       true)
+                                       metadataPath.getAbsolutePath)
 
       source.getOffset.get // Write initial offset
 
@@ -166,8 +165,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val source = new EventHubsSource(sqlContext,
                                        parameters,
                                        SimulatedClient.apply,
-                                       metadataPath.getAbsolutePath,
-                                       true)
+                                       metadataPath.getAbsolutePath)
 
       val e = intercept[java.lang.IllegalStateException] {
         source.getOffset.get // Read initial offset
@@ -338,24 +336,22 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
-  for (failOnDataLoss <- Seq(true, false)) {
-    test(s"assign from latest offsets (failOnDataLoss: $failOnDataLoss)") {
-      val eh = newEventHubs()
-      testFromLatestSeqNos(eh, failOnDataLoss = failOnDataLoss)
-    }
-
-    test(s"assign from earliest offsets (failOnDataLoss: $failOnDataLoss)") {
-      val eh = newEventHubs()
-      testFromEarliestSeqNos(eh, failOnDataLoss = failOnDataLoss)
-    }
-
-    test(s"assign from specific offsets (failOnDataLoss: $failOnDataLoss)") {
-      val eh = newEventHubs()
-      testFromSpecificSeqNos(eh, failOnDataLoss = failOnDataLoss)
-    }
+  test(s"assign from latest offsets") {
+    val eh = newEventHubs()
+    testFromLatestSeqNos(eh)
   }
 
-  private def testFromLatestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
+  test(s"assign from earliest offsets") {
+    val eh = newEventHubs()
+    testFromEarliestSeqNos(eh)
+  }
+
+  test(s"assign from specific offsets") {
+    val eh = newEventHubs()
+    testFromSpecificSeqNos(eh)
+  }
+
+  private def testFromLatestSeqNos(eh: String): Unit = {
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
     testUtils.send(eh, 0, Seq(-1))
 
@@ -372,7 +368,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf(eh)
       .setStartingPositions(positions)
-      .setFailOnDataLoss(failOnDataLoss)
 
     val reader = spark.readStream
       .format("eventhubs")
@@ -403,14 +398,13 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
-  private def testFromEarliestSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
+  private def testFromEarliestSeqNos(eh: String): Unit = {
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
     testUtils.send(eh, 1 to 3) // round robin events across partitions
 
     val conf = getEventHubsConf(eh)
-      .setFailOnDataLoss(failOnDataLoss)
 
     val reader = spark.readStream
     reader
@@ -439,7 +433,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
-  private def testFromSpecificSeqNos(eh: String, failOnDataLoss: Boolean): Unit = {
+  private def testFromSpecificSeqNos(eh: String): Unit = {
     testUtils.createEventHubs(eh, partitionCount = 5)
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 5)
@@ -454,7 +448,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val conf = getEventHubsConf(eh)
       .setStartingPositions(positions)
-      .setFailOnDataLoss(failOnDataLoss)
 
     // partition 0 starts at the earliest sequence numbers, these should all be seen
     testUtils.send(eh, 0, Seq(-20, -21, -22))

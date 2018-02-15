@@ -89,7 +89,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[Exception] { map(MaxRatesPerPartitionKey) }
     intercept[Exception] { map(ReceiverTimeoutKey) }
     intercept[Exception] { map(OperationTimeoutKey) }
-    intercept[Exception] { map(FailOnDataLossKey) }
     intercept[Exception] { map(MaxEventsPerTriggerKey) }
     assert(map(UseSimulatedClientKey).toBoolean)
   }

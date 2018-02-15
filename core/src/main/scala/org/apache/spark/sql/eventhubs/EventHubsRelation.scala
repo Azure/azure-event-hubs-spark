@@ -33,7 +33,6 @@ import scala.language.postfixOps
 
 private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
                                            options: Map[String, String],
-                                           failOnDataLoss: Boolean,
                                            clientFactory: (EventHubsConf => Client))
     extends BaseRelation
     with TableScan
@@ -69,11 +68,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
 
     val offsetRanges = untilSeqNos.keySet.map { p =>
       val fromSeqNo = fromSeqNos
-        .get(p)
-        .getOrElse {
-          // This should never happen.
-          throw new IllegalStateException(s"$p doesn't have a fromSeqNo")
-        }
+        .getOrElse(p, throw new IllegalStateException(s"$p doesn't have a fromSeqNo"))
       val untilSeqNo = untilSeqNos(p)
       OffsetRange(ehConf.name, p, fromSeqNo, untilSeqNo)
     }.toArray

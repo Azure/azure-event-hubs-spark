@@ -341,14 +341,6 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(OperationTimeoutKey) map (str => Duration.parse(str))
   }
 
-  def setFailOnDataLoss(b: Boolean): EventHubsConf = {
-    set(FailOnDataLossKey, b)
-  }
-
-  def failOnDataLoss: Option[Boolean] = {
-    self.get(FailOnDataLossKey) map (str => str.toBoolean)
-  }
-
   /**
    * Rate limit on maximum number of events processed per trigger interval.
    * Only valid for Structured Streaming. The specified total number of events
@@ -391,7 +383,6 @@ object EventHubsConf extends Logging {
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
-  val FailOnDataLossKey = "failOnDataLoss"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
 

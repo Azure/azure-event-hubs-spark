@@ -43,20 +43,11 @@ private[spark] class EventHubsTestUtils {
   import EventHubsTestUtils._
 
   def send(ehName: String, data: Seq[Int]): Seq[Int] = {
-    var count = 0
-    val eventHub = eventHubs(ehName)
-    for (event <- data) {
-      val part = count % eventHub.partitionCount
-      count += 1
-      eventHub.send(part, Seq(event))
-    }
-
-    data
+    eventHubs(ehName).send(data)
   }
 
   def send(ehName: String, partitionId: PartitionId, data: Seq[Int]): Seq[Int] = {
     eventHubs(ehName).send(partitionId, data)
-    data
   }
 
   def getLatestSeqNos(ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
@@ -130,6 +121,8 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   private val partitions: Map[PartitionId, SimulatedEventHubsPartition] =
     (for { p <- 0 until partitionCount } yield p -> new SimulatedEventHubsPartition).toMap
 
+  private var count = 0
+
   def partitionSize(partitionId: PartitionId): Int = {
     partitions(partitionId).size
   }
@@ -148,8 +141,28 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     (for { _ <- 0 until eventCount } yield partitions(partitionId).get(seqNo)).asJava
   }
 
-  def send(partitionId: PartitionId, events: Seq[Int]): Unit = {
+  def send(events: Seq[Int]): Seq[Int] = {
+    for (event <- events) {
+      val part = count % this.partitionCount
+      count += 1
+      this.send(part, Seq(event))
+    }
+    events
+  }
+
+  def send(partitionId: PartitionId, events: Seq[Int]): Seq[Int] = {
     partitions(partitionId).send(events)
+    events
+  }
+
+  def send(event: EventData): Unit = {
+    val part = count % this.partitionCount
+    count += 1
+    this.send(part, event)
+  }
+
+  def send(partitionId: PartitionId, event: EventData): Unit = {
+    partitions(partitionId).send(event)
   }
 
   def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
@@ -198,6 +211,10 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       }
     }
 
+    private[spark] def send(event: EventData): Unit = {
+      data :+ event
+    }
+
     private[spark] def size = data.size
 
     private[spark] def get(index: SequenceNumber): EventData = {
@@ -242,15 +259,15 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   }
 
   override def send(event: EventData): Unit = {
-    // TODO
+    eventHub.send(event)
   }
 
   override def send(event: EventData, partitionKey: String): Unit = {
-    // TODO
+    throw new UnsupportedOperationException
   }
 
   override def send(event: EventData, partitionId: Int): Unit = {
-    // TODO
+    eventHub.send(partitionId, event)
   }
 
   override def receive(eventCount: Int): Iterable[EventData] = {

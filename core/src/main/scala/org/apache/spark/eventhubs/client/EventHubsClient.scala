@@ -45,7 +45,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   private var client = ClientConnectionPool.borrowClient(ehConf)
 
   private var receiver: PartitionReceiver = _
-  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
+  override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (receiver == null) {
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
@@ -56,6 +56,34 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         .get
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
+  }
+
+  private var partitionSender: PartitionSender = _
+  override def createPartitionSender(partitionId: Int): Unit = {
+    val id = partitionId.toString
+    if (partitionSender == null) {
+      logInfo(s"Creating partition sender for $partitionId for EventHub ${client.getEventHubName}")
+      partitionSender = client.createPartitionSenderSync(id)
+    } else if (partitionSender.getPartitionId != id) {
+      logInfo(
+        s"Closing partition sender for ${partitionSender.getPartitionId} for EventHub ${client.getEventHubName}")
+      partitionSender.closeSync()
+      logInfo(s"Creating partition sender for $partitionId for EventHub ${client.getEventHubName}")
+      partitionSender = client.createPartitionSenderSync(id)
+    }
+  }
+
+  override def send(event: EventData): Unit = {
+    client.sendSync(event)
+  }
+
+  override def send(event: EventData, partitionKey: String): Unit = {
+    client.sendSync(event, partitionKey)
+  }
+
+  override def send(event: EventData, partitionId: Int): Unit = {
+    require(partitionSender.getPartitionId.toInt == partitionId)
+    partitionSender.sendSync(event)
   }
 
   override def setPrefetchCount(count: Int): Unit = {
@@ -131,6 +159,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   override def close(): Unit = {
     logInfo("close: Closing EventHubsClient.")
     if (receiver != null) receiver.closeSync()
+    if (partitionSender != null) receiver.closeSync()
     if (client != null) {
       ClientConnectionPool.returnClient(client)
       client = null

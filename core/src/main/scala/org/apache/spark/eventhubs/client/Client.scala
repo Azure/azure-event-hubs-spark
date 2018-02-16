@@ -24,12 +24,46 @@ import org.apache.spark.eventhubs._
 private[spark] trait Client extends Serializable {
 
   /**
+   * Creates a sender which sends directly to the specified partitionId.
+   *
+   * @param partitionId the partition that will receive all events sent from this partition sender.
+   */
+  def createPartitionSender(partitionId: Int)
+
+  /**
    * Creates an EventHub receiver.
    *
    * @param partitionId the partitionId the receiver will consume from.
    * @param startingSeqNo the sequence number the receiver will start from.
    */
   def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit
+
+  /**
+   * Sends an [[EventData]] to your EventHubs.
+   *
+   * @param event the event that is being sent.
+   */
+  def send(event: EventData): Unit
+
+  /**
+   * Sends an [[EventData]] to your EventHubs with the provided
+   * partition key.
+   *
+   * @param event the event that is being sent.
+   * @param partitionKey the partitionKey will be hash'ed to determine the partitionId
+   *                     to send the events to. On the Received message this can be accessed
+   *                     at [[EventData.SystemProperties#getPartitionKey()]]
+   */
+  def send(event: EventData, partitionKey: String): Unit
+
+  /**
+   * Sends an [[EventData]] directly to the provided partitionId in your
+   * EventHubs.
+   *
+   * @param event the event that is being sent.
+   * @param partitionId the partition that will receive all events being sent.
+   */
+  def send(event: EventData, partitionId: Int): Unit
 
   /**
    * Receive events from your EventHubs instance.

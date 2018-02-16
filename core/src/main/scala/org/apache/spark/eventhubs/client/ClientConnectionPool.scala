@@ -25,7 +25,8 @@ import org.apache.spark.eventhubs._
 import org.apache.spark.internal.Logging
 
 /**
- *
+ * A connection pool for EventHubClients. If a connection isn't available in the pool, then
+ * a new one is created. If a connection idles in the pool for 5 minutes, it will be closed.
  *
  * @param ehConf The Event Hubs configurations corresponding to this specific connection pool.
  */
@@ -41,7 +42,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
         s"No clients left to borrow. EventHub name: ${ehConf.name}. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
       connStr.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
-      EventHubClient.createFromConnectionStringSync(connStr.toString, ClientThreadPool.pool)
+      EventHubClient.createSync(connStr.toString, ClientThreadPool.pool)
     } else {
       logInfo(s"Borrowing client. EventHub name: ${ehConf.name}")
       client

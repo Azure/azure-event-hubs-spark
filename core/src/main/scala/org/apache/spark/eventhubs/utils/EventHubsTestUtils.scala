@@ -227,17 +227,34 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
 
   import EventHubsTestUtils._
 
-  private var partitionId: Int = _
+  private var rPartitionId: Int = _ // used in receivers
+  private var sPartitionId: Int = _ // used in senders
   private var currentSeqNo: SequenceNumber = _
   private val eventHub = eventHubs(ehConf.name)
 
   override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
-    self.partitionId = partitionId.toInt
+    self.rPartitionId = partitionId.toInt
     self.currentSeqNo = startingSeqNo
   }
 
+  override def createPartitionSender(partitionId: Int): Unit = {
+    sPartitionId = partitionId.toInt
+  }
+
+  override def send(event: EventData): Unit = {
+    // TODO
+  }
+
+  override def send(event: EventData, partitionKey: String): Unit = {
+    // TODO
+  }
+
+  override def send(event: EventData, partitionId: Int): Unit = {
+    // TODO
+  }
+
   override def receive(eventCount: Int): Iterable[EventData] = {
-    val events = eventHub.receive(eventCount, self.partitionId, currentSeqNo)
+    val events = eventHub.receive(eventCount, self.rPartitionId, currentSeqNo)
     currentSeqNo += eventCount
     events.asScala
   }

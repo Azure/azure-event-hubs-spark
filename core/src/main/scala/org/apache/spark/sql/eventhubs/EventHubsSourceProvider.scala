@@ -24,8 +24,9 @@ import org.apache.spark.eventhubs.client.{ Client, EventHubsClient }
 import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.execution.streaming.Source
+import org.apache.spark.sql.execution.streaming.{ Sink, Source }
 import org.apache.spark.sql.sources._
+import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
 
 /**
@@ -34,6 +35,7 @@ import org.apache.spark.sql.types._
 private[sql] class EventHubsSourceProvider
     extends DataSourceRegister
     with StreamSourceProvider
+    with StreamSinkProvider
     with RelationProvider
     with Logging {
 
@@ -74,6 +76,20 @@ private[sql] class EventHubsSourceProvider
     val caseInsensitiveMap = parameters.map { case (k, v) => (k.toLowerCase(Locale.ROOT), v) }
 
     new EventHubsRelation(sqlContext, parameters, clientFactory(caseInsensitiveMap))
+  }
+
+  override def createSink(sqlContext: SQLContext,
+                          parameters: Map[String, String],
+                          partitionColumns: Seq[String],
+                          outputMode: OutputMode): Sink = {
+    EventHubsClient.userAgent =
+      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
+
+    val caseInsensitiveMap = parameters.map {
+      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
+    }
+
+    new EventHubsSink(sqlContext, caseInsensitiveMap, clientFactory(caseInsensitiveMap))
   }
 
   private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client = {

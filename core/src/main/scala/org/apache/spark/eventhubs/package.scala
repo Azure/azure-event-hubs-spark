@@ -18,7 +18,7 @@
 package org.apache.spark
 
 import java.time.Duration
-import java.util.concurrent.Executor
+import java.util.concurrent.{ ExecutorService, Executors }
 
 import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
 import org.json4s.NoTypeHints
@@ -34,8 +34,7 @@ package object eventhubs {
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
-  val PrefetchCountMinimum: Int = 10
-  // Change this to PartitionReceiver.PREFETCH_COUNT_MINIMUM on next client release.
+  val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
 
@@ -61,12 +60,5 @@ package object eventhubs {
     def toOffset: Offset = str.toLong
     def toEnqueueTime: EnqueueTime = str.toLong
     def toSequenceNumber: SequenceNumber = str.toLong
-  }
-
-  // This class will replaced once thread pooling is implemented.
-  class StandardExecutor extends Executor {
-    override def execute(command: Runnable): Unit = {
-      command.run()
-    }
   }
 }

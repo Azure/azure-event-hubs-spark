@@ -20,6 +20,11 @@ package org.apache.spark.eventhubs.utils
 import java.util.Date
 
 import com.microsoft.azure.eventhubs.EventData
+import com.microsoft.azure.eventhubs.impl.AmqpConstants.{
+  ENQUEUED_TIME_UTC,
+  OFFSET,
+  SEQUENCE_NUMBER
+}
 import com.microsoft.azure.eventhubs.impl.EventDataImpl
 import org.apache.qpid.proton.amqp.Binary
 import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
@@ -111,6 +116,25 @@ private[spark] object EventHubsTestUtils {
   val DefaultName = "name"
 
   private[utils] val eventHubs: mutable.Map[String, SimulatedEventHubs] = mutable.Map.empty
+
+  def createEventData(event: Array[Byte], seqNo: Long): EventData = {
+    val constructor = classOf[EventDataImpl].getDeclaredConstructor(classOf[Message])
+    constructor.setAccessible(true)
+
+    val s = seqNo.toLong.asInstanceOf[AnyRef]
+    // This value is not accurate. However, "offet" is never used in testing.
+    // Placing dummy value here because one is required in order for EventData
+    // to serialize/de-serialize properly during tests.
+    val o = s.toString.asInstanceOf[AnyRef]
+    val t = new Date(System.currentTimeMillis()).asInstanceOf[AnyRef]
+
+    val msgAnnotations = new MessageAnnotations(
+      Map(SEQUENCE_NUMBER -> s, OFFSET -> o, ENQUEUED_TIME_UTC -> t).asJava)
+
+    val body = new Data(new Binary(event))
+    val msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
+    constructor.newInstance(msg).asInstanceOf[EventData]
+  }
 }
 
 /**
@@ -143,9 +167,11 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
 
   def send(events: Seq[Int]): Seq[Int] = {
     for (event <- events) {
-      val part = count % this.partitionCount
-      count += 1
-      this.send(part, Seq(event))
+      synchronized {
+        val part = count % this.partitionCount
+        count += 1
+        this.send(part, Seq(event))
+      }
     }
     events
   }
@@ -156,9 +182,11 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   }
 
   def send(event: EventData): Unit = {
-    val part = count % this.partitionCount
-    count += 1
-    this.send(part, event)
+    synchronized {
+      val part = count % this.partitionCount
+      count += 1
+      this.send(part, event)
+    }
   }
 
   def send(partitionId: PartitionId, event: EventData): Unit = {
@@ -190,32 +218,36 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     constructor.setAccessible(true)
 
     private[spark] def send(events: Seq[Int]): Unit = {
-      for (event <- events) {
-        val seqNo = data.size.toLong.asInstanceOf[AnyRef]
+      synchronized {
+        for (event <- events) {
+          val seqNo = data.size.toLong.asInstanceOf[AnyRef]
 
-        // This value is not accurate. However, "offet" is never used in testing.
-        // Placing dummy value here because one is required in order for EventData
-        // to serialize/de-serialize properly during tests.
-        val offset = data.size.toString.asInstanceOf[AnyRef]
+          // This value is not accurate. However, "offet" is never used in testing.
+          // Placing dummy value here because one is required in order for EventData
+          // to serialize/de-serialize properly during tests.
+          val offset = data.size.toString.asInstanceOf[AnyRef]
 
-        val time = new Date(System.currentTimeMillis()).asInstanceOf[AnyRef]
+          val time = new Date(System.currentTimeMillis()).asInstanceOf[AnyRef]
 
-        val msgAnnotations = new MessageAnnotations(
-          Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)
+          val msgAnnotations = new MessageAnnotations(
+            Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)
 
-        val body = new Data(new Binary(s"$event".getBytes("UTF-8")))
+          val body = new Data(new Binary(s"$event".getBytes("UTF-8")))
 
-        val msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
+          val msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
 
-        data = data :+ constructor.newInstance(msg).asInstanceOf[EventData]
+          data = data :+ constructor.newInstance(msg).asInstanceOf[EventData]
+        }
       }
     }
 
     private[spark] def send(event: EventData): Unit = {
-      data :+ event
+      // Need to add a Seq No to the EventData to properly simulate the service.
+      val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong)
+      synchronized(data = data :+ e)
     }
 
-    private[spark] def size = data.size
+    private[spark] def size = synchronized(data.size)
 
     private[spark] def get(index: SequenceNumber): EventData = {
       data(index.toInt)
@@ -309,9 +341,13 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
         }
       }
     } else {
-      val positions = ehConf.endingPositions.getOrElse(Map.empty)
+      val positions = ehConf.endingPositions.getOrElse {
+        (for {
+          id <- 0 until eventHub.partitionCount
+        } yield
+          NameAndPartition(eventHub.name, id) -> EventPosition.fromSequenceNumber(latestSeqNo(id))).toMap
+      }
 
-      assert(positions.nonEmpty)
       positions.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues { seqNo =>
         { if (seqNo == -1L) 0L else seqNo }
       }

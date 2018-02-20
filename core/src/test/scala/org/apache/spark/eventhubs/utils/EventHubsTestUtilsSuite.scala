@@ -19,6 +19,7 @@ package org.apache.spark.eventhubs.utils
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
@@ -177,5 +178,53 @@ class EventHubsTestUtilsSuite
     eventHub.send(3, Seq(7))
 
     assert(eventHub.totalSize == 7)
+  }
+
+  test("send EventData") {
+    // events are sent round-robin, so the first event will go to partition 0.
+    val part = 0
+
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 10)
+
+    val ehConf = getEventHubsConf(eh)
+    val client = new SimulatedClient(ehConf)
+    val event = EventData.create("1".getBytes)
+    client.send(event)
+
+    assert(testUtils.getEventHubs(eh).getPartitions(part).size == 1)
+    assert(
+      testUtils
+        .getEventHubs(eh)
+        .getPartitions(part)
+        .getEvents
+        .head
+        .getBytes
+        .sameElements(event.getBytes))
+
+  }
+
+  test("send EventData to specific partition") {
+    // use this partition in the partition sender
+    val part = 7
+
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 10)
+
+    val ehConf = getEventHubsConf(eh)
+    val client = new SimulatedClient(ehConf)
+    val event = EventData.create("1".getBytes)
+    client.send(event, part)
+
+    assert(testUtils.getEventHubs(eh).getPartitions(part).size == 1)
+    assert(
+      testUtils
+        .getEventHubs(eh)
+        .getPartitions(part)
+        .getEvents
+        .head
+        .getBytes
+        .sameElements(event.getBytes))
+
   }
 }

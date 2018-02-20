@@ -113,7 +113,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private var currentSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
 
-  override def schema: StructType = EventHubsSourceProvider.eventhubSchema
+  override def schema: StructType = EventHubsSourceProvider.eventHubsSchema
 
   override def getOffset: Option[Offset] = {
     // Make sure initialPartitionSeqNos is initialized

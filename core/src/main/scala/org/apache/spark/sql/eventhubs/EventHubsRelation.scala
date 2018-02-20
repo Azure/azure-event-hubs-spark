@@ -57,7 +57,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
   }
   init()
 
-  override def schema: StructType = EventHubsSourceProvider.eventhubSchema
+  override def schema: StructType = EventHubsSourceProvider.eventHubsSchema
 
   override def buildScan(): RDD[Row] = {
 

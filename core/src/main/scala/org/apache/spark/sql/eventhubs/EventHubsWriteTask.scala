@@ -21,7 +21,7 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{ Attribute, Cast, UnsafeProjection }
+import org.apache.spark.sql.catalyst.expressions.{ Attribute, Cast, Literal, UnsafeProjection }
 import org.apache.spark.sql.types.{ BinaryType, StringType }
 import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 
@@ -75,7 +75,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     val partitionKey = projectedRow.getUTF8String(1)
     val partitionId = projectedRow.getUTF8String(2)
 
-    require(partitionId != null || partitionKey != null,
+    require(partitionId == null || partitionKey == null,
             "A partitionId and partitionKey have been set. This is not allowed.")
 
     val event = EventData.create(body)
@@ -109,9 +109,12 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     }
 
     val partitionKeyExpression =
-      inputSchema.find(_.name == EventHubsWriter.PartitionKeyAttributeName).orNull
+      inputSchema
+        .find(_.name == EventHubsWriter.PartitionKeyAttributeName)
+        .getOrElse(Literal(null, StringType))
+
     partitionKeyExpression.dataType match {
-      case null | StringType => // good
+      case StringType => // good
       case t =>
         throw new IllegalStateException(
           s"${EventHubsWriter.PartitionKeyAttributeName} attribute unsupported type $t"
@@ -119,9 +122,12 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     }
 
     val partitionIdExpression =
-      inputSchema.find(_.name == EventHubsWriter.PartitionIdAttributeName).orNull
+      inputSchema
+        .find(_.name == EventHubsWriter.PartitionIdAttributeName)
+        .getOrElse(Literal(null, StringType))
+
     partitionIdExpression.dataType match {
-      case null | StringType => // good
+      case StringType => // good
       case t =>
         throw new IllegalStateException(
           s"${EventHubsWriter.PartitionKeyAttributeName} attribute unsupported type $t"

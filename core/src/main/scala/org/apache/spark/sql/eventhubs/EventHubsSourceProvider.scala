@@ -23,7 +23,7 @@ import org.apache.spark.eventhubs.{ EventHubsConf, _ }
 import org.apache.spark.eventhubs.client.{ Client, EventHubsClient }
 import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{ AnalysisException, DataFrame, SQLContext, SaveMode }
 import org.apache.spark.sql.execution.streaming.{ Sink, Source }
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
@@ -37,6 +37,7 @@ private[sql] class EventHubsSourceProvider
     with StreamSourceProvider
     with StreamSinkProvider
     with RelationProvider
+    with CreatableRelationProvider
     with Logging {
 
   import EventHubsConf._
@@ -47,7 +48,7 @@ private[sql] class EventHubsSourceProvider
                             schema: Option[StructType],
                             providerName: String,
                             parameters: Map[String, String]): (String, StructType) = {
-    (shortName(), EventHubsSourceProvider.eventhubSchema)
+    (shortName(), EventHubsSourceProvider.eventHubsSchema)
   }
 
   override def createSource(sqlContext: SQLContext,
@@ -92,6 +93,48 @@ private[sql] class EventHubsSourceProvider
     new EventHubsSink(sqlContext, caseInsensitiveMap, clientFactory(caseInsensitiveMap))
   }
 
+  override def createRelation(outerSQLContext: SQLContext,
+                              mode: SaveMode,
+                              parameters: Map[String, String],
+                              data: DataFrame): BaseRelation = {
+    EventHubsClient.userAgent =
+      s"Structured-Streaming-${outerSQLContext.sparkSession.sparkContext.version}"
+
+    mode match {
+      case SaveMode.Overwrite | SaveMode.Ignore =>
+        throw new AnalysisException(
+          s"Save mode $mode not allowed for EventHubs. " +
+            s"Allowed save modes are ${SaveMode.Append} and " +
+            s"${SaveMode.ErrorIfExists} (default).")
+      case _ => // good
+    }
+
+    val caseInsensitiveMap = parameters.map {
+      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
+    }
+
+    EventHubsWriter.write(outerSQLContext.sparkSession,
+                          data.queryExecution,
+                          caseInsensitiveMap,
+                          clientFactory(caseInsensitiveMap))
+
+    /* This method is suppose to return a relation that reads the data that was written.
+     * We cannot support this for EventHubs. Therefore, in order to make things consistent,
+     * we return an empty base relation.
+     */
+    new BaseRelation {
+      override def sqlContext: SQLContext = unsupportedException
+      override def schema: StructType = unsupportedException
+      override def needConversion: Boolean = unsupportedException
+      override def sizeInBytes: Long = unsupportedException
+      override def unhandledFilters(filters: Array[Filter]): Array[Filter] = unsupportedException
+      private def unsupportedException =
+        throw new UnsupportedOperationException(
+          "BaseRelation from EventHubs write " +
+            "operation is not usable.")
+    }
+  }
+
   private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client = {
     if (caseInsensitiveParams
           .getOrElse(UseSimulatedClientKey.toLowerCase, DefaultUseSimulatedClient)
@@ -104,7 +147,7 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
-  def eventhubSchema: StructType = {
+  def eventHubsSchema: StructType = {
     StructType(
       Seq(
         StructField("body", StringType),

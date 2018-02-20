@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubs
 
 import java.time.Duration
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.http.annotation.Experimental
@@ -390,7 +391,11 @@ object EventHubsConf extends Logging {
   def apply(connectionString: String) = new EventHubsConf(connectionString)
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
-    val ehConf = EventHubsConf(params("eventhubs.connectionString"))
+    val caseInsensitiveMap = params.map {
+      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
+    }
+
+    val ehConf = EventHubsConf(caseInsensitiveMap(ConnectionStringKey.toLowerCase))
 
     for ((k, v) <- params) { ehConf.set(k, v) }
 

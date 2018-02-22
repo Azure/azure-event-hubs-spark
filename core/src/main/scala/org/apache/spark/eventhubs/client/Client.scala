@@ -101,7 +101,7 @@ private[spark] trait Client extends Serializable {
    */
   def translate[T](ehConf: EventHubsConf,
                    partitionCount: Int,
-                   useStart: Boolean = false): Map[PartitionId, SequenceNumber]
+                   useStart: Boolean = true): Map[PartitionId, SequenceNumber]
 
   /**
    * Returns the number of partitions in your EventHubs instance.

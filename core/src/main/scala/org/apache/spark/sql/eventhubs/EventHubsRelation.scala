@@ -41,25 +41,15 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
   import org.apache.spark.eventhubs._
 
   private val ehConf = EventHubsConf.toConf(options)
-  private var partitionCount: Int = _
-
-  private var fromSeqNos: Map[PartitionId, SequenceNumber] = _
-  private var untilSeqNos: Map[PartitionId, SequenceNumber] = _
-
-  private def init(): Unit = {
-    val client = clientFactory(ehConf)
-
-    partitionCount = client.partitionCount
-    fromSeqNos = client.translate(ehConf, partitionCount)
-    untilSeqNos = client.translate(ehConf, partitionCount, useStart = false)
-
-    client.close()
-  }
-  init()
 
   override def schema: StructType = EventHubsSourceProvider.eventHubsSchema
 
   override def buildScan(): RDD[Row] = {
+    val client = clientFactory(ehConf)
+    val partitionCount: Int = client.partitionCount
+
+    val fromSeqNos = client.translate(ehConf, partitionCount)
+    val untilSeqNos = client.translate(ehConf, partitionCount, useStart = false)
 
     require(fromSeqNos.forall(f => f._2 >= 0L),
             "Currently only sequence numbers can be passed in your starting positions.")
@@ -72,6 +62,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
       val untilSeqNo = untilSeqNos(p)
       OffsetRange(ehConf.name, p, fromSeqNo, untilSeqNo)
     }.toArray
+    client.close()
 
     logInfo(
       "GetBatch generating RDD of with offsetRanges: " +

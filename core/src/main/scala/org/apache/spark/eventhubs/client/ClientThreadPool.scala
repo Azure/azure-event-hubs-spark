@@ -25,5 +25,5 @@ import java.util.concurrent.{ ExecutorService, Executors }
  * In future releases, thread pool will be configurable by users.
  */
 object ClientThreadPool {
-  var pool: ExecutorService = Executors.newCachedThreadPool
+  val pool: ExecutorService = Executors.newCachedThreadPool
 }

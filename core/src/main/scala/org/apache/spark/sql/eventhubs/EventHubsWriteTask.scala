@@ -75,8 +75,9 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     val partitionKey = projectedRow.getUTF8String(1)
     val partitionId = projectedRow.getUTF8String(2)
 
-    require(partitionId == null || partitionKey == null,
-            "A partitionId and partitionKey have been set. This is not allowed.")
+    require(
+      partitionId == null || partitionKey == null,
+      s"Both a partitionKey ($partitionKey) and partitionId ($partitionId) have been detected. Both can not be set.")
 
     val event = EventData.create(body)
 
@@ -101,6 +102,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
       .find(_.name == EventHubsWriter.BodyAttributeName)
       .getOrElse(throw new IllegalStateException(
         s"Required attribute '${EventHubsWriter.BodyAttributeName}' not found."))
+
     bodyExpression.dataType match {
       case StringType | BinaryType => // good
       case t =>

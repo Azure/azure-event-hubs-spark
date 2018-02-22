@@ -190,7 +190,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   }
 
   def send(partitionId: PartitionId, event: EventData): Unit = {
-    partitions(partitionId).send(event)
+    synchronized(partitions(partitionId).send(event))
   }
 
   def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
@@ -324,32 +324,21 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
                             partitionCount: Int,
                             useStarting: Boolean = true): Map[PartitionId, SequenceNumber] = {
 
-    if (useStarting) {
-      val positions = ehConf.startingPositions.getOrElse(Map.empty)
+    val positions = if (useStarting) { ehConf.startingPositions } else { ehConf.endingPositions }
+    val position = if (useStarting) { ehConf.startingPosition } else { ehConf.endingPosition }
+    val apiCall = if (useStarting) { earliestSeqNo _ } else { latestSeqNo _ }
 
-      if (positions.isEmpty) {
-        val position = ehConf.startingPosition.get
-        require(position.seqNo >= 0L)
-
-        (for { id <- 0 until partitionCount } yield id -> position.seqNo).toMap
-      } else {
-        require(positions.forall(x => x._2.seqNo >= 0L))
-        require(positions.size == partitionCount)
-
-        positions.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues { seqNo =>
-          { if (seqNo == -1L) 0L else seqNo }
-        }
-      }
+    if (positions.isEmpty && position.isEmpty) {
+      (for { id <- 0 until eventHub.partitionCount } yield id -> apiCall(id)).toMap
+    } else if (positions.isEmpty) {
+      require(position.get.seqNo >= 0L)
+      (for { id <- 0 until partitionCount } yield id -> position.get.seqNo).toMap
     } else {
-      val positions = ehConf.endingPositions.getOrElse {
-        (for {
-          id <- 0 until eventHub.partitionCount
-        } yield
-          NameAndPartition(eventHub.name, id) -> EventPosition.fromSequenceNumber(latestSeqNo(id))).toMap
-      }
-
-      positions.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues { seqNo =>
-        { if (seqNo == -1L) 0L else seqNo }
+      require(positions.get.forall(x => x._2.seqNo >= 0L))
+      require(positions.get.size == partitionCount)
+      positions.get.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues {
+        seqNo =>
+          { if (seqNo == -1L) 0L else seqNo }
       }
     }
   }

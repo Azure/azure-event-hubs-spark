@@ -21,7 +21,7 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 import org.scalatest.time.SpanSugar._
 
-import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs._
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
@@ -33,7 +33,6 @@ import org.scalatest.time.Span
 class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
   import testImplicits._
   import EventHubsTestUtils._
-  import org.apache.spark.eventhubs._
 
   protected var testUtils: EventHubsTestUtils = _
 

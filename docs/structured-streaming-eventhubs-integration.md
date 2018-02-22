@@ -162,6 +162,68 @@ Each row in the source has the following schema:
 | publisher | string |
 | partitionKey | string | 
 
+## Writing Data to EventHubs
+
+Here, we describe the support for writting Streaming Queries and Batch Queries to Azure EventHubs. Take note that, today, Azure EventHubs only supports
+at least once semantics. Consequently, when writing - either Streaming Queries or Batch Queries - to  EventHubs, some records may be duplicated;
+this can happen, for example, if EventHubs needs to retry an event that was not acknowledged by the EventHubs service, event if the service received and 
+stored the event. Structured Streaming cannot prevent such duplicates from ocurring due to these EventHubs write semantics. However, if writing the query 
+is successful, then you can assume that the query output was written at least once. A possible solution to remove duplicates when reading the written data
+could be to introduce a primary (unique) key that can be used to perform de-duplication when reading. 
+
+The Dataframe being written to EventHubs should have the following columns in the schema:
+
+| Column | Type | 
+| ------ | ---- | 
+| body (required) | string or binary |
+| partitionId (*optional) | string |
+| partitionKey (*optional) | string |
+
+* Only one (partitionId or partitionKey) can be set at a time. If both are set, your Structured Streaming job will be stopped. 
+
+The body column is the only required option. If a partitionId and partitionKey are not provided, then events will distributed to partitions
+using a round-robin model. Alternatively, if a partitionId is provided, the query output will be sent to that specific partition exclusively. 
+Sending to a single partition is *not* a recommended pattern. Finally, if a partionKey is provided, each event will be sent with the
+provided partitionKey. For more information on how a partitionKey works, click 
+[here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-programming-guide#partition-key).
+
+### Creating an EventHubs Sink for Streaming Queries 
+
+```scala
+// Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
+val ds = df
+  .select("body")
+  .writeStream
+  .format("eventhubs")
+  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.
+  .start()
+  
+// Write body data from a DataFrame to EventHubs with a partitionKey
+val ds = df
+  .selectExpr("partitionKey", "body")
+  .format("eventHubs")
+  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.
+  .start()
+```
+
+### Writing the output of Batch Queries to EventHubs
+
+```scala
+// Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
+df.select("body")
+  .write
+  .format("eventhubs")
+  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.
+  .save()
+  
+// Write body data   
+df.selectExpr("partitionKey", "body")
+  .write
+  .format("eventhubs")
+  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.  
+  .save()
+```
+
 ## Deploying 
 
 As with any Spark applications, `spark-submit` is used to launch your application. `azure-eventhubs-spark_2.11`

@@ -48,7 +48,7 @@ private[eventhubs] object EventHubsWriter extends Logging {
       case StringType | BinaryType => // good
       case _ =>
         throw new AnalysisException(
-          s"$BodyAttributeName attribute type" +
+          s"$BodyAttributeName attribute type " +
             s"must be a String or BinaryType.")
     }
   }

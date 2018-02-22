@@ -277,4 +277,79 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
         .contains(
           s"both a partitionkey ($partitionKey) and partitionid ($partitionId) have been detected. both can not be set."))
   }
+
+  test("streaming - write data with valid schema but wrong type - bad body type") {
+    val input = MemoryStream[String]
+    val eh = newEventHub()
+    testUtils.createEventHubs(eh, partitionCount = 10)
+    val ehConf = getEventHubsConf(eh)
+
+    var writer: StreamingQuery = null
+    var ex: Exception = null
+    try {
+      ex = intercept[StreamingQueryException] {
+        writer = createEventHubsWriter(input.toDF(), ehConf)("CAST (body as INT) as body")
+        input.addData("1", "2", "3", "4", "5")
+        writer.processAllAvailable()
+      }
+    } finally {
+      writer.stop()
+    }
+    assert(
+      ex.getMessage
+        .toLowerCase(Locale.ROOT)
+        .contains("body attribute type must be a string or binarytype"))
+  }
+
+  test("streaming - write data with valid schema but wrong type - bad partitionId type") {
+    val input = MemoryStream[String]
+    val eh = newEventHub()
+    testUtils.createEventHubs(eh, partitionCount = 10)
+    val ehConf = getEventHubsConf(eh)
+
+    var writer: StreamingQuery = null
+    var ex: Exception = null
+    val partitionId = "0"
+    try {
+      ex = intercept[StreamingQueryException] {
+        writer =
+          createEventHubsWriter(input.toDF(), ehConf)(s"CAST('$partitionId' as INT) as partitionId",
+                                                      "body")
+        input.addData("1", "2", "3", "4", "5")
+        writer.processAllAvailable()
+      }
+    } finally {
+      writer.stop()
+    }
+    assert(
+      ex.getMessage
+        .toLowerCase(Locale.ROOT)
+        .contains(s"partitionid attribute unsupported type"))
+  }
+
+  test("streaming - write data with valid schema but wrong type - bad partitionKey type") {
+    val input = MemoryStream[String]
+    val eh = newEventHub()
+    testUtils.createEventHubs(eh, partitionCount = 10)
+    val ehConf = getEventHubsConf(eh)
+
+    var writer: StreamingQuery = null
+    var ex: Exception = null
+    val partitionKey = "234"
+    try {
+      ex = intercept[StreamingQueryException] {
+        writer = createEventHubsWriter(input.toDF(), ehConf)(
+          s"CAST('$partitionKey' as INT) as partitionKey",
+          "body")
+        input.addData("1", "2", "3", "4", "5")
+        writer.processAllAvailable()
+      }
+    } finally {
+      writer.stop()
+    }
+    assert(
+      ex.getMessage
+        .toLowerCase(Locale.ROOT)
+        .contains(s"partitionkey attribute unsupported type"))
+  }
 }

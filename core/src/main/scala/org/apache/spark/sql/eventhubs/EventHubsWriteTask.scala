@@ -18,6 +18,7 @@
 package org.apache.spark.sql.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
+import com.sun.org.apache.xalan.internal.xsltc.compiler.util.IntType
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.sql.catalyst.InternalRow
@@ -132,7 +133,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
       case StringType => // good
       case t =>
         throw new IllegalStateException(
-          s"${EventHubsWriter.PartitionKeyAttributeName} attribute unsupported type $t"
+          s"${EventHubsWriter.PartitionIdAttributeName} attribute unsupported type $t"
         )
     }
 

@@ -32,7 +32,7 @@ case class NameAndPartition(ehName: String, partitionId: Int) extends Serializab
     Serialization.write(self)
   }
 
-  override def hashCode(): Rate = {
+  override def hashCode: Rate = {
     toTuple.hashCode()
   }
 

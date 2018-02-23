@@ -28,7 +28,8 @@ trait HasOffsetRanges {
 
 private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
                                        val fromSeqNo: SequenceNumber,
-                                       val untilSeqNo: SequenceNumber)
+                                       val untilSeqNo: SequenceNumber,
+                                       val preferredLoc: Option[String])
     extends Serializable {
   import OffsetRange.OffsetRangeTuple
 
@@ -51,26 +52,28 @@ private[spark] final class OffsetRange(val nameAndPartition: NameAndPartition,
     toTuple.hashCode()
   }
 
-  def toTuple: OffsetRangeTuple = (nameAndPartition, fromSeqNo, untilSeqNo)
+  def toTuple: OffsetRangeTuple = (nameAndPartition, fromSeqNo, untilSeqNo, preferredLoc)
 
   override def toString =
     s"OffsetRange(partitionId: ${nameAndPartition.partitionId} | fromSeqNo: $fromSeqNo | untilSeqNo: $untilSeqNo)"
 }
 
 private[spark] object OffsetRange {
-  type OffsetRangeTuple = (NameAndPartition, SequenceNumber, SequenceNumber)
+  type OffsetRangeTuple = (NameAndPartition, SequenceNumber, SequenceNumber, Option[String])
 
   def apply(name: String,
             partitionId: PartitionId,
             fromSeq: SequenceNumber,
-            untilSeq: SequenceNumber): OffsetRange = {
-    OffsetRange(NameAndPartition(name, partitionId), fromSeq, untilSeq)
+            untilSeq: SequenceNumber,
+            preferredLoc: Option[String]): OffsetRange = {
+    OffsetRange(NameAndPartition(name, partitionId), fromSeq, untilSeq, preferredLoc)
   }
 
   def apply(nAndP: NameAndPartition,
             fromSeq: SequenceNumber,
-            untilSeq: SequenceNumber): OffsetRange = {
-    new OffsetRange(nAndP, fromSeq, untilSeq)
+            untilSeq: SequenceNumber,
+            preferredLoc: Option[String]): OffsetRange = {
+    new OffsetRange(nAndP, fromSeq, untilSeq, preferredLoc)
   }
 
   def apply(tuple: OffsetRangeTuple): OffsetRange = {
@@ -78,7 +81,7 @@ private[spark] object OffsetRange {
   }
 
   implicit def tupleToOffsetRange(tuple: OffsetRangeTuple): OffsetRange =
-    OffsetRange(tuple._1, tuple._2, tuple._3)
+    OffsetRange(tuple._1, tuple._2, tuple._3, tuple._4)
 
   implicit def tupleListToOffsetRangeList(list: List[OffsetRangeTuple]): List[OffsetRange] =
     for { tuple <- list } yield tupleToOffsetRange(tuple)

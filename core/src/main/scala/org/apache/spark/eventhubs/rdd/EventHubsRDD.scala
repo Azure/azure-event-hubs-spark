@@ -39,7 +39,8 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   override def getPartitions: Array[Partition] = {
     for {
       (o, i) <- offsetRanges.zipWithIndex
-    } yield new EventHubsRDDPartition(i, o.nameAndPartition, o.fromSeqNo, o.untilSeqNo)
+    } yield
+      new EventHubsRDDPartition(i, o.nameAndPartition, o.fromSeqNo, o.untilSeqNo, o.preferredLoc)
   }
 
   override def count: Long = offsetRanges.map(_.count).sum
@@ -72,6 +73,11 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       parts.keys.toArray)
     res.foreach(buf ++= _)
     buf.toArray
+  }
+
+  override def getPreferredLocations(split: Partition): Seq[String] = {
+    val part = split.asInstanceOf[EventHubsRDDPartition]
+    part.preferredLoc.map(Seq(_)).getOrElse(Seq.empty)
   }
 
   private def errBeginAfterEnd(part: EventHubsRDDPartition): String =

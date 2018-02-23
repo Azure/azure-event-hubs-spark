@@ -24,7 +24,8 @@ import org.apache.spark.eventhubs.{ PartitionId, SequenceNumber }
 private class EventHubsRDDPartition(val index: Int,
                                     val nameAndPartition: NameAndPartition,
                                     val fromSeqNo: SequenceNumber,
-                                    val untilSeqNo: SequenceNumber)
+                                    val untilSeqNo: SequenceNumber,
+                                    val preferredLoc: Option[String])
     extends Partition {
 
   /** Number of messages this partition refers to */

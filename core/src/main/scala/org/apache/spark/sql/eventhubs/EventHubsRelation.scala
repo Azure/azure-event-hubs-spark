@@ -60,7 +60,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
       val fromSeqNo = fromSeqNos
         .getOrElse(p, throw new IllegalStateException(s"$p doesn't have a fromSeqNo"))
       val untilSeqNo = untilSeqNos(p)
-      OffsetRange(ehConf.name, p, fromSeqNo, untilSeqNo)
+      OffsetRange(ehConf.name, p, fromSeqNo, untilSeqNo, None)
     }.toArray
     client.close()
 

@@ -261,11 +261,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       reportDataLoss(s"$deletedPartitions are gone. Some data may have been missed")
     }
 
-    val partitions = untilSeqNos.keySet.filter { p =>
+    val nameAndPartitions = untilSeqNos.keySet.filter { p =>
       // Ignore partitions that we don't know the from offsets.
       newPartitionSeqNos.contains(p) || fromSeqNos.contains(p)
     }.toSeq
-    logDebug("Partitions: " + partitions.mkString(", "))
+    logDebug("Partitions: " + nameAndPartitions.mkString(", "))
 
     val sortedExecutors = getSortedExecutorList(sc)
     val numExecutors = sortedExecutors.length
@@ -273,12 +273,14 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     // Calculate offset ranges
     val offsetRanges = (for {
-      p <- partitions
+      np <- nameAndPartitions
       fromSeqNo = fromSeqNos
-        .getOrElse(p, throw new IllegalStateException(s"$p doesn't have a fromSeqNo"))
-      untilSeqNo = untilSeqNos(p)
-      // preferredLoc - coming soon
-    } yield OffsetRange(p, fromSeqNo, untilSeqNo)).filter { range =>
+        .getOrElse(np, throw new IllegalStateException(s"$np doesn't have a fromSeqNo"))
+      untilSeqNo = untilSeqNos(np)
+      preferredLoc = if (numExecutors > 0) {
+        Some(sortedExecutors(Math.floorMod(np.hashCode, numExecutors)))
+      } else None
+    } yield OffsetRange(np, fromSeqNo, untilSeqNo, preferredLoc)).filter { range =>
       if (range.untilSeqNo < range.fromSeqNo) {
         reportDataLoss(
           s"Partition ${range.nameAndPartition}'s sequence number was changed from " +

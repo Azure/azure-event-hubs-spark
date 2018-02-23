@@ -19,6 +19,7 @@ package org.apache.spark.streaming.eventhubs
 
 import scala.collection.mutable
 import com.microsoft.azure.eventhubs.EventData
+import org.apache.spark.SparkContext
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs._
@@ -26,6 +27,7 @@ import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
+import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.streaming.{ StreamingContext, Time }
 import org.apache.spark.streaming.dstream.{ DStreamCheckpointData, InputDStream }
 import org.apache.spark.streaming.scheduler.{ RateController, StreamInputInfo }
@@ -44,6 +46,8 @@ private[spark] class EventHubsDirectDStream private[spark] (
     clientFactory: (EventHubsConf => Client))
     extends InputDStream[EventData](_ssc)
     with Logging {
+
+  import EventHubsDirectDStream._
 
   private lazy val partitionCount: Int = ehClient.partitionCount
   private lazy val ehName = ehConf.name
@@ -91,11 +95,18 @@ private[spark] class EventHubsDirectDStream private[spark] (
   }
 
   override def compute(validTime: Time): Option[RDD[EventData]] = {
+    val sortedExecutors = getSortedExecutorList(ssc.sparkContext)
+    val numExecutors = sortedExecutors.length
+    logDebug("Sorted executors: " + sortedExecutors.mkString(", "))
+
     val untilSeqNos = clamp(latestSeqNos())
-    val offsetRanges = (for { partitionId <- 0 until partitionCount } yield
-      OffsetRange(NameAndPartition(ehName, partitionId),
-                  fromSeqNos(partitionId),
-                  untilSeqNos(partitionId))).toArray
+    val offsetRanges = (for {
+      p <- 0 until partitionCount
+      preferredLoc = if (numExecutors > 0) {
+        Some(sortedExecutors(Math.floorMod(NameAndPartition(ehName, p).hashCode, numExecutors)))
+      } else None
+    } yield
+      OffsetRange(NameAndPartition(ehName, p), fromSeqNos(p), untilSeqNos(p), preferredLoc)).toArray
 
     val rdd = new EventHubsRDD(context.sparkContext, ehConf, offsetRanges, clientFactory)
 
@@ -154,5 +165,21 @@ private[spark] class EventHubsDirectDStream private[spark] (
     override protected def publish(rate: Long): Unit = {
       // publish nothing as there is no receiver
     }
+  }
+}
+
+private[eventhubs] object EventHubsDirectDStream {
+  def getSortedExecutorList(sc: SparkContext): Array[String] = {
+    val bm = sc.env.blockManager
+    bm.master
+      .getPeers(bm.blockManagerId)
+      .toArray
+      .map(x => ExecutorCacheTaskLocation(x.host, x.executorId))
+      .sortWith(compare)
+      .map(_.toString)
+  }
+
+  private def compare(a: ExecutorCacheTaskLocation, b: ExecutorCacheTaskLocation): Boolean = {
+    if (a.host == b.host) { a.executorId > b.executorId } else { a.host > b.host }
   }
 }

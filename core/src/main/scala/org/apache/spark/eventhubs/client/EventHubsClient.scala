@@ -100,8 +100,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     try {
       client.getPartitionRuntimeInformation(partitionId.toString).get
     } catch {
-      case e: Exception =>
-        throw e
+      case e: Exception => throw e
     }
   }
 
@@ -116,8 +115,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       val seqNo = runtimeInformation.getBeginSequenceNumber
       if (seqNo == -1L) 0L else seqNo
     } catch {
-      case e: Exception =>
-        throw e
+      case e: Exception => throw e
     }
   }
 
@@ -131,8 +129,19 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       val runtimeInfo = getRunTimeInfo(partitionId)
       runtimeInfo.getLastEnqueuedSequenceNumber + 1
     } catch {
-      case e: Exception =>
-        throw e
+      case e: Exception => throw e
+    }
+  }
+
+  override def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber) = {
+    try {
+      val runtimeInfo = getRunTimeInfo(partitionId)
+      val earliest =
+        if (runtimeInfo.getBeginSequenceNumber == -1L) 0L else runtimeInfo.getBeginSequenceNumber
+      val latest = runtimeInfo.getLastEnqueuedSequenceNumber + 1
+      (earliest, latest)
+    } catch {
+      case e: Exception => throw e
     }
   }
 
@@ -149,8 +158,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         val runtimeInfo = client.getRuntimeInformation.get
         _partitionCount = runtimeInfo.getPartitionCount
       } catch {
-        case e: Exception =>
-          throw e
+        case e: Exception => throw e
       }
     }
     _partitionCount

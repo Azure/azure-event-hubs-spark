@@ -320,6 +320,10 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     eventHub.latestSeqNo(partitionId)
   }
 
+  override def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber) = {
+    (earliestSeqNo(partitionId), latestSeqNo(partitionId))
+  }
+
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int,
                             useStarting: Boolean = true): Map[PartitionId, SequenceNumber] = {

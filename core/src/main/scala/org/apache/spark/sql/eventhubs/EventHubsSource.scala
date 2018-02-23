@@ -52,6 +52,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private lazy val partitionCount: Int = ehClient.partitionCount
 
   private val ehConf = EventHubsConf.toConf(options)
+  private val ehName = ehConf.name
 
   private val sc = sqlContext.sparkContext
 
@@ -101,7 +102,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         // translate starting points within ehConf to sequence numbers
         val seqNos = ehClient.translate(ehConf, partitionCount).map {
           case (pId, seqNo) =>
-            (NameAndPartition(ehConf.name, pId), seqNo)
+            (NameAndPartition(ehName, pId), seqNo)
         }
         val offset = EventHubsSourceOffset(seqNos)
         metadataLog.add(0, offset)
@@ -113,17 +114,34 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private var currentSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
 
+  private var earliestSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
+
   override def schema: StructType = EventHubsSourceProvider.eventHubsSchema
 
   override def getOffset: Option[Offset] = {
     // Make sure initialPartitionSeqNos is initialized
     initialPartitionSeqNos
 
-    val latest = (for {
+    // This contains an array of the following elements:
+    // (partitionId, (earliestSeqNo, latestSeqNo)
+    val earliestAndLatest = for {
       p <- 0 until partitionCount
-      n = ehConf.name
-      seqNo = ehClient.latestSeqNo(p)
-    } yield NameAndPartition(n, p) -> seqNo).toMap
+      n = ehName
+    } yield (p, ehClient.boundedSeqNos(p))
+
+    // There is a possibility that data from EventHubs will
+    // expire before it can be consumed from Spark. We collect
+    // the earliest sequence numbers available in the service
+    // here. In getBatch, we'll make sure our starting sequence
+    // numbers are greater than or equal to the earliestSeqNos.
+    // If not, we'll report possible data loss.
+    earliestSeqNos = Some(earliestAndLatest.map {
+      case (p, (e, _)) => NameAndPartition(ehName, p) -> e
+    }.toMap)
+
+    val latest = earliestAndLatest.map {
+      case (p, (_, l)) => NameAndPartition(ehName, p) -> l
+    }.toMap
 
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>
@@ -206,6 +224,20 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       case None =>
         // we need to
         initialPartitionSeqNos
+    }
+    if (earliestSeqNos.isEmpty) {
+      earliestSeqNos = Some(fromSeqNos)
+    }
+    fromSeqNos.map {
+      case (nAndP, seqNo) =>
+        if (seqNo < currentSeqNos.get(nAndP)) {
+          reportDataLoss(
+            s"Starting seqNo $seqNo is behind the earliest sequence number ${currentSeqNos.get(nAndP)}" +
+              s" present in the service. Some events may have expired and been missed.")
+          nAndP -> currentSeqNos.get(nAndP)
+        } else {
+          nAndP -> seqNo
+        }
     }
 
     // Find the new partitions, and get their earliest offsets

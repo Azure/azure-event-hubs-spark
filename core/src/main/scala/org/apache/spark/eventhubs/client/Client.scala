@@ -95,6 +95,13 @@ private[spark] trait Client extends Serializable {
   def latestSeqNo(partitionId: PartitionId): SequenceNumber
 
   /**
+   * Provides the earliest and the latest sequence numbers in the provided partition.
+   *
+   * @return the earliest and latest sequence numbers for the specified partition.
+   */
+  def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber)
+
+  /**
    * Translates any starting point provided by a user to the specific offset and sequence number
    * that we need to start from. This ensure that within Spark, we're only dealing with offsets
    * and sequence numbers.

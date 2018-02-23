@@ -112,10 +112,6 @@ private[spark] class EventHubsDirectDStream private[spark] (
   }
 
   override def start(): Unit = {
-    val concurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
-    require(
-      concurrentJobs == 1,
-      "due to the limitation from eventhub, we do not allow to have multiple concurrent spark jobs")
     EventHubsClient.userAgent = s"Spark-Streaming-${ssc.sc.version}"
   }
 

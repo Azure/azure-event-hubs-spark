@@ -27,7 +27,7 @@ import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
-import scala.collection.parallel.immutable.ParVector
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -184,7 +184,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     logInfo(s"translate: useStart is set to $useStart.")
 
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
-    val needsTranslation = ParVector[NameAndPartition]()
+    val needsTranslation = ArrayBuffer[NameAndPartition]()
 
     val positions = if (useStart) {
       ehConf.startingPositions.getOrElse(Map.empty).par
@@ -209,16 +209,16 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       if (position.seqNo >= 0L) {
         result.put(id, position.seqNo)
       } else {
-        needsTranslation :+ nAndP
+        synchronized(needsTranslation += nAndP)
       }
     }
 
     logInfo(s"translate: needsTranslation = $needsTranslation")
 
-    val threads = ParVector[Thread]()
+    val threads = ArrayBuffer[Thread]()
     needsTranslation.foreach(nAndP => {
       val partitionId = nAndP.partitionId
-      threads :+ new Thread {
+      threads += new Thread {
         override def run(): Unit = {
           val receiver = client
             .createReceiver(DefaultConsumerGroup,
@@ -238,6 +238,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     threads.foreach(_.join())
     logInfo("translate: Translation complete.")
     logInfo(s"translate: result = $result")
+
+    assert(result.size == partitionCount,
+           s"translate: result size ${result.size} does not equal partition count $partitionCount")
 
     result.asScala.toMap.mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }

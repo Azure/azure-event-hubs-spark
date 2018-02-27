@@ -315,8 +315,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   }
 
   /**
-   * If 'failOnDataLoss' is true, this method will throw an 'IllegalStateException'.
-   * Otherwise, just log a warning.
+   * Logs a warning when data may have been missed.
    */
   private def reportDataLoss(message: String): Unit = {
     logWarning(message + s". $InstructionsForPotentialDataLoss")
@@ -328,8 +327,7 @@ private[eventhubs] object EventHubsSource {
     """
       |Some data may have been lost because they are not available in EventHubs any more; either the
       | data was aged out by EventHubs or the EventHubs instance may have been deleted before all the data in the
-      | instance was processed. If you want your streaming query to fail on such cases, set the source
-      | option "failOnDataLoss" to "true".
+      | instance was processed.
     """.stripMargin
 
   private[eventhubs] val VERSION = 1

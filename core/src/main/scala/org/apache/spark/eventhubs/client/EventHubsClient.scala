@@ -46,8 +46,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   private var receiver: PartitionReceiver = _
   override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
-    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (receiver == null) {
+      val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
         .createReceiver(consumerGroup,

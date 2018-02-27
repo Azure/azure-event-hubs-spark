@@ -17,12 +17,137 @@ See the [Deploying](#deploying) subsection below.
 ## User Configuration
 
 ### Connection String
+
 An Event Hubs connection string is required to connect to the Event Hubs service. You can get the connection string 
 for your Event Hubs instance from the [Azure Portal](https://portal.azure.com) or by using the `ConnectionStringBuilder` 
 in our library. 
 
+#### Azure Portal
+
+When you get the connection string from the Azure Portal, it may or may not have the `EntityPath` key. Consider:
+
+```scala
+// Without an entity path
+val without = "Endpoint=ENDPOINT;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY"
+    
+// With an entity path 
+val with = "Endpoint=sb://SAMPLE;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY;EntityPath=EVENTHUB_NAME"
+```
+
+To connect to your EventHubs, an `EntityPath` must be present. If your connection string doesn't have one, don't worry!
+This will take care of it:
+
+```scala 
+import org.apache.spark.eventhubs.ConnectionStringBuilder
+
+val connectionString = ConnectionStringBuilder(without)   // defined in the previous code block
+  .setEventHubName("EVENTHUB_NAME")
+  .build
+```
+
+#### ConnectionStringBuilder
+
+Alternatively, you can use the `ConnectionStringBuilder` to make your connection string.
+
+```scala
+import org.apache.spark.eventhubs.ConnectionStringBuilder
+
+val connectionString = ConnectionStringBuilder()
+  .setNamespaceName("NAMESPACE_NAME")
+  .setEventHubName("EVENTHUB_NAME")
+  .setSasKeyName("KEY_NAME")
+  .setSasKey("KEY")
+  .build
+```
+
+### EventHubsConf
+
+All configuration relating to Event Hubs happens in your `EventHubsConf`. To create an `EventHubsConf`, you must
+pass a connection string:
+
+```scala
+val connectionString = "YOUR.CONNECTION.STRING"
+val ehConf = EventHubsConf(connectionString)
+```
+
+Please read the [Connection String](#connection-string) subsection for more information on obtaining a valid
+connection string. 
+
+Additionally, the following configurations are optional:
+
+| Option | value | default | query type | meaning |
+| ------ | ----- | ------- | ---------- | ------- |
+| consumerGroup | `String` | "$Default" | streaming and batch | A consuer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
+| startingPositions | `Map[NameAndPartition, EventPosition]` | start of stream | streaming and batch | Sets starting positions for specific partitions. If any positions are set in this option, they take priority over any other option. If nothing is configured within this option, then the setting in `startingPosition` is used. If no position has been set in either option, we will start consuming from the beginning of the partition. |
+| startingPosition | `EventPosition` | start of stream | streaming and batch | The starting position for your Structured Streaming job. Please read `startingPositions` for detail on which order the options are read. |
+| endingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | batch query | The ending position of a batch query on a per partition basis. This works the same as `startingPositions`. |
+| endingPosition | `EventPosition` | end of stream | batch query | The ending position of a batch query. This workds the same as `startingPosition`.  | 
+| maxEventsPerTrigger | `long` | none | streaming query | Rate limit on maximum number of events processed per trigger interval. The specified total number of events will be proportionally split across partitions of different volume. | 
+| receiverTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
+| operationTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub API calls will be retried before throwing an exception. |
+
+For each option, there exists a corresponding setter in the EventHubsConf. For example:
+
+```scala
+import org.apache.spark.eventhubs._
+
+val cs = "YOUR.CONNECTION.STRING"
+val ehConf = EventHubsConf(cs)
+  .setConsumerGroup("sample-cg")
+  .setMaxEventsPerTrigger(10000)
+  .setReceiverTimeout(Duration.ofSeconds(30))
+```
+
+#### EventPosition
+
+The `EventHubsConf` allows users to specify starting (and ending) positions with the `EventPosition` class. `EventPosition` 
+defines a position of an event in an Event Hub partition. The position can be an enqueued time, offset, sequence number,
+the start of the stream, or the end of the stream. It's (hopefully!) pretty straightforward:
+
+```scala
+import org.apache.spark.eventhubs._
+
+EventPosition.fromOffset("100")             // Specifies offset 100
+EventPosition.fromSequenceNumber(100L)      // Specifies sequence number 100
+EventPosition.fromEnqueuedTime(Instant.now) // Specifies any event after the current time 
+EventPosition.fromStartOfStream             // Specifies from start of stream
+EventPosition.fromEndOfStream               // Specifies from end of stream
+```
+
+If you'd like to start (or end) at a specific position, simply create the correct `EventPosition` and
+set it in your `EventHubsConf`:
+
+```scala
+val cs = "YOUR.CONNECTION.STRING"
+val ehConf = EventHubsConf(cs)
+  .setStartingPosition(EventPosition.fromEndOfStream)
+```
+
+#### Per Partition Configuration
+
+For advanced users, we have provided the option to configure starting and ending positions on a per partition
+basis. Simply pass a `Map[NameAndPartition, EventPosition]` to your `EventHubsConf`. Consider:
+
+```scala
+// name is the EventHub name!
+val positions = Map(
+  NameAndPartition(name, 0) -> EventPosition.fromStartOfStream,
+  NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(100L)
+)
+
+val cs = "YOUR.CONNECTION.STRING"
+val ehConf = EventHubsConf(cs)
+  .setStartingPositions(positions)
+  .setStartingPosition(EventPosition.fromEndOfStream)
+```
+
+In this case, partition 0 starts from the beginning of the partition, partition 1 starts from sequence number `100L`, 
+and all other partitions will start from the end of the partitions. You can start from any position on any partition
+you'd like! 
+
 #### IoT Hub
-If using IoT Hub, follow these instructions to get your EventHubs-compatible connection string: 
+If using IoT Hub, getting your connection string is the only part of the process that is different - all 
+other documentation still applies. Follow these instructions to get your EventHubs-compatible connection string: 
 
 1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
 2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
@@ -36,48 +161,6 @@ val connectionString = ConnectionStringBuilder("YOUR.EVENTHUB.COMPATIBLE.ENDPOIN
   .setEventHubName("YOUR.EVENTHUB.COMPATIBLE.NAME")
   .build
 ```
-
-### EventPosition
-The `EventPosition` defines a position of an event in an event hub partition. The position can be an enqueued time, offset,
-or sequence number. If you would like start from a specific point in a partition, you must pass an `EventPosition` to 
-your [`EventHubsConf`](#eventhubsconf). Consider the following example:
-
-```scala
-val seqNo = EventPosition.fromSequenceNumber(400L, isInclusive = true)
-```
-
-This creates an `EventPosition` which specifies the sequence number 400. If `isInclusive` was false, the position would 
-be sequence number 401. The following options are available for specificying positions:
-
-| Method Name        | Required Parameter   | Optional Parameters | Returns | 
-| -----------        | ------------------   | ------------------- | ------- |
-| fromSequenceNumber | sequenceNumber: `Long` | isInclusive = false | `EventPosition` at the given sequence number. |
-| fromOffset         | offset: `String`       | isInclusive = false | `EventPosition` at the given byte offset. |
-| fromEnqueuedTime   | enqueuedTime: `java.time.Instant` | None | `EventPosition` at the given enqueued time. |
-| fromStartOfStream  | None | None | `EventPosition` for the start of the stream. |
-| fromEndOfStream    | None | None | `EventPosition` for the end of the stream. | 
-
-### EventHubsConf
-All configuration relating to Event Hubs happens in your `EventHubsConf`. A connection string must be passed to the EventHubsConf constructor like so:
-
-```scala
-val connectionString = "ValidEventHubsConnectionString"
-val ehConf = EventHubsConf(connectionString)
-```
-
-Additionally, the follow configurations are optional:
-
-| Option | value | default | query type | meaning |
-| ------ | ----- | ------- | ---------- | ------- |
-| consumerGroup | `String` | "$Default" | streaming and batch | A consuer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
-| startingPositions | `Map[PartitionId, EventPosition]` | start of stream | streaming and batch | Starting positions for specific partitions. If any positions are set in this option, they take priority when starting the Structured Streaming job. If nothing is configured for a specific partition, then the `EventPosition` set in startingPosition is used. If no position set there, we will start consuming from the beginning of the partition. |
-| startingPosition | `EventPosition` | start of stream | streaming and batch | The starting position for your Structured Streaming job. If a specific EventPosition is *not* set for a partition using startingPositions, then we use the `EventPosition` set in startingPosition. If nothing is set in either option, we will begin consuming from the beginning of the partition. |
-| endingPositions | `Map[PartitionId, EventPosition]` | end of stream | batch query | The ending position of a batch query on a per partition basis. This works the same as `startingPositions`. |
-| endingPosition | `EventPosition` | end of stream | batch query | The ending position of a batch query. This workds the same as `startingPosition`.  | 
-| failOnDataLoss | `true` or `false` | true | streaming query | Whether to fail the query when it's possible that data is lost (e.g. when sequence numbers are out of range). This may be a false alarm. You can disable it when it doesn't work as you expected. | 
-| maxEventsPerTrigger | `long` | none | streaming query | Rate limit on maximum number of events processed per trigger interval. The specified total number of events will be proportionally split across partitions of different volume. | 
-| receiverTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
-| operationTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub API calls will be retried before throwing an exception. |
 
 ## Reading Data from Event Hubs
 

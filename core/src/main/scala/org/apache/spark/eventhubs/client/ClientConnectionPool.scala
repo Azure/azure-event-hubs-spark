@@ -36,17 +36,19 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   private[this] val count = new AtomicInteger(0)
 
   private def borrowClient: EventHubClient = {
-    val client = pool.poll()
+    var client = pool.poll()
     if (client == null) {
       logInfo(
         s"No clients left to borrow. EventHub name: ${ehConf.name}. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
       connStr.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
-      EventHubClient.createSync(connStr.toString, ClientThreadPool.pool)
+      while (client == null) {
+        client = EventHubClient.createSync(connStr.toString, ClientThreadPool.pool)
+      }
     } else {
       logInfo(s"Borrowing client. EventHub name: ${ehConf.name}")
-      client
     }
+    client
   }
 
   private def returnClient(client: EventHubClient): Unit = {

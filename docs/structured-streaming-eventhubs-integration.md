@@ -146,6 +146,7 @@ and all other partitions will start from the end of the partitions. You can star
 you'd like! 
 
 #### IoT Hub
+
 If using IoT Hub, getting your connection string is the only part of the process that is different - all 
 other documentation still applies. Follow these instructions to get your EventHubs-compatible connection string: 
 

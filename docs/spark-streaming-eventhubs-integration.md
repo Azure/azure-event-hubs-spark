@@ -106,7 +106,7 @@ the start of the stream, or the end of the stream. It's (hopefully!) pretty stra
 ```scala
 import org.apache.spark.eventhubs._
 
-EventPosition.fromOffset("100")             // Specifies offset 100
+EventPosition.fromOffset("246812")          // Specifies offset 246812
 EventPosition.fromSequenceNumber(100L)      // Specifies sequence number 100
 EventPosition.fromEnqueuedTime(Instant.now) // Specifies any event after the current time 
 EventPosition.fromStartOfStream             // Specifies from start of stream

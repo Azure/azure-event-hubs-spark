@@ -205,6 +205,21 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     partitions
   }
 
+  override def toString: String = {
+    print(s"""
+      |EventHub Name: $name
+      |Partition Count: $partitionCount
+    """.stripMargin)
+
+    for (p <- partitions.keySet.toSeq.sorted) {
+      print(s"""
+        Partition: $p
+        ${partitions(p).getEvents.map(_.getBytes.map(_.toChar).mkString)})
+      """)
+    }
+    ""
+  }
+
   /** Specifies the contents of each partition. */
   private[spark] class SimulatedEventHubsPartition {
     import com.microsoft.azure.eventhubs.impl.AmqpConstants._

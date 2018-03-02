@@ -3,7 +3,7 @@ The Spark Streaming integration for Azure Event Hubs provides simple parallelism
 partitions and Spark partitions, and access to sequence numbers and metadata.
 
 ## Linking
-For Scala/Java applications using SBT/Maven project defnitions, link your application with the follow artifact:
+For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 
 ```
   groupId = com.microsoft.azure

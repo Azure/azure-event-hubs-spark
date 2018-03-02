@@ -22,8 +22,38 @@ This library is relatively easy to build. To build and test this locally, make s
 - Scala 2.11.X is installed
 - A supported version of Apache Spark is installed (see [Latest Releases](/README.md#latest-releases) for supported versions). 
 
-After that, clone the code, import it into a Maven project in your favorite IDE. If the above tools are installed, everything should
-build. If that's not the case for you OR you need additional help, just contact us on our [gitter chat](https://gitter.im/azure-event-hubs-spark)! 
+After that, cloning the code and running `mvn clean package` should successfully run all unit/integration tests and build a JAR. 
+ 
+## Getting the Staging Version
+
+We also publish a staging version of the Azure EventHubs + Apache Spark connector in GitHub. To use the staging version, two things need to 
+be added to your pom.xml. First add a new repository like so:
+
+```XML
+	<repository>
+		<id>azure-event-hubs-spark</id>
+		<url>https://raw.github.com/Azure/azure-event-hubs-spark/maven-repo/</url>
+		<snapshots>
+			<enabled>true</enabled>
+			<updatePolicy>always</updatePolicy>
+		</snapshots>
+	</repository>
+```
+
+Then add the following dependency declaration:
+
+```XML
+    <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
+        <version>2.1.6-SNAPSHOT</version>
+    </dependency>
+```
+
+### SBT Dependency
+
+    // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
+    libraryDependencies += "com.microsoft.azure" % "azure-eventhubs-spark_2.11" % "2.1.6-SNAPSHOT"
  
 ## Filing Issues
 
@@ -34,15 +64,20 @@ If you encounter any bugs, would like to request a feature, or have general ques
 
 ## Pull Requests
 
+### Required guidelines
+
+When filing a pull request, the following must be true:
+
+- Tests have been added (if needed) to validate changes
+- scalafmt (using the `.scalafmt.conf` in the repo) must be used to style the code 
+- `mvn clean package` must run successfully  
+
+### General guidelines
+
 If you would like to make changes to this library, **break up the change into small, logical, testable chunks, and organize your pull 
 requests accordingly**. This makes for a cleaner, less error-prone development process. 
 
 If you'd like to get involved, but don't know what to work on, then just reach out to us by opening an issue! All contributions/efforts are welcome :) 
-
-To open your own pull request, click [here](https://github.com/Azure/spark-eventhubs/compare). Please do your best to detail what's being changed 
-and why! The more detail, the easier it is to review and merge into existing code. 
-
-#### General guidelines
 
 If you're new to opening pull requests - or would like some additional guidance - the following list is a good set of best practices! 
 
@@ -50,14 +85,10 @@ If you're new to opening pull requests - or would like some additional guidance 
 - There are a small number of commits that each have an informative message
 - A description of the changes the pull request makes is included, and a reference to the bug/issue the pull request fixes is included, if applicable
 
-#### Testing guidelines
+### Testing guidelines
 
-In addition to what has been mentioned, it's important to mention tests! If you add code, make sure you add enough to tests to validate 
-your changes. Again, below is a list of best practices when contributing: 
+If you add code, make sure you add tests to validate your changes. Again, below is a list of best practices when contributing: 
 
 - Pull request includes test coverage for the included changes
 - Test code should not contain hard coded values for resource names or similar values
 - Test should not use App.config files for settings
-
-
-#### We've mentioned it a few times, but, just once more, please feel free to contact us :) Thanks for your interest in the connector! 

@@ -41,62 +41,18 @@ Planned changes can be found on our [wiki](https://github.com/Azure/azure-event-
 
 ### Linking 
 
-This library is available for use in Maven projects from the Maven Central Repository, and can be referenced using the following dependency 
-declaration. Be sure to see the [Latest Releases](#latest-releases) to find the package name and package version that works with your version
-of Apache Spark (or Databricks)!
+For Scala/Java applications using SBT/Maven project definitions, link your application with the artifact below. 
+**Note:** See [Latest Releases](#latest-releases) to find the correct artifiact for your version of Apache Spark (or Databricks)!
 
-```XML
-    <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
-        <version>[LATEST]</version>
-    </dependency>
-	
-	<!--- The correct artifactId and version can be found
-	in the Latest Releases section above -->
-```
-
-#### SBT Dependency
-
-    // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
-    libraryDependencies += "com.microsoft.azure" % "azure-eventhubs-spark_[2.XX]" % "[LATEST]"
-
-#### Getting the Staging Version
-
-We also publish a staging version of the Azure EventHubs + Apache Spark connector in GitHub. To use the staging version, two things needed to 
-be added to your pom.xml. First add a new repository like so:
-
-```XML
-	<repository>
-		<id>azure-event-hubs-spark</id>
-		<url>https://raw.github.com/Azure/azure-event-hubs-spark/maven-repo/</url>
-		<snapshots>
-			<enabled>true</enabled>
-			<updatePolicy>always</updatePolicy>
-		</snapshots>
-	</repository>
-```
-
-Then add the following dependency declaration:
-
-```XML
-    <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
-        <version>2.1.6-SNAPSHOT</version>
-    </dependency>
-```
-
-#### SBT Dependency
-
-    // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
-    libraryDependencies += "com.microsoft.azure" % "azure-eventhubs-spark_2.11" % "2.1.6-SNAPSHOT"
+groupId = com.microsoft.azure
+artifactId = azure-eventhubs-spark_[2.XX]</artifactId>
+version = 2.3.0
 
 ### Documentation
 
-Documentation for our connector can be found [here](docs/). 
+Documentation for our connector can be found [here](docs/). The integration guides there contain all the information you need to use this library. 
 
-**If you're new to Spark and/or Event Hubs, then we highly recommend reading their documentation first.** You can read Azure Event Hubs 
+**If you're new to Apache Spark and/or Event Hubs, then we highly recommend reading their documentation first.** You can read Azure Event Hubs 
 documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming 
 [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, last but not least, Structured Streaming 
 [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 
@@ -109,9 +65,7 @@ requests, bug reports, etc are all welcomed!
 
 ## Contributing 
 
-In general, you should not need to build this library yourself. If you'd like to help contribute (we'd love to have your help!), 
-then building the source and running tests is certainly necessary. You can go to our [Contributor's Guide](/.github/CONTRIBUTING.md) 
-for that information and more. 
+If you'd like to help contribute (we'd love to have your help!), then go to our [Contributor's Guide](/.github/CONTRIBUTING.md) for more information. 
 
 ## Build Prerequisites
 

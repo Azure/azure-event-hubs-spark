@@ -48,6 +48,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
     } else {
       logInfo(s"Borrowing client. EventHub name: ${ehConf.name}")
     }
+    logInfo(s"Available clients: {${pool.size}}. Total clients: ${count.get}")
     client
   }
 

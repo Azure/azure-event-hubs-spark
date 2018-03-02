@@ -51,27 +51,13 @@
   <properties>
     <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
     <scala.binary.version>2.11</scala.binary.version>
-    <spark.version>2.3.0-SNAPSHOT</spark.version>
+    <spark.version>2.3.0</spark.version>
     <github.global.server>github</github.global.server>
   </properties>
 
   <modules>
     <module>core</module>
   </modules>
-
-  <repositories>
-    <repository>
-      <id>apache.snapshots</id>
-      <name>Apache Development Snapshot Repository</name>
-      <url>https://repository.apache.org/snapshots/</url>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
 
   <profiles>
       <!-- Profile to release a staging version to github. mvn clean deploy -Prelease-to-github -DskipTests-->
@@ -144,23 +130,11 @@
       <artifactId>spark-sql_2.11</artifactId>
       <version>${spark.version}</version>
     </dependency>
-
-
-
     <dependency>
       <groupId>com.microsoft.azure</groupId>
       <artifactId>azure-eventhubs</artifactId>
-      <version>1.0.0-SNAPSHOT</version>
+      <version>1.0.0</version>
     </dependency>
-
-  <dependency>
-    <groupId>org.apache.qpid</groupId>
-    <artifactId>proton-j</artifactId>
-    <version>0.25.0</version>
-  </dependency>
-
-
-
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>

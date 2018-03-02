@@ -57,7 +57,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger =
-    options.get(MaxEventsPerTriggerKey).map(_.toSequenceNumber)
+    Some(options.get(MaxEventsPerTriggerKey).map(_.toInt).getOrElse(partitionCount * 2000))
 
   private var _client: Client = _
   private[spark] def ehClient = {

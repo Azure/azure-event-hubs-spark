@@ -70,7 +70,7 @@ private[spark] trait Client extends Serializable {
    *
    * @param eventCount the number of events that will be requested from the EventHub partition.
    */
-  def receive(eventCount: Int): Iterable[EventData]
+  def receive(eventCount: Int): java.lang.Iterable[EventData]
 
   /**
    * When a connection with the service is established, the client will begin to prefetch EventData.

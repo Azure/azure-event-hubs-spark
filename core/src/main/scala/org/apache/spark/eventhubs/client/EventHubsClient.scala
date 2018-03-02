@@ -90,9 +90,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     receiver.setPrefetchCount(count)
   }
 
-  override def receive(eventCount: Int): Iterable[EventData] = {
+  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
     require(receiver != null, "receive: PartitionReceiver has not been created.")
-    receiver.receive(eventCount).get.asScala
+    receiver.receive(eventCount).get
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure

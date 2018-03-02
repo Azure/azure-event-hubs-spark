@@ -317,10 +317,10 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     eventHub.send(partitionId, event)
   }
 
-  override def receive(eventCount: Int): Iterable[EventData] = {
+  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
     val events = eventHub.receive(eventCount, self.rPartitionId, currentSeqNo)
     currentSeqNo += eventCount
-    events.asScala
+    events
   }
 
   override def setPrefetchCount(count: Int): Unit = {

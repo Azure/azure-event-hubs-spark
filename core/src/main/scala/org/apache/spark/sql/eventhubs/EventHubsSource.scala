@@ -232,8 +232,9 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       case (nAndP, seqNo) =>
         if (seqNo < currentSeqNos.get(nAndP)) {
           reportDataLoss(
-            s"Starting seqNo $seqNo is behind the earliest sequence number ${currentSeqNos.get(nAndP)}" +
-              s" present in the service. Some events may have expired and been missed.")
+            s"Starting seqNo $seqNo in partition ${nAndP.partitionId} of EventHub ${nAndP.ehName} " +
+              s"is behind the earliest sequence number ${currentSeqNos.get(nAndP)} " +
+              s"present in the service. Some events may have expired and been missed.")
           nAndP -> currentSeqNos.get(nAndP)
         } else {
           nAndP -> seqNo

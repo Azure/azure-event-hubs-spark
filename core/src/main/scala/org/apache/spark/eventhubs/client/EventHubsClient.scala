@@ -166,8 +166,14 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   override def close(): Unit = {
     logInfo("close: Closing EventHubsClient.")
-    if (receiver != null) receiver.closeSync()
-    if (partitionSender != null) receiver.closeSync()
+    if (receiver != null) {
+      receiver.closeSync()
+      receiver = null
+    }
+    if (partitionSender != null) {
+      partitionSender.closeSync()
+      partitionSender = null
+    }
     if (client != null) {
       ClientConnectionPool.returnClient(client)
       client = null

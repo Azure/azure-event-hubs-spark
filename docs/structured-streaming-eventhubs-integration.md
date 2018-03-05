@@ -177,7 +177,6 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
-  .as[EventData]
 
 // Source with per partition starting positions and rate limiting. In this case, we'll start from 
 // a sequence number for partition 0, enqueued time for partition 3, the end of stream
@@ -199,7 +198,6 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
-  .as[EventData]
 ```
 
 ### Creating an Event Hubs Source for Batch Queries 

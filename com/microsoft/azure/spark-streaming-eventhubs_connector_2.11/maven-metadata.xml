@@ -3,9 +3,10 @@
   <groupId>com.microsoft.azure</groupId>
   <artifactId>spark-streaming-eventhubs_connector_2.11</artifactId>
   <versioning>
+    <release>2.1.4-HOTFIX</release>
     <versions>
-      <version>2.1.6-SNAPSHOT</version>
+      <version>2.1.4-HOTFIX</version>
     </versions>
-    <lastUpdated>20171102182027</lastUpdated>
+    <lastUpdated>20180305224019</lastUpdated>
   </versioning>
 </metadata>

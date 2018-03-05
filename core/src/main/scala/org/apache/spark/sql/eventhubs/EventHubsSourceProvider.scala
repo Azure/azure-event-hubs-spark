@@ -150,7 +150,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
   def eventHubsSchema: StructType = {
     StructType(
       Seq(
-        StructField("body", StringType),
+        StructField("body", BinaryType),
         StructField("offset", LongType),
         StructField("sequenceNumber", LongType),
         StructField("enqueuedTime", TimestampType),

@@ -177,6 +177,11 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
+  
+// Select body column as a String 
+val eventhubs = df
+  .select("body")
+  .as[String]
 
 // Source with per partition starting positions and rate limiting. In this case, we'll start from 
 // a sequence number for partition 0, enqueued time for partition 3, the end of stream
@@ -237,7 +242,7 @@ Each row in the source has the following schema:
 
 | Column | Type |
 | ------ | ---- |
-| body | string |
+| body | binary |
 | offset | long |
 | sequenceNumber | long |
 | enqueuedTime | timestamp |

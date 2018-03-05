@@ -62,7 +62,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
       .format("eventhubs")
       .options(ehConf.toMap)
       .load()
-      .select("body")
+      .selectExpr("CAST (body AS STRING)")
   }
 
   private def createEventHubsWriter(

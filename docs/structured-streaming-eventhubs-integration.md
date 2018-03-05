@@ -11,7 +11,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
   version = 2.3.0
 ```
 
-For Python applications, you need to add this above library and its dependencies when deploying your applciation.
+For Python applications, you need to add this above library and its dependencies when deploying your application.
 See the [Deploying](#deploying) subsection below.
 
 ## User Configuration
@@ -177,7 +177,11 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
-  .as[EventData]
+  
+// Select body column as a String 
+val eventhubs = df
+  .select("body")
+  .as[String]
 
 // Source with per partition starting positions and rate limiting. In this case, we'll start from 
 // a sequence number for partition 0, enqueued time for partition 3, the end of stream
@@ -199,7 +203,6 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
-  .as[EventData]
 ```
 
 ### Creating an Event Hubs Source for Batch Queries 
@@ -239,7 +242,7 @@ Each row in the source has the following schema:
 
 | Column | Type |
 | ------ | ---- |
-| body | string |
+| body | binary |
 | offset | long |
 | sequenceNumber | long |
 | enqueuedTime | timestamp |

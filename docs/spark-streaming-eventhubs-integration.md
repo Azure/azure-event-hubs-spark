@@ -11,7 +11,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
   version = 2.3.0
 ```
 
-For Python applications, you need to add this above library and its dependencies when deploying your applciation.
+For Python applications, you need to add this above library and its dependencies when deploying your application.
 See the [Deploying](#deploying) subsection below.
 
 ## User Configuration

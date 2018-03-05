@@ -71,7 +71,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
     val rdd = new EventHubsRDD(sqlContext.sparkContext, ehConf, offsetRanges, clientFactory).map {
       ed =>
         InternalRow(
-          UTF8String.fromBytes(ed.getBytes),
+          ed.getBytes,
           ed.getSystemProperties.getOffset.toLong,
           ed.getSystemProperties.getSequenceNumber,
           DateTimeUtils.fromJavaTimestamp(

@@ -50,10 +50,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
-        .createReceiver(consumerGroup,
+        .createReceiverSync(consumerGroup,
                         partitionId,
                         EventPosition.fromSequenceNumber(startingSeqNo).convert)
-        .get
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
   }
@@ -92,7 +91,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
     require(receiver != null, "receive: PartitionReceiver has not been created.")
-    receiver.receive(eventCount).get
+    receiver.receiveSync(eventCount)
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
@@ -227,13 +226,12 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       threads += new Thread {
         override def run(): Unit = {
           val receiver = client
-            .createReceiver(DefaultConsumerGroup,
+            .createReceiverSync(DefaultConsumerGroup,
                             partitionId.toString,
                             positions.getOrElse(nAndP, defaultPos).convert)
-            .get
           receiver.setPrefetchCount(PrefetchCountMinimum)
-          val event = receiver.receive(1).get.iterator.next // get the first event that was received.
-          receiver.close().get()
+          val event = receiver.receiveSync(1).iterator.next // get the first event that was received.
+          receiver.closeSync()
           result.put(partitionId, event.getSystemProperties.getSequenceNumber)
         }
       }

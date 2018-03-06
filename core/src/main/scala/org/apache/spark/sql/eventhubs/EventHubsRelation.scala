@@ -72,7 +72,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
       ed =>
         InternalRow(
           ed.getBytes,
-          ed.getSystemProperties.getOffset.toLong,
+          UTF8String.fromString(ed.getSystemProperties.getOffset),
           ed.getSystemProperties.getSequenceNumber,
           DateTimeUtils.fromJavaTimestamp(
             new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),

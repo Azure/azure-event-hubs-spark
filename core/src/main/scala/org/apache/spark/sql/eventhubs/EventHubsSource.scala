@@ -295,7 +295,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, clientFactory).map { ed =>
       InternalRow(
         ed.getBytes,
-        ed.getSystemProperties.getOffset.toLong,
+        UTF8String.fromString(ed.getSystemProperties.getOffset),
         ed.getSystemProperties.getSequenceNumber,
         DateTimeUtils.fromJavaTimestamp(
           new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),

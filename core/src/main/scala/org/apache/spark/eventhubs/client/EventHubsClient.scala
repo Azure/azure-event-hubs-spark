@@ -219,6 +219,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
 
     logInfo(s"translate: needsTranslation = $needsTranslation")
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
 
     val threads = ArrayBuffer[Thread]()
     needsTranslation.foreach(nAndP => {
@@ -226,7 +227,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       threads += new Thread {
         override def run(): Unit = {
           val receiver = client
-            .createReceiverSync(DefaultConsumerGroup,
+            .createReceiverSync(consumerGroup,
                             partitionId.toString,
                             positions.getOrElse(nAndP, defaultPos).convert)
           receiver.setPrefetchCount(PrefetchCountMinimum)
@@ -239,16 +240,16 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
             val receiverOptions = new ReceiverOptions()
             receiverOptions.setReceiverRuntimeMetricEnabled(true)
             val newReceiver = client
-              .createReceiverSync(DefaultConsumerGroup,
+              .createReceiverSync(consumerGroup,
                             partitionId.toString,
                             com.microsoft.azure.eventhubs.EventPosition.fromStartOfStream,
                             receiverOptions);
             val startEvents = newReceiver.receiveSync(1)
             if (startEvents == null || !startEvents.iterator().hasNext) {
-              result.put(partitionId, 1L);
+              result.put(partitionId, StartingSequenceNumber);
             } else {
               val lastSequenceNumber = newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
-              result.put(partitionId, lastSequenceNumber)
+              result.put(partitionId, lastSequenceNumber + 1)
             }
           } else {
             val event = events.iterator.next

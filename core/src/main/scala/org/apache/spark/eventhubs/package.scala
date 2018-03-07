@@ -37,6 +37,7 @@ package object eventhubs {
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
+  val StartingSequenceNumber = 0L
 
   type PartitionId = Int
   val PartitionId = Int

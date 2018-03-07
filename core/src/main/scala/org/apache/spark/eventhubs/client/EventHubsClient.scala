@@ -50,10 +50,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
-        .createReceiver(consumerGroup,
+        .createReceiverSync(consumerGroup,
                         partitionId,
                         EventPosition.fromSequenceNumber(startingSeqNo).convert)
-        .get
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
   }
@@ -92,7 +91,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
     require(receiver != null, "receive: PartitionReceiver has not been created.")
-    receiver.receive(eventCount).get
+    receiver.receiveSync(eventCount)
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
@@ -220,6 +219,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
 
     logInfo(s"translate: needsTranslation = $needsTranslation")
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
 
     val threads = ArrayBuffer[Thread]()
     needsTranslation.foreach(nAndP => {
@@ -227,14 +227,35 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       threads += new Thread {
         override def run(): Unit = {
           val receiver = client
-            .createReceiver(DefaultConsumerGroup,
+            .createReceiverSync(consumerGroup,
                             partitionId.toString,
                             positions.getOrElse(nAndP, defaultPos).convert)
-            .get
           receiver.setPrefetchCount(PrefetchCountMinimum)
-          val event = receiver.receive(1).get.iterator.next // get the first event that was received.
-          receiver.close().get()
-          result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+          val events = receiver.receiveSync(1) // get the first event that was received.
+          receiver.closeSync()
+          if (events == null || !events.iterator().hasNext) {
+            // no events to receive at EndOfStream can happen in 2 cases
+            // 1. receive at endOfStream and no new events arrive
+            // 2. receive on a brand new partition
+            val receiverOptions = new ReceiverOptions()
+            receiverOptions.setReceiverRuntimeMetricEnabled(true)
+            val newReceiver = client
+              .createReceiverSync(consumerGroup,
+                            partitionId.toString,
+                            com.microsoft.azure.eventhubs.EventPosition.fromStartOfStream,
+                            receiverOptions);
+            val startEvents = newReceiver.receiveSync(1)
+            if (startEvents == null || !startEvents.iterator().hasNext) {
+              result.put(partitionId, StartingSequenceNumber);
+            } else {
+              val lastSequenceNumber = newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
+              result.put(partitionId, lastSequenceNumber + 1)
+            }
+            newReceiver.closeSync()
+          } else {
+            val event = events.iterator.next
+            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+          }
         }
       }
     })

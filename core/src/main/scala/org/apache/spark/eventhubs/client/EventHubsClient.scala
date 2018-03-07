@@ -230,9 +230,30 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                             partitionId.toString,
                             positions.getOrElse(nAndP, defaultPos).convert)
           receiver.setPrefetchCount(PrefetchCountMinimum)
-          val event = receiver.receiveSync(1).iterator.next // get the first event that was received.
+          val events = receiver.receiveSync(1) // get the first event that was received.
           receiver.closeSync()
-          result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+          if (events == null || !events.iterator().hasNext) {
+            // no events to receive at EndOfStream can happen in 2 cases
+            // 1. receive at endOfStream and no new events arrive
+            // 2. receive on a brand new partition
+            val receiverOptions = new ReceiverOptions()
+            receiverOptions.setReceiverRuntimeMetricEnabled(true)
+            val newReceiver = client
+              .createReceiverSync(DefaultConsumerGroup,
+                            partitionId.toString,
+                            com.microsoft.azure.eventhubs.EventPosition.fromStartOfStream,
+                            receiverOptions);
+            val startEvents = newReceiver.receiveSync(1)
+            if (startEvents == null || !startEvents.iterator().hasNext) {
+              result.put(partitionId, 1L);
+            } else {
+              val lastSequenceNumber = newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
+              result.put(partitionId, lastSequenceNumber)
+            }
+          } else {
+            val event = events.iterator.next
+            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+          }
         }
       }
     })

@@ -251,6 +251,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
               val lastSequenceNumber = newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
               result.put(partitionId, lastSequenceNumber + 1)
             }
+            newReceiver.closeSync()
           } else {
             val event = events.iterator.next
             result.put(partitionId, event.getSystemProperties.getSequenceNumber)

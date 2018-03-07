@@ -243,7 +243,7 @@ Each row in the source has the following schema:
 | Column | Type |
 | ------ | ---- |
 | body | binary |
-| offset | long |
+| offset | string |
 | sequenceNumber | long |
 | enqueuedTime | timestamp |
 | publisher | string |

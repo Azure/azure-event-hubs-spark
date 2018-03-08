@@ -190,9 +190,8 @@ If you have a use case that is better suited to batch processing, you can create
 // Import dependencies and create EventHubsConf as in Create Direct Stream above
 
 val offsetRanges = Array(
-  // Event Hub name, partition, inclusive starting sequence number, exclusive ending sequence number
-  OffsetRange("test", 0, 0, 100),
-  OffsetRange("test", 0, 0, 100)
+  OffsetRange(name = "sample", partitionId = 0, fromSeq = 0, untilSeq = 100),
+  OffsetRange(name "sample", partitionId = 1, fromSeq = 0, untilSeq = 100)
 )
 
 val rdd = EventHubsUtils.createRDD(sparkContext, ehConf, offsetRanges)

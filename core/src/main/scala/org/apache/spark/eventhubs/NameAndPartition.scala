@@ -39,7 +39,7 @@ case class NameAndPartition(ehName: String, partitionId: Int) extends Serializab
   def toTuple: (String, Int) = (ehName, partitionId)
 }
 
-private[spark] object NameAndPartition {
+object NameAndPartition {
   def fromString(str: String): NameAndPartition = {
     Serialization.read[NameAndPartition](str)
   }

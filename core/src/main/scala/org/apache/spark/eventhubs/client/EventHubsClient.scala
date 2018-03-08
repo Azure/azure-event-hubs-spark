@@ -51,8 +51,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
         .createReceiverSync(consumerGroup,
-                        partitionId,
-                        EventPosition.fromSequenceNumber(startingSeqNo).convert)
+                            partitionId,
+                            EventPosition.fromSequenceNumber(startingSeqNo).convert)
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
   }
@@ -228,8 +228,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         override def run(): Unit = {
           val receiver = client
             .createReceiverSync(consumerGroup,
-                            partitionId.toString,
-                            positions.getOrElse(nAndP, defaultPos).convert)
+                                partitionId.toString,
+                                positions.getOrElse(nAndP, defaultPos).convert)
           receiver.setPrefetchCount(PrefetchCountMinimum)
           val events = receiver.receiveSync(1) // get the first event that was received.
           receiver.closeSync()
@@ -241,14 +241,15 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
             receiverOptions.setReceiverRuntimeMetricEnabled(true)
             val newReceiver = client
               .createReceiverSync(consumerGroup,
-                            partitionId.toString,
-                            com.microsoft.azure.eventhubs.EventPosition.fromStartOfStream,
-                            receiverOptions);
+                                  partitionId.toString,
+                                  com.microsoft.azure.eventhubs.EventPosition.fromStartOfStream,
+                                  receiverOptions)
             val startEvents = newReceiver.receiveSync(1)
             if (startEvents == null || !startEvents.iterator().hasNext) {
-              result.put(partitionId, StartingSequenceNumber);
+              result.put(partitionId, StartingSequenceNumber)
             } else {
-              val lastSequenceNumber = newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
+              val lastSequenceNumber =
+                newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
               result.put(partitionId, lastSequenceNumber + 1)
             }
             newReceiver.closeSync()

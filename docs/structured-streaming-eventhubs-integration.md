@@ -131,8 +131,8 @@ basis. Simply pass a `Map[NameAndPartition, EventPosition]` to your `EventHubsCo
 ```scala
 // name is the EventHub name!
 val positions = Map(
-  NameAndPartition(name, 0) -> EventPosition.fromStartOfStream,
-  NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(100L)
+  new NameAndPartition(name, 0) -> EventPosition.fromStartOfStream,
+  new NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(100L)
 )
 
 val cs = "YOUR.CONNECTION.STRING"
@@ -190,9 +190,9 @@ val connectionString = "Valid EventHubs connection string."
 val name = connectionString.getEventHubName
 
 val positions = Map(
-  NameAndPartition(name, 0) -> EventPosition.fromSequenceNumber(1000L, isInclusive = true),
-  NameAndPartition(name, 3) -> EventPosition.fromEnqueuedTime(Instant.now),
-  NameAndPartition(name, 5) -> EventPosition.fromEndOfStream
+  new NameAndPartition(name, 0) -> EventPosition.fromSequenceNumber(1000L, isInclusive = true),
+  new NameAndPartition(name, 3) -> EventPosition.fromEnqueuedTime(Instant.now),
+  new NameAndPartition(name, 5) -> EventPosition.fromEndOfStream
 )
 
 val ehConf = EventHubsConf(connectionString)
@@ -224,13 +224,13 @@ val ehConf = EventHubsConf("VALID.CONNECTION.STRING")
 
 // per partition config
 val start = Map(
-  NameAndPartition(name, 0) -> EventPosition.fromSequenceNumber(1000L),
-  NameAndPartition(name, 1) -> EventPosition.fromOffset("100")
+  new NameAndPartition(name, 0) -> EventPosition.fromSequenceNumber(1000L),
+  new NameAndPartition(name, 1) -> EventPosition.fromOffset("100")
 )
 
 val end = Map(
-  NameAndPartition(name, 0) -> EventPosition.fromEnqueuedTime(Instant.now),
-  NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(1000L)
+  new NameAndPartition(name, 0) -> EventPosition.fromEnqueuedTime(Instant.now),
+  new NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(1000L)
 )
 
 val ehConf = EventHubsConf("VALID.CONNECTION.STRING")

@@ -180,18 +180,19 @@ val df = spark
   
 // Select body column as a String 
 val eventhubs = df
-  .select("body")
+  .select("CAST (body AS STRING)")
   .as[String]
 
 // Source with per partition starting positions and rate limiting. In this case, we'll start from 
 // a sequence number for partition 0, enqueued time for partition 3, the end of stream
 // for partition 5, and the start of stream for all other partitions.
 val connectionString = "Valid EventHubs connection string."
+val name = connectionString.getEventHubName
 
 val positions = Map(
-  0 -> EventPosition.fromSequenceNumber(1000L, isInclusive = true),
-  3 -> EventPosition.fromEnqueuedTime(Instant.now),
-  5 -> EventPosition.fromEndOfStream
+  NameAndPartition(name, 0) -> EventPosition.fromSequenceNumber(1000L, isInclusive = true),
+  NameAndPartition(name, 3) -> EventPosition.fromEnqueuedTime(Instant.now),
+  NameAndPartition(name, 5) -> EventPosition.fromEndOfStream
 )
 
 val ehConf = EventHubsConf(connectionString)
@@ -214,7 +215,7 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
-df.select("body").as[String]
+df.select("CAST(body AS STRING)").as[String]
 
 // start from same place across all partitions. end at the same place accross all partitions.
 val ehConf = EventHubsConf("VALID.CONNECTION.STRING")
@@ -223,13 +224,13 @@ val ehConf = EventHubsConf("VALID.CONNECTION.STRING")
 
 // per partition config
 val start = Map(
-  0 -> EventPosition.fromSequenceNumber(1000L),
-  1 -> EventPosition.fromOffset("100")
+  NameAndPartition(name, 0) -> EventPosition.fromSequenceNumber(1000L),
+  NameAndPartition(name, 1) -> EventPosition.fromOffset("100")
 )
 
 val end = Map(
-  0 -> EventPosition.fromEnqueuedTime(Instant.now),
-  1 -> EventPosition.fromSequenceNumber(1000L)
+  NameAndPartition(name, 0) -> EventPosition.fromEnqueuedTime(Instant.now),
+  NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(1000L)
 )
 
 val ehConf = EventHubsConf("VALID.CONNECTION.STRING")
@@ -282,14 +283,14 @@ val ds = df
   .select("body")
   .writeStream
   .format("eventhubs")
-  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.
+  .options(ehWriteConf.toMap)    // EventHubsConf containing the destination EventHub connection string.
   .start()
   
 // Write body data from a DataFrame to EventHubs with a partitionKey
 val ds = df
   .selectExpr("partitionKey", "body")
   .format("eventHubs")
-  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.
+  .options(ehWriteConf.toMap)    // EventHubsConf containing the destination EventHub connection string.
   .start()
 ```
 
@@ -300,14 +301,14 @@ val ds = df
 df.select("body")
   .write
   .format("eventhubs")
-  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.
+  .options(ehWriteConf.toMap)    // EventHubsConf containing the destination EventHub connection string.
   .save()
   
 // Write body data   
 df.selectExpr("partitionKey", "body")
   .write
   .format("eventhubs")
-  .options(ehWriteConf.toMap)    // A new EventHubsConf that contains the correct connection string for the destination EventHub.  
+  .options(ehWriteConf.toMap)    // EventHubsConf containing the destination EventHub connection string.
   .save()
 ```
 

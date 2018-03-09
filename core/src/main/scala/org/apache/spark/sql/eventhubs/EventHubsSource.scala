@@ -214,9 +214,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       currentSeqNos = Some(untilSeqNos)
     }
     if (start.isDefined && start.get == end) {
-      return sqlContext.internalCreateDataFrame(sqlContext.sparkContext.emptyRDD,
-                                                schema,
-                                                isStreaming = true)
+      return sqlContext.internalCreateDataFrame(sqlContext.sparkContext.emptyRDD, schema)
     }
     val fromSeqNos = start match {
       case Some(prevBatchEndOffset) =>
@@ -308,7 +306,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       "GetBatch generating RDD of offset range: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
 
-    sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = true)
+    sqlContext.internalCreateDataFrame(rdd, schema)
   }
 
   override def stop(): Unit = synchronized {

@@ -69,7 +69,7 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromOffset(offset: String): EventPosition = {
-    EventPosition(offset = offset)
+    EventPosition(offset)
   }
 
   /**

@@ -178,7 +178,6 @@ val df = spark
   .options(ehConf.toMap)
   .load()
   
-// Select body column as a String 
 val eventhubs = df.select($"body" cast "string")
 
 // Source with per partition starting positions and rate limiting. In this case, we'll start from 

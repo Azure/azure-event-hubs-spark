@@ -44,9 +44,9 @@ Planned changes can be found on our [wiki](https://github.com/Azure/azure-event-
 For Scala/Java applications using SBT/Maven project definitions, link your application with the artifact below. 
 **Note:** See [Latest Releases](#latest-releases) to find the correct artifiact for your version of Apache Spark (or Databricks)!
 
-groupId = com.microsoft.azure
-artifactId = azure-eventhubs-spark_[2.XX]</artifactId>
-version = 2.3.0
+    groupId = com.microsoft.azure
+    artifactId = azure-eventhubs-spark_[2.XX]</artifactId>
+    version = 2.3.0
 
 ### Documentation
 

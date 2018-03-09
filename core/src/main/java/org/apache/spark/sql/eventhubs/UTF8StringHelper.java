@@ -49,7 +49,6 @@ public class UTF8StringHelper {
 
             Function<Integer, Byte> getByte = (i) -> Platform.getByte(_base, _offset + i);
 
-
             int numBytes = str.numBytes();
             if (numBytes == 0) {
                 retVal = false;

@@ -21,8 +21,8 @@ import java.time.Duration
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
+import org.apache.spark.eventhubs.utils.CaseInsensitiveMap
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 

@@ -55,7 +55,7 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
       .format("eventhubs")
       .options(ehConf.toMap)
       .load()
-      .selectExpr("CAST (body AS STRING)")
+      .select($"body" cast "string")
   }
 
   private def createPositions(seqNo: Long, ehName: String, partitionCount: Int) = {

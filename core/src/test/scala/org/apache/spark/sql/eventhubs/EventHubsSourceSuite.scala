@@ -26,11 +26,9 @@ import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartiti
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{ count, window }
-import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
@@ -191,125 +189,6 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .options(parameters)
 
     testStream(reader.load())(makeSureGetOffsetCalled, StopStream, StartStream(), StopStream)
-  }
-
-  test("maxSeqNosPerTrigger") {
-    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    testUtils.populateUniformly(eventHub.name, 5000)
-
-    val parameters =
-      getEventHubsConf(eventHub.name)
-        .setMaxEventsPerTrigger(4)
-        .toMap
-
-    val reader = spark.readStream
-      .format("eventhubs")
-      .options(parameters)
-
-    val eventhubs = reader
-      .load()
-      .select("body")
-      .as[String]
-
-    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
-
-    val clock = new StreamManualClock
-
-    val waitUntilBatchProcessed = AssertOnQuery { q =>
-      eventually(Timeout(streamingTimeout)) {
-        if (q.exception.isEmpty) {
-          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
-        }
-      }
-      if (q.exception.isDefined) {
-        throw q.exception.get
-      }
-      true
-    }
-
-    testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
-      waitUntilBatchProcessed,
-      // we'll get one event per partition per trigger
-      CheckAnswer(0, 0, 0, 0),
-      AdvanceManualClock(100),
-      waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1),
-      StopStream,
-      StartStream(ProcessingTime(100), clock),
-      waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2),
-      AdvanceManualClock(100),
-      waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3)
-    )
-  }
-
-  test("maxOffsetsPerTrigger with non-uniform partitions") {
-    val name = newEventHubs()
-    val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)
-
-    testUtils.send(name, 0, 100 to 200)
-    testUtils.send(name, 1, 10 to 20)
-    testUtils.send(name, 2, Seq(1))
-    // partition 3 of 3 remains empty.
-
-    val parameters =
-      getEventHubsConf(name)
-        .setMaxEventsPerTrigger(10)
-        .toMap
-
-    val reader = spark.readStream
-      .format("eventhubs")
-      .options(parameters)
-
-    val eventhubs = reader
-      .load()
-      .select("body")
-      .as[String]
-
-    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(e => e.toInt)
-
-    val clock = new StreamManualClock
-
-    val waitUntilBatchProcessed = AssertOnQuery { q =>
-      eventually(Timeout(streamingTimeout)) {
-        if (q.exception.isEmpty) {
-          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
-        }
-      }
-      if (q.exception.isDefined) {
-        throw q.exception.get
-      }
-      true
-    }
-
-    testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
-      waitUntilBatchProcessed,
-      // 1 from smallest, 1 from middle, 8 from biggest
-      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107),
-      AdvanceManualClock(100),
-      waitUntilBatchProcessed,
-      // smallest now empty, 1 more from middle, 9 more from biggest
-      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
-        114, 115, 116),
-      StopStream,
-      StartStream(ProcessingTime(100), clock),
-      waitUntilBatchProcessed,
-      // smallest now empty, 1 more from middle, 9 more from biggest
-      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
-        114, 115, 116, 12, 117, 118, 119, 120, 121, 122, 123, 124, 125),
-      AdvanceManualClock(100),
-      waitUntilBatchProcessed,
-      // smallest now empty, 1 more from middle, 9 more from biggest
-      CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
-        114, 115, 116, 12, 117, 118, 119, 120, 121, 122, 123, 124, 125, 13, 126, 127, 128, 129, 130,
-        131, 132, 133, 134)
-    )
   }
 
   test("cannot stop EventHubs stream") {

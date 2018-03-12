@@ -8,7 +8,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.0
+  version = 2.2.0
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -178,10 +178,7 @@ val df = spark
   .options(ehConf.toMap)
   .load()
   
-// Select body column as a String 
-val eventhubs = df
-  .select("CAST (body AS STRING)")
-  .as[String]
+val eventhubs = df.select($"body" cast "string")
 
 // Source with per partition starting positions and rate limiting. In this case, we'll start from 
 // a sequence number for partition 0, enqueued time for partition 3, the end of stream
@@ -215,7 +212,7 @@ val df = spark
   .format("eventhubs")
   .options(ehConf.toMap)
   .load()
-df.select("CAST(body AS STRING)").as[String]
+df.select($"body" cast "string")
 
 // start from same place across all partitions. end at the same place accross all partitions.
 val ehConf = EventHubsConf("VALID.CONNECTION.STRING")

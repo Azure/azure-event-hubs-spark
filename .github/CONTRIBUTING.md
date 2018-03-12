@@ -10,7 +10,7 @@ see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq
 
 To build and test this locally, make sure you've done the following:
 - Java 1.8 SDK is installed
-- Maven 3.x is installed (or SBT version 0.13.13)
+- [Maven 3.x](https://maven.apache.org/download.cgi) is installed (or [SBT version 1.x](https://www.scala-sbt.org/1.x/docs/index.html))
 - A supported version of Apache Spark is installed (see [Latest Releases](/README.md#latest-releases) for supported versions). 
 
 After that, cloning the code and running `mvn clean package` should successfully 

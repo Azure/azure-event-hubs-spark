@@ -24,17 +24,15 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Spark
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
-|Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11)|
-|Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11)|
-|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11)|
-
-<sup>*Note:* Version 2.2.0 will supports Spark 2.1 as well.</sup>
+|Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.0-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.0%7Cjar)|
+|Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0-PREVIEW%7Cjar)|
+|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0-PREVIEW%7Cjar)|
 
 #### Databricks
-|Databricks Runtime Version|Package Name|Package Version|
+|Databricks Runtime Version|Artifact Id|Package Version|
 |-------------|------------|----------------|
-|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11)|
-|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.microsoft.azure/azure-eventhubs-spark_2.11)|
+|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.0-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.0%7Cjar)|
+|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.0-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.0%7Cjar)|
 
 #### Roadmap
 

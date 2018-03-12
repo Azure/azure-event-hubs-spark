@@ -69,7 +69,7 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromOffset(offset: String): EventPosition = {
-    EventPosition(offset = offset, isInclusive = true)
+    EventPosition(offset)
   }
 
   /**
@@ -81,7 +81,7 @@ object EventPosition {
    */
   def fromSequenceNumber(seqNo: SequenceNumber): EventPosition = {
     require(seqNo >= 0L, "Please pass a positive sequence number.")
-    EventPosition(seqNo = seqNo, isInclusive = true)
+    EventPosition(seqNo = seqNo)
   }
 
   /**

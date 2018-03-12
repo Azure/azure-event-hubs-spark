@@ -42,7 +42,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   private implicit val formats = Serialization.formats(NoTypeHints)
 
-  private var client = ClientConnectionPool.borrowClient(ehConf)
+  private[this] var connectionPoolObject = ClientConnectionPool.borrowClient(ehConf)
+  private var client = connectionPoolObject.getEventHubClient
 
   private var receiver: PartitionReceiver = _
   override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
@@ -174,7 +175,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       partitionSender = null
     }
     if (client != null) {
-      ClientConnectionPool.returnClient(client)
+      ClientConnectionPool.returnClient(connectionPoolObject)
+      connectionPoolObject = null
       client = null
     }
   }

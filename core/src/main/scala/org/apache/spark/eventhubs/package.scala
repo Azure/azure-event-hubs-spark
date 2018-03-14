@@ -28,7 +28,7 @@ package object eventhubs {
 
   implicit val formats = Serialization.formats(NoTypeHints)
 
-  val DefaultEventPosition: EventPosition = EventPosition.fromStartOfStream
+  val DefaultEventPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)

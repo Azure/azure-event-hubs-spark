@@ -251,13 +251,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
               // No events to receive can happen in 2 cases:
               //   1. Receive from EndOfStream and no new events arrive
               //   2. Receive from an empty partition
-              val runtimeInfo = getRunTimeInfo(partitionId)
-              val earliest = runtimeInfo.getBeginSequenceNumber
-              val latest = runtimeInfo.getLastEnqueuedSequenceNumber
+              val (earliest, latest) = boundedSeqNos(partitionId)
               if (earliest >= latest) {
-                result.put(partitionId, earliest + 1)
+                result.put(partitionId, earliest)
               } else {
-                result.put(partitionId, latest + 1)
+                result.put(partitionId, latest)
               }
           }
         }

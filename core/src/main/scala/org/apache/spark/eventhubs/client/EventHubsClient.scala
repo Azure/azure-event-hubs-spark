@@ -17,6 +17,7 @@
 
 package org.apache.spark.eventhubs.client
 
+import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 import com.microsoft.azure.eventhubs._
@@ -43,7 +44,13 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   private implicit val formats = Serialization.formats(NoTypeHints)
 
-  private var client = ClientConnectionPool.borrowClient(ehConf)
+  private var _client: EventHubClient = _
+  private def client = {
+    if (_client == null) {
+      _client = ClientConnectionPool.borrowClient(ehConf)
+    }
+    _client
+  }
 
   private var receiver: PartitionReceiver = _
   override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
@@ -178,9 +185,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       partitionSender.closeSync()
       partitionSender = null
     }
-    if (client != null) {
-      ClientConnectionPool.returnClient(client)
-      client = null
+    if (_client != null) {
+      ClientConnectionPool.returnClient(_client)
+      _client = null
     }
   }
 
@@ -190,24 +197,20 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int,
                             useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
-
-    logInfo(s"translate: useStart is set to $useStart.")
-
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
     val needsTranslation = ArrayBuffer[NameAndPartition]()
 
+    logInfo(s"translate: useStart is set to $useStart.")
     val positions = if (useStart) {
       ehConf.startingPositions.getOrElse(Map.empty).par
     } else {
       ehConf.endingPositions.getOrElse(Map.empty).par
     }
-
     val defaultPos = if (useStart) {
       ehConf.startingPosition.getOrElse(DefaultEventPosition)
     } else {
       ehConf.endingPosition.getOrElse(DefaultEndingPosition)
     }
-
     logInfo(s"translate: PerPartitionPositions = $positions")
     logInfo(s"translate: Default position = $defaultPos")
 
@@ -222,45 +225,40 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         synchronized(needsTranslation += nAndP)
       }
     }
-
     logInfo(s"translate: needsTranslation = $needsTranslation")
-    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
 
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val threads = ArrayBuffer[Thread]()
     needsTranslation.foreach(nAndP => {
       val partitionId = nAndP.partitionId
       threads += new Thread {
         override def run(): Unit = {
-          val receiver = client
-            .createReceiverSync(consumerGroup,
-                                partitionId.toString,
-                                positions.getOrElse(nAndP, defaultPos).convert)
-          receiver.setPrefetchCount(PrefetchCountMinimum)
-          val events = receiver.receiveSync(1) // get the first event that was received.
-          receiver.closeSync()
-          if (events == null || !events.iterator().hasNext) {
-            // no events to receive at EndOfStream can happen in 2 cases
-            // 1. receive at endOfStream and no new events arrive
-            // 2. receive on a brand new partition
-            val receiverOptions = new ReceiverOptions()
-            receiverOptions.setReceiverRuntimeMetricEnabled(true)
-            val newReceiver = client
+          @volatile var receiver: PartitionReceiver = null
+          try {
+            receiver = client
               .createReceiverSync(consumerGroup,
                                   partitionId.toString,
-                                  com.microsoft.azure.eventhubs.EventPosition.fromStartOfStream,
-                                  receiverOptions)
-            val startEvents = newReceiver.receiveSync(1)
-            if (startEvents == null || !startEvents.iterator().hasNext) {
-              result.put(partitionId, StartingSequenceNumber)
-            } else {
-              val lastSequenceNumber =
-                newReceiver.getRuntimeInformation.getLastEnqueuedSequenceNumber
-              result.put(partitionId, lastSequenceNumber + 1)
-            }
-            newReceiver.closeSync()
-          } else {
+                                  positions.getOrElse(nAndP, defaultPos).convert)
+            receiver.setPrefetchCount(PrefetchCountMinimum)
+            receiver.setReceiveTimeout(Duration.ofSeconds(5))
+            val events = receiver.receiveSync(1) // get the first event that was received.
             val event = events.iterator.next
             result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+            receiver.closeSync()
+          } catch {
+            case e: Exception =>
+              logWarning("translate: failed to receive event.", e)
+              // No events to receive can happen in 2 cases:
+              //   1. Receive from EndOfStream and no new events arrive
+              //   2. Receive from an empty partition
+              val runtimeInfo = getRunTimeInfo(partitionId)
+              val earliest = runtimeInfo.getBeginSequenceNumber
+              val latest = runtimeInfo.getLastEnqueuedSequenceNumber
+              if (earliest >= latest) {
+                result.put(partitionId, earliest + 1)
+              } else {
+                result.put(partitionId, latest + 1)
+              }
           }
         }
       }

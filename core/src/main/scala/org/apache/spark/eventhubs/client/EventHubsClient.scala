@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.impl.EventHubClientImpl
+import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
@@ -48,11 +49,15 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
     if (receiver == null) {
       val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+      val receiverOptions = new ReceiverOptions
+      receiverOptions.setReceiverRuntimeMetricEnabled(false)
+      receiverOptions.setIdentifier(s"${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
       logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
       receiver = client
         .createReceiverSync(consumerGroup,
                             partitionId,
-                            EventPosition.fromSequenceNumber(startingSeqNo).convert)
+                            EventPosition.fromSequenceNumber(startingSeqNo).convert,
+                            receiverOptions)
       receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
     }
   }

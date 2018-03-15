@@ -45,7 +45,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   private implicit val formats = Serialization.formats(NoTypeHints)
 
   private var _client: EventHubClient = _
-  private def client = {
+  private def client = synchronized {
     if (_client == null) {
       _client = ClientConnectionPool.borrowClient(ehConf)
     }
@@ -244,9 +244,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
             val events = receiver.receiveSync(1) // get the first event that was received.
             val event = events.iterator.next
             result.put(partitionId, event.getSystemProperties.getSequenceNumber)
-            receiver.closeSync()
           } catch {
-            case e: Exception =>
+            case e: NullPointerException =>
               logWarning("translate: failed to receive event.", e)
               // No events to receive can happen in 2 cases:
               //   1. Receive from EndOfStream and no new events arrive
@@ -257,6 +256,14 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
               } else {
                 result.put(partitionId, latest)
               }
+
+            case x: IllegalEntityException =>
+              logError("translate: IllegalEntityException. Consumer group may not exist.", x)
+              throw x
+          } finally {
+            if (receiver != null) {
+              receiver.closeSync()
+            }
           }
         }
       }

@@ -272,7 +272,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
     result.asScala.toMap.mapValues { seqNo =>
       { if (seqNo == -1L) 0L else seqNo }
-    }
+    }.map(identity)
   }
 }
 

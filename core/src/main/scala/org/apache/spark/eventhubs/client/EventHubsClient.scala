@@ -242,11 +242,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
             receiver.setPrefetchCount(PrefetchCountMinimum)
             receiver.setReceiveTimeout(Duration.ofSeconds(5))
             val events = receiver.receiveSync(1) // get the first event that was received.
-            val event = events.iterator.next
-            result.put(partitionId, event.getSystemProperties.getSequenceNumber)
-          } catch {
-            case e: NullPointerException =>
-              logWarning("translate: failed to receive event.", e)
+            if (events == null || !events.iterator.hasNext) {
+              logWarning("translate: failed to receive event.")
               // No events to receive can happen in 2 cases:
               //   1. Receive from EndOfStream and no new events arrive
               //   2. Receive from an empty partition
@@ -256,10 +253,14 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
               } else {
                 result.put(partitionId, latest)
               }
-
-            case x: IllegalEntityException =>
-              logError("translate: IllegalEntityException. Consumer group may not exist.", x)
-              throw x
+            } else {
+              val event = events.iterator.next
+              result.put(partitionId, event.getSystemProperties.getSequenceNumber)
+            }
+          } catch {
+            case e: IllegalEntityException =>
+              logError("translate: IllegalEntityException. Consumer group may not exist.", e)
+              throw e
           } finally {
             if (receiver != null) {
               receiver.closeSync()
@@ -278,9 +279,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     assert(result.size == partitionCount,
            s"translate: result size ${result.size} does not equal partition count $partitionCount")
 
-    result.asScala.toMap.mapValues { seqNo =>
-      { if (seqNo == -1L) 0L else seqNo }
-    }.map(identity)
+    result.asScala.toMap
+      .mapValues { seqNo =>
+        { if (seqNo == -1L) 0L else seqNo }
+      }
+      .map(identity)
   }
 }
 

@@ -72,9 +72,8 @@ If you'd like to help contribute (we'd love to have your help!), then go to our 
 
 In order to use the connector, you need to have:
 
-1. Java 1.8 SDK.
-2. Maven 3.x
-3. Scala 2.11
+- Java 1.8 SDK installed
+- [Maven 3.x](https://maven.apache.org/download.cgi) installed (or [SBT version 1.x](https://www.scala-sbt.org/1.x/docs/index.html))
 
 More details on building from source and running tests can be found in our [Contributor's Guide](/.github/CONTRIBUTING.md). 
 

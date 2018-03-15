@@ -130,8 +130,8 @@ basis. Simply pass a `Map[NameAndPartition, EventPosition]` to your `EventHubsCo
 ```scala
 // name is the EventHub name!
 val positions = Map(
-  NameAndPartition(name, 0) -> EventPosition.fromStartOfStream,
-  NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(100L)
+  new NameAndPartition(name, 0) -> EventPosition.fromStartOfStream,
+  new NameAndPartition(name, 1) -> EventPosition.fromSequenceNumber(100L)
 )
 
 val cs = "YOUR.CONNECTION.STRING"
@@ -190,9 +190,8 @@ If you have a use case that is better suited to batch processing, you can create
 // Import dependencies and create EventHubsConf as in Create Direct Stream above
 
 val offsetRanges = Array(
-  // Event Hub name, partition, inclusive starting sequence number, exclusive ending sequence number
-  OffsetRange("test", 0, 0, 100),
-  OffsetRange("test", 0, 0, 100)
+  OffsetRange(name = "sample", partitionId = 0, fromSeq = 0, untilSeq = 100),
+  OffsetRange(name "sample", partitionId = 1, fromSeq = 0, untilSeq = 100)
 )
 
 val rdd = EventHubsUtils.createRDD(sparkContext, ehConf, offsetRanges)
@@ -245,7 +244,7 @@ typically hard to make idempotent.
 
 // begin from the the offsets committed to the database
 val fromOffsets = selectOffsetsFromYourDatabase.map { resultSet =>
-  NameAndPartition(resultSet.string("eventhubName"), resultSet.int("partition")) -> resultSet.long("seqNo")
+  new NameAndPartition(resultSet.string("eventhubName"), resultSet.int("partition")) -> resultSet.long("seqNo")
 }.toMap
 
 // Assuming the EventHubs conf is created elsewhere

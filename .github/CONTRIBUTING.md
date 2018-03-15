@@ -8,11 +8,9 @@ see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq
 
 ## Getting Started
 
-This library is relatively easy to build. To build and test this locally, 
-make sure you've done the following:
+To build and test this locally, make sure you've done the following:
 - Java 1.8 SDK is installed
-- Maven 3.x is installed
-- Scala 2.11.X is installed
+- [Maven 3.x](https://maven.apache.org/download.cgi) is installed (or [SBT version 1.x](https://www.scala-sbt.org/1.x/docs/index.html))
 - A supported version of Apache Spark is installed (see [Latest Releases](/README.md#latest-releases) for supported versions). 
 
 After that, cloning the code and running `mvn clean package` should successfully 
@@ -41,14 +39,14 @@ Then add the following dependency declaration:
     <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
-        <version>2.1.6-SNAPSHOT</version>
+        <version>2.3.0</version>
     </dependency>
 ```
 
 ### SBT Dependency
 
     // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
-    libraryDependencies += "com.microsoft.azure" % "azure-eventhubs-spark_2.11" % "2.1.6-SNAPSHOT"
+    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.0"
  
 ## Filing Issues
 
@@ -61,15 +59,15 @@ questions/concerns/comments, feel free to file an issue [here](https://github.co
 
 ## Pull Requests
 
-### Required guidelines
+### Required Guidelines
 
 When filing a pull request, the following must be true:
 
 - Tests have been added (if needed) to validate changes
 - scalafmt (using the `.scalafmt.conf` in the repo) must be used to style the code 
-- `mvn clean package` must run successfully  
+- `mvn clean test` must run successfully  
 
-### General guidelines
+### General Guidelines
 
 If you would like to make changes to this library, **break up the change into small, 
 logical, testable chunks, and organize your pull requests accordingly**. This makes 
@@ -85,7 +83,7 @@ following list is a good set of best practices!
 - There are a small number of commits that each have an informative message
 - A description of the changes the pull request makes is included, and a reference to the bug/issue the pull request fixes is included, if applicable
 
-### Testing guidelines
+### Testing Guidelines
 
 If you add code, make sure you add tests to validate your changes. Again, below is a 
 list of best practices when contributing: 

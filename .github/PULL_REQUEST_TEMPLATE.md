@@ -2,7 +2,7 @@ Thanks for contributing! We appreciate it :)
 
 For a Pull Request to be accepted, you must:
 - Run scalafmt on your code using the `.scalafmt.conf` present in this project
-- All tests must pass when you run `mvn clean package` 
+- All tests must pass when you run `mvn clean test` 
 
 Just in case, here are some tips that could prove useful when opening a pull request:
 - Read the [Contributor's Guide](CONTRIBUTING.md)

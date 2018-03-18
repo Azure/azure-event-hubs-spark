@@ -1,4 +1,8 @@
-### Thanks for contributing! We appreciate it :) 
+Thanks for contributing! We appreciate it :) 
+
+For a Pull Request to be accepted, you must:
+- Run scalafmt on your code using the `.scalafmt.conf` present in this project
+- All tests must pass when you run `mvn clean test` 
 
 Just in case, here are some tips that could prove useful when opening a pull request:
 - Read the [Contributor's Guide](CONTRIBUTING.md)
@@ -8,5 +12,3 @@ Just in case, here are some tips that could prove useful when opening a pull req
 - Any public code should be properly documented 
 - Be sure to write tests for any changes in the pull request
 - The code should build without any errors 
-
-#### Again, thanks for taking the time! Feel free to reach out with any questions or concerns! 

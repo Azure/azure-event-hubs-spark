@@ -19,7 +19,6 @@ package org.apache.spark.sql.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
-import java.util.Objects
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext

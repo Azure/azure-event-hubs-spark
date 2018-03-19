@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.eventhubs
 
-import java.util.Objects
-
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.EventHubsConf

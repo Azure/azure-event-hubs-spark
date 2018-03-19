@@ -259,7 +259,7 @@ Each row in the source has the following schema:
 | enqueuedTime | timestamp |
 | publisher | string |
 | partitionKey | string |
-| properties | map[string, string] |
+| properties | map[string, object] |
 
 ## Writing Data to EventHubs
 

@@ -305,7 +305,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         UTF8String.fromString(ed.getSystemProperties.getPublisher),
         UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
         ArrayBasedMapData(ed.getProperties.asScala.map { p =>
-          UTF8String.fromString(p._1) -> UTF8String.fromString(Objects.toString(p._2))
+          UTF8String.fromString(p._1) -> p._2
         })
       )
     }

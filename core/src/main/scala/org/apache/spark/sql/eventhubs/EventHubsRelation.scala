@@ -23,13 +23,14 @@ import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.catalyst.util.{ ArrayBasedMapData, DateTimeUtils }
 import org.apache.spark.sql.{ Row, SQLContext }
 import org.apache.spark.sql.sources.{ BaseRelation, TableScan }
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.types.UTF8String
 
 import scala.language.postfixOps
+import collection.JavaConverters._
 
 private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
                                            options: Map[String, String],
@@ -77,7 +78,10 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
           DateTimeUtils.fromJavaTimestamp(
             new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
           UTF8String.fromString(ed.getSystemProperties.getPublisher),
-          UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
+          UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
+          ArrayBasedMapData(ed.getProperties.asScala.map { p =>
+            UTF8String.fromString(p._1) -> p._2
+          })
         )
     }
 

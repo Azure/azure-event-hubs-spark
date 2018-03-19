@@ -245,7 +245,8 @@ Each row in the source has the following schema:
 | sequenceNumber | long |
 | enqueuedTime | timestamp |
 | publisher | string |
-| partitionKey | string | 
+| partitionKey | string |
+| properties | map[string, object] |
 
 ## Writing Data to EventHubs
 

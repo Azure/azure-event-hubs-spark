@@ -343,6 +343,21 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
+    * Set the number of parallel read tasks to use per Event Hub partition.
+    * Limited to 1 >= X <= 5
+    * @param tasks number of parallel read tasks
+    * @return the updated [[EventHubsConf]] instance
+    */
+  def setParallelTasksPerPartition(tasks:Int): EventHubsConf = {
+    val splitCount = Math.max(1, Math.min(5, tasks))
+    set(ParallelTasksPerPartition, splitCount)
+  }
+
+  def parallelTasksPerPartition: Int = {
+    self.get(ParallelTasksPerPartition).map(_.toInt).getOrElse(1)
+  }
+
+  /**
    * Rate limit on maximum number of events processed per trigger interval.
    * Only valid for Structured Streaming. The specified total number of events
    * will be proportionally split across partitions of different volume.
@@ -386,6 +401,7 @@ object EventHubsConf extends Logging {
   val OperationTimeoutKey = "eventhubs.operationTimeout"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
+  val ParallelTasksPerPartition = "parallelReaderTasks"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

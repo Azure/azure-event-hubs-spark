@@ -2,6 +2,30 @@
 The Spark Streaming integration for Azure Event Hubs provides simple parallelism, 1:1 correspondence between Event Hubs 
 partitions and Spark partitions, and access to sequence numbers and metadata.
 
+Table of Contents
+=================
+* [Linking](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#linking)
+* [User Configurations](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#user-configuration)
+  * [Connection String](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#connection-string)
+    * [Azure Portal](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#azure-portal)
+    * [ConnectionStringBuilder](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#connectionstringbuilder)
+  * [EventHubsConf](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#eventhubsconf)
+    * [EventPosition](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#eventposition)
+    * [Per Partition Configuration](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#per-partition-configuration)
+    * [IoT Hub](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#iot-hub)
+* [Creating a Direct Stream](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#creating-a-direct-stream)
+* [Creating an RDD](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#creating-an-rdd)
+* [Obtaining Offests](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#obtaining-offests)
+* [Storing Offsets](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#storing-offsets)
+  * [Checkpoints](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#checkpoints)
+  * [Your own data store](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#your-own-data-store)
+* [Deploying](https://github.com/basilhariri/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#deploying)
+
+
+
+
+
+
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 

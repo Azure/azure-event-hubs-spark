@@ -2,6 +2,20 @@
 
 Structured Streaming integration for Azure Event Hubs to read data from Event Hubs. 
 
+## Table of Contents
+* [Linking](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#linking)
+* [User Configurations](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#user-configuration)
+  * [Connection String](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#connection-string)
+  * [EventHubsConf](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#eventhubsconf)
+* [Reading Data from Event Hubs](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#reading-data-from-event-hubs)
+  * [Creating an Event Hubs Source for Streaming Queries](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#creating-an-event-hubs-source-for-streaming-queries)
+  * [Creating an Event Hubs Source for Batch Queries](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#creating-an-event-hubs-source-for-batch-queries)
+* [Writing Data to EventHubs](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#writing-data-to-eventhubs)
+  * [Creating an EventHubs Sink for Streaming Queries](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#creating-an-eventhubs-sink-for-streaming-queries)
+  * [Writing the output of Batch Queries to EventHubs](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#writing-the-output-of-batch-queries-to-eventhubs)
+* [Deploying](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#deploying)
+
+
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 

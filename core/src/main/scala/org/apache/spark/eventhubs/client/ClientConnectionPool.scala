@@ -90,8 +90,8 @@ object ClientConnectionPool extends Logging {
   def borrowClient(ehConf: EventHubsConf): EventHubClient = {
     val name = ehConf.name
 
-    if (!isInitialized(name)) {
-      pools.synchronized {
+    pools.synchronized {
+      if (!isInitialized(name)) {
         pools.update(name, new ClientConnectionPool(ehConf))
       }
     }

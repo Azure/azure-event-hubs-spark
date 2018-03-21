@@ -24,6 +24,8 @@ import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
 
+import collection.JavaConverters._
+
 /**
  * Tests the functionality of the simulated EventHubs instance used for testing.
  */
@@ -205,8 +207,7 @@ class EventHubsTestUtilsSuite
   }
 
   test("send EventData to specific partition") {
-    // use this partition in the partition sender
-    val part = 7
+    val targetPartition = 7
 
     val eh = newEventHubs()
     testUtils.createEventHubs(eh, partitionCount = 10)
@@ -214,17 +215,29 @@ class EventHubsTestUtilsSuite
     val ehConf = getEventHubsConf(eh)
     val client = new SimulatedClient(ehConf)
     val event = EventData.create("1".getBytes)
-    client.send(event, part)
+    client.send(event, targetPartition)
 
-    assert(testUtils.getEventHubs(eh).getPartitions(part).size == 1)
+    assert(testUtils.getEventHubs(eh).getPartitions(targetPartition).size == 1)
     assert(
       testUtils
         .getEventHubs(eh)
-        .getPartitions(part)
+        .getPartitions(targetPartition)
         .getEvents
         .head
         .getBytes
         .sameElements(event.getBytes))
+  }
 
+  test("application properties") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 1)
+    val properties: Map[String, AnyRef] = Map(
+      "A" -> "1".getBytes,
+      "B" -> Map.empty,
+      "C" -> "Hello, world."
+    )
+    testUtils.send(eh, Seq(0), Some(properties))
+    val event = testUtils.getEventHubs(eh).getPartitions(0).getEvents.head
+    assert(event.getProperties === properties.asJava)
   }
 }

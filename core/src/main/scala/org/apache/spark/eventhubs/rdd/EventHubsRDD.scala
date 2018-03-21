@@ -24,6 +24,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
+import scala.collection.immutable.NumericRange
 import scala.collection.mutable.ArrayBuffer
 
 private[spark] class EventHubsRDD(sc: SparkContext,
@@ -37,10 +38,40 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   import org.apache.spark.eventhubs._
 
   override def getPartitions: Array[Partition] = {
+    log.info(s"Generating ${ehConf.parallelTasksPerPartition} tasks per ${offsetRanges.size} offsets")
     for {
-      (o, i) <- offsetRanges.zipWithIndex
+      (o, i) <- offsetRanges.flatMap(or => split(or, ehConf.parallelTasksPerPartition)).zipWithIndex
     } yield
       new EventHubsRDDPartition(i, o.nameAndPartition, o.fromSeqNo, o.untilSeqNo, o.preferredLoc)
+  }
+
+  private def split(offset:OffsetRange, chunks:Int):Seq[OffsetRange]  = {
+    if(chunks == 1){
+      Seq(offset)
+    }
+    val groups = splitRange(offset.fromSeqNo until offset.untilSeqNo, 5, 2)
+    val groupTuples = groups.map(f => (f.start, f.end))
+    groupTuples.map(r => {
+      OffsetRange(offset.nameAndPartition, r._1, r._2, offset.preferredLoc)
+    }).toSeq
+  }
+
+  private def splitRange(r: NumericRange[Long], chunks: Int, minimum:Int): Seq[NumericRange[Long]] = {
+    if (r.step != 1)
+      throw new IllegalArgumentException("Range must have step size equal to 1")
+
+    val nchunks = scala.math.max(chunks, 1)
+    val chunkSize = scala.math.max(r.length / nchunks, 1)
+    val starts = r.by(chunkSize).take(nchunks)
+    val ends = starts.drop(1) :+ r.end
+    val ranges = starts.zip(ends).map(x => x._1 until x._2)
+    if(ranges.exists(_.size < minimum) && chunks > 0) {
+      splitRange(r, chunks - 1, minimum)
+    } else if (chunks > 0) {
+      ranges
+    } else {
+      Seq(r)
+    }
   }
 
   override def count: Long = offsetRanges.map(_.count).sum

@@ -558,7 +558,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // producer. So here we just use a low bound to make sure the internal conversion works.
     assert(row.getAs[java.sql.Timestamp]("enqueuedTime").getTime >= now,
            s"Unexpected results: $row")
-    assert(row.getAs[Map[String, String]]("properties") === Map(), s"Unexpected results: $row")
+    assert(row.getAs[Map[String, Array[Byte]]]("properties") === Map(), s"Unexpected results: $row")
     query.stop()
   }
 

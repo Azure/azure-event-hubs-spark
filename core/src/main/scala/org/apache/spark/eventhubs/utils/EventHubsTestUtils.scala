@@ -27,7 +27,7 @@ import com.microsoft.azure.eventhubs.impl.AmqpConstants.{
 }
 import com.microsoft.azure.eventhubs.impl.EventDataImpl
 import org.apache.qpid.proton.amqp.Binary
-import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
+import org.apache.qpid.proton.amqp.messaging.{ ApplicationProperties, Data, MessageAnnotations }
 import org.apache.qpid.proton.message.Message
 import org.apache.qpid.proton.message.Message.Factory
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
@@ -47,12 +47,21 @@ private[spark] class EventHubsTestUtils {
 
   import EventHubsTestUtils._
 
-  def send(ehName: String, data: Seq[Int]): Seq[Int] = {
-    eventHubs(ehName).send(data)
+  def send(ehName: String, data: Seq[Int], properties: Option[Map[String, Object]]): Seq[Int] = {
+    eventHubs(ehName).send(data, properties)
   }
 
-  def send(ehName: String, partitionId: PartitionId, data: Seq[Int]): Seq[Int] = {
-    eventHubs(ehName).send(partitionId, data)
+  // Overload of above method. Have to do Java-style overload because
+  // multiple overloads cannot have the same default arguments.
+  def send(ehName: String, data: Seq[Int]): Seq[Int] = {
+    eventHubs(ehName).send(data, None)
+  }
+
+  def send(ehName: String,
+           partitionId: PartitionId,
+           data: Seq[Int],
+           properties: Option[Map[String, Object]] = None): Seq[Int] = {
+    eventHubs(ehName).send(partitionId, data, properties)
   }
 
   def getLatestSeqNos(ehConf: EventHubsConf): Map[NameAndPartition, SequenceNumber] = {
@@ -102,10 +111,12 @@ private[spark] class EventHubsTestUtils {
   }
 
   // Put 'count' events in every simulated EventHubs partition
-  def populateUniformly(ehName: String, count: Int): Unit = {
+  def populateUniformly(ehName: String,
+                        count: Int,
+                        properties: Option[Map[String, Object]] = None): Unit = {
     val eventHub = eventHubs(ehName)
     for (i <- 0 until eventHub.partitionCount) {
-      eventHub.send(i, 0 until count)
+      eventHub.send(i, 0 until count, properties)
     }
   }
 }
@@ -117,7 +128,9 @@ private[spark] object EventHubsTestUtils {
 
   private[utils] val eventHubs: mutable.Map[String, SimulatedEventHubs] = mutable.Map.empty
 
-  def createEventData(event: Array[Byte], seqNo: Long): EventData = {
+  def createEventData(event: Array[Byte],
+                      seqNo: Long,
+                      properties: Option[Map[String, Object]] = None): EventData = {
     val constructor = classOf[EventDataImpl].getDeclaredConstructor(classOf[Message])
     constructor.setAccessible(true)
 
@@ -130,9 +143,13 @@ private[spark] object EventHubsTestUtils {
 
     val msgAnnotations = new MessageAnnotations(
       Map(SEQUENCE_NUMBER -> s, OFFSET -> o, ENQUEUED_TIME_UTC -> t).asJava)
-
     val body = new Data(new Binary(event))
+
     val msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
+    if (properties.isDefined) {
+      val appProperties = new ApplicationProperties(properties.get.asJava)
+      msg.setApplicationProperties(appProperties)
+    }
     constructor.newInstance(msg).asInstanceOf[EventData]
   }
 }
@@ -165,32 +182,36 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     (for { _ <- 0 until eventCount } yield partitions(partitionId).get(seqNo)).asJava
   }
 
-  def send(events: Seq[Int]): Seq[Int] = {
+  def send(events: Seq[Int], properties: Option[Map[String, Object]]): Seq[Int] = {
     for (event <- events) {
       synchronized {
         val part = count % this.partitionCount
         count += 1
-        this.send(part, Seq(event))
+        this.send(part, Seq(event), properties)
       }
     }
     events
   }
 
-  def send(partitionId: PartitionId, events: Seq[Int]): Seq[Int] = {
-    partitions(partitionId).send(events)
+  def send(partitionId: PartitionId,
+           events: Seq[Int],
+           properties: Option[Map[String, Object]]): Seq[Int] = {
+    partitions(partitionId).send(events, properties)
     events
   }
 
-  def send(event: EventData): Unit = {
+  def send(event: EventData, properties: Option[Map[String, Object]]): Unit = {
     synchronized {
       val part = count % this.partitionCount
       count += 1
-      this.send(part, event)
+      this.send(part, event, properties)
     }
   }
 
-  def send(partitionId: PartitionId, event: EventData): Unit = {
-    synchronized(partitions(partitionId).send(event))
+  def send(partitionId: PartitionId,
+           event: EventData,
+           properties: Option[Map[String, Object]]): Unit = {
+    synchronized(partitions(partitionId).send(event, properties))
   }
 
   def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
@@ -222,43 +243,22 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
 
   /** Specifies the contents of each partition. */
   private[spark] class SimulatedEventHubsPartition {
-    import com.microsoft.azure.eventhubs.impl.AmqpConstants._
 
     private var data: Seq[EventData] = Seq.empty
 
     def getEvents: Seq[EventData] = data
 
-    // This allows us to invoke the EventData(Message) constructor
-    private val constructor = classOf[EventDataImpl].getDeclaredConstructor(classOf[Message])
-    constructor.setAccessible(true)
-
-    private[spark] def send(events: Seq[Int]): Unit = {
-      synchronized {
-        for (event <- events) {
-          val seqNo = data.size.toLong.asInstanceOf[AnyRef]
-
-          // This value is not accurate. However, "offet" is never used in testing.
-          // Placing dummy value here because one is required in order for EventData
-          // to serialize/de-serialize properly during tests.
-          val offset = data.size.toString.asInstanceOf[AnyRef]
-
-          val time = new Date(System.currentTimeMillis()).asInstanceOf[AnyRef]
-
-          val msgAnnotations = new MessageAnnotations(
-            Map(SEQUENCE_NUMBER -> seqNo, OFFSET -> offset, ENQUEUED_TIME_UTC -> time).asJava)
-
-          val body = new Data(new Binary(s"$event".getBytes("UTF-8")))
-
-          val msg = Factory.create(null, null, msgAnnotations, null, null, body, null)
-
-          data = data :+ constructor.newInstance(msg).asInstanceOf[EventData]
-        }
+    private[spark] def send(events: Seq[Int], properties: Option[Map[String, Object]]): Unit = {
+      for (event <- events) {
+        val seqNo = data.size.toLong
+        val e = EventHubsTestUtils.createEventData(s"$event".getBytes("UTF-8"), seqNo, properties)
+        synchronized { data = data :+ e }
       }
     }
 
-    private[spark] def send(event: EventData): Unit = {
+    private[spark] def send(event: EventData, properties: Option[Map[String, Object]]): Unit = {
       // Need to add a Seq No to the EventData to properly simulate the service.
-      val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong)
+      val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong, properties)
       synchronized(data = data :+ e)
     }
 
@@ -306,7 +306,7 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   }
 
   override def send(event: EventData): Unit = {
-    eventHub.send(event)
+    eventHub.send(event, None)
   }
 
   override def send(event: EventData, partitionKey: String): Unit = {
@@ -314,7 +314,7 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   }
 
   override def send(event: EventData, partitionId: Int): Unit = {
-    eventHub.send(partitionId, event)
+    eventHub.send(partitionId, event, None)
   }
 
   override def receive(eventCount: Int): java.lang.Iterable[EventData] = {

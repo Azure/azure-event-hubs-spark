@@ -58,7 +58,7 @@ class EventHubsTestUtilsSuite
 
   test("Send one event to one partition") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    eventHub.send(0, Seq(0))
+    eventHub.send(0, Seq(0), None)
 
     val data = eventHub.getPartitions
 
@@ -86,10 +86,10 @@ class EventHubsTestUtilsSuite
 
   test("All partitions have different data.") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    eventHub.send(0, Seq(1, 2, 3))
-    eventHub.send(1, Seq(4, 5, 6))
-    eventHub.send(2, Seq(7, 8, 9))
-    eventHub.send(3, Seq(10, 11, 12))
+    eventHub.send(0, Seq(1, 2, 3), None)
+    eventHub.send(1, Seq(4, 5, 6), None)
+    eventHub.send(2, Seq(7, 8, 9), None)
+    eventHub.send(3, Seq(10, 11, 12), None)
 
     val data = eventHub.getPartitions
 
@@ -135,10 +135,10 @@ class EventHubsTestUtilsSuite
   test("latestSeqNo") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
 
-    eventHub.send(0, Seq(1))
-    eventHub.send(1, Seq(2, 3))
-    eventHub.send(2, Seq(4, 5, 6))
-    eventHub.send(3, Seq(7))
+    eventHub.send(0, Seq(1), None)
+    eventHub.send(1, Seq(2, 3), None)
+    eventHub.send(2, Seq(4, 5, 6), None)
+    eventHub.send(3, Seq(7), None)
 
     val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
@@ -156,10 +156,10 @@ class EventHubsTestUtilsSuite
     assert(eventHub.partitionSize(2) == 0)
     assert(eventHub.partitionSize(3) == 0)
 
-    eventHub.send(0, Seq(1))
-    eventHub.send(1, Seq(2, 3))
-    eventHub.send(2, Seq(4, 5, 6))
-    eventHub.send(3, Seq(7))
+    eventHub.send(0, Seq(1), None)
+    eventHub.send(1, Seq(2, 3), None)
+    eventHub.send(2, Seq(4, 5, 6), None)
+    eventHub.send(3, Seq(7), None)
 
     assert(eventHub.partitionSize(0) == 1)
     assert(eventHub.partitionSize(1) == 2)
@@ -172,10 +172,10 @@ class EventHubsTestUtilsSuite
 
     assert(eventHub.totalSize == 0)
 
-    eventHub.send(0, Seq(1))
-    eventHub.send(1, Seq(2, 3))
-    eventHub.send(2, Seq(4, 5, 6))
-    eventHub.send(3, Seq(7))
+    eventHub.send(0, Seq(1), None)
+    eventHub.send(1, Seq(2, 3), None)
+    eventHub.send(2, Seq(4, 5, 6), None)
+    eventHub.send(3, Seq(7), None)
 
     assert(eventHub.totalSize == 7)
   }

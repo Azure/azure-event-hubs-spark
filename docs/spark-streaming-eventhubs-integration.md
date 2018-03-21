@@ -15,7 +15,6 @@ partitions and Spark partitions, and access to sequence numbers and metadata.
   * [Your own data store](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#your-own-data-store)
 * [Deploying](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#deploying)
 
-
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 

@@ -3,17 +3,17 @@ The Spark Streaming integration for Azure Event Hubs provides simple parallelism
 partitions and Spark partitions, and access to sequence numbers and metadata.
 
 ## Table of Contents
-* [Linking](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#linking)
-* [User Configurations](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#user-configuration)
-  * [Connection String](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#connection-string)
-  * [EventHubsConf](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#eventhubsconf)
-* [Creating a Direct Stream](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#creating-a-direct-stream)
-* [Creating an RDD](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#creating-an-rdd)
-* [Obtaining Offests](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#obtaining-offests)
-* [Storing Offsets](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#storing-offsets)
-  * [Checkpoints](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#checkpoints)
-  * [Your own data store](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#your-own-data-store)
-* [Deploying](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/spark-streaming-eventhubs-integration.md#deploying)
+* [Linking](#linking)
+* [User Configurations](#user-configuration)
+  * [Connection String](#connection-string)
+  * [EventHubsConf](#eventhubsconf)
+* [Creating a Direct Stream](#creating-a-direct-stream)
+* [Creating an RDD](#creating-an-rdd)
+* [Obtaining Offests](#obtaining-offests)
+* [Storing Offsets](#storing-offsets)
+  * [Checkpoints](#checkpoints)
+  * [Your own data store](#your-own-data-store)
+* [Deploying](#deploying)
 
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:

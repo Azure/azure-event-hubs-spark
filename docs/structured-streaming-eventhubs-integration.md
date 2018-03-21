@@ -15,7 +15,6 @@ Structured Streaming integration for Azure Event Hubs to read data from Event Hu
   * [Writing the output of Batch Queries to EventHubs](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#writing-the-output-of-batch-queries-to-eventhubs)
 * [Deploying](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#deploying)
 
-
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 

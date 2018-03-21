@@ -3,7 +3,7 @@
 Structured Streaming integration for Azure Event Hubs to read data from Event Hubs. 
 
 ## Table of Contents
-* [Linking](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#linking)
+* [Linking](#linking)
 * [User Configurations](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#user-configuration)
   * [Connection String](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#connection-string)
   * [EventHubsConf](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#eventhubsconf)

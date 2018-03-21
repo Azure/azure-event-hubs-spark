@@ -2,6 +2,19 @@
 
 Structured Streaming integration for Azure Event Hubs to read data from Event Hubs. 
 
+## Table of Contents
+* [Linking](#linking)
+* [User Configurations](#user-configuration)
+  * [Connection String](#connection-string)
+  * [EventHubsConf](#eventhubsconf)
+* [Reading Data from Event Hubs](#reading-data-from-event-hubs)
+  * [Creating an Event Hubs Source for Streaming Queries](#creating-an-event-hubs-source-for-streaming-queries)
+  * [Creating an Event Hubs Source for Batch Queries](#creating-an-event-hubs-source-for-batch-queries)
+* [Writing Data to EventHubs](#writing-data-to-eventhubs)
+  * [Creating an EventHubs Sink for Streaming Queries](#creating-an-eventhubs-sink-for-streaming-queries)
+  * [Writing the output of Batch Queries to EventHubs](#writing-the-output-of-batch-queries-to-eventhubs)
+* [Deploying](#deploying)
+
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 

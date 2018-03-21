@@ -2,6 +2,19 @@
 The Spark Streaming integration for Azure Event Hubs provides simple parallelism, 1:1 correspondence between Event Hubs 
 partitions and Spark partitions, and access to sequence numbers and metadata.
 
+## Table of Contents
+* [Linking](#linking)
+* [User Configurations](#user-configuration)
+  * [Connection String](#connection-string)
+  * [EventHubsConf](#eventhubsconf)
+* [Creating a Direct Stream](#creating-a-direct-stream)
+* [Creating an RDD](#creating-an-rdd)
+* [Obtaining Offests](#obtaining-offests)
+* [Storing Offsets](#storing-offsets)
+  * [Checkpoints](#checkpoints)
+  * [Your own data store](#your-own-data-store)
+* [Deploying](#deploying)
+
 ## Linking
 For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
 

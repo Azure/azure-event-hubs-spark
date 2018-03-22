@@ -13,6 +13,7 @@ partitions and Spark partitions, and access to sequence numbers and metadata.
 * [Storing Offsets](#storing-offsets)
   * [Checkpoints](#checkpoints)
   * [Your own data store](#your-own-data-store)
+* [Managing Throughput](#managing-throughput)
 * [Deploying](#deploying)
 
 ## Linking
@@ -279,6 +280,25 @@ stream.foreachRDD { rdd =>
   // end your transaction
 }
 ```
+
+## Managing Throughput
+
+When you create an Event Hubs namespace, you are prompted choose how many throughput units you want for your namespace. 
+A single **throughput unit** (or TU) entitles you to:
+
+- Up to 1 MB per second of ingress events (events sent into an event hub), but no more than 1000 ingress events or API calls per second.
+- Up to 2 MB per second of egress events (events consumed from an event hub).
+
+With that said, your TUs set an upper bound for the throughput in your streaming application, and this upperbound needs to
+be set in Spark as well. In Spark Streaming, this is done with the `maxRatePerPartition` (or `maxRatesPerPartition` for
+per partition configuration). 
+
+Let's say you have 1 TU for a single 4-partition Event Hub instance. This means that Spark is able to consume 2 MB per second 
+from your Event Hub without being throttled. Your `batchInterval` needs to be set such that `consumptionTime + processingTime
+< batchInterval`. With that said, if your `maxRatePerPartition` is set such that 2 MB or less are consumed within an entire batch
+(e.g. across all partitions), then you only need to allocate one second (or less) for `consumptionTime` in your `batchInterval`.
+If `maxRatePerPartition` is set such that you have 8 MB per batch (e.g. 8 MB total across all partitions), then your `batchInterval`
+then your `batchInterval` must be greater than 4 seconds because `consumptionTime` could be up to 4 seconds. 
 
 ## Deploying 
 As with any Spark applications, `spark-submit` is used to launch your application.

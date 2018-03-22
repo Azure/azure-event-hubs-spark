@@ -217,7 +217,7 @@ stream.foreachRDD { rdd =>
   val OffsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
   rdd.foreachPartition { iter => 
     val o: OffsetRange = offsetRanges(TaskContext.get.partitionId)
-    println(s"${o.name} ${o.partition} ${o.fromOffset} ${o.untilOffset}")
+    println(s"${o.name} ${o.partition} ${o.fromSeqNo} ${o.untilSeqNo}")
   }
 }
 ```

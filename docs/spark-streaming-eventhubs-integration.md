@@ -290,7 +290,7 @@ A single **throughput unit** (or TU) entitles you to:
 - Up to 2 MB per second of egress events (events consumed from an event hub).
 
 With that said, your TUs set an upper bound for the throughput in your streaming application, and this upper bound needs to
-be set in Spark as well. In Spark Streaming, this is done with the `maxRatePerPartition` (or `maxRatesPerPartition` for
+be set in Spark as well. In Spark Streaming, this is done with `maxRatePerPartition` (or `maxRatesPerPartition` for
 per partition configuration). 
 
 Let's say you have 1 TU for a single 4-partition Event Hub instance. This means that Spark is able to consume 2 MB per second 

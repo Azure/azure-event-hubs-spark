@@ -325,20 +325,21 @@ df.selectExpr("partitionKey", "body")
 
 ## Managing Throughput
 
-When you create an Event Hubs namespace, you are prompted choose how many throughput units you want for your namespace. 
+When you create an Event Hubs namespace, you are prompted to choose how many throughput units you want for your namespace. 
 A single **throughput unit** (or TU) entitles you to:
 
 - Up to 1 MB per second of ingress events (events sent into an event hub), but no more than 1000 ingress events or API calls per second.
 - Up to 2 MB per second of egress events (events consumed from an event hub).
 
-With that said, your TUs set an upper bound for the throughput in your streaming application, and this upperbound needs to
+With that said, your TUs set an upper bound for the throughput in your streaming application, and this upper bound needs to
 be set in Spark as well. In Structured Streaming, this is done with the `maxEventsPerTrigger` option.
 
 Let's say you have 1 TU for a single 4-partition Event Hub instance. This means that Spark is able to consume 2 MB per second 
-from your Event Hub without being throttled. If `maxEventsPerTrigger` is set such that it's *less than 2 MB*, then consumption will 
-happen within a second. You're free to leave it as such or you can increase your `maxEventsPerTrigger` up to 2 MB per second.
-If `maxEventsPerTrigger` is set such that it's *greater than 2 MB*, your micro-batch will always take more than one second to be
-created because consuming for Event Hubs will always take at least one second. 
+from your Event Hub without being throttled. If `maxEventsPerTrigger` is set such that Spark consumes *less than 2 MB*, then consumption
+will happen within a second. You're free to leave it as such or you can increase your `maxEventsPerTrigger` up to 2 MB per second.
+If `maxEventsPerTrigger` is set such that Spark consumes *greater than 2 MB*, your micro-batch will always take more than one second
+to be created because consuming from Event Hubs will always take at least one second. You're free to leave it as is or you can increase
+your TUs to increase throughput. 
 
 ## Deploying 
 

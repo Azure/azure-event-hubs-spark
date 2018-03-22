@@ -283,13 +283,13 @@ stream.foreachRDD { rdd =>
 
 ## Managing Throughput
 
-When you create an Event Hubs namespace, you are prompted choose how many throughput units you want for your namespace. 
+When you create an Event Hubs namespace, you are prompted to choose how many throughput units you want for your namespace. 
 A single **throughput unit** (or TU) entitles you to:
 
 - Up to 1 MB per second of ingress events (events sent into an event hub), but no more than 1000 ingress events or API calls per second.
 - Up to 2 MB per second of egress events (events consumed from an event hub).
 
-With that said, your TUs set an upper bound for the throughput in your streaming application, and this upperbound needs to
+With that said, your TUs set an upper bound for the throughput in your streaming application, and this upper bound needs to
 be set in Spark as well. In Spark Streaming, this is done with the `maxRatePerPartition` (or `maxRatesPerPartition` for
 per partition configuration). 
 

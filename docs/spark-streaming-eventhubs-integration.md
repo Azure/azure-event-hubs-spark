@@ -273,8 +273,7 @@ stream.foreachRDD { rdd =>
 
   // begin your transaction
 
-  // update results
-  // update offsetRanges 
+  // store `nameAndPartition`, `fromSeqNo`, and/or `untilSeqNo` (all are in offsetRanges)
   // assert that offsetRanges were updated correctly
 
   // end your transaction

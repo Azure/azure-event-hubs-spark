@@ -228,7 +228,7 @@ class EventHubsTestUtilsSuite
         .sameElements(event.getBytes))
   }
 
-  test("application properties") {
+  test("application properties - send") {
     val eh = newEventHubs()
     testUtils.createEventHubs(eh, partitionCount = 1)
     val properties: Map[String, AnyRef] = Map(
@@ -237,6 +237,30 @@ class EventHubsTestUtilsSuite
       "C" -> "Hello, world."
     )
     testUtils.send(eh, Seq(0), Some(properties))
+    val event = testUtils.getEventHubs(eh).getPartitions(0).getEvents.head
+    assert(event.getProperties === properties.asJava)
+  }
+
+  test("application properties - partition send") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 2)
+    val properties: Map[String, AnyRef] = Map(
+      "A" -> "1".getBytes,
+      "B" -> Map.empty
+    )
+    testUtils.send(eh, partitionId = 1, Seq(0), Some(properties))
+    val event = testUtils.getEventHubs(eh).getPartitions(1).getEvents.head
+    assert(event.getProperties === properties.asJava)
+  }
+
+  test("application properties - populate uniformly") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 2)
+    val properties: Map[String, AnyRef] = Map(
+      "A" -> "1".getBytes,
+      "B" -> Map.empty
+    )
+    testUtils.populateUniformly(eh, 1, Some(properties))
     val event = testUtils.getEventHubs(eh).getPartitions(0).getEvents.head
     assert(event.getProperties === properties.asJava)
   }

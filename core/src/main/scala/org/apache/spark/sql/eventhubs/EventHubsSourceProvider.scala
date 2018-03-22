@@ -156,8 +156,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
         StructField("enqueuedTime", TimestampType),
         StructField("publisher", StringType),
         StructField("partitionKey", StringType),
-        StructField("properties",
-                    MapType(StringType, BinaryType), nullable = true)
+        StructField("properties", MapType(StringType, StringType), nullable = true)
       ))
   }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.eventhubs
 
+import org.apache.qpid.proton.amqp.Binary
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.EventHubsConf
@@ -28,6 +29,7 @@ import org.apache.spark.sql.{ Row, SQLContext }
 import org.apache.spark.sql.sources.{ BaseRelation, TableScan }
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.types.UTF8String
+import org.json4s.jackson.Serialization
 
 import scala.language.postfixOps
 import collection.JavaConverters._
@@ -79,9 +81,17 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
             new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
           UTF8String.fromString(ed.getSystemProperties.getPublisher),
           UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
-          ArrayBasedMapData(ed.getProperties.asScala.map { p =>
-            UTF8String.fromString(p._1) -> p._2
-          })
+          ArrayBasedMapData(
+            ed.getProperties.asScala
+              .mapValues {
+                case b: Binary                             => b.getArray.asInstanceOf[AnyRef]
+                case s: org.apache.qpid.proton.amqp.Symbol => s.toString.asInstanceOf[AnyRef]
+                case c: Character                          => c.toString
+                case default                               => default
+              }
+              .map { p =>
+                UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+              })
         )
     }
 

@@ -19,10 +19,13 @@ package org.apache.spark.sql.eventhubs
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.qpid.proton.amqp.Binary
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.apache.spark.sql.{ DataFrame, QueryTest }
 import org.apache.spark.sql.test.SharedSQLContext
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
 import org.scalatest.BeforeAndAfter
 
 class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQLContext {
@@ -32,6 +35,8 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
   private val eventhubId = new AtomicInteger(0)
 
   private var testUtils: EventHubsTestUtils = _
+
+  implicit val formats = Serialization.formats(NoTypeHints)
 
   private def newEventHub(): String = s"eh-${eventhubId.getAndIncrement()}"
 
@@ -95,6 +100,53 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
 
     val df = createDF(ehConf)
     checkAnswer(df, (0 to 29).map(_.toString).toDF)
+  }
+
+  test("with application properties") {
+    val properties: Option[Map[String, Object]] = Some(
+      Map(
+        "A" -> "Hello, world.",
+        "B" -> Map.empty,
+        "C" -> "432".getBytes,
+        "D" -> null,
+        "E" -> Boolean.box(true),
+        "F" -> Int.box(1),
+        "G" -> Int.box(-1),
+        "H" -> Long.box(1L),
+        "I" -> Long.box(-1L),
+        "J" -> Short.box(1),
+        "K" -> Double.box(1),
+        "L" -> Float.box(3.4028235E38.toFloat),
+        "M" -> Char.box('a'),
+        "N" -> new Binary("1".getBytes),
+        "O" -> org.apache.qpid.proton.amqp.Symbol.getSymbol("x-opt-partition-key")
+      ))
+    val expected = properties.get
+      .mapValues {
+        case b: Binary                             => b.getArray.asInstanceOf[AnyRef]
+        case s: org.apache.qpid.proton.amqp.Symbol => s.toString.asInstanceOf[AnyRef]
+        case c: Character                          => c.toString
+        case default                               => default
+      }
+      .map { p =>
+        p._1 -> Serialization.write(p._2)
+      }
+
+    val eh = newEventHub()
+    testUtils.createEventHubs(eh, partitionCount = 3)
+    testUtils.send(eh, 0, 0 to 9, properties)
+
+    val ehConf = getEventHubsConf(eh)
+      .setStartingPositions(Map.empty)
+      .setEndingPositions(Map.empty)
+
+    val df = spark.read
+      .format("eventhubs")
+      .options(ehConf.toMap)
+      .load()
+      .select("properties")
+
+    checkAnswer(df, Seq.fill(10)(expected).toDF)
   }
 
   test("reuse same dataframe in query") {

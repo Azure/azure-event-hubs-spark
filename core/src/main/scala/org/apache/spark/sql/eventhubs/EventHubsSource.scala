@@ -21,6 +21,7 @@ import java.io._
 import java.nio.charset.StandardCharsets
 
 import org.apache.commons.io.IOUtils
+import org.apache.qpid.proton.amqp.Binary
 import org.apache.spark.SparkContext
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
@@ -38,6 +39,7 @@ import org.apache.spark.sql.execution.streaming.{
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ DataFrame, SQLContext }
 import org.apache.spark.unsafe.types.UTF8String
+import org.json4s.jackson.Serialization
 
 import collection.JavaConverters._
 
@@ -168,7 +170,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     } yield nameAndPartition -> seqNo).toMap
   }
 
-  /** Proportionally distribute limit number of offsets among topicpartitions */
+  /** Proportionally distribute limit number of offsets among partitions */
   private def rateLimit(
       limit: Long,
       from: Map[NameAndPartition, SequenceNumber],
@@ -195,7 +197,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
               val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
               val prorate = limit * (size / total)
               logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
-              // Don't completely starve small topicpartitions
+              // Don't completely starve small partitions
               val off = begin + (if (prorate < 1) Math.ceil(prorate) else Math.floor(prorate)).toLong
               logDebug(s"rateLimit $nameAndPartition new offset is $off")
               // Paranoia, make sure not to return an offset that's past end
@@ -303,9 +305,17 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
           new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
         UTF8String.fromString(ed.getSystemProperties.getPublisher),
         UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
-        ArrayBasedMapData(ed.getProperties.asScala.map { p =>
-          UTF8String.fromString(p._1) -> p._2
-        })
+        ArrayBasedMapData(
+          ed.getProperties.asScala
+            .mapValues {
+              case b: Binary                             => b.getArray.asInstanceOf[AnyRef]
+              case s: org.apache.qpid.proton.amqp.Symbol => s.toString.asInstanceOf[AnyRef]
+              case c: Character                          => c.toString
+              case default                               => default
+            }
+            .map { p =>
+              UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+            })
       )
     }
 

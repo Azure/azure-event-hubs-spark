@@ -257,7 +257,8 @@ typically hard to make idempotent.
 
 // begin from the the offsets committed to the database
 val fromOffsets = selectOffsetsFromYourDatabase.map { resultSet =>
-  new NameAndPartition(resultSet.string("eventhubName"), resultSet.int("partition")) -> resultSet.long("seqNo")
+  new NameAndPartition(resultSet.string("eventhubName"), resultSet.int("partition")) -> EventPosition
+    .fromSequenceNumber(resultSet.long("seqNo"))
 }.toMap
 
 // Assuming the EventHubs conf is created elsewhere
@@ -273,8 +274,8 @@ stream.foreachRDD { rdd =>
   // begin your transaction
 
   // update results
-  // update offsets where the end of existing offsets matches the beginning of this batch of offsets
-  // assert that offsets were updated correctly
+  // update offsetRanges 
+  // assert that offsetRanges were updated correctly
 
   // end your transaction
 }

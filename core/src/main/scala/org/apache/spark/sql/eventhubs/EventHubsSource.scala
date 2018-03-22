@@ -166,7 +166,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     } yield nameAndPartition -> seqNo).toMap
   }
 
-  /** Proportionally distribute limit number of offsets among topicpartitions */
+  /** Proportionally distribute limit number of offsets among partitions */
   private def rateLimit(
       limit: Long,
       from: Map[NameAndPartition, SequenceNumber],
@@ -193,7 +193,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
               val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
               val prorate = limit * (size / total)
               logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
-              // Don't completely starve small topicpartitions
+              // Don't completely starve small partitions
               val off = begin + (if (prorate < 1) Math.ceil(prorate) else Math.floor(prorate)).toLong
               logDebug(s"rateLimit $nameAndPartition new offset is $off")
               // Paranoia, make sure not to return an offset that's past end

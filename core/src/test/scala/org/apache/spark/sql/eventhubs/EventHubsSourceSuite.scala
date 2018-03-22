@@ -66,7 +66,6 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
     override def addData(query: Option[StreamExecution]): (Source, Offset) = {
       if (query.get.isActive) {
-        // Make sure no Spark job is running when deleting a topic
         query.get.processAllAvailable()
       }
 

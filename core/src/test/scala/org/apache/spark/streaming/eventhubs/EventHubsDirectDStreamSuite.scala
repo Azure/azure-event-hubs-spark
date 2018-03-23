@@ -148,69 +148,6 @@ class EventHubsDirectDStreamSuite
     ssc.stop()
   }
 
-  test("basic stream receiving from random sequence number") {
-    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    testUtils.populateUniformly(eventHub.name, EventsPerPartition)
-
-    val startSeqNo = Math.abs(scala.util.Random.nextInt) % (EventsPerPartition / 2)
-
-    val ehConf = getEventHubsConf(eventHub.name)
-      .setStartingPositions(Map.empty)
-      .setStartingPosition(EventPosition.fromSequenceNumber(startSeqNo))
-
-    val batchInterval = 1000
-    val timeoutAfter = 10000
-    val expectedTotal =
-      (timeoutAfter / batchInterval) * DefaultMaxRate * DefaultPartitionCount
-
-    ssc = new StreamingContext(sparkConf, Milliseconds(batchInterval))
-    val stream = withClue("Error creating direct stream") {
-      new EventHubsDirectDStream(ssc, ehConf, SimulatedClient.apply)
-    }
-    val allReceived = new ConcurrentLinkedQueue[EventData]()
-
-    // hold a reference to the current offset ranges so it can be used downstream
-    var offsetRanges = Array[OffsetRange]()
-    val tf = stream.transform { rdd =>
-      // Get the offset ranges in the RDD
-      offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
-      rdd
-    }
-
-    tf.foreachRDD { rdd =>
-      for (o <- offsetRanges) {
-        logInfo(s"${o.name} ${o.partitionId} ${o.fromSeqNo} ${o.untilSeqNo}")
-      }
-      val collected = rdd.mapPartitionsWithIndex { (i, iter) =>
-        // For each partition, get size of the range in the partition
-        // and the number of items in the partition
-        val off = offsetRanges(i)
-        val all = iter.toSeq
-        val partSize = all.size
-        val rangeSize = off.untilSeqNo - off.fromSeqNo
-        Iterator((partSize, rangeSize))
-      }.collect
-
-      // Verify whether number of elements in each partition
-      // matches with the corresponding offset range
-      collected.foreach {
-        case (partSize, rangeSize) =>
-          assert(partSize == rangeSize, "offset ranges are wrong")
-      }
-    }
-
-    stream.foreachRDD { rdd =>
-      allReceived.addAll(util.Arrays.asList(rdd.collect(): _*))
-    }
-    ssc.start()
-    eventually(timeout(timeoutAfter milliseconds), interval(batchInterval milliseconds)) {
-      assert(allReceived.size === expectedTotal,
-             "didn't get expected number of messages, messages:\n" +
-               allReceived.asScala.mkString("\n"))
-    }
-    ssc.stop()
-  }
-
   test("receiving from largest starting offset") {
     val eh = newEventHubs()
     testUtils.createEventHubs(eh, DefaultPartitionCount)

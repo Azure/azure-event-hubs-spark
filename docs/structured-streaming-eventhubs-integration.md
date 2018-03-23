@@ -22,7 +22,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.0
+  version = 2.3.1
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -346,11 +346,11 @@ your TUs to increase throughput.
 As with any Spark applications, `spark-submit` is used to launch your application. `azure-eventhubs-spark_2.11`
 and its dependencies can be directly added to `spark-submit` using `--packages`, such as,
 
-    ./bin/spark-submit --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.0 ...
+    ./bin/spark-submit --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.1 ...
 
 For experimenting on `spark-shell`, you can also use `--packages` to add `azure-eventhubs-spark_2.11` and its dependencies directly,
 
-    ./bin/spark-shell --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.0 ...
+    ./bin/spark-shell --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.1 ...
 
 See [Application Submission Guide](https://spark.apache.org/docs/latest/submitting-applications.html) for more details about submitting
 applications with external dependencies.

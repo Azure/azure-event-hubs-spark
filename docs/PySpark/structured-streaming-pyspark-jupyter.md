@@ -8,7 +8,7 @@ Jupyter Kernel Used: **PySpark3**
 
 ```pyspark3
 %%configure -f
-{"conf": {"spark.jars.packages": "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.0"}}
+{"conf": {"spark.jars.packages": "com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.1"}}
 ```
 
 2. Defining variables needed to connect to Azure Event Hubs.

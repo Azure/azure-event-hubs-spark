@@ -25,8 +25,8 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
 |Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.1-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.1%7Cjar)|
-|Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0-PREVIEW%7Cjar)|
-|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0-PREVIEW%7Cjar)|
+|Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.2.0-blue.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0%7Cjar)|
+|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.2.0-blue.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0%7Cjar)|
 
 #### Databricks
 |Databricks Runtime Version|Artifact Id|Package Version|
@@ -36,7 +36,8 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 
 #### Roadmap
 
-Planned changes can be found on our [wiki](https://github.com/Azure/azure-event-hubs-spark/wiki).
+There is an open issue for each planned feature/enhancement. Additional comments can be found on 
+our [wiki](https://github.com/Azure/azure-event-hubs-spark/wiki).
 
 ## Usage
 

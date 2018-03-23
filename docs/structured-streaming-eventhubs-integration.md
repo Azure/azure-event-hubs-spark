@@ -300,7 +300,7 @@ val ds = df
 // Write body data from a DataFrame to EventHubs with a partitionKey
 val ds = df
   .selectExpr("partitionKey", "body")
-  .format("eventHubs")
+  .format("eventhubs")
   .options(ehWriteConf.toMap)    // EventHubsConf containing the destination EventHub connection string.
   .start()
 ```

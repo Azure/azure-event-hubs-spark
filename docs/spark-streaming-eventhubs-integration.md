@@ -22,7 +22,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.1
+  version = 2.2.0
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -248,7 +248,7 @@ good starting offsets.
 ### Your own data store
 
 For data stores that support transactions, saving sequence numbers from Event Hubs in the same transaction as the results 
-can keep the two in sync, even in failure situations. If you’re careful about detecting repeated or skipped offset ranges, 
+can keep the two in sync, even in failure situations. If you're careful about detecting repeated or skipped offset ranges, 
 rolling back the transaction prevents duplicated or lost messages from affecting results. This gives the equivalent of 
 exactly-once semantics. It is also possible to use this tactic even for outputs that result from aggregations, which are 
 typically hard to make idempotent.

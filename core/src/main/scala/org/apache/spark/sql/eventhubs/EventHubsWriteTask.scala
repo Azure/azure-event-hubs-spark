@@ -18,13 +18,12 @@
 package org.apache.spark.sql.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-import com.sun.org.apache.xalan.internal.xsltc.compiler.util.IntType
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{ Attribute, Cast, Literal, UnsafeProjection }
+import org.apache.spark.sql.eventhubs.UTF8StringHelper.IntWrapper
 import org.apache.spark.sql.types.{ BinaryType, StringType }
-import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 
 /**
  * Writes out data in a single Spark task, without any concerns about how
@@ -86,7 +85,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
       sender.send(event, partitionKey.toString)
     } else if (partitionId != null) {
       val wrapper = new IntWrapper
-      if (partitionId.toInt(wrapper)) {
+      if (UTF8StringHelper.toInt(partitionId, wrapper)) {
         sender.createPartitionSender(wrapper.value)
         sender.send(event, wrapper.value)
       } else {

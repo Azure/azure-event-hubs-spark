@@ -1,4 +1,4 @@
-# Structured Streaming + Azure Event Hubs Integration Guide  
+# Structured Streaming + Event Hubs Integration Guide for PySpark  
 
 ## Table of Contents
 * [Linking](#linking)
@@ -16,7 +16,16 @@
 
 ## Linking
 
-Work in progress
+Structured streaming integration for Azure Event Hubs is ultimately run on the JVM, so you'll need to import the libraries from the Maven coordinate below:
+
+```
+  groupId = com.microsoft.azure
+  artifactId = azure-eventhubs-spark_2.11
+  version = 2.3.1
+```
+
+For Python applications, you need to add this above library and its dependencies when deploying your application.
+See the [Deploying](#deploying) subsection below.
 
 ## User Configuration
 
@@ -180,7 +189,6 @@ Note that the timeout duration format is different than the `enqueuedTime` forma
 ```python
 # Source with default settings
 connectionString = "YOUR.CONNECTION.STRING"
-
 ehConf = {
   'eventhubs.connectionString' : connectionString
 }
@@ -194,7 +202,32 @@ df = spark \
 
 ### Creating an Event Hubs Source for Batch Queries
   
-Work in progress
+```python
+# Source with default settings
+connectionString = "YOUR.CONNECTION.STRING"
+ehConf = {
+  'eventhubs.connectionString' : connectionString
+}
+
+# Simple batch query
+val df = spark \
+  .read \
+  .format("eventhubs") \
+  .options(**ehConf) \
+  .load()
+df = df.withColumn("body", df["body"].cast("string"))
+```
+
+Each row in the source has the following schema:
+
+| Column | Type |
+| ------ | ---- |
+| body | binary |
+| offset | string |
+| sequenceNumber | long |
+| enqueuedTime | timestamp |
+| publisher | string |
+| partitionKey | string | 
 
 ## Writing Data to Event Hubs
 
@@ -251,7 +284,31 @@ ds = df \
 
 ### Writing the output of Batch Queries to EventHubs
 
-Work in progress
+```python
+# Set up the Event Hub config dictionary with default settings
+writeConnectionString = "YOUR.EVENTHUB.NAME"
+ehWriteConf = {
+  'eventhubs.connectionString' : writeConnectionString
+}
+
+# Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
+ds = df \
+  .select("body") \
+  .write \
+  .format("eventhubs") \
+  .options(**ehWriteConf) \
+  .option("checkpointLocation", YOUR.OUTPUT.PATH.STRING) \
+  .save()
+
+# Write body data from a DataFrame to EventHubs with a partitionKey
+ds = df \
+  .selectExpr("partitionKey", "body") \
+  .writeStream \
+  .format("eventhubs") \
+  .options(**ehWriteConf) \
+  .option("checkpointLocation", "///output.txt") \
+  .save()
+```
 
 ## Managing Throughput
 

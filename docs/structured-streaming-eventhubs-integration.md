@@ -1,4 +1,4 @@
-# Structured Streaming + Azure Event Hubs Integration Guide 
+# Structured Streaming + Event Hubs Integration Guide 
 
 Structured Streaming integration for Azure Event Hubs to read data from Event Hubs. 
 

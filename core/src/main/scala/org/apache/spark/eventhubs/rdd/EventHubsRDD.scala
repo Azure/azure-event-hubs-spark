@@ -37,7 +37,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   import org.apache.spark.eventhubs._
 
   override def getPartitions: Array[Partition] = {
-    for { o <- offsetRanges } yield
+    for { o <- offsetRanges.sortWith(_.partitionId < _.partitionId) } yield
       new EventHubsRDDPartition(o.partitionId,
                                 o.nameAndPartition,
                                 o.fromSeqNo,

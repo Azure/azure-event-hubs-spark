@@ -36,8 +36,9 @@ class EventPositionSuite extends FunSuite {
   }
 
   test("convert - enqueued time") {
-    val actual = EventPosition.fromEnqueuedTime(Instant.now()).convert
-    val expected = com.microsoft.azure.eventhubs.EventPosition.fromEnqueuedTime(Instant.now())
+    val instant = Instant.parse("2007-12-03T10:15:30.00Z")
+    val actual = EventPosition.fromEnqueuedTime(instant).convert
+    val expected = com.microsoft.azure.eventhubs.EventPosition.fromEnqueuedTime(instant)
     assert(actual.toString === expected.toString)
   }
 

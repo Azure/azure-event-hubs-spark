@@ -111,6 +111,6 @@ object EventPosition {
    * @return An [[EventPosition]] instance.
    */
   def fromEndOfStream: EventPosition = {
-    EventPosition(EndOfStream)
+    EventPosition(EndOfStream, isInclusive = false)
   }
 }

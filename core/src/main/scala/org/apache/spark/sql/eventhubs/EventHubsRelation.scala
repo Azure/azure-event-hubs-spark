@@ -68,18 +68,23 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
       "GetBatch generating RDD of with offsetRanges: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
 
-    val rdd = new EventHubsRDD(sqlContext.sparkContext, ehConf, offsetRanges, clientFactory).map {
-      ed =>
-        InternalRow(
-          ed.getBytes,
-          UTF8String.fromString(ed.getSystemProperties.getOffset),
-          ed.getSystemProperties.getSequenceNumber,
-          DateTimeUtils.fromJavaTimestamp(
-            new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
-          UTF8String.fromString(ed.getSystemProperties.getPublisher),
-          UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
-        )
-    }
+    val rdd = new EventHubsRDD(sqlContext.sparkContext, ehConf, offsetRanges, clientFactory)
+      .mapPartitionsWithIndex { (p, iter) =>
+        {
+          iter.map { ed =>
+            InternalRow(
+              ed.getBytes,
+              UTF8String.fromString(p.toString),
+              UTF8String.fromString(ed.getSystemProperties.getOffset),
+              ed.getSystemProperties.getSequenceNumber,
+              DateTimeUtils.fromJavaTimestamp(
+                new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
+              UTF8String.fromString(ed.getSystemProperties.getPublisher),
+              UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
+            )
+          }
+        }
+      }
 
     sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = false).rdd
   }

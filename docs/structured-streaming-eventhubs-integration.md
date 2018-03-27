@@ -255,6 +255,7 @@ Each row in the source has the following schema:
 | Column | Type |
 | ------ | ---- |
 | body | binary |
+| partition | string |
 | offset | string |
 | sequenceNumber | long |
 | enqueuedTime | timestamp |

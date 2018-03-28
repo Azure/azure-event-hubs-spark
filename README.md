@@ -10,9 +10,6 @@
   <a href="https://travis-ci.org/Azure/azure-event-hubs-spark">
     <img src="https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master" alt="build status">
   </a>
-  <a href="https://travis-ci.org/Azure/azure-event-hubs-spark">
-    <img src="https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master" alt="build status">
-  </a>
   <a href="#star-our-repo">
     <img src="https://img.shields.io/github/stars/azure/azure-event-hubs-spark.svg?style=social&label=Stars" alt="star our repo">
   </a>

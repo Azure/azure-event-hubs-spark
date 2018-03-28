@@ -2,13 +2,21 @@
   <img src="event-hubs_spark.png" alt="Azure Event Hubs + Apache Spark Connector" width="270"/>
 </p>
 
-# Azure Event Hubs Connector for Apache Spark
-
-[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/azure-event-hubs-spark)
-
-|Branch|Status|
-|------|-------------|
-|master|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
+<h1 align="center">Azure Event Hubs Connector for Apache Spark
+<p align="center">
+  <a href="https://gitter.im/azure-event-hubs-spark">
+    <img src="https://badges.gitter.im/gitterHQ/gitter.png" alt="chat on gitter">
+  </a>
+  <a href="https://travis-ci.org/Azure/azure-event-hubs-spark">
+    <img src="https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master" alt="build status">
+  </a>
+  <a href="https://travis-ci.org/Azure/azure-event-hubs-spark">
+    <img src="https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master" alt="build status">
+  </a>
+  <a href="#star-our-repo">
+    <img src="https://img.shields.io/github/stars/azure/azure-event-hubs-spark.svg?style=social&label=Stars" alt="star our repo">
+  </a>
+</p></h1>  
 
 This is the source code of the Azure Event Hubs Connector for Apache Spark. 
 

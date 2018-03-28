@@ -2,8 +2,9 @@
   <img src="event-hubs_spark.png" alt="Azure Event Hubs + Apache Spark Connector" width="270"/>
 </p>
 
-<h1 align="center">Azure Event Hubs Connector for Apache Spark
-<p align="center">
+# Azure Event Hubs Connector for Apache Spark
+
+<p>
   <a href="https://gitter.im/azure-event-hubs-spark">
     <img src="https://badges.gitter.im/gitterHQ/gitter.png" alt="chat on gitter">
   </a>
@@ -13,7 +14,7 @@
   <a href="#star-our-repo">
     <img src="https://img.shields.io/github/stars/azure/azure-event-hubs-spark.svg?style=social&label=Stars" alt="star our repo">
   </a>
-</p></h1>  
+</p>  
 
 This is the source code of the Azure Event Hubs Connector for Apache Spark. 
 

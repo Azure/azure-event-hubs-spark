@@ -31,14 +31,6 @@ private[spark] trait Client extends Serializable {
   def createPartitionSender(partitionId: Int)
 
   /**
-   * Creates an EventHub receiver.
-   *
-   * @param partitionId the partitionId the receiver will consume from.
-   * @param startingSeqNo the sequence number the receiver will start from.
-   */
-  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit
-
-  /**
    * Sends an [[EventData]] to your EventHubs.
    *
    * @param event the event that is being sent.
@@ -64,19 +56,6 @@ private[spark] trait Client extends Serializable {
    * @param partitionId the partition that will receive all events being sent.
    */
   def send(event: EventData, partitionId: Int): Unit
-
-  /**
-   * Receive events from your EventHubs instance.
-   *
-   * @param eventCount the number of events that will be requested from the EventHub partition.
-   */
-  def receive(eventCount: Int): java.lang.Iterable[EventData]
-
-  /**
-   * When a connection with the service is established, the client will begin to prefetch EventData.
-   * This number specifies the max number of events that will prefetched.
-   */
-  def setPrefetchCount(count: Int): Unit
 
   /**
    * Provides the earliest (lowest) sequence number that exists in the EventHubs instance

@@ -19,7 +19,8 @@ package org.apache.spark.eventhubs.rdd
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.client.{ CachedEventHubsReceiver, CachedReceiver }
+import org.apache.spark.eventhubs.utils.SimulatedCachedReceiver
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
@@ -28,8 +29,7 @@ import scala.collection.mutable.ArrayBuffer
 
 private[spark] class EventHubsRDD(sc: SparkContext,
                                   val ehConf: EventHubsConf,
-                                  val offsetRanges: Array[OffsetRange],
-                                  receiverFactory: (EventHubsConf => Client))
+                                  val offsetRanges: Array[OffsetRange])
     extends RDD[EventData](sc, Nil)
     with Logging
     with HasOffsetRanges {
@@ -103,46 +103,25 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   private class EventHubsRDDIterator(part: EventHubsRDDPartition, context: TaskContext)
       extends Iterator[EventData] {
 
+    val cachedReceiver: CachedReceiver = if (ehConf.useSimulatedClient) {
+      SimulatedCachedReceiver
+    } else {
+      CachedEventHubsReceiver
+    }
+
     logInfo(
       s"Computing EventHubs ${part.name}, partitionId ${part.partitionId} " +
         s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
-
-    val client: Client = receiverFactory(ehConf)
-    client.createReceiver(part.partitionId.toString, part.fromSeqNo)
-
-    val prefetchCount =
-      if (part.count.toInt < PrefetchCountMinimum) PrefetchCountMinimum else part.count.toInt
-    client.setPrefetchCount(prefetchCount)
 
     var requestSeqNo: SequenceNumber = part.fromSeqNo
 
     override def hasNext(): Boolean = requestSeqNo < part.untilSeqNo
 
-    def errWrongSeqNo(part: EventHubsRDDPartition, receivedSeqNo: SequenceNumber): String =
-      s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
-
     override def next(): EventData = {
       assert(hasNext(), "Can't call next() once untilSeqNo has been reached.")
-
-      @volatile var event: EventData = null
-      @volatile var i: java.lang.Iterable[EventData] = null
-      while (i == null) {
-        i = client.receive(1)
-      }
-      event = i.iterator.next
-
-      assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
-             errWrongSeqNo(part, event.getSystemProperties.getSequenceNumber))
+      val event = cachedReceiver.receive(ehConf, part.nameAndPartition, requestSeqNo)
       requestSeqNo += 1
       event
-    }
-
-    context.addTaskCompletionListener { _ =>
-      closeIfNeeded()
-    }
-
-    def closeIfNeeded(): Unit = {
-      if (client != null) client.close()
     }
   }
 }

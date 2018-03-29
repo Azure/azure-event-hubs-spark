@@ -31,7 +31,7 @@ import org.apache.qpid.proton.amqp.messaging.{ Data, MessageAnnotations }
 import org.apache.qpid.proton.message.Message
 import org.apache.qpid.proton.message.Message.Factory
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
-import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.client.{ CachedReceiver, Client }
 import org.apache.spark.eventhubs._
 
 import scala.collection.JavaConverters._
@@ -296,11 +296,6 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   private var currentSeqNo: SequenceNumber = _
   private val eventHub = eventHubs(ehConf.name)
 
-  override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
-    self.rPartitionId = partitionId.toInt
-    self.currentSeqNo = startingSeqNo
-  }
-
   override def createPartitionSender(partitionId: Int): Unit = {
     sPartitionId = partitionId.toInt
   }
@@ -315,16 +310,6 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
 
   override def send(event: EventData, partitionId: Int): Unit = {
     eventHub.send(partitionId, event)
-  }
-
-  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
-    val events = eventHub.receive(eventCount, self.rPartitionId, currentSeqNo)
-    currentSeqNo += eventCount
-    events
-  }
-
-  override def setPrefetchCount(count: Int): Unit = {
-    // not prefetching anything in tests
   }
 
   override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
@@ -371,4 +356,15 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
 
 private[spark] object SimulatedClient {
   def apply(ehConf: EventHubsConf): SimulatedClient = new SimulatedClient(ehConf)
+}
+
+private[spark] object SimulatedCachedReceiver extends CachedReceiver {
+
+  import EventHubsTestUtils._
+
+  override def receive(ehConf: EventHubsConf,
+                       nAndP: NameAndPartition,
+                       requestSeqNo: SequenceNumber): EventData = {
+    eventHubs(ehConf.name).receive(1, nAndP.partitionId, requestSeqNo).iterator().next()
+  }
 }

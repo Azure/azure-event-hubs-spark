@@ -20,7 +20,7 @@ package org.apache.spark.eventhubs.utils
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
 
@@ -124,12 +124,9 @@ class EventHubsTestUtilsSuite
                "Sequence number doesn't match expected value.")
       }
     }
-
     val conf = testUtils.getEventHubsConf(eventHub.name)
-    val client = SimulatedClient(conf)
-    client.createReceiver(partitionId = "0", 20)
-    val event = client.receive(1)
-    assert(event.iterator.next.getSystemProperties.getSequenceNumber === 20)
+    val event = SimulatedCachedReceiver.receive(conf, NameAndPartition(conf.name, 0), 20)
+    assert(event.getSystemProperties.getSequenceNumber === 20)
   }
 
   test("latestSeqNo") {

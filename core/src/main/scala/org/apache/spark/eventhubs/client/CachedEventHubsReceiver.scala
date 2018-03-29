@@ -24,18 +24,20 @@ import com.microsoft.azure.eventhubs.{
   ReceiverOptions
 }
 import org.apache.spark.{ SparkEnv, TaskContext }
-import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
 
-private[spark] sealed trait CachedReceiver {
-  def receive(ehConf: EventHubsConf, nAndP: NameAndPartition, requestSeqNo: Long): EventData
+private[spark] trait CachedReceiver {
+  def receive(ehConf: EventHubsConf,
+              nAndP: NameAndPartition,
+              requestSeqNo: SequenceNumber): EventData
 }
 
 // TODO: Figure out correct prefetch count
 // TODO: Benefits of a smart buffer?
 private class CachedEventHubsReceiver(ehConf: EventHubsConf,
                                       nAndP: NameAndPartition,
-                                      startingSeqNo: Long)
+                                      startingSeqNo: SequenceNumber)
     extends Logging {
 
   import org.apache.spark.eventhubs._
@@ -115,7 +117,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   override def receive(ehConf: EventHubsConf,
                        nAndP: NameAndPartition,
-                       requestSeqNo: Long): EventData = {
+                       requestSeqNo: SequenceNumber): EventData = {
     receivers.synchronized {
       if (!isInitialized(nAndP)) {
         receivers.update(nAndP, new CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo))

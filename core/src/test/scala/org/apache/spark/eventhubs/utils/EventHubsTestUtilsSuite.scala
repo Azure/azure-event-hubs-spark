@@ -125,7 +125,9 @@ class EventHubsTestUtilsSuite
       }
     }
     val conf = testUtils.getEventHubsConf(eventHub.name)
-    val event = SimulatedCachedReceiver.receive(conf, NameAndPartition(conf.name, 0), 20)
+    // batchSize is just a dummy value.
+    val event =
+      SimulatedCachedReceiver.receive(conf, NameAndPartition(conf.name, 0), 20, batchSize = 0)
     assert(event.getSystemProperties.getSequenceNumber === 20)
   }
 

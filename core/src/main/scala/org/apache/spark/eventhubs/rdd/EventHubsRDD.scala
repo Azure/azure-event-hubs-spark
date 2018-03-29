@@ -119,7 +119,10 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
     override def next(): EventData = {
       assert(hasNext(), "Can't call next() once untilSeqNo has been reached.")
-      val event = cachedReceiver.receive(ehConf, part.nameAndPartition, requestSeqNo)
+      val event = cachedReceiver.receive(ehConf,
+                                         part.nameAndPartition,
+                                         requestSeqNo,
+                                         (part.untilSeqNo - part.fromSeqNo).toInt)
       requestSeqNo += 1
       event
     }

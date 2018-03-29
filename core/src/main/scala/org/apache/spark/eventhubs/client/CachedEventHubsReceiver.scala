@@ -27,14 +27,15 @@ import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
 
+import scala.collection.mutable.ListBuffer
+
 private[spark] trait CachedReceiver {
   def receive(ehConf: EventHubsConf,
               nAndP: NameAndPartition,
-              requestSeqNo: SequenceNumber): EventData
+              requestSeqNo: SequenceNumber,
+              batchSize: Int): EventData
 }
 
-// TODO: Figure out correct prefetch count
-// TODO: Benefits of a smart buffer?
 private class CachedEventHubsReceiver(ehConf: EventHubsConf,
                                       nAndP: NameAndPartition,
                                       startingSeqNo: SequenceNumber)
@@ -42,7 +43,7 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf,
 
   import org.apache.spark.eventhubs._
 
-  val prefetchCount = 2000
+  val prefetchCounts = new FixedList[Int](5)
   var requestSeqNo: SequenceNumber = startingSeqNo
 
   private var _client: EventHubClient = _
@@ -64,7 +65,7 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf,
                                             nAndP.partitionId.toString,
                                             EventPosition.fromSequenceNumber(startingSeqNo).convert,
                                             receiverOptions)
-      _receiver.setPrefetchCount(prefetchCount)
+      _receiver.setPrefetchCount(DefaultPrefetchCount)
     }
     _receiver
   }
@@ -72,7 +73,7 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf,
   def errWrongSeqNo(receivedSeqNo: SequenceNumber): String =
     s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
 
-  def receive: EventData = {
+  def receive(batchSize: Int): EventData = {
     @volatile var event: EventData = null
     @volatile var i: java.lang.Iterable[EventData] = null
     while (i == null) {
@@ -83,7 +84,22 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf,
     assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
            errWrongSeqNo(event.getSystemProperties.getSequenceNumber))
     requestSeqNo += 1
+    logAndUpdate(batchSize)
     event
+  }
+
+  def logAndUpdate(batchSize: Int): Unit = {
+    prefetchCounts.append(batchSize)
+    val avg = prefetchCounts.list.sum / prefetchCounts.list.size
+    receiver.setPrefetchCount(avg)
+  }
+
+  private[client] class FixedList[A](max: Int) {
+    val list: ListBuffer[A] = ListBuffer()
+    def append(elem: A) {
+      if (list.size == max) { list.trimStart(1) }
+      list.append(elem)
+    }
   }
 }
 
@@ -117,7 +133,8 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   override def receive(ehConf: EventHubsConf,
                        nAndP: NameAndPartition,
-                       requestSeqNo: SequenceNumber): EventData = {
+                       requestSeqNo: SequenceNumber,
+                       batchSize: Int): EventData = {
     receivers.synchronized {
       if (!isInitialized(nAndP)) {
         receivers.update(nAndP, new CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo))
@@ -125,6 +142,6 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
     }
 
     val receiver = get(nAndP)
-    receiver.receive
+    receiver.receive(batchSize)
   }
 }

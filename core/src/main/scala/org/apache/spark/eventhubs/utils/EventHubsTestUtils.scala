@@ -300,16 +300,16 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     sPartitionId = partitionId.toInt
   }
 
-  override def send(event: EventData): Unit = {
-    eventHub.send(event)
-  }
-
-  override def send(event: EventData, partitionKey: String): Unit = {
-    throw new UnsupportedOperationException
-  }
-
-  override def send(event: EventData, partitionId: Int): Unit = {
-    eventHub.send(partitionId, event)
+  override def send(event: EventData,
+                    partition: Option[Int] = None,
+                    partitionKey: Option[String] = None): Unit = {
+    if (partition.isDefined) {
+      eventHub.send(partition.get, event)
+    } else if (partitionKey.isDefined) {
+      throw new UnsupportedOperationException
+    } else {
+      eventHub.send(event)
+    }
   }
 
   override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {

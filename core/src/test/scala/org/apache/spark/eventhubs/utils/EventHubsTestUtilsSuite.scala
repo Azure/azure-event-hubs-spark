@@ -211,7 +211,7 @@ class EventHubsTestUtilsSuite
     val ehConf = getEventHubsConf(eh)
     val client = new SimulatedClient(ehConf)
     val event = EventData.create("1".getBytes)
-    client.send(event, part)
+    client.send(event, Some(part))
 
     assert(testUtils.getEventHubs(eh).getPartitions(part).size == 1)
     assert(

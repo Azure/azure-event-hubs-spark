@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.client.{ CachedEventHubsReceiver, EventHubsClient }
+import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream

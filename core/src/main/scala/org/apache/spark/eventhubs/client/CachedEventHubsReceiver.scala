@@ -36,15 +36,12 @@ private[spark] trait CachedReceiver {
               batchSize: Int): EventData
 }
 
-private class CachedEventHubsReceiver(ehConf: EventHubsConf,
-                                      nAndP: NameAndPartition,
-                                      startingSeqNo: SequenceNumber)
+private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndPartition)
     extends Logging {
 
   import org.apache.spark.eventhubs._
 
   val prefetchCounts = new FixedList[Int](5)
-  var requestSeqNo: SequenceNumber = startingSeqNo
 
   private var _client: EventHubClient = _
   private def client: EventHubClient = {
@@ -54,26 +51,31 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf,
     _client
   }
 
+  def createReceiver(requestSeqNo: SequenceNumber): Unit = {
+    logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+    val receiverOptions = new ReceiverOptions
+    receiverOptions.setReceiverRuntimeMetricEnabled(false)
+    receiverOptions.setIdentifier(s"${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
+    _receiver = client.createReceiverSync(consumerGroup,
+                                          nAndP.partitionId.toString,
+                                          EventPosition.fromSequenceNumber(requestSeqNo).convert,
+                                          receiverOptions)
+    _receiver.setPrefetchCount(DefaultPrefetchCount)
+  }
+
   private[this] var _receiver: PartitionReceiver = _
   private def receiver: PartitionReceiver = {
     if (_receiver == null) {
-      val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-      val receiverOptions = new ReceiverOptions
-      receiverOptions.setReceiverRuntimeMetricEnabled(false)
-      receiverOptions.setIdentifier(s"${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
-      _receiver = client.createReceiverSync(consumerGroup,
-                                            nAndP.partitionId.toString,
-                                            EventPosition.fromSequenceNumber(startingSeqNo).convert,
-                                            receiverOptions)
-      _receiver.setPrefetchCount(DefaultPrefetchCount)
+      throw new IllegalStateException(s"No receiver for $nAndP")
     }
     _receiver
   }
 
-  def errWrongSeqNo(receivedSeqNo: SequenceNumber): String =
+  def errWrongSeqNo(requestSeqNo: SequenceNumber, receivedSeqNo: SequenceNumber): String =
     s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
 
-  def receive(batchSize: Int): EventData = {
+  def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
     @volatile var event: EventData = null
     @volatile var i: java.lang.Iterable[EventData] = null
     while (i == null) {
@@ -81,17 +83,30 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf,
     }
     event = i.iterator.next
 
-    assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
-           errWrongSeqNo(event.getSystemProperties.getSequenceNumber))
-    requestSeqNo += 1
-    logAndUpdate(batchSize)
+    if (requestSeqNo != event.getSystemProperties.getSequenceNumber) {
+      logWarning(
+        s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
+          s"Recreating receiver for $nAndP")
+
+      createReceiver(requestSeqNo)
+
+      while (i == null) {
+        i = receiver.receiveSync(1)
+      }
+      event = i.iterator.next
+      assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
+             errWrongSeqNo(requestSeqNo, event.getSystemProperties.getSequenceNumber))
+    }
+
+    logAndUpdatePrefetch(batchSize)
     event
   }
 
-  def logAndUpdate(batchSize: Int): Unit = {
+  private def logAndUpdatePrefetch(batchSize: Int): Unit = {
     prefetchCounts.append(batchSize)
     val avg = prefetchCounts.list.sum / prefetchCounts.list.size
-    receiver.setPrefetchCount(avg)
+    val updated = if (avg < PrefetchCountMinimum) { PrefetchCountMinimum * 2 } else { avg * 2 }
+    receiver.setPrefetchCount(updated)
   }
 
   private[client] class FixedList[A](max: Int) {
@@ -117,14 +132,8 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
     receivers.get(nAndP).isDefined
   }
 
-  private def ensureInitialized(nAndP: NameAndPartition): Unit = {
-    if (!isInitialized(nAndP)) {
-      val message = notInitializedMessage(nAndP)
-      throw new IllegalStateException(message)
-    }
-  }
-
   private def get(nAndP: NameAndPartition): CachedEventHubsReceiver = receivers.synchronized {
+    logInfo(s"lookup on $nAndP")
     receivers.getOrElse(nAndP, {
       val message = notInitializedMessage(nAndP)
       throw new IllegalStateException(message)
@@ -137,11 +146,12 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                        batchSize: Int): EventData = {
     receivers.synchronized {
       if (!isInitialized(nAndP)) {
-        receivers.update(nAndP, new CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo))
+        receivers.update(nAndP, new CachedEventHubsReceiver(ehConf, nAndP))
+        get(nAndP).createReceiver(requestSeqNo)
       }
     }
 
     val receiver = get(nAndP)
-    receiver.receive(batchSize)
+    receiver.receive(requestSeqNo, batchSize)
   }
 }

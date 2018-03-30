@@ -28,13 +28,14 @@ import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNum
 import org.apache.spark.internal.Logging
 
 private[spark] trait CachedReceiver {
-  def receive(ehConf: EventHubsConf,
-              nAndP: NameAndPartition,
-              requestSeqNo: SequenceNumber,
-              batchSize: Int): EventData
+  private[eventhubs] def receive(ehConf: EventHubsConf,
+                                 nAndP: NameAndPartition,
+                                 requestSeqNo: SequenceNumber,
+                                 batchSize: Int): EventData
 }
 
-private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndPartition)
+private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
+                                                       nAndP: NameAndPartition)
     extends Logging {
 
   import org.apache.spark.eventhubs._
@@ -47,7 +48,7 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
     _client
   }
 
-  def createReceiver(requestSeqNo: SequenceNumber): Unit = {
+  private def createReceiver(requestSeqNo: SequenceNumber): Unit = {
     logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val receiverOptions = new ReceiverOptions
@@ -61,7 +62,7 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
     _receiver.setPrefetchCount(DefaultPrefetchCount)
   }
 
-  private[this] var _receiver: PartitionReceiver = _
+  private var _receiver: PartitionReceiver = _
   private def receiver: PartitionReceiver = {
     if (_receiver == null) {
       throw new IllegalStateException(s"No receiver for $nAndP")
@@ -69,10 +70,10 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
     _receiver
   }
 
-  def errWrongSeqNo(requestSeqNo: SequenceNumber, receivedSeqNo: SequenceNumber): String =
+  private def errWrongSeqNo(requestSeqNo: SequenceNumber, receivedSeqNo: SequenceNumber): String =
     s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
 
-  def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
+  private def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
     @volatile var event: EventData = null
     @volatile var i: java.lang.Iterable[EventData] = null
     while (i == null) { i = receiver.receiveSync(1) }
@@ -103,7 +104,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   private[this] val receivers = new MutableMap[NameAndPartition, CachedEventHubsReceiver]()
 
-  def isInitialized(nAndP: NameAndPartition): Boolean = receivers.synchronized {
+  private def isInitialized(nAndP: NameAndPartition): Boolean = receivers.synchronized {
     receivers.get(nAndP).isDefined
   }
 
@@ -115,18 +116,25 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
     })
   }
 
-  override def receive(ehConf: EventHubsConf,
-                       nAndP: NameAndPartition,
-                       requestSeqNo: SequenceNumber,
-                       batchSize: Int): EventData = {
+  private[eventhubs] override def receive(ehConf: EventHubsConf,
+                                          nAndP: NameAndPartition,
+                                          requestSeqNo: SequenceNumber,
+                                          batchSize: Int): EventData = {
     receivers.synchronized {
       if (!isInitialized(nAndP)) {
-        receivers.update(nAndP, new CachedEventHubsReceiver(ehConf, nAndP))
-        get(nAndP).createReceiver(requestSeqNo)
+        receivers.update(nAndP, CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo))
       }
     }
 
     val receiver = get(nAndP)
     receiver.receive(requestSeqNo, batchSize)
+  }
+
+  def apply(ehConf: EventHubsConf,
+            nAndP: NameAndPartition,
+            startSeqNo: SequenceNumber): CachedEventHubsReceiver = {
+    val cr = new CachedEventHubsReceiver(ehConf, nAndP)
+    cr.createReceiver(startSeqNo)
+    cr
   }
 }

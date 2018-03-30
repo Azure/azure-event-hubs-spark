@@ -52,23 +52,6 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     _client
   }
 
-  private var receiver: PartitionReceiver = _
-  override def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit = {
-    if (receiver == null) {
-      val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-      val receiverOptions = new ReceiverOptions
-      receiverOptions.setReceiverRuntimeMetricEnabled(false)
-      receiverOptions.setIdentifier(s"${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
-      logInfo(s"Starting receiver for partitionId $partitionId from seqNo $startingSeqNo")
-      receiver = client
-        .createReceiverSync(consumerGroup,
-                            partitionId,
-                            EventPosition.fromSequenceNumber(startingSeqNo).convert,
-                            receiverOptions)
-      receiver.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-    }
-  }
-
   private var partitionSender: PartitionSender = _
   override def createPartitionSender(partitionId: Int): Unit = {
     val id = partitionId.toString
@@ -84,26 +67,17 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
   }
 
-  override def send(event: EventData): Unit = {
-    client.sendSync(event)
-  }
-
-  override def send(event: EventData, partitionKey: String): Unit = {
-    client.sendSync(event, partitionKey)
-  }
-
-  override def send(event: EventData, partitionId: Int): Unit = {
-    require(partitionSender.getPartitionId.toInt == partitionId)
-    partitionSender.sendSync(event)
-  }
-
-  override def setPrefetchCount(count: Int): Unit = {
-    receiver.setPrefetchCount(count)
-  }
-
-  override def receive(eventCount: Int): java.lang.Iterable[EventData] = {
-    require(receiver != null, "receive: PartitionReceiver has not been created.")
-    receiver.receiveSync(eventCount)
+  override def send(event: EventData,
+                    partition: Option[Rate] = None,
+                    partitionKey: Option[String] = None): Unit = {
+    if (partition.isDefined) {
+      require(partitionSender.getPartitionId.toInt == partition.get)
+      partitionSender.sendSync(event)
+    } else if (partitionKey.isDefined) {
+      client.sendSync(event, partitionKey.get)
+    } else {
+      client.sendSync(event)
+    }
   }
 
   // Note: the EventHubs Java Client will retry this API call on failure
@@ -177,10 +151,6 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   override def close(): Unit = {
     logInfo("close: Closing EventHubsClient.")
-    if (receiver != null) {
-      receiver.closeSync()
-      receiver = null
-    }
     if (partitionSender != null) {
       partitionSender.closeSync()
       partitionSender = null

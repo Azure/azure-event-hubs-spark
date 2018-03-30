@@ -35,6 +35,7 @@ package object eventhubs {
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
+  val DefaultPrefetchCount: Int = 2000
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
   val StartingSequenceNumber = 0L

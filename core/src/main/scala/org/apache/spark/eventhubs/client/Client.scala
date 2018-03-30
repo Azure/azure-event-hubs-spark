@@ -31,52 +31,19 @@ private[spark] trait Client extends Serializable {
   def createPartitionSender(partitionId: Int)
 
   /**
-   * Creates an EventHub receiver.
-   *
-   * @param partitionId the partitionId the receiver will consume from.
-   * @param startingSeqNo the sequence number the receiver will start from.
-   */
-  def createReceiver(partitionId: String, startingSeqNo: SequenceNumber): Unit
-
-  /**
-   * Sends an [[EventData]] to your EventHubs.
+   * Sends an [[EventData]] to your Event Hub. If a partition is provided, the event
+   * will be sent directly to that partition. If a partition key is provided, it will be
+   * used to determine the target partition.
    *
    * @param event the event that is being sent.
-   */
-  def send(event: EventData): Unit
-
-  /**
-   * Sends an [[EventData]] to your EventHubs with the provided
-   * partition key.
-   *
-   * @param event the event that is being sent.
+   * @param partition the partition that will receive all events being sent.
    * @param partitionKey the partitionKey will be hash'ed to determine the partitionId
    *                     to send the events to. On the Received message this can be accessed
    *                     at [[EventData.SystemProperties#getPartitionKey()]]
    */
-  def send(event: EventData, partitionKey: String): Unit
-
-  /**
-   * Sends an [[EventData]] directly to the provided partitionId in your
-   * EventHubs.
-   *
-   * @param event the event that is being sent.
-   * @param partitionId the partition that will receive all events being sent.
-   */
-  def send(event: EventData, partitionId: Int): Unit
-
-  /**
-   * Receive events from your EventHubs instance.
-   *
-   * @param eventCount the number of events that will be requested from the EventHub partition.
-   */
-  def receive(eventCount: Int): java.lang.Iterable[EventData]
-
-  /**
-   * When a connection with the service is established, the client will begin to prefetch EventData.
-   * This number specifies the max number of events that will prefetched.
-   */
-  def setPrefetchCount(count: Int): Unit
+  def send(event: EventData,
+           partition: Option[Int] = None,
+           partitionKey: Option[String] = None): Unit
 
   /**
    * Provides the earliest (lowest) sequence number that exists in the EventHubs instance

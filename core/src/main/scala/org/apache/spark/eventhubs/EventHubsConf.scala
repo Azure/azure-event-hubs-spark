@@ -359,6 +359,10 @@ final class EventHubsConf private (private val connectionStr: String)
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
     set(UseSimulatedClientKey, b)
   }
+
+  private[spark] def useSimulatedClient: Boolean = {
+    self.get(UseSimulatedClientKey).getOrElse(DefaultUseSimulatedClient).toBoolean
+  }
 }
 
 object EventHubsConf extends Logging {

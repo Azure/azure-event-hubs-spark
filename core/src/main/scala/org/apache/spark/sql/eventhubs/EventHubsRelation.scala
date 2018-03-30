@@ -68,7 +68,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
       "GetBatch generating RDD of with offsetRanges: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
 
-    val rdd = new EventHubsRDD(sqlContext.sparkContext, ehConf, offsetRanges, clientFactory)
+    val rdd = new EventHubsRDD(sqlContext.sparkContext, ehConf, offsetRanges)
       .mapPartitionsWithIndex { (p, iter) =>
         {
           iter.map { ed =>

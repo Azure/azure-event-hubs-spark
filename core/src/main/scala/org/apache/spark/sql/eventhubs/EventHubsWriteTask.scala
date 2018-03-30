@@ -83,12 +83,12 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     val event = EventData.create(body)
 
     if (partitionKey != null) {
-      sender.send(event, partitionKey.toString)
+      sender.send(event, partitionKey = Some(partitionKey.toString))
     } else if (partitionId != null) {
       val wrapper = new IntWrapper
       if (partitionId.toInt(wrapper)) {
         sender.createPartitionSender(wrapper.value)
-        sender.send(event, wrapper.value)
+        sender.send(event, partition = Some(wrapper.value))
       } else {
         throw new IllegalStateException(
           s"partitionId '$partitionId' could not be parsed to an int.")

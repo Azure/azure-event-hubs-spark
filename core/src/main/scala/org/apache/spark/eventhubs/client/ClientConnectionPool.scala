@@ -17,7 +17,7 @@
 
 package org.apache.spark.eventhubs.client
 
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.{ ConcurrentLinkedQueue, ExecutorService, Executors }
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.microsoft.azure.eventhubs.EventHubClient
@@ -106,4 +106,13 @@ object ClientConnectionPool extends Logging {
     val pool = get(name)
     pool.returnClient(client)
   }
+}
+
+/**
+ * Thread pool for EventHub client. We create one thread pool per JVM.
+ * Threads are created on demand if none are available.
+ * In future releases, thread pool will be configurable by users.
+ */
+object ClientThreadPool {
+  val pool: ExecutorService = Executors.newCachedThreadPool
 }

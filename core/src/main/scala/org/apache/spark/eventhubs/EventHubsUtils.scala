@@ -66,7 +66,7 @@ object EventHubsUtils {
   def createRDD(sc: SparkContext,
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): EventHubsRDD = {
-    new EventHubsRDD(sc, ehConf, offsetRanges, EventHubsClient.apply)
+    new EventHubsRDD(sc, ehConf, offsetRanges)
   }
 
   /**

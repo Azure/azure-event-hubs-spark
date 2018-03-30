@@ -27,8 +27,6 @@ import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
 
-import scala.collection.mutable.ListBuffer
-
 private[spark] trait CachedReceiver {
   def receive(ehConf: EventHubsConf,
               nAndP: NameAndPartition,
@@ -40,12 +38,6 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
     extends Logging {
 
   import org.apache.spark.eventhubs._
-
-  // Currently, we save the most recent batch size and adjust the
-  // prefetch count accordingly. Leaving fixed list in place in case
-  // we want to calculate a moving average in the future. To do so,
-  // simply update the max FixedList size.
-  val prefetchCounts = new FixedList[Int](1)
 
   private var _client: EventHubClient = _
   private def client: EventHubClient = {
@@ -60,7 +52,8 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(false)
-    receiverOptions.setIdentifier(s"${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
+    receiverOptions.setIdentifier(
+      s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
     _receiver = client.createReceiverSync(consumerGroup,
                                           nAndP.partitionId.toString,
                                           EventPosition.fromSequenceNumber(requestSeqNo).convert,
@@ -82,47 +75,21 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
   def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
     @volatile var event: EventData = null
     @volatile var i: java.lang.Iterable[EventData] = null
-    while (i == null) {
-      i = receiver.receiveSync(1)
-    }
+    while (i == null) { i = receiver.receiveSync(1) }
     event = i.iterator.next
 
     if (requestSeqNo != event.getSystemProperties.getSequenceNumber) {
       logWarning(
         s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
           s"Recreating receiver for $nAndP")
-
       createReceiver(requestSeqNo)
-
-      while (i == null) {
-        i = receiver.receiveSync(1)
-      }
+      while (i == null) { i = receiver.receiveSync(1) }
       event = i.iterator.next
       assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
              errWrongSeqNo(requestSeqNo, event.getSystemProperties.getSequenceNumber))
     }
-
-    logAndUpdatePrefetch(batchSize)
+    receiver.setPrefetchCount(batchSize)
     event
-  }
-
-  private def logAndUpdatePrefetch(batchSize: Int): Unit = {
-    prefetchCounts.append(batchSize)
-    val avg = prefetchCounts.list.sum / prefetchCounts.list.size
-    val updated = if (avg < PrefetchCountMinimum) { PrefetchCountMinimum * 2 } else { avg * 2 }
-    receiver.setPrefetchCount(updated)
-  }
-
-  private[client] class FixedList[A](max: Int) {
-    val list: ListBuffer[A] = ListBuffer()
-    def append(elem: A) {
-      if (list takeRight 1 contains elem) {
-        // no-op, don't add duplicate batch size
-      } else {
-        if (list.size == max) { list.trimStart(1) }
-        list.append(elem)
-      }
-    }
   }
 }
 

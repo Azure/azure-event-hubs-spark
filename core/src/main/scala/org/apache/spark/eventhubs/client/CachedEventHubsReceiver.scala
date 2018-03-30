@@ -74,8 +74,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
 
   private def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
-    @volatile var event: EventData = null
-    @volatile var i: java.lang.Iterable[EventData] = null
+    var event: EventData = null
+    var i: java.lang.Iterable[EventData] = null
     while (i == null) { i = receiver.receiveSync(1) }
     event = i.iterator.next
 
@@ -96,37 +96,20 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
 private[spark] object CachedEventHubsReceiver extends CachedReceiver with Logging {
 
-  private def notInitializedMessage(nAndP: NameAndPartition): String = {
-    s"No receiver found for EventHubs ${nAndP.ehName} on partition ${nAndP.partitionId}"
-  }
-
   type MutableMap[A, B] = scala.collection.mutable.HashMap[A, B]
 
   private[this] val receivers = new MutableMap[NameAndPartition, CachedEventHubsReceiver]()
-
-  private def isInitialized(nAndP: NameAndPartition): Boolean = receivers.synchronized {
-    receivers.get(nAndP).isDefined
-  }
-
-  private def get(nAndP: NameAndPartition): CachedEventHubsReceiver = receivers.synchronized {
-    logInfo(s"lookup on $nAndP")
-    receivers.getOrElse(nAndP, {
-      val message = notInitializedMessage(nAndP)
-      throw new IllegalStateException(message)
-    })
-  }
 
   private[eventhubs] override def receive(ehConf: EventHubsConf,
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
                                           batchSize: Int): EventData = {
+    var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
-      if (!isInitialized(nAndP)) {
-        receivers.update(nAndP, CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo))
-      }
+      receiver = receivers.getOrElseUpdate(nAndP, {
+        CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo)
+      })
     }
-
-    val receiver = get(nAndP)
     receiver.receive(requestSeqNo, batchSize)
   }
 

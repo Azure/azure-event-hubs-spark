@@ -41,7 +41,11 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
 
   import org.apache.spark.eventhubs._
 
-  val prefetchCounts = new FixedList[Int](5)
+  // Currently, we save the most recent batch size and adjust the
+  // prefetch count accordingly. Leaving fixed list in place in case
+  // we want to calculate a moving average in the future. To do so,
+  // simply update the max FixedList size.
+  val prefetchCounts = new FixedList[Int](1)
 
   private var _client: EventHubClient = _
   private def client: EventHubClient = {
@@ -112,8 +116,12 @@ private class CachedEventHubsReceiver(ehConf: EventHubsConf, nAndP: NameAndParti
   private[client] class FixedList[A](max: Int) {
     val list: ListBuffer[A] = ListBuffer()
     def append(elem: A) {
-      if (list.size == max) { list.trimStart(1) }
-      list.append(elem)
+      if (list takeRight 1 contains elem) {
+        // no-op, don't add duplicate batch size
+      } else {
+        if (list.size == max) { list.trimStart(1) }
+        list.append(elem)
+      }
     }
   }
 }

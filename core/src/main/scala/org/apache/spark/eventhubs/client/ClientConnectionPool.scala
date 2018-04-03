@@ -69,41 +69,42 @@ object ClientConnectionPool extends Logging {
 
   private[this] val pools = new MutableMap[String, ClientConnectionPool]()
 
-  def isInitialized(name: String): Boolean = pools.synchronized {
-    pools.get(name).isDefined
+  def isInitialized(key: String): Boolean = pools.synchronized {
+    pools.get(key).isDefined
   }
 
-  private def ensureInitialized(name: String): Unit = {
-    if (!isInitialized(name)) {
-      val message = notInitializedMessage(name)
+  private def ensureInitialized(key: String): Unit = {
+    if (!isInitialized(key)) {
+      val message = notInitializedMessage(key)
       throw new IllegalStateException(message)
     }
   }
 
-  private def get(name: String): ClientConnectionPool = pools.synchronized {
-    pools.getOrElse(name, {
-      val message = notInitializedMessage(name)
+  private def key(ehConf: EventHubsConf): String = {
+    ehConf.connectionString
+  }
+
+  private def get(key: String): ClientConnectionPool = pools.synchronized {
+    pools.getOrElse(key, {
+      val message = notInitializedMessage(key)
       throw new IllegalStateException(message)
     })
   }
 
   def borrowClient(ehConf: EventHubsConf): EventHubClient = {
-    val name = ehConf.name
-
     pools.synchronized {
-      if (!isInitialized(name)) {
-        pools.update(name, new ClientConnectionPool(ehConf))
+      if (!isInitialized(key(ehConf))) {
+        pools.update(key(ehConf), new ClientConnectionPool(ehConf))
       }
     }
 
-    val pool = get(name)
+    val pool = get(key(ehConf))
     pool.borrowClient
   }
 
-  def returnClient(client: EventHubClient): Unit = {
-    val name = client.getEventHubName
-    ensureInitialized(name)
-    val pool = get(name)
+  def returnClient(ehConf: EventHubsConf, client: EventHubClient): Unit = {
+    ensureInitialized(key(ehConf))
+    val pool = get(key(ehConf))
     pool.returnClient(client)
   }
 }

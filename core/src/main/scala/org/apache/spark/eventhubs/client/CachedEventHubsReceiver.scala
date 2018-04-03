@@ -98,7 +98,11 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   type MutableMap[A, B] = scala.collection.mutable.HashMap[A, B]
 
-  private[this] val receivers = new MutableMap[NameAndPartition, CachedEventHubsReceiver]()
+  private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
+
+  private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
+    ehConf.connectionString + nAndP.partitionId
+  }
 
   private[eventhubs] override def receive(ehConf: EventHubsConf,
                                           nAndP: NameAndPartition,
@@ -106,7 +110,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           batchSize: Int): EventData = {
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
-      receiver = receivers.getOrElseUpdate(nAndP, {
+      receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {
         CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo)
       })
     }

@@ -81,7 +81,7 @@ object ClientConnectionPool extends Logging {
   }
 
   private def key(ehConf: EventHubsConf): String = {
-    ehConf.connectionString
+    ehConf.connectionString.toLowerCase
   }
 
   private def get(key: String): ClientConnectionPool = pools.synchronized {

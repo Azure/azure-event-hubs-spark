@@ -101,7 +101,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
-    ehConf.connectionString + nAndP.partitionId
+    (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase
   }
 
   private[eventhubs] override def receive(ehConf: EventHubsConf,

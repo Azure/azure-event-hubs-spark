@@ -21,6 +21,7 @@ import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWrit
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.qpid.proton.amqp.Binary
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.sql.Dataset
@@ -30,12 +31,16 @@ import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
   protected var testUtils: EventHubsTestUtils = _
+
+  implicit val formats = Serialization.formats(NoTypeHints)
 
   override def beforeAll: Unit = {
     super.beforeAll
@@ -482,6 +487,75 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
+  test("with application properties") {
+    val properties: Option[Map[String, Object]] = Some(
+      Map(
+        "A" -> "Hello, world.",
+        "B" -> Map.empty,
+        "C" -> "432".getBytes,
+        "D" -> null,
+        "E" -> Boolean.box(true),
+        "F" -> Int.box(1),
+        "G" -> Int.box(-1),
+        "H" -> Long.box(1L),
+        "I" -> Long.box(-1L),
+        "J" -> Short.box(1),
+        "K" -> Double.box(1),
+        "L" -> Float.box(3.4028235E38.toFloat),
+        "M" -> Char.box('a'),
+        "N" -> new Binary("1".getBytes),
+        "O" -> org.apache.qpid.proton.amqp.Symbol.getSymbol("x-opt-partition-key")
+      ))
+    val expected = properties.get
+      .mapValues {
+        case b: Binary                             => b.getArray.asInstanceOf[AnyRef]
+        case s: org.apache.qpid.proton.amqp.Symbol => s.toString.asInstanceOf[AnyRef]
+        case c: Character                          => c.toString
+        case default                               => default
+      }
+      .map { p =>
+        p._1 -> Serialization.write(p._2)
+      }
+
+    val eventHub = testUtils.createEventHubs(newEventHubs(), partitionCount = 1)
+    testUtils.populateUniformly(eventHub.name, 5000, properties)
+
+    val parameters =
+      getEventHubsConf(eventHub.name)
+        .setMaxEventsPerTrigger(1)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("properties")
+      .as[Map[String, String]]
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(eventhubs)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // we'll get one event per partition per trigger
+      CheckAnswer(expected)
+    )
+  }
+
   test("input row metrics") {
     val eh = newEventHubs()
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
@@ -558,6 +632,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // producer. So here we just use a low bound to make sure the internal conversion works.
     assert(row.getAs[java.sql.Timestamp]("enqueuedTime").getTime >= now,
            s"Unexpected results: $row")
+    assert(row.getAs[Map[String, Array[Byte]]]("properties") === Map(), s"Unexpected results: $row")
     query.stop()
   }
 

@@ -24,6 +24,8 @@ import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
 import org.apache.spark.internal.Logging
 import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
 
+import collection.JavaConverters._
+
 /**
  * Tests the functionality of the simulated EventHubs instance used for testing.
  */
@@ -58,7 +60,7 @@ class EventHubsTestUtilsSuite
 
   test("Send one event to one partition") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    eventHub.send(0, Seq(0))
+    eventHub.send(0, Seq(0), None)
 
     val data = eventHub.getPartitions
 
@@ -86,10 +88,10 @@ class EventHubsTestUtilsSuite
 
   test("All partitions have different data.") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    eventHub.send(0, Seq(1, 2, 3))
-    eventHub.send(1, Seq(4, 5, 6))
-    eventHub.send(2, Seq(7, 8, 9))
-    eventHub.send(3, Seq(10, 11, 12))
+    eventHub.send(0, Seq(1, 2, 3), None)
+    eventHub.send(1, Seq(4, 5, 6), None)
+    eventHub.send(2, Seq(7, 8, 9), None)
+    eventHub.send(3, Seq(10, 11, 12), None)
 
     val data = eventHub.getPartitions
 
@@ -134,10 +136,10 @@ class EventHubsTestUtilsSuite
   test("latestSeqNo") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
 
-    eventHub.send(0, Seq(1))
-    eventHub.send(1, Seq(2, 3))
-    eventHub.send(2, Seq(4, 5, 6))
-    eventHub.send(3, Seq(7))
+    eventHub.send(0, Seq(1), None)
+    eventHub.send(1, Seq(2, 3), None)
+    eventHub.send(2, Seq(4, 5, 6), None)
+    eventHub.send(3, Seq(7), None)
 
     val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
@@ -155,10 +157,10 @@ class EventHubsTestUtilsSuite
     assert(eventHub.partitionSize(2) == 0)
     assert(eventHub.partitionSize(3) == 0)
 
-    eventHub.send(0, Seq(1))
-    eventHub.send(1, Seq(2, 3))
-    eventHub.send(2, Seq(4, 5, 6))
-    eventHub.send(3, Seq(7))
+    eventHub.send(0, Seq(1), None)
+    eventHub.send(1, Seq(2, 3), None)
+    eventHub.send(2, Seq(4, 5, 6), None)
+    eventHub.send(3, Seq(7), None)
 
     assert(eventHub.partitionSize(0) == 1)
     assert(eventHub.partitionSize(1) == 2)
@@ -171,10 +173,10 @@ class EventHubsTestUtilsSuite
 
     assert(eventHub.totalSize == 0)
 
-    eventHub.send(0, Seq(1))
-    eventHub.send(1, Seq(2, 3))
-    eventHub.send(2, Seq(4, 5, 6))
-    eventHub.send(3, Seq(7))
+    eventHub.send(0, Seq(1), None)
+    eventHub.send(1, Seq(2, 3), None)
+    eventHub.send(2, Seq(4, 5, 6), None)
+    eventHub.send(3, Seq(7), None)
 
     assert(eventHub.totalSize == 7)
   }
@@ -204,8 +206,7 @@ class EventHubsTestUtilsSuite
   }
 
   test("send EventData to specific partition") {
-    // use this partition in the partition sender
-    val part = 7
+    val targetPartition = 7
 
     val eh = newEventHubs()
     testUtils.createEventHubs(eh, partitionCount = 10)
@@ -215,15 +216,51 @@ class EventHubsTestUtilsSuite
     val event = EventData.create("1".getBytes)
     client.send(event, Some(part))
 
-    assert(testUtils.getEventHubs(eh).getPartitions(part).size == 1)
+    assert(testUtils.getEventHubs(eh).getPartitions(targetPartition).size == 1)
     assert(
       testUtils
         .getEventHubs(eh)
-        .getPartitions(part)
+        .getPartitions(targetPartition)
         .getEvents
         .head
         .getBytes
         .sameElements(event.getBytes))
+  }
 
+  test("application properties - send") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 1)
+    val properties: Map[String, AnyRef] = Map(
+      "A" -> "1".getBytes,
+      "B" -> Map.empty,
+      "C" -> "Hello, world."
+    )
+    testUtils.send(eh, Seq(0), Some(properties))
+    val event = testUtils.getEventHubs(eh).getPartitions(0).getEvents.head
+    assert(event.getProperties === properties.asJava)
+  }
+
+  test("application properties - partition send") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 2)
+    val properties: Map[String, AnyRef] = Map(
+      "A" -> "1".getBytes,
+      "B" -> Map.empty
+    )
+    testUtils.send(eh, partitionId = 1, Seq(0), Some(properties))
+    val event = testUtils.getEventHubs(eh).getPartitions(1).getEvents.head
+    assert(event.getProperties === properties.asJava)
+  }
+
+  test("application properties - populate uniformly") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 2)
+    val properties: Map[String, AnyRef] = Map(
+      "A" -> "1".getBytes,
+      "B" -> Map.empty
+    )
+    testUtils.populateUniformly(eh, 1, Some(properties))
+    val event = testUtils.getEventHubs(eh).getPartitions(0).getEvents.head
+    assert(event.getProperties === properties.asJava)
   }
 }

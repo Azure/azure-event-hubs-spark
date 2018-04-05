@@ -17,19 +17,22 @@
 
 package org.apache.spark.sql.eventhubs
 
+import org.apache.qpid.proton.amqp.Binary
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.catalyst.util.{ ArrayBasedMapData, DateTimeUtils }
 import org.apache.spark.sql.{ Row, SQLContext }
 import org.apache.spark.sql.sources.{ BaseRelation, TableScan }
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.types.UTF8String
+import org.json4s.jackson.Serialization
 
 import scala.language.postfixOps
+import collection.JavaConverters._
 
 private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
                                            options: Map[String, String],

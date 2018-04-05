@@ -1,4 +1,4 @@
-# Structured Streaming + Azure Event Hubs Integration Guide 
+# Structured Streaming + Event Hubs Integration Guide 
 
 Structured Streaming integration for Azure Event Hubs to read data from Event Hubs. 
 
@@ -13,6 +13,7 @@ Structured Streaming integration for Azure Event Hubs to read data from Event Hu
 * [Writing Data to EventHubs](#writing-data-to-eventhubs)
   * [Creating an EventHubs Sink for Streaming Queries](#creating-an-eventhubs-sink-for-streaming-queries)
   * [Writing the output of Batch Queries to EventHubs](#writing-the-output-of-batch-queries-to-eventhubs)
+* [Managing Throughput](#managing-throughput)
 * [Deploying](#deploying)
 
 ## Linking
@@ -21,7 +22,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.0
+  version = 2.3.1
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -254,6 +255,7 @@ Each row in the source has the following schema:
 | Column | Type |
 | ------ | ---- |
 | body | binary |
+| partition | string |
 | offset | string |
 | sequenceNumber | long |
 | enqueuedTime | timestamp |
@@ -300,7 +302,8 @@ val ds = df
 // Write body data from a DataFrame to EventHubs with a partitionKey
 val ds = df
   .selectExpr("partitionKey", "body")
-  .format("eventHubs")
+  .writeStream
+  .format("eventhubs")
   .options(ehWriteConf.toMap)    // EventHubsConf containing the destination EventHub connection string.
   .start()
 ```
@@ -323,16 +326,34 @@ df.selectExpr("partitionKey", "body")
   .save()
 ```
 
+## Managing Throughput
+
+When you create an Event Hubs namespace, you are prompted to choose how many throughput units you want for your namespace. 
+A single **throughput unit** (or TU) entitles you to:
+
+- Up to 1 MB per second of ingress events (events sent into an event hub), but no more than 1000 ingress events or API calls per second.
+- Up to 2 MB per second of egress events (events consumed from an event hub).
+
+With that said, your TUs set an upper bound for the throughput in your streaming application, and this upper bound needs to
+be set in Spark as well. In Structured Streaming, this is done with the `maxEventsPerTrigger` option.
+
+Let's say you have 1 TU for a single 4-partition Event Hub instance. This means that Spark is able to consume 2 MB per second 
+from your Event Hub without being throttled. If `maxEventsPerTrigger` is set such that Spark consumes *less than 2 MB*, then consumption
+will happen within a second. You're free to leave it as such or you can increase your `maxEventsPerTrigger` up to 2 MB per second.
+If `maxEventsPerTrigger` is set such that Spark consumes *greater than 2 MB*, your micro-batch will always take more than one second
+to be created because consuming from Event Hubs will always take at least one second. You're free to leave it as is or you can increase
+your TUs to increase throughput. 
+
 ## Deploying 
 
 As with any Spark applications, `spark-submit` is used to launch your application. `azure-eventhubs-spark_2.11`
 and its dependencies can be directly added to `spark-submit` using `--packages`, such as,
 
-    ./bin/spark-submit --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.0 ...
+    ./bin/spark-submit --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.1 ...
 
 For experimenting on `spark-shell`, you can also use `--packages` to add `azure-eventhubs-spark_2.11` and its dependencies directly,
 
-    ./bin/spark-shell --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.0 ...
+    ./bin/spark-shell --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.1 ...
 
 See [Application Submission Guide](https://spark.apache.org/docs/latest/submitting-applications.html) for more details about submitting
 applications with external dependencies.

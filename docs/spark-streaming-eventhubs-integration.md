@@ -13,6 +13,7 @@ partitions and Spark partitions, and access to sequence numbers and metadata.
 * [Storing Offsets](#storing-offsets)
   * [Checkpoints](#checkpoints)
   * [Your own data store](#your-own-data-store)
+* [Managing Throughput](#managing-throughput)
 * [Deploying](#deploying)
 
 ## Linking
@@ -21,7 +22,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.0
+  version = 2.3.1
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -93,8 +94,8 @@ Additionally, the following configurations are optional:
 | consumerGroup | `String` | "$Default" | RDD and DStream | A consumer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
 | startingPositions | `Map[NameAndPartition, EventPosition]` | start of stream | RDD and DStream | Starting positions for specific partitions. If any positions are set in this option, they take priority when starting the Structured Streaming job. If nothing is configured for a specific partition, then the `EventPosition` set in startingPosition is used. If no position set there, we will start consuming from the beginning of the partition. |
 | startingPosition | `EventPosition` | start of stream | DStream only | The starting position for your Structured Streaming job. If a specific EventPosition is *not* set for a partition using startingPositions, then we use the `EventPosition` set in startingPosition. If nothing is set in either option, we will begin consuming from the beginning of the partition. |
-| maxRatesPerPartition | `Map[PartitionId, Long]` | None | DStream only | Rate limits on a per partition basis. Specify the maximum number of events to be processed on a certain partition within a batch interval. If nothing is set here, `maxRatePerPartition` is used. If nothing is set in there, the default value (1000) is used. | 
-| maxRatePerPartition | `long` | 1000 | DStream only | Rate limit on maximum number of events processed per partition per batch interval. | 
+| maxRatesPerPartition | `Map[NameAndPartition, Int]` | None | DStream only | Rate limits on a per partition basis. Specify the maximum number of events to be processed on a certain partition within a batch interval. If nothing is set here, `maxRatePerPartition` is used. If nothing is set in there, the default value (1000) is used. | 
+| maxRatePerPartition | `Int` | 1000 | DStream only | Rate limit on maximum number of events processed per partition per batch interval. | 
 | receiverTimeout | `java.time.Duration` | 60 seconds | RDD and DStream | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
 | operationTimeout | `java.time.Duration` | 60 seconds | RDD and DStream | The amount of time Event Hub API calls will be retried before throwing an exception. |
 
@@ -217,7 +218,7 @@ stream.foreachRDD { rdd =>
   val OffsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
   rdd.foreachPartition { iter => 
     val o: OffsetRange = offsetRanges(TaskContext.get.partitionId)
-    println(s"${o.name} ${o.partition} ${o.fromOffset} ${o.untilOffset}")
+    println(s"${o.name} ${o.partition} ${o.fromSeqNo} ${o.untilSeqNo}")
   }
 }
 ```
@@ -257,7 +258,8 @@ typically hard to make idempotent.
 
 // begin from the the offsets committed to the database
 val fromOffsets = selectOffsetsFromYourDatabase.map { resultSet =>
-  new NameAndPartition(resultSet.string("eventhubName"), resultSet.int("partition")) -> resultSet.long("seqNo")
+  new NameAndPartition(resultSet.string("eventhubName"), resultSet.int("partition")) -> EventPosition
+    .fromSequenceNumber(resultSet.long("seqNo"))
 }.toMap
 
 // Assuming the EventHubs conf is created elsewhere
@@ -272,13 +274,31 @@ stream.foreachRDD { rdd =>
 
   // begin your transaction
 
-  // update results
-  // update offsets where the end of existing offsets matches the beginning of this batch of offsets
-  // assert that offsets were updated correctly
+  // store `nameAndPartition`, `fromSeqNo`, and/or `untilSeqNo` (all are in offsetRanges)
+  // assert that offsetRanges were updated correctly
 
   // end your transaction
 }
 ```
+
+## Managing Throughput
+
+When you create an Event Hubs namespace, you are prompted to choose how many throughput units you want for your namespace. 
+A single **throughput unit** (or TU) entitles you to:
+
+- Up to 1 MB per second of ingress events (events sent into an event hub), but no more than 1000 ingress events or API calls per second.
+- Up to 2 MB per second of egress events (events consumed from an event hub).
+
+With that said, your TUs set an upper bound for the throughput in your streaming application, and this upper bound needs to
+be set in Spark as well. In Spark Streaming, this is done with `maxRatePerPartition` (or `maxRatesPerPartition` for
+per partition configuration). 
+
+Let's say you have 1 TU for a single 4-partition Event Hub instance. This means that Spark is able to consume 2 MB per second 
+from your Event Hub without being throttled. Your `batchInterval` needs to be set such that `consumptionTime + processingTime
+< batchInterval`. With that said, if your `maxRatePerPartition` is set such that 2 MB or less are consumed within an entire batch
+(e.g. across all partitions), then you only need to allocate one second (or less) for `consumptionTime` in your `batchInterval`.
+If `maxRatePerPartition` is set such that you have 8 MB per batch (e.g. 8 MB total across all partitions), then your `batchInterval`
+then your `batchInterval` must be greater than 4 seconds because `consumptionTime` could be up to 4 seconds. 
 
 ## Deploying 
 As with any Spark applications, `spark-submit` is used to launch your application.

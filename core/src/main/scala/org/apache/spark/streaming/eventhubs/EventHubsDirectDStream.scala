@@ -108,7 +108,7 @@ private[spark] class EventHubsDirectDStream private[spark] (
     } yield
       OffsetRange(NameAndPartition(ehName, p), fromSeqNos(p), untilSeqNos(p), preferredLoc)).toArray
 
-    val rdd = new EventHubsRDD(context.sparkContext, ehConf, offsetRanges, clientFactory)
+    val rdd = new EventHubsRDD(context.sparkContext, ehConf, offsetRanges)
 
     val description = offsetRanges.map(_.toString).mkString("\n")
     logInfo(s"Starting batch at $validTime for EH: $ehName with\n $description")
@@ -154,8 +154,7 @@ private[spark] class EventHubsDirectDStream private[spark] (
           logInfo(s"Restoring EventHubsRDD for time $t ${b.mkString("[", ", ", "]")}")
           generatedRDDs += t -> new EventHubsRDD(context.sparkContext,
                                                  ehConf,
-                                                 b.map(OffsetRange(_)),
-                                                 clientFactory)
+                                                 b.map(OffsetRange(_)))
       }
     }
   }

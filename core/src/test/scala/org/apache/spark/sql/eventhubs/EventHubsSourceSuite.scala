@@ -71,7 +71,6 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
     override def addData(query: Option[StreamExecution]): (Source, Offset) = {
       if (query.get.isActive) {
-        // Make sure no Spark job is running when deleting a topic
         query.get.processAllAvailable()
       }
 
@@ -624,6 +623,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     assert(rows.length === 1, s"Unexpected results: ${rows.toList}")
     val row = rows(0)
     assert(row.getAs[Array[Byte]]("body") === "1".getBytes(UTF_8), s"Unexpected results: $row")
+    assert(row.getAs[String]("partition") === "0", s"Unexpected results: $row")
     assert(row.getAs[String]("offset") === "0", s"Unexpected results: $row")
     assert(row.getAs[Long]("sequenceNumber") === 0, s"Unexpected results: $row")
     assert(row.getAs[String]("publisher") === null, s"Unexpected results: $row")

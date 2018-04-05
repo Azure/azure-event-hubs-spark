@@ -296,28 +296,23 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       }
     }.toArray
 
-    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges, clientFactory).map { ed =>
-      InternalRow(
-        ed.getBytes,
-        UTF8String.fromString(ed.getSystemProperties.getOffset),
-        ed.getSystemProperties.getSequenceNumber,
-        DateTimeUtils.fromJavaTimestamp(
-          new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
-        UTF8String.fromString(ed.getSystemProperties.getPublisher),
-        UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
-        ArrayBasedMapData(
-          ed.getProperties.asScala
-            .mapValues {
-              case b: Binary                             => b.getArray.asInstanceOf[AnyRef]
-              case s: org.apache.qpid.proton.amqp.Symbol => s.toString.asInstanceOf[AnyRef]
-              case c: Character                          => c.toString
-              case default                               => default
-            }
-            .map { p =>
-              UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
-            })
-      )
-    }
+    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges)
+      .mapPartitionsWithIndex { (p, iter) =>
+        {
+          iter.map { ed =>
+            InternalRow(
+              ed.getBytes,
+              UTF8String.fromString(p.toString),
+              UTF8String.fromString(ed.getSystemProperties.getOffset),
+              ed.getSystemProperties.getSequenceNumber,
+              DateTimeUtils.fromJavaTimestamp(
+                new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
+              UTF8String.fromString(ed.getSystemProperties.getPublisher),
+              UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
+            )
+          }
+        }
+      }
 
     logInfo(
       "GetBatch generating RDD of offset range: " +

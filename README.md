@@ -2,13 +2,19 @@
   <img src="event-hubs_spark.png" alt="Azure Event Hubs + Apache Spark Connector" width="270"/>
 </p>
 
-# Azure Event Hubs Connector for Apache Spark
+<h1>Azure Event Hubs Connector for Apache Spark</h1> 
 
-[![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.png)](https://gitter.im/azure-event-hubs-spark)
-
-|Branch|Status|
-|------|-------------|
-|master|[![Build Status](https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master)](https://travis-ci.org/Azure/azure-event-hubs-spark)|
+<p>
+  <a href="https://gitter.im/azure-event-hubs-spark">
+    <img src="https://badges.gitter.im/gitterHQ/gitter.png" alt="chat on gitter">
+  </a>
+  <a href="https://travis-ci.org/Azure/azure-event-hubs-spark">
+    <img src="https://travis-ci.org/Azure/azure-event-hubs-spark.svg?branch=master" alt="build status">
+  </a>
+  <a href="#star-our-repo">
+    <img src="https://img.shields.io/github/stars/azure/azure-event-hubs-spark.svg?style=social&label=Stars" alt="star our repo">
+  </a>
+</p> 
 
 This is the source code of the Azure Event Hubs Connector for Apache Spark. 
 
@@ -24,19 +30,20 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Spark
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
-|Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.0-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.0%7Cjar)|
-|Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0-PREVIEW%7Cjar)|
-|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/maven-central/v/com.microsoft.azure/azure-eventhubs-spark_2.11/2.2.0-PREVIEW.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0-PREVIEW%7Cjar)|
+|Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.1-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.1%7Cjar)|
+|Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.2.0-blue.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0%7Cjar)|
+|Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.2.0-blue.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.0%7Cjar)|
 
 #### Databricks
 |Databricks Runtime Version|Artifact Id|Package Version|
 |-------------|------------|----------------|
-|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.0-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.0%7Cjar)|
-|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.0-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.0%7Cjar)|
+|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.1-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.1%7Cjar)|
+|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.1-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.1%7Cjar)|
 
 #### Roadmap
 
-Planned changes can be found on our [wiki](https://github.com/Azure/azure-event-hubs-spark/wiki).
+There is an open issue for each planned feature/enhancement. Additional comments can be found on 
+our [wiki](https://github.com/Azure/azure-event-hubs-spark/wiki).
 
 ## Usage
 
@@ -47,7 +54,7 @@ For Scala/Java applications using SBT/Maven project definitions, link your appli
 
     groupId = com.microsoft.azure
     artifactId = azure-eventhubs-spark_2.11
-    version = 2.3.0
+    version = 2.3.1
 
 ### Documentation
 

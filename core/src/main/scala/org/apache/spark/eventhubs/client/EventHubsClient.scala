@@ -22,7 +22,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.impl.EventHubClientImpl
-import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
@@ -156,7 +155,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       partitionSender = null
     }
     if (_client != null) {
-      ClientConnectionPool.returnClient(_client)
+      ClientConnectionPool.returnClient(ehConf, _client)
       _client = null
     }
   }

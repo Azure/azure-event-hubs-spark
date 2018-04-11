@@ -89,7 +89,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
              errWrongSeqNo(requestSeqNo, event.getSystemProperties.getSequenceNumber))
     }
-    receiver.setPrefetchCount(batchSize)
+    val newPrefetchCount = if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum else batchSize
+    receiver.setPrefetchCount(newPrefetchCount)
     event
   }
 }

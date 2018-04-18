@@ -189,13 +189,10 @@ other documentation still applies. Follow these instructions to get your EventHu
 2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
 3. Find your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.
 
-```scala
-import org.apache.spark.eventhubs.ConnectionStringBuilder
-
-// Build connection string with the above information 
-val connectionString = ConnectionStringBuilder("YOUR.EVENTHUB.COMPATIBLE.ENDPOINT")
-  .setEventHubName("YOUR.EVENTHUB.COMPATIBLE.NAME")
-  .build
+```python
+# Note: Remove '{' and '}' when you add your endpoint and eventhub compatible name. 
+connectionString = "Endpoint={YOUR.EVENTHUB.COMPATIBLE.ENDPOINT};EntityPath={YOUR.EVENTHUB.COMPATIBLE.NAME}"
+ehConf['eventhubs.connectionString'] = connectionString
 ```
 
 ## Reading Data from Event Hubs

@@ -34,6 +34,13 @@ See the [Deploying](#deploying) subsection below.
 An Event Hubs connection string is required to connect to the Event Hubs service. You can get the connection string 
 for your Event Hubs instance from the [Azure Portal](https://portal.azure.com).
 
+If connecting to the IoT Hub's Event Hub-compatible endpoint, you should add the Event Hub-compatible name to the connection string as the EntityPath.
+The resulting connection string should thus be in format:
+
+```
+"<Event Hub-compatible endpoint>;EntityPath=<Event Hub-compatible name>"
+```
+
 ### Event Hubs Configuration
 
 All configuration relating to Event Hubs happens in your Event Hubs configuration dictionary. The configuration dictionary must contain an Event Hubs connection string:

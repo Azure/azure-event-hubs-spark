@@ -180,7 +180,23 @@ ehConf["eventhubs.operationTimeout"] = operationTimeoutDuration
 
 Note that the timeout duration format is different than the `enqueuedTime` format in the Event Position [section](#event-position). The timeout format must follow the ISO-8601 representation for time (more specifically, it must be a format accepted by `java.time.Duration`).
 
-####
+#### IoT Hub
+
+If using IoT Hub, getting your connection string is the only part of the process that is different - all 
+other documentation still applies. Follow these instructions to get your EventHubs-compatible connection string: 
+
+1. Go to the [Azure Portal](https://ms.portal.azure.com) and find your IoT Hub instance
+2. Click on **Endpoints** under **Messaging**. Then click on **Events**.
+3. Find your ```EventHub-compatible name``` and ```EventHub-compatible endpoint```.
+
+```scala
+import org.apache.spark.eventhubs.ConnectionStringBuilder
+
+// Build connection string with the above information 
+val connectionString = ConnectionStringBuilder("YOUR.EVENTHUB.COMPATIBLE.ENDPOINT")
+  .setEventHubName("YOUR.EVENTHUB.COMPATIBLE.NAME")
+  .build
+```
 
 ## Reading Data from Event Hubs
 

@@ -28,7 +28,6 @@
   </parent>
   <artifactId>azure-eventhubs-spark_2.11</artifactId>
   <packaging>jar</packaging>
-
   <dependencies>
     <dependency>
         <groupId>org.apache.spark</groupId>

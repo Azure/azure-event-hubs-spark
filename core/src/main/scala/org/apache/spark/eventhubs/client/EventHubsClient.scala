@@ -186,7 +186,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       partitionSender = null
     }
     if (_client != null) {
-      ClientConnectionPool.returnClient(_client)
+      ClientConnectionPool.returnClient(ehConf, _client)
       _client = null
     }
   }

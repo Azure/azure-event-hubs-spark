@@ -87,23 +87,28 @@ object ClientConnectionPool extends Logging {
     })
   }
 
+  def getId(ehConf: EventHubsConf): String = {
+    val host = ConnectionStringBuilder(ehConf.connectionString).getEndpoint.getHost
+    s"$host-${ehConf.name}"
+  }
+
   def borrowClient(ehConf: EventHubsConf): EventHubClient = {
-    val name = ehConf.name
+    val id = getId(ehConf)
 
     pools.synchronized {
-      if (!isInitialized(name)) {
-        pools.update(name, new ClientConnectionPool(ehConf))
+      if (!isInitialized(id)) {
+        pools.update(id, new ClientConnectionPool(ehConf))
       }
     }
 
-    val pool = get(name)
+    val pool = get(id)
     pool.borrowClient
   }
 
-  def returnClient(client: EventHubClient): Unit = {
-    val name = client.getEventHubName
-    ensureInitialized(name)
-    val pool = get(name)
+  def returnClient(ehConf: EventHubsConf, client: EventHubClient): Unit = {
+    val id = getId(ehConf)
+    ensureInitialized(id)
+    val pool = get(id)
     pool.returnClient(client)
   }
 }

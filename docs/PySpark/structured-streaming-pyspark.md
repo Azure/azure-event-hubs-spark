@@ -34,6 +34,10 @@ See the [Deploying](#deploying) subsection below.
 An Event Hubs connection string is required to connect to the Event Hubs service. You can get the connection string 
 for your Event Hubs instance from the [Azure Portal](https://portal.azure.com).
 
+Connection strings must contain an `Endpoint`, `EntityPath` (the Event Hub name), `SharedAccessKeyName`, and `SharedAccessKey`:
+
+    Endpoint=sb://{NAMESPACE}.servicebus.windows.net/{EVENT_HUB_NAME};EntityPath={EVENT_HUB_NAME};SharedAccessKeyName={ACCESS_KEY_NAME};SharedAccessKey={ACCESS_KEY}
+
 ### Event Hubs Configuration
 
 All configuration relating to Event Hubs happens in your Event Hubs configuration dictionary. The configuration dictionary must contain an Event Hubs connection string:

@@ -55,10 +55,12 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiverOptions.setReceiverRuntimeMetricEnabled(false)
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
-    _receiver = client.createReceiverSync(consumerGroup,
-                                          nAndP.partitionId.toString,
-                                          EventPosition.fromSequenceNumber(requestSeqNo).convert,
-                                          receiverOptions)
+    _receiver = client.createEpochReceiverSync(
+      consumerGroup,
+      nAndP.partitionId.toString,
+      EventPosition.fromSequenceNumber(requestSeqNo).convert,
+      DefaultEpoch,
+      receiverOptions)
     _receiver.setPrefetchCount(DefaultPrefetchCount)
   }
 
@@ -83,6 +85,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       logWarning(
         s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
           s"Recreating receiver for $nAndP")
+      _receiver.closeSync()
       createReceiver(requestSeqNo)
       while (i == null) { i = receiver.receiveSync(1) }
       event = i.iterator.next

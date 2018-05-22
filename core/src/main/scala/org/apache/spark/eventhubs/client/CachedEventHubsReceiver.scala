@@ -64,6 +64,15 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     _receiver.setPrefetchCount(DefaultPrefetchCount)
   }
 
+  private def closeReceiver(): Unit = {
+    try {
+      _receiver.closeSync()
+      _receiver = null
+    } catch {
+      case e: Exception => logInfo("closeSync failed on cached receiver.", e)
+    }
+  }
+
   private var _receiver: PartitionReceiver = _
   private def receiver: PartitionReceiver = {
     if (_receiver == null) {
@@ -85,7 +94,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       logWarning(
         s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
           s"Recreating receiver for $nAndP")
-      _receiver.closeSync()
+      closeReceiver()
       createReceiver(requestSeqNo)
       while (i == null) { i = receiver.receiveSync(1) }
       event = i.iterator.next

@@ -29,6 +29,7 @@ import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
+import scala.util.{ Failure, Success, Try }
 
 /**
  * Wraps a raw EventHubReceiver to make it easier for unit tests
@@ -79,12 +80,20 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
   }
 
-  // Note: the EventHubs Java Client will retry this API call on failure
+  @annotation.tailrec
+  final def retry[T](n: Int)(fn: => T): T = {
+    Try { fn } match {
+      case Success(x) => x
+      case _ if n > 1 => retry(n - 1)(fn)
+      case Failure(e) =>
+        logInfo("getRunTimeInfo failure.", e)
+        throw e
+    }
+  }
+
   private def getRunTimeInfo(partitionId: PartitionId): PartitionRuntimeInformation = {
-    try {
+    retry(RetryCount) {
       client.getPartitionRuntimeInformation(partitionId.toString).get
-    } catch {
-      case e: Exception => throw e
     }
   }
 

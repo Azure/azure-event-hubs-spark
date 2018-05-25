@@ -84,10 +84,10 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   final def retry[T](n: Int)(fn: => T): T = {
     Try { fn } match {
       case Success(x) => x
-      case _ if n > 1 => retry(n - 1)(fn)
-      case Failure(e) =>
-        logInfo("getRunTimeInfo failure.", e)
-        throw e
+      case Failure(e: EventHubException) if e.getIsTransient && n > 1 =>
+        logInfo("Retrying getRunTimeInfo failure.", e)
+        retry(n - 1)(fn)
+      case Failure(e) => throw e
     }
   }
 

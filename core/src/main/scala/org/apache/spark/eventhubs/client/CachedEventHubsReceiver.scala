@@ -17,12 +17,7 @@
 
 package org.apache.spark.eventhubs.client
 
-import com.microsoft.azure.eventhubs.{
-  EventData,
-  EventHubClient,
-  PartitionReceiver,
-  ReceiverOptions
-}
+import com.microsoft.azure.eventhubs._
 import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
@@ -87,7 +82,19 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
     var event: EventData = null
     var i: java.lang.Iterable[EventData] = null
-    while (i == null) { i = receiver.receiveSync(1) }
+    while (i == null) {
+      i = try {
+        receiver.receiveSync(1)
+      } catch {
+        case r: ReceiverDisconnectedException => {
+          throw new Exception(
+            "You are likely running multiple Spark jobs with the same consumer group. " +
+              "For each Spark job, please create and use a unique consumer group to avoid this issue.",
+            r
+          )
+        }
+      }
+    }
     event = i.iterator.next
 
     if (requestSeqNo != event.getSystemProperties.getSequenceNumber) {

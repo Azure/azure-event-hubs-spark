@@ -27,6 +27,8 @@ import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
 
+import scala.util.{ Failure, Success, Try }
+
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
                                  nAndP: NameAndPartition,
@@ -65,11 +67,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def closeReceiver(): Unit = {
-    try {
-      _receiver.closeSync()
-      _receiver = null
-    } catch {
-      case e: Exception => logInfo("closeSync failed on cached receiver.", e)
+    Try(_receiver.closeSync()) match {
+      case Success(_) => _receiver = null
+      case Failure(e) => logInfo("closeSync failed in cached receiver.", e)
     }
   }
 

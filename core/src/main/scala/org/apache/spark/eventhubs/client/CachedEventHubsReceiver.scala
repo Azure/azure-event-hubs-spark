@@ -17,15 +17,12 @@
 
 package org.apache.spark.eventhubs.client
 
-import com.microsoft.azure.eventhubs.{
-  EventData,
-  EventHubClient,
-  PartitionReceiver,
-  ReceiverOptions
-}
+import com.microsoft.azure.eventhubs._
 import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
+
+import scala.util.{ Failure, Success, Try }
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
@@ -55,11 +52,20 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiverOptions.setReceiverRuntimeMetricEnabled(false)
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
-    _receiver = client.createReceiverSync(consumerGroup,
-                                          nAndP.partitionId.toString,
-                                          EventPosition.fromSequenceNumber(requestSeqNo).convert,
-                                          receiverOptions)
+    _receiver = client.createEpochReceiverSync(
+      consumerGroup,
+      nAndP.partitionId.toString,
+      EventPosition.fromSequenceNumber(requestSeqNo).convert,
+      DefaultEpoch,
+      receiverOptions)
     _receiver.setPrefetchCount(DefaultPrefetchCount)
+  }
+
+  private def closeReceiver(): Unit = {
+    Try(_receiver.closeSync()) match {
+      case Success(_) => _receiver = null
+      case Failure(e) => logInfo("closeSync failed in cached receiver.", e)
+    }
   }
 
   private var _receiver: PartitionReceiver = _
@@ -76,13 +82,26 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
     var event: EventData = null
     var i: java.lang.Iterable[EventData] = null
-    while (i == null) { i = receiver.receiveSync(1) }
+    while (i == null) {
+      i = try {
+        receiver.receiveSync(1)
+      } catch {
+        case r: ReceiverDisconnectedException => {
+          throw new Exception(
+            "You are likely running multiple Spark jobs with the same consumer group. " +
+              "For each Spark job, please create and use a unique consumer group to avoid this issue.",
+            r
+          )
+        }
+      }
+    }
     event = i.iterator.next
 
     if (requestSeqNo != event.getSystemProperties.getSequenceNumber) {
       logWarning(
         s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
           s"Recreating receiver for $nAndP")
+      closeReceiver()
       createReceiver(requestSeqNo)
       while (i == null) { i = receiver.receiveSync(1) }
       event = i.iterator.next

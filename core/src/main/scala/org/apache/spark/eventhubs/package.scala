@@ -39,6 +39,7 @@ package object eventhubs {
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
   val StartingSequenceNumber = 0L
+  val DefaultEpoch = 0L
 
   type PartitionId = Int
   val PartitionId = Int

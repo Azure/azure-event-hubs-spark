@@ -233,7 +233,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         if (seqNo < earliestSeqNos.get(nAndP)) {
           reportDataLoss(
             s"Starting seqNo $seqNo in partition ${nAndP.partitionId} of EventHub ${nAndP.ehName} " +
-              s"is behind the earliest sequence number ${currentSeqNos.get(nAndP)} " +
+              s"is behind the earliest sequence number ${earliestSeqNos.get(nAndP)} " +
               s"present in the service. Some events may have expired and been missed.")
           nAndP -> earliestSeqNos.get(nAndP)
         } else {
@@ -241,33 +241,8 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         }
     }
 
-    // Find the new partitions, and get their earliest offsets
-    val newPartitions = untilSeqNos.keySet.diff(fromSeqNos.keySet)
-    val newPartitionSeqNos = fetchEarliestSeqNos(newPartitions.toSeq)
-    if (newPartitionSeqNos.keySet != newPartitions) {
-      // We cannot get fromOffsets for some partitions. It means they got deleted.
-      val deletedPartitions = newPartitions.diff(newPartitionSeqNos.keySet)
-      reportDataLoss(
-        s"Cannot find earliest sequence numbers of $deletedPartitions. Some data may have been missed")
-    }
-    logInfo(s"Partitions added: $newPartitionSeqNos")
-    newPartitionSeqNos.filter(_._2 != 0).foreach {
-      case (p, s) =>
-        reportDataLoss(
-          s"Added partition $p starts from $s instead of 0. Some data may have been missed")
-    }
-
-    val deletedPartitions = fromSeqNos.keySet.diff(untilSeqNos.keySet)
-    if (deletedPartitions.nonEmpty) {
-      reportDataLoss(s"$deletedPartitions are gone. Some data may have been missed")
-    }
-
-    val nameAndPartitions = untilSeqNos.keySet.filter { p =>
-      // Ignore partitions that we don't know the from offsets.
-      newPartitionSeqNos.contains(p) || fromSeqNos.contains(p)
-    }.toSeq
+    val nameAndPartitions = untilSeqNos.keySet.toSeq
     logDebug("Partitions: " + nameAndPartitions.mkString(", "))
-
     val sortedExecutors = getSortedExecutorList(sc)
     val numExecutors = sortedExecutors.length
     logDebug("Sorted executors: " + sortedExecutors.mkString(", "))

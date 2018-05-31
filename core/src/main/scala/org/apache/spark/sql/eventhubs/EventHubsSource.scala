@@ -28,7 +28,7 @@ import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.catalyst.util.{ ArrayBasedMapData, DateTimeUtils }
 import org.apache.spark.sql.execution.streaming.{
   HDFSMetadataLog,
   Offset,
@@ -38,6 +38,10 @@ import org.apache.spark.sql.execution.streaming.{
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ DataFrame, SQLContext }
 import org.apache.spark.unsafe.types.UTF8String
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
+
+import collection.JavaConverters._
 
 private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                          options: Map[String, String],
@@ -204,6 +208,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     }
   }
 
+  private def serialize(x: AnyRef): String = {
+    implicit val formats = Serialization.formats(NoTypeHints)
+    Serialization.write(x)
+  }
+
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
     initialPartitionSeqNos
 
@@ -279,7 +288,10 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
               DateTimeUtils.fromJavaTimestamp(
                 new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
               UTF8String.fromString(ed.getSystemProperties.getPublisher),
-              UTF8String.fromString(ed.getSystemProperties.getPartitionKey)
+              UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
+              ArrayBasedMapData(ed.getProperties.asScala.map { p =>
+                UTF8String.fromString(p._1) -> UTF8String.fromString(serialize(p._2))
+              })
             )
           }
         }

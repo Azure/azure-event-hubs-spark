@@ -47,11 +47,6 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
 
   override def schema: StructType = EventHubsSourceProvider.eventHubsSchema
 
-  private def serialize(x: AnyRef): String = {
-    implicit val formats = Serialization.formats(NoTypeHints)
-    Serialization.write(x)
-  }
-
   override def buildScan(): RDD[Row] = {
     val client = clientFactory(ehConf)
     val partitionCount: Int = client.partitionCount
@@ -90,7 +85,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
               UTF8String.fromString(ed.getSystemProperties.getPublisher),
               UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
               ArrayBasedMapData(ed.getProperties.asScala.map { p =>
-                UTF8String.fromString(p._1) -> UTF8String.fromString(serialize(p._2))
+                UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
               })
             )
           }

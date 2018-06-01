@@ -342,9 +342,25 @@ from your Event Hub without being throttled. If `maxEventsPerTrigger` is set suc
 will happen within a second. You're free to leave it as such or you can increase your `maxEventsPerTrigger` up to 2 MB per second.
 If `maxEventsPerTrigger` is set such that Spark consumes *greater than 2 MB*, your micro-batch will always take more than one second
 to be created because consuming from Event Hubs will always take at least one second. You're free to leave it as is or you can increase
-your TUs to increase throughput. 
+your TUs to increase throughput.
 
-## Deploying 
+## Serialization of Event Data Properties
+
+Users can pass custom key-value properties in their `EventData`. These properties are exposed in the Spark SQL schema. Keys
+are exposed as strings, and values are exposed as json-serialized strings. Native types are supported out of the box. Custom
+AMQP types need to be handled explicitly by the connector. Below we list the AMQP types we support and how they are handled:
+
+- `Binary` - the underlying byte array is serialized.
+- `Decimal128` - the underlying byte array is serialized.
+- `Decimal32` - the underlying integer representation is serialized.
+- `Decimal64` - the underlying long representation is serialized.
+- `Symbol` - the underlying string is serialized.
+- `UnsignedByte` - the underlying string is serialized.
+- `UnsignedInteger` - the underlying string is serialized.
+- `UnsignedLong` - the underlying string is serialized.
+- `UnsignedShort` - the underlying string is serialized.
+
+## Deploying
 
 As with any Spark applications, `spark-submit` is used to launch your application. `azure-eventhubs-spark_2.11`
 and its dependencies can be directly added to `spark-submit` using `--packages`, such as,

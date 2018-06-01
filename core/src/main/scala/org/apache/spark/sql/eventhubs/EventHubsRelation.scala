@@ -17,6 +17,17 @@
 
 package org.apache.spark.sql.eventhubs
 
+import org.apache.qpid.proton.amqp.{
+  Binary,
+  Decimal128,
+  Decimal32,
+  Decimal64,
+  Symbol,
+  UnsignedByte,
+  UnsignedInteger,
+  UnsignedLong,
+  UnsignedShort
+}
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.EventHubsConf
@@ -84,9 +95,28 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
                 new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
               UTF8String.fromString(ed.getSystemProperties.getPublisher),
               UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
-              ArrayBasedMapData(ed.getProperties.asScala.map { p =>
-                UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
-              })
+              ArrayBasedMapData(
+                ed.getProperties.asScala
+                  .mapValues {
+                    case b: Binary =>
+                      val buf = b.asByteBuffer()
+                      val arr = new Array[Byte](buf.remaining)
+                      buf.get(arr)
+                      arr.asInstanceOf[AnyRef]
+                    case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
+                    case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
+                    case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
+                    case s: Symbol           => s.toString.asInstanceOf[AnyRef]
+                    case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
+                    case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
+                    case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
+                    case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
+                    case c: Character        => c.toString.asInstanceOf[AnyRef]
+                    case default             => default
+                  }
+                  .map { p =>
+                    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  })
             )
           }
         }

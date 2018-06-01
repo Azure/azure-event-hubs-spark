@@ -17,9 +17,10 @@
 
 package org.apache.spark.sql.eventhubs
 
+import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.qpid.proton.amqp.Binary
+import org.apache.qpid.proton.amqp._
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.apache.spark.sql.{ DataFrame, QueryTest }
@@ -111,19 +112,38 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
         "D" -> null,
         "E" -> Boolean.box(true),
         "F" -> Int.box(1),
-        "G" -> Int.box(-1),
-        "H" -> Long.box(1L),
-        "I" -> Long.box(-1L),
-        "J" -> Short.box(1),
-        "K" -> Double.box(1),
-        "L" -> Float.box(3.4028235E38.toFloat),
-        "M" -> Char.box('a'),
-        "N" -> new Binary("1".getBytes),
-        "O" -> org.apache.qpid.proton.amqp.Symbol.getSymbol("x-opt-partition-key")
+        "G" -> Long.box(1L),
+        "H" -> Char.box('a'),
+        "I" -> new Binary("1".getBytes),
+        "J" -> Symbol.getSymbol("x-opt-partition-key"),
+        "K" -> new Decimal128(Array[Byte](0, 1, 2, 3, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0)),
+        "L" -> new Decimal32(12),
+        "M" -> new Decimal64(13),
+        "N" -> new UnsignedByte(1.toByte),
+        "O" -> new UnsignedLong(987654321L),
+        "P" -> new UnsignedShort(Short.box(1))
       ))
-    val expected = properties.get.map { p =>
-      p._1 -> Serialization.write(p._2)
-    }
+    val expected = properties.get
+      .mapValues {
+        case b: Binary =>
+          val buf = b.asByteBuffer()
+          val arr = new Array[Byte](buf.remaining)
+          buf.get(arr)
+          arr.asInstanceOf[AnyRef]
+        case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
+        case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
+        case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
+        case s: Symbol           => s.toString.asInstanceOf[AnyRef]
+        case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
+        case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
+        case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
+        case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
+        case c: Character        => c.toString.asInstanceOf[AnyRef]
+        case default             => default
+      }
+      .map { p =>
+        p._1 -> Serialization.write(p._2)
+      }
 
     val eh = newEventHub()
     testUtils.createEventHubs(eh, partitionCount = 3)

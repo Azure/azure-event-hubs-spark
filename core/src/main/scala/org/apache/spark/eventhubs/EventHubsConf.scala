@@ -71,6 +71,11 @@ final class EventHubsConf private (private val connectionStr: String)
     this
   }
 
+  private def remove(key: String): EventHubsConf = {
+    settings.remove(key)
+    this
+  }
+
   private[spark] def apply(key: String): String = {
     get(key).get
   }
@@ -375,6 +380,23 @@ object EventHubsConf extends Logging {
 
   private def write[T <: AnyRef](value: T): String = {
     Serialization.write[T](value)
+  }
+
+  /**
+   * This method removes all parameters that aren't needed by Spark executors.
+   *
+   * @param ehConf the [[EventHubsConf]] that will be trimmed
+   * @return trimmed [[EventHubsConf]]
+   */
+  private[spark] def trim(ehConf: EventHubsConf): EventHubsConf = {
+    ehConf
+      .remove("eventhubs.startingPosition")
+      .remove("eventhubs.startingPositions")
+      .remove("eventhubs.endingPosition")
+      .remove("eventhubs.endingPositions")
+      .remove("eventhubs.maxRatePerPartition")
+      .remove("eventhubs.maxRatesPerPartition")
+      .remove("maxEventsPerTrigger")
   }
 
   // Option key values

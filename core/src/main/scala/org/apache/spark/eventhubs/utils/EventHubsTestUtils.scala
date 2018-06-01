@@ -47,11 +47,7 @@ private[spark] class EventHubsTestUtils {
 
   import EventHubsTestUtils._
 
-  def send(ehName: String, data: Seq[Int]): Seq[Int] = {
-    eventHubs(ehName).send(data)
-  }
-
-  def send(ehName: String, partitionId: PartitionId, data: Seq[Int]): Seq[Int] = {
+  def send(ehName: String, partitionId: Option[PartitionId] = None, data: Seq[Int]): Seq[Int] = {
     eventHubs(ehName).send(partitionId, data)
   }
 
@@ -105,7 +101,7 @@ private[spark] class EventHubsTestUtils {
   def populateUniformly(ehName: String, count: Int): Unit = {
     val eventHub = eventHubs(ehName)
     for (i <- 0 until eventHub.partitionCount) {
-      eventHub.send(i, 0 until count)
+      eventHub.send(Some(i), 0 until count)
     }
   }
 }
@@ -165,32 +161,31 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     (for { _ <- 0 until eventCount } yield partitions(partitionId).get(seqNo)).asJava
   }
 
-  def send(events: Seq[Int]): Seq[Int] = {
-    for (event <- events) {
-      synchronized {
-        val part = count % this.partitionCount
-        count += 1
-        this.send(part, Seq(event))
+  private[utils] def send(partitionId: Option[PartitionId], events: Seq[Int]): Seq[Int] = {
+    if (partitionId.isDefined) {
+      partitions(partitionId.get).send(events)
+    } else {
+      for (event <- events) {
+        synchronized {
+          val part = count % this.partitionCount
+          count += 1
+          this.send(Some(part), Seq(event))
+        }
       }
     }
     events
   }
 
-  def send(partitionId: PartitionId, events: Seq[Int]): Seq[Int] = {
-    partitions(partitionId).send(events)
-    events
-  }
-
-  def send(event: EventData): Unit = {
-    synchronized {
-      val part = count % this.partitionCount
-      count += 1
-      this.send(part, event)
+  private[utils] def send(partitionId: Option[PartitionId], event: EventData): Unit = {
+    if (partitionId.isDefined) {
+      synchronized(partitions(partitionId.get).send(event))
+    } else {
+      synchronized {
+        val part = count % this.partitionCount
+        count += 1
+        this.send(Some(part), event)
+      }
     }
-  }
-
-  def send(partitionId: PartitionId, event: EventData): Unit = {
-    synchronized(partitions(partitionId).send(event))
   }
 
   def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
@@ -221,7 +216,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   }
 
   /** Specifies the contents of each partition. */
-  private[spark] class SimulatedEventHubsPartition {
+  private[utils] class SimulatedEventHubsPartition {
     import com.microsoft.azure.eventhubs.impl.AmqpConstants._
 
     private var data: Seq[EventData] = Seq.empty
@@ -232,7 +227,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     private val constructor = classOf[EventDataImpl].getDeclaredConstructor(classOf[Message])
     constructor.setAccessible(true)
 
-    private[spark] def send(events: Seq[Int]): Unit = {
+    private[utils] def send(events: Seq[Int]): Unit = {
       synchronized {
         for (event <- events) {
           val seqNo = data.size.toLong.asInstanceOf[AnyRef]
@@ -256,19 +251,19 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       }
     }
 
-    private[spark] def send(event: EventData): Unit = {
+    private[utils] def send(event: EventData): Unit = {
       // Need to add a Seq No to the EventData to properly simulate the service.
       val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong)
       synchronized(data = data :+ e)
     }
 
-    private[spark] def size = synchronized(data.size)
+    private[utils] def size = synchronized(data.size)
 
-    private[spark] def get(index: SequenceNumber): EventData = {
+    private[utils] def get(index: SequenceNumber): EventData = {
       data(index.toInt)
     }
 
-    private[spark] def earliestSeqNo: SequenceNumber = {
+    private[utils] def earliestSeqNo: SequenceNumber = {
       if (data.isEmpty) {
         0L
       } else {
@@ -276,7 +271,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       }
     }
 
-    private[spark] def latestSeqNo: SequenceNumber = {
+    private[utils] def latestSeqNo: SequenceNumber = {
       if (data.isEmpty) {
         0L
       } else {
@@ -303,12 +298,10 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   override def send(event: EventData,
                     partition: Option[Int] = None,
                     partitionKey: Option[String] = None): Unit = {
-    if (partition.isDefined) {
-      eventHub.send(partition.get, event)
-    } else if (partitionKey.isDefined) {
+    if (partitionKey.isDefined) {
       throw new UnsupportedOperationException
     } else {
-      eventHub.send(event)
+      eventHub.send(partition, event)
     }
   }
 

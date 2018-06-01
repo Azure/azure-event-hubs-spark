@@ -67,9 +67,9 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
   test("default earliest to latest events") {
     val eh = newEventHub()
     testUtils.createEventHubs(eh, partitionCount = 3)
-    testUtils.send(eh, 0, 0 to 9)
-    testUtils.send(eh, 1, 10 to 19)
-    testUtils.send(eh, 2, 20 to 29)
+    testUtils.send(eh, partitionId = Some(0), data = 0 to 9)
+    testUtils.send(eh, partitionId = Some(1), data = 10 to 19)
+    testUtils.send(eh, partitionId = Some(2), data = 20 to 29)
 
     val ehConf = getEventHubsConf(eh)
       .setStartingPositions(Map.empty)
@@ -82,9 +82,9 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
   test("explicit earliest to latest events") {
     val eh = newEventHub()
     testUtils.createEventHubs(eh, partitionCount = 3)
-    testUtils.send(eh, 0, 0 to 9)
-    testUtils.send(eh, 1, 10 to 19)
-    testUtils.send(eh, 2, 20 to 29)
+    testUtils.send(eh, partitionId = Some(0), data = 0 to 9)
+    testUtils.send(eh, partitionId = Some(1), data = 10 to 19)
+    testUtils.send(eh, partitionId = Some(2), data = 20 to 29)
 
     val start = createPositions(0L, eh, partitionCount = 3)
     val end = createPositions(10L, eh, partitionCount = 3)
@@ -100,7 +100,7 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
   test("reuse same dataframe in query") {
     val eh = newEventHub()
     testUtils.createEventHubs(eh, partitionCount = 1)
-    testUtils.send(eh, 0, 0 to 10)
+    testUtils.send(eh, partitionId = Some(0), data = 0 to 10)
 
     val ehConf = getEventHubsConf(eh)
       .setStartingPositions(Map.empty)

@@ -14,6 +14,7 @@ Structured Streaming integration for Azure Event Hubs to read data from Event Hu
   * [Creating an EventHubs Sink for Streaming Queries](#creating-an-eventhubs-sink-for-streaming-queries)
   * [Writing the output of Batch Queries to EventHubs](#writing-the-output-of-batch-queries-to-eventhubs)
 * [Managing Throughput](#managing-throughput)
+* [Serialization of Event Data Properties](#serialization-of-event-data-properties)
 * [Deploying](#deploying)
 
 ## Linking

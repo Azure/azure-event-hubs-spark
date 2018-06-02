@@ -12,6 +12,7 @@
   * [Creating an Event Hubs Sink for Streaming Queries](#creating-an-eventhubs-sink-for-streaming-queries)
   * [Writing the output of Batch Queries to Event Hubs](#writing-the-output-of-batch-queries-to-event-hubs)
 * [Managing Throughput](#managing-throughput)
+* [Serialization of Event Data Properties](#serialization-of-event-data-properties)
 * [Deploying](#deploying)
 
 ## Linking

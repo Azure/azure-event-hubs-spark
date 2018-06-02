@@ -35,11 +35,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
     super.beforeAll()
     testUtils = new EventHubsTestUtils
     val eventHub = testUtils.createEventHubs(DefaultName, DefaultPartitionCount)
-
-    // Send events to simulated EventHubs
-    for (i <- 0 until DefaultPartitionCount) {
-      eventHub.send(i, 0 until 5000)
-    }
+    testUtils.populateUniformly(eventHub.name, 5000)
 
     sc = new SparkContext(sparkConf)
   }

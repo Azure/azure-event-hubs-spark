@@ -21,6 +21,17 @@ import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWrit
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.apache.qpid.proton.amqp.{
+  Binary,
+  Decimal128,
+  Decimal32,
+  Decimal64,
+  Symbol,
+  UnsignedByte,
+  UnsignedInteger,
+  UnsignedLong,
+  UnsignedShort
+}
 import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.sql.Dataset
@@ -30,12 +41,16 @@ import org.apache.spark.sql.streaming.util.StreamManualClock
 import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
+import org.json4s.NoTypeHints
+import org.json4s.jackson.Serialization
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
 abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
 
   protected var testUtils: EventHubsTestUtils = _
+
+  implicit val formats = Serialization.formats(NoTypeHints)
 
   override def beforeAll: Unit = {
     super.beforeAll
@@ -83,7 +98,7 @@ abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
       }
 
       val ehSource = sources.head
-      testUtils.send(conf.name, data)
+      testUtils.send(conf.name, data = data)
 
       val seqNos = testUtils.getLatestSeqNos(conf)
       require(seqNos.size == testUtils.getEventHubs(conf.name).partitionCount)
@@ -251,9 +266,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val name = newEventHubs()
     val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)
 
-    testUtils.send(name, 0, 100 to 200)
-    testUtils.send(name, 1, 10 to 20)
-    testUtils.send(name, 2, Seq(1))
+    testUtils.send(name, partitionId = Some(0), data = 100 to 200)
+    testUtils.send(name, partitionId = Some(1), data = 10 to 20)
+    testUtils.send(name, partitionId = Some(2), data = Seq(1))
     // partition 3 of 3 remains empty.
 
     val parameters =
@@ -352,7 +367,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   private def testFromLatestSeqNos(eh: String): Unit = {
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
-    testUtils.send(eh, 0, Seq(-1))
+    testUtils.send(eh, partitionId = Some(0), Seq(-1))
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
@@ -401,7 +416,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
-    testUtils.send(eh, 1 to 3) // round robin events across partitions
+    testUtils.send(eh, data = 1 to 3) // round robin events across partitions
 
     val conf = getEventHubsConf(eh)
 
@@ -449,15 +464,15 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .setStartingPositions(positions)
 
     // partition 0 starts at the earliest sequence numbers, these should all be seen
-    testUtils.send(eh, 0, Seq(-20, -21, -22))
+    testUtils.send(eh, partitionId = Some(0), Seq(-20, -21, -22))
     // partition 1 starts at the latest sequence numbers, these should all be skipped
-    testUtils.send(eh, 1, Seq(-10, -11, -12))
+    testUtils.send(eh, partitionId = Some(1), Seq(-10, -11, -12))
     // partition 2 starts at 0, these should all be seen
-    testUtils.send(eh, 2, Seq(0, 1, 2))
+    testUtils.send(eh, partitionId = Some(2), Seq(0, 1, 2))
     // partition 3 starts at 1, first should be skipped
-    testUtils.send(eh, 3, Seq(10, 11, 12))
+    testUtils.send(eh, partitionId = Some(3), Seq(10, 11, 12))
     // partition 4 starts at 2, first and second should be skipped
-    testUtils.send(eh, 4, Seq(20, 21, 22))
+    testUtils.send(eh, partitionId = Some(4), Seq(20, 21, 22))
 
     val reader = spark.readStream
       .format("eventhubs")
@@ -482,11 +497,97 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
+  test("with application properties") {
+    val properties: Option[Map[String, Object]] = Some(
+      Map(
+        "A" -> "Hello, world.",
+        "B" -> Map.empty,
+        "C" -> "432".getBytes,
+        "D" -> null,
+        "E" -> Boolean.box(true),
+        "F" -> Int.box(1),
+        "G" -> Long.box(1L),
+        "H" -> Char.box('a'),
+        "I" -> new Binary("1".getBytes),
+        "J" -> Symbol.getSymbol("x-opt-partition-key"),
+        "K" -> new Decimal128(Array[Byte](0, 1, 2, 3, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0)),
+        "L" -> new Decimal32(12),
+        "M" -> new Decimal64(13),
+        "N" -> new UnsignedByte(1.toByte),
+        "O" -> new UnsignedLong(987654321L),
+        "P" -> new UnsignedShort(Short.box(1))
+      ))
+
+    // The expected serializes to:
+    //     [Map(E -> true, N -> "1", J -> "x-opt-partition-key", F -> 1, A -> "Hello, world.",
+    //     M -> 13, I -> [49], G -> 1, L -> 12, B -> {}, P -> "1", C -> [52,51,50], H -> "a",
+    //     K -> [0,1,2,3,0,0,0,0,0,1,2,3,0,0,0,0], O -> "987654321", D -> null)]
+    val expected = properties.get
+      .mapValues {
+        case b: Binary =>
+          val buf = b.asByteBuffer()
+          val arr = new Array[Byte](buf.remaining)
+          buf.get(arr)
+          arr.asInstanceOf[AnyRef]
+        case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
+        case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
+        case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
+        case s: Symbol           => s.toString.asInstanceOf[AnyRef]
+        case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
+        case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
+        case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
+        case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
+        case c: Character        => c.toString.asInstanceOf[AnyRef]
+        case default             => default
+      }
+      .map { p =>
+        p._1 -> Serialization.write(p._2)
+      }
+
+    val eventHub = testUtils.createEventHubs(newEventHubs(), partitionCount = 1)
+    testUtils.populateUniformly(eventHub.name, 5000, properties)
+
+    val parameters =
+      getEventHubsConf(eventHub.name)
+        .setMaxEventsPerTrigger(1)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("properties")
+      .as[Map[String, String]]
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(eventhubs)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // we'll get one event per partition per trigger
+      CheckAnswer(expected)
+    )
+  }
+
   test("input row metrics") {
     val eh = newEventHubs()
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
 
-    testUtils.send(eh, Seq(-1))
+    testUtils.send(eh, data = Seq(-1))
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
     val positions = Map(
@@ -531,7 +632,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 
-    testUtils.send(eh, Seq(1))
+    testUtils.send(eh, data = Seq(1))
 
     val eventhubs = spark.readStream
       .format("eventhubs")
@@ -558,6 +659,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     // producer. So here we just use a low bound to make sure the internal conversion works.
     assert(row.getAs[java.sql.Timestamp]("enqueuedTime").getTime >= now,
            s"Unexpected results: $row")
+    assert(row.getAs[Map[String, String]]("properties") === Map(), s"Unexpected results: $row")
     query.stop()
   }
 
@@ -572,7 +674,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 1)
 
-    testUtils.send(eh, Seq(1))
+    testUtils.send(eh, data = Seq(1))
 
     val eventhubs = spark.readStream
       .format("eventhubs")

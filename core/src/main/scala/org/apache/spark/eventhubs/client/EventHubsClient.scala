@@ -221,10 +221,12 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
             receiver.setReceiveTimeout(Duration.ofSeconds(5))
             val events = receiver.receiveSync(1) // get the first event that was received.
             if (events == null || !events.iterator.hasNext) {
-              logWarning("translate: failed to receive event.")
-              // No events to receive can happen in 2 cases:
-              //   1. Receive from EndOfStream and no new events arrive
-              //   2. Receive from an empty partition
+              logWarning(
+                "translate: failed to translate event. There are three cases in which we fail" +
+                  "to translate events: 1) We are receiving from the EndOfStream and no new " +
+                  "events are being sent, 2) The partition is empty, or 3) The user passed" +
+                  "an invalid offset. In any case, when a failure occurs, we will start from" +
+                  "the end of the stream (e.g. the latest events in your partition). ")
               val (earliest, latest) = boundedSeqNos(partitionId)
               if (earliest >= latest) {
                 result.put(partitionId, earliest)

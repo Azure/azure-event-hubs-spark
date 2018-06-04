@@ -19,13 +19,37 @@ package org.apache.spark.eventhubs.rdd
 
 import org.apache.spark.eventhubs.NameAndPartition
 import org.apache.spark.eventhubs._
+import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
 
 import scala.language.implicitConversions
 
+/**
+ * Represents any object that has a collection of [[OffsetRange]]s.
+ * This can be used to access the offset ranges in RDDs generated
+ * by the [[EventHubsDirectDStream]].
+ *
+ * {{{
+ *   EventHubsUtils.createDirectStream(...).foreachRDD { rdd =>
+ *      val offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
+ *      ...
+ *   }
+ * }}}
+ */
 trait HasOffsetRanges {
   def offsetRanges: Array[OffsetRange]
 }
 
+/**
+ * Represents a sequence number range for a single partition. The range
+ * generally corresponds to an inclusive starting point and exclusive
+ * ending point for a single partition within an [[EventHubsRDD]].
+ *
+ * @param nameAndPartition the Event Hub name and Event Hub partition
+ *                         associated with this offset range
+ * @param fromSeqNo an inclusive starting sequence number
+ * @param untilSeqNo an exclusive ending sequence number
+ * @param preferredLoc the preferred executor for this partition
+ */
 final class OffsetRange(val nameAndPartition: NameAndPartition,
                         val fromSeqNo: SequenceNumber,
                         val untilSeqNo: SequenceNumber,
@@ -58,6 +82,9 @@ final class OffsetRange(val nameAndPartition: NameAndPartition,
     s"OffsetRange(partition: ${nameAndPartition.partitionId} | fromSeqNo: $fromSeqNo | untilSeqNo: $untilSeqNo)"
 }
 
+/**
+ * Companion object that allows the creation of [[OffsetRange]]s.
+ */
 object OffsetRange {
   type OffsetRangeTuple = (NameAndPartition, SequenceNumber, SequenceNumber, Option[String])
 

@@ -67,7 +67,7 @@ private[spark] trait Client extends Serializable {
    * instance for the given partition.
    *
    * @param partition the partition that will be queried
-   * @return the leatest sequence number for the specified partition
+   * @return the latest sequence number for the specified partition
    */
   def latestSeqNo(partition: PartitionId): SequenceNumber
 
@@ -103,7 +103,7 @@ private[spark] trait Client extends Serializable {
   def partitionCount: Int
 
   /**
-   * Closes the EventHubs client.
+   * Cleans up all open connections and AMQP links.
    */
   def close(): Unit
 }

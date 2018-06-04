@@ -32,7 +32,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.{ Failure, Success, Try }
 
 /**
- * Wraps a raw EventHubReceiver to make it easier for unit tests
+ * A [[Client]] which connects to an event hub instance. All interaction
+ * between Spark and Event Hubs will happen within this client.
  */
 @SerialVersionUID(1L)
 private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
@@ -54,17 +55,18 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     _client
   }
 
+  // TODO support multiple partitions senders
   private var partitionSender: PartitionSender = _
-  override def createPartitionSender(partitionId: Int): Unit = {
-    val id = partitionId.toString
+  override def createPartitionSender(partition: Int): Unit = {
+    val id = partition.toString
     if (partitionSender == null) {
-      logInfo(s"Creating partition sender for $partitionId for EventHub ${client.getEventHubName}")
+      logInfo(s"Creating partition sender for $partition for EventHub ${client.getEventHubName}")
       partitionSender = client.createPartitionSenderSync(id)
     } else if (partitionSender.getPartitionId != id) {
       logInfo(
         s"Closing partition sender for ${partitionSender.getPartitionId} for EventHub ${client.getEventHubName}")
       partitionSender.closeSync()
-      logInfo(s"Creating partition sender for $partitionId for EventHub ${client.getEventHubName}")
+      logInfo(s"Creating partition sender for $partition for EventHub ${client.getEventHubName}")
       partitionSender = client.createPartitionSenderSync(id)
     }
   }
@@ -100,13 +102,15 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   }
 
   /**
-   * return the start seq number of each partition
+   * Provides the earliest (lowest) sequence number that exists in the
+   * EventHubs instance for the given partition.
    *
-   * @return a map from eventhubName-partition to seq
+   * @param partition the partition that will be queried
+   * @return the earliest sequence number for the specified partition
    */
-  override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
+  override def earliestSeqNo(partition: PartitionId): SequenceNumber = {
     try {
-      val runtimeInformation = getRunTimeInfo(partitionId)
+      val runtimeInformation = getRunTimeInfo(partition)
       val seqNo = runtimeInformation.getBeginSequenceNumber
       if (seqNo == -1L) 0L else seqNo
     } catch {
@@ -115,22 +119,31 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   }
 
   /**
-   * Returns the end point of each partition
+   * Provides the latest (highest) sequence number that exists in the EventHubs
+   * instance for the given partition.
    *
-   * @return a map from eventhubName-partition to (offset, seq)
+   * @param partition the partition that will be queried
+   * @return the latest sequence number for the specified partition
    */
-  override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
+  override def latestSeqNo(partition: PartitionId): SequenceNumber = {
     try {
-      val runtimeInfo = getRunTimeInfo(partitionId)
+      val runtimeInfo = getRunTimeInfo(partition)
       runtimeInfo.getLastEnqueuedSequenceNumber + 1
     } catch {
       case e: Exception => throw e
     }
   }
 
-  override def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber) = {
+  /**
+   * Provides the earliest and the latest sequence numbers in the provided
+   * partition.
+   *
+   * @param partition the partition that will be queried
+   * @return the earliest and latest sequence numbers for the specified partition.
+   */
+  override def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber) = {
     try {
-      val runtimeInfo = getRunTimeInfo(partitionId)
+      val runtimeInfo = getRunTimeInfo(partition)
       val earliest =
         if (runtimeInfo.getBeginSequenceNumber == -1L) 0L else runtimeInfo.getBeginSequenceNumber
       val latest = runtimeInfo.getLastEnqueuedSequenceNumber + 1
@@ -140,25 +153,27 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
   }
 
-  private var _partitionCount = -1
-
   /**
    * The number of partitions in the EventHubs instance.
    *
    * @return partition count
    */
-  override def partitionCount: Int = {
-    if (_partitionCount == -1) {
-      try {
-        val runtimeInfo = client.getRuntimeInformation.get
-        _partitionCount = runtimeInfo.getPartitionCount
-      } catch {
-        case e: Exception => throw e
-      }
+  override lazy val partitionCount: Int = {
+    try {
+      val runtimeInfo = client.getRuntimeInformation.get
+      runtimeInfo.getPartitionCount
+    } catch {
+      case e: Exception => throw e
     }
-    _partitionCount
   }
 
+  /**
+   * Cleans up all open connections and links.
+   *
+   * The [[EventHubClient]] is returned to the [[ClientConnectionPool]].
+   *
+   * [[PartitionSender]] is closed.
+   */
   override def close(): Unit = {
     logInfo("close: Closing EventHubsClient.")
     if (partitionSender != null) {
@@ -172,7 +187,17 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   }
 
   /**
-   * Convert any starting positions to the corresponding sequence number.
+   * Translates all [[EventPosition]]s provided in the [[EventHubsConf]] to
+   * sequence numbers. Sequence numbers are zero-based indices. The 5th event
+   * in an Event Hubs partition will have a sequence number of 4.
+   *
+   * This allows us to exclusively use sequence numbers to generate and manage
+   * batches within Spark (rather than coding for many different filter types).
+   *
+   * @param ehConf the [[EventHubsConf]] containing starting (or ending positions)
+   * @param partitionCount the number of partitions in the Event Hub instance
+   * @param useStart translates starting positions when true and ending positions
+   *                 when false
    */
   override def translate[T](ehConf: EventHubsConf,
                             partitionCount: Int,
@@ -273,11 +298,21 @@ private[spark] object EventHubsClient {
   private[spark] def apply(ehConf: EventHubsConf): EventHubsClient =
     new EventHubsClient(ehConf)
 
+  /**
+   * @return the currently set user agent
+   */
   def userAgent: String = {
     EventHubClientImpl.USER_AGENT
   }
 
-  def userAgent_=(str: String) {
-    EventHubClientImpl.USER_AGENT = str
+  /**
+   * A user agent is set whenever the connector is initialized.
+   * In the case of the connector, the user agent is the Spark
+   * version in use.
+   *
+   * @param user_agent the user agent
+   */
+  def userAgent_=(user_agent: String) {
+    EventHubClientImpl.USER_AGENT = user_agent
   }
 }

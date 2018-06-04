@@ -55,7 +55,7 @@ final class OffsetRange(val nameAndPartition: NameAndPartition,
   def toTuple: OffsetRangeTuple = (nameAndPartition, fromSeqNo, untilSeqNo, preferredLoc)
 
   override def toString =
-    s"OffsetRange(partitionId: ${nameAndPartition.partitionId} | fromSeqNo: $fromSeqNo | untilSeqNo: $untilSeqNo)"
+    s"OffsetRange(partition: ${nameAndPartition.partitionId} | fromSeqNo: $fromSeqNo | untilSeqNo: $untilSeqNo)"
 }
 
 object OffsetRange {

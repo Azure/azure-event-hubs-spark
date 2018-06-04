@@ -30,12 +30,12 @@ private[spark] trait Client extends Serializable {
 
   /**
    * Creates a [[PartitionSender]] which sends directly to the specified
-   * partitionId.
+   * partition.
    *
-   * @param partitionId the partition that will receive all events sent
+   * @param partition the partition that will receive all events sent
    *                    from this partition sender.
    */
-  def createPartitionSender(partitionId: Int)
+  def createPartitionSender(partition: Int)
 
   /**
    * Sends an [[EventData]] to your Event Hub. If a partition is provided,
@@ -45,7 +45,7 @@ private[spark] trait Client extends Serializable {
    * @param event the event that is being sent.
    * @param partition the partition that will receive all events being sent.
    * @param partitionKey the partitionKey will be hash'ed to determine the
-   *                     partitionId to send the events to. On the Received
+   *                     partition to send the events to. On the Received
    *                     message this can be accessed at
    *                     [[EventData.SystemProperties#getPartitionKey()]]
    */
@@ -57,25 +57,28 @@ private[spark] trait Client extends Serializable {
    * Provides the earliest (lowest) sequence number that exists in the
    * EventHubs instance for the given partition.
    *
+   * @param partition the partition that will be queried
    * @return the earliest sequence number for the specified partition
    */
-  def earliestSeqNo(partitionId: PartitionId): SequenceNumber
+  def earliestSeqNo(partition: PartitionId): SequenceNumber
 
   /**
    * Provides the latest (highest) sequence number that exists in the EventHubs
    * instance for the given partition.
    *
+   * @param partition the partition that will be queried
    * @return the leatest sequence number for the specified partition
    */
-  def latestSeqNo(partitionId: PartitionId): SequenceNumber
+  def latestSeqNo(partition: PartitionId): SequenceNumber
 
   /**
    * Provides the earliest and the latest sequence numbers in the provided
    * partition.
    *
+   * @param partition the partition that will be queried
    * @return the earliest and latest sequence numbers for the specified partition.
    */
-  def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber)
+  def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber)
 
   /**
    * Translates all [[EventPosition]]s provided in the [[EventHubsConf]] to
@@ -84,6 +87,11 @@ private[spark] trait Client extends Serializable {
    *
    * This allows us to exclusively use sequence numbers to generate and manage
    * batches within Spark (rather than coding for many different filter types).
+   *
+   * @param ehConf the [[EventHubsConf]] containing starting (or ending positions)
+   * @param partitionCount the number of partitions in the Event Hub instance
+   * @param useStart translates starting positions when true and ending positions
+   *                 when false
    */
   def translate[T](ehConf: EventHubsConf,
                    partitionCount: Int,

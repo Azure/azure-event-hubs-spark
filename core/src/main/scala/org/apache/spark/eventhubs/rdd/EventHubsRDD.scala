@@ -84,7 +84,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
   private def errBeginAfterEnd(part: EventHubsRDDPartition): String =
     s"The beginning sequence number ${part.fromSeqNo} is larger than thet ending sequence number ${part.untilSeqNo}" +
-      s"for EventHubs ${part.name} on partitionId ${part.partitionId}."
+      s"for EventHubs ${part.name} on partition ${part.partitionId}."
 
   override def compute(partition: Partition, context: TaskContext): Iterator[EventData] = {
     val part = partition.asInstanceOf[EventHubsRDDPartition]
@@ -110,7 +110,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     }
 
     logInfo(
-      s"Computing EventHubs ${part.name}, partitionId ${part.partitionId} " +
+      s"Computing EventHubs ${part.name}, partition ${part.partitionId} " +
         s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
 
     var requestSeqNo: SequenceNumber = part.fromSeqNo

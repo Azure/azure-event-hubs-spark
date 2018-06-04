@@ -34,7 +34,7 @@ private[eventhubs] object EventHubsWriter extends Logging {
 
   val BodyAttributeName = "body"
   val PartitionKeyAttributeName = "partitionKey"
-  val PartitionIdAttributeName = "partitionId"
+  val PartitionIdAttributeName = "partition"
 
   override def toString: String = "EventHubsWriter"
 

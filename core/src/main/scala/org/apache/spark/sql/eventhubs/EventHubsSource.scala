@@ -138,7 +138,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     initialPartitionSeqNos
 
     // This contains an array of the following elements:
-    // (partitionId, (earliestSeqNo, latestSeqNo)
+    // (partition, (earliestSeqNo, latestSeqNo)
     val earliestAndLatest = for {
       p <- 0 until partitionCount
       n = ehName

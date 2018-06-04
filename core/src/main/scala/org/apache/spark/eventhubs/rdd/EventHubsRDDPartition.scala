@@ -34,6 +34,6 @@ private class EventHubsRDDPartition(val index: Int,
   /** The EventHubs name corresponding to this RDD Partition */
   def name: String = nameAndPartition.ehName
 
-  /** The EventHubs partitionId corresponding to this RDD Partition */
+  /** The EventHubs partition corresponding to this RDD Partition */
   def partitionId: PartitionId = nameAndPartition.partitionId
 }

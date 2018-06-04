@@ -17,37 +17,45 @@
 
 package org.apache.spark.eventhubs.client
 
-import com.microsoft.azure.eventhubs.EventData
+import com.microsoft.azure.eventhubs.{ EventData, PartitionSender }
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs._
 
+/**
+ * In order to deliver Event Hubs data in Spark, we must collect various
+ * data and metadata from the Event Hubs service. [[Client]] contains
+ * all client operations done between Spark and the Event Hubs service.
+ */
 private[spark] trait Client extends Serializable {
 
   /**
-   * Creates a sender which sends directly to the specified partitionId.
+   * Creates a [[PartitionSender]] which sends directly to the specified
+   * partitionId.
    *
-   * @param partitionId the partition that will receive all events sent from this partition sender.
+   * @param partitionId the partition that will receive all events sent
+   *                    from this partition sender.
    */
   def createPartitionSender(partitionId: Int)
 
   /**
-   * Sends an [[EventData]] to your Event Hub. If a partition is provided, the event
-   * will be sent directly to that partition. If a partition key is provided, it will be
-   * used to determine the target partition.
+   * Sends an [[EventData]] to your Event Hub. If a partition is provided,
+   * the event will be sent directly to that partition. If a partition
+   * key is provided, it will be used to determine the target partition.
    *
    * @param event the event that is being sent.
    * @param partition the partition that will receive all events being sent.
-   * @param partitionKey the partitionKey will be hash'ed to determine the partitionId
-   *                     to send the events to. On the Received message this can be accessed
-   *                     at [[EventData.SystemProperties#getPartitionKey()]]
+   * @param partitionKey the partitionKey will be hash'ed to determine the
+   *                     partitionId to send the events to. On the Received
+   *                     message this can be accessed at
+   *                     [[EventData.SystemProperties#getPartitionKey()]]
    */
   def send(event: EventData,
            partition: Option[Int] = None,
            partitionKey: Option[String] = None): Unit
 
   /**
-   * Provides the earliest (lowest) sequence number that exists in the EventHubs instance
-   * for the given partition.
+   * Provides the earliest (lowest) sequence number that exists in the
+   * EventHubs instance for the given partition.
    *
    * @return the earliest sequence number for the specified partition
    */
@@ -62,16 +70,20 @@ private[spark] trait Client extends Serializable {
   def latestSeqNo(partitionId: PartitionId): SequenceNumber
 
   /**
-   * Provides the earliest and the latest sequence numbers in the provided partition.
+   * Provides the earliest and the latest sequence numbers in the provided
+   * partition.
    *
    * @return the earliest and latest sequence numbers for the specified partition.
    */
   def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber)
 
   /**
-   * Translates any starting point provided by a user to the specific offset and sequence number
-   * that we need to start from. This ensure that within Spark, we're only dealing with offsets
-   * and sequence numbers.
+   * Translates all [[EventPosition]]s provided in the [[EventHubsConf]] to
+   * sequence numbers. Sequence numbers are zero-based indices. The 5th event
+   * in an Event Hubs partition will have a sequence number of 4.
+   *
+   * This allows us to exclusively use sequence numbers to generate and manage
+   * batches within Spark (rather than coding for many different filter types).
    */
   def translate[T](ehConf: EventHubsConf,
                    partitionCount: Int,

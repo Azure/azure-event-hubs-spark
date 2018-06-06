@@ -58,6 +58,9 @@ case class EventPosition private (offset: String = null,
   }
 }
 
+/**
+ * Companion object to help create [[EventPosition]] instances.
+ */
 object EventPosition {
   private val StartOfStream: String = "-1"
   private val EndOfStream: String = "@latest"
@@ -95,8 +98,8 @@ object EventPosition {
   }
 
   /**
-   * Returns the position for the start of a stream. Provide this position to your [[EventHubsConf]] to start
-   * receiving from the first available event in the partition.
+   * Returns the position for the start of a stream. Provide this position to your
+   * [[EventHubsConf]] to start receiving from the first available event in the partition.
    *
    * @return An [[EventPosition]] instance.
    */
@@ -105,8 +108,9 @@ object EventPosition {
   }
 
   /**
-   * Returns the position for the end of a stream. Provide this position to your [[EventHubsConf]] to start
-   * receiving from the next available event in the partition after the receiver is created.
+   * Returns the position for the end of a stream. Provide this position to your
+   * [[EventHubsConf]] to start receiving from the next available event in the
+   * partition after the receiver is created.
    *
    * @return An [[EventPosition]] instance.
    */

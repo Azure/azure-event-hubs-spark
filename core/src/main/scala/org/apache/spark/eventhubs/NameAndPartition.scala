@@ -19,6 +19,12 @@ package org.apache.spark.eventhubs
 
 import org.json4s.jackson.Serialization
 
+/**
+ * A Event Hub name and partition id
+ *
+ * @param ehName an Event Hub name
+ * @param partitionId a partition id
+ */
 case class NameAndPartition(ehName: String, partitionId: Int) extends Serializable { self =>
 
   override def equals(obj: scala.Any): Boolean = obj match {
@@ -39,6 +45,9 @@ case class NameAndPartition(ehName: String, partitionId: Int) extends Serializab
   def toTuple: (String, Int) = (ehName, partitionId)
 }
 
+/**
+ * A companion object to help make [[NameAndPartition]] instances.
+ */
 object NameAndPartition {
   def fromString(str: String): NameAndPartition = {
     Serialization.read[NameAndPartition](str)

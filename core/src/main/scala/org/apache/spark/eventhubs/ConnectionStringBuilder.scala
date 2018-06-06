@@ -382,6 +382,9 @@ class ConnectionStringBuilder private () {
 
 }
 
+/**
+ * Companion object to help create [[ConnectionStringBuilder]] instances.
+ */
 object ConnectionStringBuilder {
   private val DefaultProtocol = "sb://"
   private val DefaultDomainName = "servicebus.windows.net"

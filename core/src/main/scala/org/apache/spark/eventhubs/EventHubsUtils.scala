@@ -26,6 +26,9 @@ import org.apache.spark.SparkContext
 import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
 import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
 
+/**
+ * Helper to create Direct DStreams which consume events from Event Hubs.
+ */
 object EventHubsUtils {
 
   /**

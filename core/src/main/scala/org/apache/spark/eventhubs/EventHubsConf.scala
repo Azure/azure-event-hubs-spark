@@ -405,10 +405,12 @@ object EventHubsConf extends Logging {
                       "eventhubs.consumerGroup",
                       "eventhubs.receiverTimeout",
                       "eventhubs.operationTimeout",
-                      "useSimulatedClient")
+                      "useSimulatedClient").map(s => s.toLowerCase)
 
-    ehConf.settings.asScala.filter(tuple => include.contains(tuple._1))
-    ehConf
+    val filtered = ehConf.settings.asScala.filter(k => include.contains(k._1))
+    val newConf = EventHubsConf(ehConf.connectionString)
+    for ((k, v) <- filtered) { newConf.set(k, v) }
+    newConf
   }
 
   // Option key values

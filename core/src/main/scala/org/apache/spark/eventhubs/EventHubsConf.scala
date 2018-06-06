@@ -372,10 +372,10 @@ final class EventHubsConf private (private val connectionStr: String)
   private[spark] def validate: Boolean = {
     if (ConnectionStringBuilder(self.connectionString).getEventHubName == null) {
       throw new IllegalStateException(
-        "No EntityPath has been set in the Event Hubs " +
-          "connection string. The EntityPath is simply your EventHub name. Your connection" +
-          "string should look like:\n\"Endpoint=sb://SAMPLE;SharedAccessKeyName=KEY_NAME;" +
-          "SharedAccessKey=KEY;EntityPath=EVENTHUB_NAME\"")
+        "No EntityPath has been set in the Event Hubs connection string. The EntityPath " +
+          "is simply your EventHub name. Your connection string should look like:\n" +
+          "\"Endpoint=sb://SAMPLE;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY;" +
+          "EntityPath=EVENTHUB_NAME\"")
     }
     true
   }

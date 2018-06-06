@@ -389,14 +389,15 @@ object EventHubsConf extends Logging {
    * @return trimmed [[EventHubsConf]]
    */
   private[spark] def trim(ehConf: EventHubsConf): EventHubsConf = {
+    // These are the options needed by Spark executors
+    val include = Seq("eventhubs.connectionString",
+                      "eventhubs.consumerGroup",
+                      "eventhubs.receiverTimeout",
+                      "eventhubs.operationTimeout",
+                      "useSimulatedClient")
+
+    ehConf.settings.asScala.filter(tuple => include.contains(tuple._1))
     ehConf
-      .remove("eventhubs.startingPosition")
-      .remove("eventhubs.startingPositions")
-      .remove("eventhubs.endingPosition")
-      .remove("eventhubs.endingPositions")
-      .remove("eventhubs.maxRatePerPartition")
-      .remove("eventhubs.maxRatesPerPartition")
-      .remove("maxEventsPerTrigger")
   }
 
   // Option key values

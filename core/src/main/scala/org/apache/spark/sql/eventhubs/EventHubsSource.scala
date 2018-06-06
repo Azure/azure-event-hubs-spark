@@ -282,7 +282,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       }
     }.toArray
 
-    val rdd = new EventHubsRDD(sc, ehConf, offsetRanges)
+    val rdd = new EventHubsRDD(sc, EventHubsConf.trim(ehConf), offsetRanges)
       .mapPartitionsWithIndex { (p, iter) =>
         {
           iter.map { ed =>

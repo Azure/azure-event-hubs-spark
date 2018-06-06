@@ -57,16 +57,16 @@ private[spark] class EventHubsTestUtils {
    * Sends events to the specified simulated event hub.
    *
    * @param ehName the event hub to send to
-   * @param partitionId the partition id that will receive the data
+   * @param partition the partition id that will receive the data
    * @param data the data being sent
    * @param properties additional application properties
    * @return
    */
   def send(ehName: String,
-           partitionId: Option[PartitionId] = None,
+           partition: Option[PartitionId] = None,
            data: Seq[Int],
            properties: Option[Map[String, Object]] = None): Seq[Int] = {
-    eventHubs(ehName).send(partitionId, data, properties)
+    eventHubs(ehName).send(partition, data, properties)
   }
 
   /**
@@ -141,8 +141,8 @@ private[spark] class EventHubsTestUtils {
       .build
 
     val positions: Map[NameAndPartition, EventPosition] = (for {
-      partitionId <- 0 until partitionCount
-    } yield NameAndPartition(ehName, partitionId) -> EventPosition.fromSequenceNumber(0L)).toMap
+      partition <- 0 until partitionCount
+    } yield NameAndPartition(ehName, partition) -> EventPosition.fromSequenceNumber(0L)).toMap
 
     EventHubsConf(connectionString)
       .setConsumerGroup("consumerGroup")
@@ -232,14 +232,16 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   /**
    * The number of events in a specific partition.
    *
-   * @param partitionId the partition to be queried
+   * @param partition the partition to be queried
    * @return the number of events in the partition
    */
-  def partitionSize(partitionId: PartitionId): Int = {
-    partitions(partitionId).size
+  def partitionSize(partition: PartitionId): Int = {
+    partitions(partition).size
   }
 
   /**
+   * The total number of events across all partitions.
+   *
    * @return the number events in the entire [[SimulatedEventHubs]]
    */
   def totalSize: Int = {
@@ -250,17 +252,35 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     totalSize
   }
 
+  /**
+   * Receive an iterable of [[EventData]].
+   *
+   * @param eventCount the number of events to consume
+   * @param partition the partition the events are consumed from
+   * @param seqNo the starting sequence number in the partition
+   * @return the batch of [[EventData]]
+   */
   def receive(eventCount: Int,
-              partitionId: Int,
+              partition: Int,
               seqNo: SequenceNumber): java.lang.Iterable[EventData] = {
-    (for { _ <- 0 until eventCount } yield partitions(partitionId).get(seqNo)).asJava
+    (for { _ <- 0 until eventCount } yield partitions(partition).get(seqNo)).asJava
   }
 
-  private[utils] def send(partitionId: Option[PartitionId],
+  /**
+   * Send events to a [[SimulatedEventHubs]]. This send API is used
+   * by [[EventHubsTestUtils]] to populate [[SimulatedEventHubs]]
+   * instances.
+   *
+   * @param partition the partition to send events to
+   * @param events the events being sent
+   * @param properties the [[ApplicationProperties]] added to each event
+   * @return the [[EventData]] that was sent to the [[SimulatedEventHubs]]
+   */
+  private[utils] def send(partition: Option[PartitionId],
                           events: Seq[Int],
                           properties: Option[Map[String, Object]]): Seq[Int] = {
-    if (partitionId.isDefined) {
-      partitions(partitionId.get).send(events, properties)
+    if (partition.isDefined) {
+      partitions(partition.get).send(events, properties)
     } else {
       for (event <- events) {
         synchronized {
@@ -273,9 +293,17 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     events
   }
 
-  private[utils] def send(partitionId: Option[PartitionId], event: EventData): Unit = {
-    if (partitionId.isDefined) {
-      synchronized(partitions(partitionId.get).send(event))
+  /**
+   * Send events to a [[SimulatedEventHubs]]. This send API is used in the
+   * [[SimulatedClient]] which needs send capabilities for writing stream
+   * and batch queries in Structured Streaming.
+   *
+   * @param partition the partition to send events to
+   * @param event the event being sent
+   */
+  private[utils] def send(partition: Option[PartitionId], event: EventData): Unit = {
+    if (partition.isDefined) {
+      synchronized(partitions(partition.get).send(event))
     } else {
       synchronized {
         val part = count % this.partitionCount
@@ -285,44 +313,73 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     }
   }
 
-  def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    partitions(partitionId).earliestSeqNo
+  /**
+   * The earliest sequence number in a partition.
+   *
+   * @param partition the partition to be queried
+   * @return the earliest sequence number in the partition
+   */
+  def earliestSeqNo(partition: PartitionId): SequenceNumber = {
+    partitions(partition).earliestSeqNo
   }
 
-  def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    partitions(partitionId).latestSeqNo
+  /**
+   * The latest sequence number in a partition.
+   *
+   * @param partition the partition to be queried
+   * @return the latest sequence number in the partition
+   */
+  def latestSeqNo(partition: PartitionId): SequenceNumber = {
+    partitions(partition).latestSeqNo
   }
 
+  /**
+   * All partitions in the [[SimulatedEventHubs]] instance.
+   *
+   * @return [[SimulatedEventHubsPartition]]s mapped to their partition
+   */
   def getPartitions: Map[PartitionId, SimulatedEventHubsPartition] = {
     partitions
   }
 
   override def toString: String = {
-    print(s"""
+    var str = s"""
       |EventHub Name: $name
       |Partition Count: $partitionCount
-    """.stripMargin)
+    """.stripMargin + "\n"
 
     for (p <- partitions.keySet.toSeq.sorted) {
-      print(s"""
+      str += s"""
         Partition: $p
         ${partitions(p).getEvents.map(_.getBytes.map(_.toChar).mkString)})
-      """)
+      """
+      str += "\n"
     }
-    ""
+    str
   }
 
-  /** Specifies the contents of each partition. */
+  /**
+   * Represents a partition within a [[SimulatedEventHubs]]. Each
+   * partition contains true [[EventData]] objects as they would
+   * exist if they were sent from the service.
+   */
   private[utils] class SimulatedEventHubsPartition {
 
     private var data: Seq[EventData] = Seq.empty
 
+    /**
+     * All the [[EventData]] in the partition.
+     *
+     * @return all events in the partition
+     */
     def getEvents: Seq[EventData] = data
 
-    // This allows us to invoke the EventData(Message) constructor
-    private val constructor = classOf[EventDataImpl].getDeclaredConstructor(classOf[Message])
-    constructor.setAccessible(true)
-
+    /**
+     * Appends sent events to the partition.
+     *
+     * @param events events being sent
+     * @param properties [[ApplicationProperties]] to append to each event
+     */
     private[utils] def send(events: Seq[Int], properties: Option[Map[String, Object]]): Unit = {
       synchronized {
         for (event <- events) {
@@ -333,18 +390,39 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       }
     }
 
+    /**
+     * Appends sent events to the partition.
+     *
+     * @param event event being sent
+     */
     private[utils] def send(event: EventData): Unit = {
       // Need to add a Seq No to the EventData to properly simulate the service.
       val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong, None)
       synchronized(data = data :+ e)
     }
 
+    /**
+     * The number of events in the partition.
+     *
+     * @return the number of event in the partition.
+     */
     private[spark] def size = synchronized(data.size)
 
+    /**
+     * Lookup a specific event in the partition.
+     *
+     * @param index the sequence number to lookup
+     * @return the event
+     */
     private[utils] def get(index: SequenceNumber): EventData = {
       data(index.toInt)
     }
 
+    /**
+     * The earliest sequence number in the partition.
+     *
+     * @return the earliest sequence number
+     */
     private[utils] def earliestSeqNo: SequenceNumber = {
       if (data.isEmpty) {
         0L
@@ -353,6 +431,11 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       }
     }
 
+    /**
+     * The latest sequence number in the partition.
+     *
+     * @return the latest sequence number
+     */
     private[utils] def latestSeqNo: SequenceNumber = {
       if (data.isEmpty) {
         0L
@@ -363,8 +446,15 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   }
 }
 
-/** A simulated EventHubs client. */
-private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { self =>
+/**
+ * A [[Client]] which simulates a connection to the Event Hubs service.
+ * The simulated client receives an [[EventHubsConf]] which contains an
+ * Event Hub name. The Event Hub name is used to look up the
+ * [[SimulatedEventHubs]] the [[SimulatedClient]] should "connect" to.
+ *
+ * @param ehConf the Event Hubs specific options
+ */
+private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends Client { self =>
 
   import EventHubsTestUtils._
 
@@ -373,10 +463,26 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
   private var currentSeqNo: SequenceNumber = _
   private val eventHub = eventHubs(ehConf.name)
 
-  override def createPartitionSender(partitionId: Int): Unit = {
-    sPartitionId = partitionId.toInt
+  /**
+   * Creates a simulated partition sender.
+   *
+   * @param partition the partition that will receive events
+   *                    from send calls.
+   */
+  override def createPartitionSender(partition: Int): Unit = {
+    sPartitionId = partition.toInt
   }
 
+  /**
+   * Send events to a [[SimulatedEventHubs]].
+   *
+   * @param event the event that is being sent.
+   * @param partition the partition that will receive all events being sent.
+   * @param partitionKey the partitionKey will be hash'ed to determine the
+   *                     partition to send the events to. On the Received
+   *                     message this can be accessed at
+   *                     [[EventData.SystemProperties#getPartitionKey()]]
+   */
   override def send(event: EventData,
                     partition: Option[Int] = None,
                     partitionKey: Option[String] = None): Unit = {
@@ -387,25 +493,53 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     }
   }
 
-  override def earliestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    eventHub.earliestSeqNo(partitionId)
+  /**
+   * The earliest sequence number in a partition.
+   *
+   * @param partition the partition being queried
+   * @return the earliest sequence number for the specified partition
+   */
+  override def earliestSeqNo(partition: PartitionId): SequenceNumber = {
+    eventHub.earliestSeqNo(partition)
   }
 
-  override def latestSeqNo(partitionId: PartitionId): SequenceNumber = {
-    eventHub.latestSeqNo(partitionId)
+  /**
+   * The latest sequence number in a partition.
+   *
+   * @param partition the partition being queried
+   * @return the latest sequence number for the specified partition
+   */
+  override def latestSeqNo(partition: PartitionId): SequenceNumber = {
+    eventHub.latestSeqNo(partition)
   }
 
-  override def boundedSeqNos(partitionId: PartitionId): (SequenceNumber, SequenceNumber) = {
-    (earliestSeqNo(partitionId), latestSeqNo(partitionId))
+  /**
+   * A tuple containing the earliest and latest sequence numbers
+   * in a partition.
+   *
+   * @param partition the partition that will be queried
+   * @return the earliest and latest sequence numbers for the specified partition.
+   */
+  override def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber) = {
+    (earliestSeqNo(partition), latestSeqNo(partition))
   }
 
-  override def translate[T](ehConf: EventHubsConf,
-                            partitionCount: Int,
-                            useStarting: Boolean = true): Map[PartitionId, SequenceNumber] = {
+  /**
+   * Translates starting (or ending) positions to sequence numbers.
+   *
+   * @param ehConf the [[EventHubsConf]] containing starting (or ending positions)
+   * @param partitionCount the number of partitions in the Event Hub instance
+   * @param useStart translates starting positions when true and ending positions
+   *                 when false
+   * @return mapping of partitions to starting positions as sequence numbers
+   */
+  override def translate(ehConf: EventHubsConf,
+                         partitionCount: Int,
+                         useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
 
-    val positions = if (useStarting) { ehConf.startingPositions } else { ehConf.endingPositions }
-    val position = if (useStarting) { ehConf.startingPosition } else { ehConf.endingPosition }
-    val apiCall = if (useStarting) { earliestSeqNo _ } else { latestSeqNo _ }
+    val positions = if (useStart) { ehConf.startingPositions } else { ehConf.endingPositions }
+    val position = if (useStart) { ehConf.startingPosition } else { ehConf.endingPosition }
+    val apiCall = if (useStart) { earliestSeqNo _ } else { latestSeqNo _ }
 
     if (positions.isEmpty && position.isEmpty) {
       (for { id <- 0 until eventHub.partitionCount } yield id -> apiCall(id)).toMap
@@ -422,21 +556,44 @@ private[spark] class SimulatedClient(ehConf: EventHubsConf) extends Client { sel
     }
   }
 
-  override def partitionCount: PartitionId = eventHub.partitionCount
+  /**
+   * The number of partitions in the EventHubs instance.
+   *
+   * @return partition count
+   */
+  override val partitionCount: PartitionId = eventHub.partitionCount
 
+  /**
+   * A NOP. There's nothing to clean up in the [[SimulatedClient]].
+   */
   override def close(): Unit = {
     // nothing to close
   }
 }
 
+/**
+ * Companion object to help create [[SimulatedClient]] instances.
+ */
 private[spark] object SimulatedClient {
   def apply(ehConf: EventHubsConf): SimulatedClient = new SimulatedClient(ehConf)
 }
 
+/**
+ * Simulated version of the cached receivers.
+ */
 private[spark] object SimulatedCachedReceiver extends CachedReceiver {
 
   import EventHubsTestUtils._
 
+  /**
+   * Grabs a single event from the [[SimulatedEventHubs]].
+   *
+   * @param ehConf the Event Hubs specific parameters
+   * @param nAndP the event hub name and partition that will be consumed from
+   * @param requestSeqNo the starting sequence number
+   * @param batchSize the number of events to be consumed for the RDD partition
+   * @return the consumed event
+   */
   override def receive(ehConf: EventHubsConf,
                        nAndP: NameAndPartition,
                        requestSeqNo: SequenceNumber,

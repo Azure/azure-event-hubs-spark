@@ -198,10 +198,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @param partitionCount the number of partitions in the Event Hub instance
    * @param useStart translates starting positions when true and ending positions
    *                 when false
+   * @return mapping of partitions to starting positions as sequence numbers
    */
-  override def translate[T](ehConf: EventHubsConf,
-                            partitionCount: Int,
-                            useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
+  override def translate(ehConf: EventHubsConf,
+                         partitionCount: Int,
+                         useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
     val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
     val needsTranslation = ArrayBuffer[NameAndPartition]()
 

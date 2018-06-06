@@ -203,4 +203,14 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     assert(actual.equals(expected))
   }
+
+  test("validate - with EntityPath") {
+    assert(testUtils.getEventHubsConf().validate)
+  }
+
+  test("validate - without EntityPath") {
+    val without = "Endpoint=ENDPOINT;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY"
+    intercept[IllegalStateException] { EventHubsConf(without).validate }
+  }
+
 }

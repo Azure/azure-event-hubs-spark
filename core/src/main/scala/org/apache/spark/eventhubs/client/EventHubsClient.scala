@@ -42,6 +42,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   import org.apache.spark.eventhubs._
 
+  ehConf.validate
+
   private implicit val formats = Serialization.formats(NoTypeHints)
 
   private var _client: EventHubClient = _

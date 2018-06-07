@@ -29,6 +29,14 @@ import org.apache.spark.util.Utils
 /**
  * The [[EventHubsWriter]] class is used to write data from a batch query
  * or structured streaming query, given by a [[QueryExecution]], to EventHubs.
+ * The data being sent must have a body column which contains the event
+ * payloads. The body column must be a String or Binary.
+ * Optionally, a partition column and partitionKey column can be set. Though
+ * both cannot be set at the same time. If a partition column is present, the
+ * event will be sent to the partition present in the column. If a partitionKey
+ * column is present, events will be sent using the partition keys present in
+ * the column. If neither are set, then the events are sent to the service and
+ * are stored in round-robin fashion across all partitions.
  */
 private[eventhubs] object EventHubsWriter extends Logging {
 

@@ -35,6 +35,13 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
 
 /**
  * A DStream where each EventHubs partition corresponds to an RDD partition.
+ * A partition on Event Hubs will always generate an RDD partition with the
+ * same partition id. For example, RDD partition with index 1 always
+ * corresponds to Event Hubs partition 1.
+ *
+ * The option eventhubs.maxRatePerPartition set in the [[EventHubsConf]]
+ * sets the upper bound of events that will be received in a batch for
+ * a single partition.
  *
  * @param _ssc the StreamingContext this stream belongs to
  * @param ehConf the configurations related to your EventHubs. See [[EventHubsConf]] for detail.

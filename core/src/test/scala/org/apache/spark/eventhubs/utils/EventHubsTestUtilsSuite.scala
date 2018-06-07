@@ -249,7 +249,7 @@ class EventHubsTestUtilsSuite
       "A" -> "1".getBytes,
       "B" -> Map.empty
     )
-    testUtils.send(eh, partitionId = Some(1), Seq(0), Some(properties))
+    testUtils.send(eh, partition = Some(1), Seq(0), Some(properties))
     val event = testUtils.getEventHubs(eh).getPartitions(1).getEvents.head
     assert(event.getProperties === properties.asJava)
   }

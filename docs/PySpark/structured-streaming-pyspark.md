@@ -11,6 +11,7 @@
 * [Writing Data to Event Hubs](#writing-data-to-eventhubs)
   * [Creating an Event Hubs Sink for Streaming Queries](#creating-an-eventhubs-sink-for-streaming-queries)
   * [Writing the output of Batch Queries to Event Hubs](#writing-the-output-of-batch-queries-to-event-hubs)
+* [Recovering from Failures with Checkpointing](#recovering-from-failures-with-checkpointing)
 * [Managing Throughput](#managing-throughput)
 * [Serialization of Event Data Properties](#serialization-of-event-data-properties)
 * [Deploying](#deploying)
@@ -326,6 +327,22 @@ ds = df \
   .options(**ehWriteConf) \
   .option("checkpointLocation", "///output.txt") \
   .save()
+```
+
+## Recovering from Failures with Checkpointing
+
+The connector fully integrates with the Structured Streaming checkpointing mechanism.
+You can recover the progress and state of you query on failures by setting a checkpoint
+location in your query. This checkpoint location has to be a path in an HDFS compatible
+file system, and can be set as an option in the DataStreamWriter when starting a query.
+
+```scala
+aggDF
+  .writeStream
+  .outputMode("complete")
+  .option("checkpointLocation", "path/to/HDFS/dir")
+  .format("memory")
+  .start()
 ```
 
 ## Managing Throughput

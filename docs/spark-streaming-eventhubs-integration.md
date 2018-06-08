@@ -13,6 +13,7 @@ partitions and Spark partitions, and access to sequence numbers and metadata.
 * [Storing Offsets](#storing-offsets)
   * [Checkpoints](#checkpoints)
   * [Your own data store](#your-own-data-store)
+* [Recovering from Failures with Checkpointing](#recovering-from-failures-with-checkpointing)
 * [Managing Throughput](#managing-throughput)
 * [Deploying](#deploying)
 
@@ -248,7 +249,7 @@ good starting offsets.
 ### Your own data store
 
 For data stores that support transactions, saving sequence numbers from Event Hubs in the same transaction as the results 
-can keep the two in sync, even in failure situations. If you’re careful about detecting repeated or skipped offset ranges, 
+can keep the two in sync, even in failure situations. If you're careful about detecting repeated or skipped offset ranges, 
 rolling back the transaction prevents duplicated or lost messages from affecting results. This gives the equivalent of 
 exactly-once semantics. It is also possible to use this tactic even for outputs that result from aggregations, which are 
 typically hard to make idempotent.
@@ -279,6 +280,22 @@ stream.foreachRDD { rdd =>
 
   // end your transaction
 }
+```
+
+## Recovering from Failures with Checkpointing
+
+The connector fully integrates with the Structured Streaming checkpointing mechanism.
+You can recover the progress and state of you query on failures by setting a checkpoint
+location in your query. This checkpoint location has to be a path in an HDFS compatible
+file system, and can be set as an option in the DataStreamWriter when starting a query.
+
+```python
+aggDF \
+    .writeStream \
+    .outputMode("complete") \
+    .option("checkpointLocation", "path/to/HDFS/dir") \
+    .format("memory") \
+    .start()
 ```
 
 ## Managing Throughput

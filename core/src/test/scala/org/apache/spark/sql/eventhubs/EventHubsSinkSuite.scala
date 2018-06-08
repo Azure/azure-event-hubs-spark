@@ -274,7 +274,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
       ex.getMessage
         .toLowerCase(Locale.ROOT)
         .contains(
-          s"both a partitionkey ($partitionKey) and partitionid ($partitionId) have been detected. both can not be set."))
+          s"both a partitionkey ($partitionKey) and partition ($partitionId) have been detected. both can not be set."))
   }
 
   test("streaming - write data with valid schema but wrong type - bad body type") {
@@ -323,7 +323,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     assert(
       ex.getMessage
         .toLowerCase(Locale.ROOT)
-        .contains(s"partitionid attribute unsupported type"))
+        .contains(s"partition attribute unsupported type"))
   }
 
   test("streaming - write data with valid schema but wrong type - bad partitionKey type") {

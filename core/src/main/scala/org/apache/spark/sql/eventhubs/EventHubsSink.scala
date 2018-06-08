@@ -23,6 +23,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{ DataFrame, SQLContext }
 import org.apache.spark.sql.execution.streaming.Sink
 
+/**
+ * A [[Sink]] to write data to an Event Hubs instance.
+ */
 private[eventhubs] class EventHubsSink(sqlContext: SQLContext,
                                        parameters: Map[String, String],
                                        clientFactory: (EventHubsConf) => Client)

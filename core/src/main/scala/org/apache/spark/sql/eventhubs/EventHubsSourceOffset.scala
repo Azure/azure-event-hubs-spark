@@ -20,6 +20,9 @@ package org.apache.spark.sql.eventhubs
 import org.apache.spark.eventhubs.{ NameAndPartition, SequenceNumber }
 import org.apache.spark.sql.execution.streaming.{ Offset, SerializedOffset }
 
+/**
+ * An [[Offset]] for the [[EventHubsSource]]. This tracks all partitions and their offsets.
+ */
 private[eventhubs] case class EventHubsSourceOffset(
     partitionToSeqNos: Map[NameAndPartition, SequenceNumber])
     extends Offset {
@@ -27,6 +30,9 @@ private[eventhubs] case class EventHubsSourceOffset(
   override val json: String = JsonUtils.partitionSeqNos(partitionToSeqNos)
 }
 
+/**
+ * A companion object of the [[EventHubsSourceOffset]].
+ */
 private[eventhubs] object EventHubsSourceOffset {
 
   def getPartitionSeqNos(offset: Offset): Map[NameAndPartition, SequenceNumber] = {
@@ -39,11 +45,18 @@ private[eventhubs] object EventHubsSourceOffset {
     }
   }
 
+  /**
+   * Creates an [[EventHubsSourceOffset]] from a variable sequence of
+   * (Event Hub name, partitionId, sequence number) tuples.
+   */
   def apply(offsetTuples: (String, Int, SequenceNumber)*): EventHubsSourceOffset = {
     EventHubsSourceOffset(
       offsetTuples.map { case (n, p, s) => (new NameAndPartition(n, p), s) }.toMap)
   }
 
+  /**
+   * Creates an [[EventHubsSourceOffset]] from a JSON [[SerializedOffset]].
+   */
   def apply(offset: SerializedOffset): EventHubsSourceOffset = {
     EventHubsSourceOffset(JsonUtils.partitionSeqNos(offset.json))
   }

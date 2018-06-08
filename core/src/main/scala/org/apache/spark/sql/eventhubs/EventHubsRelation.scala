@@ -45,6 +45,9 @@ import org.json4s.jackson.Serialization
 import scala.language.postfixOps
 import collection.JavaConverters._
 
+/**
+ * A [[BaseRelation]] to allow batch queries against Event Hubs data.
+ */
 private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
                                            options: Map[String, String],
                                            clientFactory: (EventHubsConf => Client))

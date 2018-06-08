@@ -44,6 +44,9 @@ private[sql] class EventHubsSourceProvider
 
   override def shortName(): String = "eventhubs"
 
+  /**
+   * Returns the name and schema of the source.
+   */
   override def sourceSchema(sqlContext: SQLContext,
                             schema: Option[StructType],
                             providerName: String,
@@ -69,6 +72,9 @@ private[sql] class EventHubsSourceProvider
                         metadataPath)
   }
 
+  /**
+   * Returns a new base relation with the given parameters.
+   */
   override def createRelation(sqlContext: SQLContext,
                               parameters: Map[String, String]): BaseRelation = {
     EventHubsClient.userAgent =

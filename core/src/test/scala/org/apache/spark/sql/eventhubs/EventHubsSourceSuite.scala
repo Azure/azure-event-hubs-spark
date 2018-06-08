@@ -266,9 +266,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val name = newEventHubs()
     val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)
 
-    testUtils.send(name, partitionId = Some(0), data = 100 to 200)
-    testUtils.send(name, partitionId = Some(1), data = 10 to 20)
-    testUtils.send(name, partitionId = Some(2), data = Seq(1))
+    testUtils.send(name, partition = Some(0), data = 100 to 200)
+    testUtils.send(name, partition = Some(1), data = 10 to 20)
+    testUtils.send(name, partition = Some(2), data = Seq(1))
     // partition 3 of 3 remains empty.
 
     val parameters =
@@ -367,7 +367,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   private def testFromLatestSeqNos(eh: String): Unit = {
     val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
-    testUtils.send(eh, partitionId = Some(0), Seq(-1))
+    testUtils.send(eh, partition = Some(0), Seq(-1))
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
 
@@ -464,15 +464,15 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       .setStartingPositions(positions)
 
     // partition 0 starts at the earliest sequence numbers, these should all be seen
-    testUtils.send(eh, partitionId = Some(0), Seq(-20, -21, -22))
+    testUtils.send(eh, partition = Some(0), Seq(-20, -21, -22))
     // partition 1 starts at the latest sequence numbers, these should all be skipped
-    testUtils.send(eh, partitionId = Some(1), Seq(-10, -11, -12))
+    testUtils.send(eh, partition = Some(1), Seq(-10, -11, -12))
     // partition 2 starts at 0, these should all be seen
-    testUtils.send(eh, partitionId = Some(2), Seq(0, 1, 2))
+    testUtils.send(eh, partition = Some(2), Seq(0, 1, 2))
     // partition 3 starts at 1, first should be skipped
-    testUtils.send(eh, partitionId = Some(3), Seq(10, 11, 12))
+    testUtils.send(eh, partition = Some(3), Seq(10, 11, 12))
     // partition 4 starts at 2, first and second should be skipped
-    testUtils.send(eh, partitionId = Some(4), Seq(20, 21, 22))
+    testUtils.send(eh, partition = Some(4), Seq(20, 21, 22))
 
     val reader = spark.readStream
       .format("eventhubs")

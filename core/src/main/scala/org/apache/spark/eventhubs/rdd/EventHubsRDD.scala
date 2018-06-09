@@ -27,6 +27,17 @@ import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
 import scala.collection.mutable.ArrayBuffer
 
+/**
+ * An [[RDD]] for consuming from Event Hubs.
+ *
+ * Starting and ending ranges are set before hand for improved
+ * checkpointing, resiliency, and delivery-semantics.
+ *
+ * @param sc the [[SparkContext]]
+ * @param ehConf the Event Hubs specific configurations
+ * @param offsetRanges offset ranges that define which Event Hubs data
+ *                     belongs to this RDD
+ */
 private[spark] class EventHubsRDD(sc: SparkContext,
                                   val ehConf: EventHubsConf,
                                   val offsetRanges: Array[OffsetRange])
@@ -83,8 +94,9 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   }
 
   private def errBeginAfterEnd(part: EventHubsRDDPartition): String =
-    s"The beginning sequence number ${part.fromSeqNo} is larger than thet ending sequence number ${part.untilSeqNo}" +
-      s"for EventHubs ${part.name} on partitionId ${part.partitionId}."
+    s"The beginning sequence number ${part.fromSeqNo} is larger than thet ending " +
+      s"sequence number ${part.untilSeqNo} for EventHubs ${part.name} on partition " +
+      s"${part.partitionId}."
 
   override def compute(partition: Partition, context: TaskContext): Iterator[EventData] = {
     val part = partition.asInstanceOf[EventHubsRDDPartition]
@@ -92,14 +104,27 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
     if (part.fromSeqNo == part.untilSeqNo) {
       logInfo(
-        s"Beginning sequence number ${part.fromSeqNo} is equal to the ending sequence number ${part.untilSeqNo}." +
-          s"Returning empty partition for EH: ${part.name} on partition: ${part.partitionId}")
+        s"Beginning sequence number ${part.fromSeqNo} is equal to the ending sequence " +
+          s"number ${part.untilSeqNo}. Returning empty partition for EH: ${part.name} " +
+          s"on partition: ${part.partitionId}")
       Iterator.empty
     } else {
       new EventHubsRDDIterator(part, context)
     }
   }
 
+  /**
+   * An iterator which consumes events from Event Hubs for the ranges specified in the
+   * partition.
+   *
+   * [[CachedEventHubsReceiver]] is always used for consumption to take advantage of
+   * pre-fetching. For receiver cache hits, consumption is essentially an in-memory
+   * de-queue. For cache misses, a receiver needs to be created and we wait for
+   * events to be sent over the wire.
+   *
+   * @param part the partition for which events will be consumed
+   * @param context the [[TaskContext]]
+   */
   private class EventHubsRDDIterator(part: EventHubsRDDPartition, context: TaskContext)
       extends Iterator[EventData] {
 
@@ -110,7 +135,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     }
 
     logInfo(
-      s"Computing EventHubs ${part.name}, partitionId ${part.partitionId} " +
+      s"Computing EventHubs ${part.name}, partition ${part.partitionId} " +
         s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
 
     var requestSeqNo: SequenceNumber = part.fromSeqNo

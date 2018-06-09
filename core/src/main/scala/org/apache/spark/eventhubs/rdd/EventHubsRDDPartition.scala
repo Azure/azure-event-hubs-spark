@@ -21,6 +21,18 @@ import org.apache.spark.Partition
 import org.apache.spark.eventhubs.NameAndPartition
 import org.apache.spark.eventhubs.{ PartitionId, SequenceNumber }
 
+/**
+ * A [[Partition]] specifically for Event Hubs.
+ *
+ * The RDD partition index is always equal to the Event Hub partition.
+ *
+ * @param index the index of the partition
+ * @param nameAndPartition the Event Hub name and Event Hub partition
+ *                         associated with this RDD partition
+ * @param fromSeqNo inclusive starting sequence number
+ * @param untilSeqNo exclusive ending sequence number
+ * @param preferredLoc the preferred executor
+ */
 private class EventHubsRDDPartition(val index: Int,
                                     val nameAndPartition: NameAndPartition,
                                     val fromSeqNo: SequenceNumber,
@@ -34,6 +46,6 @@ private class EventHubsRDDPartition(val index: Int,
   /** The EventHubs name corresponding to this RDD Partition */
   def name: String = nameAndPartition.ehName
 
-  /** The EventHubs partitionId corresponding to this RDD Partition */
+  /** The EventHubs partition corresponding to this RDD Partition */
   def partitionId: PartitionId = nameAndPartition.partitionId
 }

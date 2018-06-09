@@ -25,8 +25,9 @@ import org.apache.spark.eventhubs._
 import org.apache.spark.internal.Logging
 
 /**
- * A connection pool for EventHubClients. If a connection isn't available in the pool, then
- * a new one is created. If a connection idles in the pool for 5 minutes, it will be closed.
+ * A connection pool for EventHubClients. A connection pool is created per connection string.
+ * If a connection isn't available in the pool, then a new one is created.
+ * If a connection is idle in the pool for 5 minutes, it will be closed.
  *
  * @param ehConf The Event Hubs configurations corresponding to this specific connection pool.
  */
@@ -35,6 +36,13 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   private[this] val pool = new ConcurrentLinkedQueue[EventHubClient]()
   private[this] val count = new AtomicInteger(0)
 
+  /**
+   * First, the connection pool is checked for available clients. If there
+   * is a client available, that is given to the borrower. If the connection
+   * pool is empty, then a new client is created and given to the borrower.
+   *
+   * @return the borrowed [[EventHubClient]]
+   */
   private def borrowClient: EventHubClient = {
     var client = pool.poll()
     if (client == null) {
@@ -52,6 +60,11 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
     client
   }
 
+  /**
+   * Returns the borrowed client to the connection pool.
+   *
+   * @param client the [[EventHubClient]] being returned
+   */
   private def returnClient(client: EventHubClient): Unit = {
     pool.offer(client)
     logInfo(
@@ -59,6 +72,10 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   }
 }
 
+/**
+ * The connection pool singleton that is created per JVM. This holds a map
+ * of Event Hubs connection strings to their specific connection pool instances.
+ */
 object ClientConnectionPool extends Logging {
 
   private def notInitializedMessage(name: String): String = {
@@ -69,7 +86,7 @@ object ClientConnectionPool extends Logging {
 
   private[this] val pools = new MutableMap[String, ClientConnectionPool]()
 
-  def isInitialized(key: String): Boolean = pools.synchronized {
+  private def isInitialized(key: String): Boolean = pools.synchronized {
     pools.get(key).isDefined
   }
 
@@ -91,6 +108,14 @@ object ClientConnectionPool extends Logging {
     })
   }
 
+  /**
+   * Looks up the connection pool instance associated with the connection
+   * string in the provided [[EventHubsConf]] and retrieves an [[EventHubClient]]
+   * for the borrower.
+   *
+   * @param ehConf the [[EventHubsConf]] used to lookup the connection pool
+   * @return the borrowed [[EventHubsClient]]
+   */
   def borrowClient(ehConf: EventHubsConf): EventHubClient = {
     pools.synchronized {
       if (!isInitialized(key(ehConf))) {
@@ -102,6 +127,14 @@ object ClientConnectionPool extends Logging {
     pool.borrowClient
   }
 
+  /**
+   * Looks up the connection pool instance associated with the connection
+   * string the the provided [[EventHubsConf]] and returns the borrowed
+   * [[EventHubsClient]] to the pool.
+   *
+   * @param ehConf the [[EventHubsConf]] use to lookup the connection pool
+   * @param client the [[EventHubsClient]] being returned
+   */
   def returnClient(ehConf: EventHubsConf, client: EventHubClient): Unit = {
     ensureInitialized(key(ehConf))
     val pool = get(key(ehConf))
@@ -110,9 +143,8 @@ object ClientConnectionPool extends Logging {
 }
 
 /**
- * Thread pool for EventHub client. We create one thread pool per JVM.
+ * Thread pool for [[EventHubClient]]s. We create one thread pool per JVM.
  * Threads are created on demand if none are available.
- * In future releases, thread pool will be configurable by users.
  */
 object ClientThreadPool {
   val pool: ExecutorService = Executors.newCachedThreadPool

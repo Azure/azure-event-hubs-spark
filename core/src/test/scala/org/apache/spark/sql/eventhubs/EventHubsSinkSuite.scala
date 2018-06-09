@@ -106,7 +106,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     testUtils.createEventHubs(eh, DefaultPartitionCount)
 
     val ehConf = getEventHubsConf(eh)
-    val df = Seq("1", "2", "3", "4", "5").map(v => (targetPartition, v)).toDF("partitionId", "body")
+    val df = Seq("1", "2", "3", "4", "5").map(v => (targetPartition, v)).toDF("partition", "body")
 
     df.write
       .format("eventhubs")
@@ -122,7 +122,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     val eh = newEventHub()
     testUtils.createEventHubs(eh, DefaultPartitionCount)
     val ehConf = getEventHubsConf(eh)
-    val df = Seq[(String, String)](("0", "1")).toDF("partitionId", "body")
+    val df = Seq[(String, String)](("0", "1")).toDF("partition", "body")
 
     // Test bad save mode Ignore
     var ex = intercept[AnalysisException] {
@@ -207,7 +207,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
       input.toDF,
       ehConf,
       withOutputMode = Some(OutputMode.Update())
-    )(s"'$targetPart' as partitionId", "body")
+    )(s"'$targetPart' as partition", "body")
 
     val reader = (e: EventHubsConf) => createReader(e).as[String].map(_.toInt)
 
@@ -249,7 +249,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     assert(ex.getMessage.toLowerCase(Locale.ROOT).contains("required attribute 'body' not found."))
   }
 
-  test("streaming - write data with bad schema - partitionKey and partitionId have been set") {
+  test("streaming - write data with bad schema - partitionKey and partition have been set") {
     val input = MemoryStream[String]
     val eh = newEventHub()
     testUtils.createEventHubs(eh, partitionCount = 10)
@@ -262,7 +262,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     try {
       ex = intercept[StreamingQueryException] {
         writer = createEventHubsWriter(input.toDF(), ehConf)(s"'$partitionKey' as partitionKey",
-                                                             s"'$partitionId' as partitionId",
+                                                             s"'$partitionId' as partition",
                                                              "body")
         input.addData("1", "2", "3", "4", "5")
         writer.processAllAvailable()
@@ -274,7 +274,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
       ex.getMessage
         .toLowerCase(Locale.ROOT)
         .contains(
-          s"both a partitionkey ($partitionKey) and partitionid ($partitionId) have been detected. both can not be set."))
+          s"both a partitionkey ($partitionKey) and partition ($partitionId) have been detected. both can not be set."))
   }
 
   test("streaming - write data with valid schema but wrong type - bad body type") {
@@ -300,7 +300,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
         .contains("body attribute type must be a string or binarytype"))
   }
 
-  test("streaming - write data with valid schema but wrong type - bad partitionId type") {
+  test("streaming - write data with valid schema but wrong type - bad partition type") {
     val input = MemoryStream[String]
     val eh = newEventHub()
     testUtils.createEventHubs(eh, partitionCount = 10)
@@ -312,7 +312,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     try {
       ex = intercept[StreamingQueryException] {
         writer =
-          createEventHubsWriter(input.toDF(), ehConf)(s"CAST('$partitionId' as INT) as partitionId",
+          createEventHubsWriter(input.toDF(), ehConf)(s"CAST('$partitionId' as INT) as partition",
                                                       "body")
         input.addData("1", "2", "3", "4", "5")
         writer.processAllAvailable()
@@ -323,7 +323,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     assert(
       ex.getMessage
         .toLowerCase(Locale.ROOT)
-        .contains(s"partitionid attribute unsupported type"))
+        .contains(s"partition attribute unsupported type"))
   }
 
   test("streaming - write data with valid schema but wrong type - bad partitionKey type") {

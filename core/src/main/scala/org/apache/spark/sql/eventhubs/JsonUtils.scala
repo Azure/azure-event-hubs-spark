@@ -24,6 +24,9 @@ import org.json4s.jackson.Serialization
 import scala.collection.mutable
 import scala.util.control.NonFatal
 
+/**
+ * Utilities for converting Event Hubs related objects to and from json.
+ */
 private object JsonUtils {
   private implicit val formats = Serialization.formats(NoTypeHints)
 

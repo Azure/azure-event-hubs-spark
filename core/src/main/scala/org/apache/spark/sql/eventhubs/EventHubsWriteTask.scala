@@ -78,7 +78,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
     require(
       partitionId == null || partitionKey == null,
-      s"Both a partitionKey ($partitionKey) and partitionId ($partitionId) have been detected. Both can not be set.")
+      s"Both a partitionKey ($partitionKey) and partition ($partitionId) have been detected. Both can not be set.")
 
     val event = EventData.create(body)
 
@@ -90,8 +90,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
         sender.createPartitionSender(wrapper.value)
         sender.send(event, partition = Some(wrapper.value))
       } else {
-        throw new IllegalStateException(
-          s"partitionId '$partitionId' could not be parsed to an int.")
+        throw new IllegalStateException(s"partition '$partitionId' could not be parsed to an int.")
       }
     } else {
       sender.send(event)

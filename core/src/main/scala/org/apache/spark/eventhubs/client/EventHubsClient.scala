@@ -17,8 +17,7 @@
 
 package org.apache.spark.eventhubs.client
 
-import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CompletableFuture
 
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.impl.EventHubClientImpl
@@ -27,8 +26,11 @@ import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
-import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.compat.java8.FutureConverters._
 import scala.util.{ Failure, Success, Try }
 
 /**
@@ -94,6 +96,48 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       case Failure(e) => throw e
     }
   }
+
+  private def getRunTimeInfoF(partitionId: PartitionId): Future[PartitionRuntimeInformation] = {
+    retry(RetryCount) {
+      toScala(client.getPartitionRuntimeInformation(partitionId.toString))
+    }
+  }
+
+  /*
+  private def boundedSeqNosF(partition: PartitionId): CompletableFuture[(Long, Long)] = {
+    try {
+      getRunTimeInfoF(partition).thenApply { r: PartitionRuntimeInformation =>
+        val earliest =
+          if (r.getBeginSequenceNumber == -1L) 0L else r.getBeginSequenceNumber
+        val latest = r.getLastEnqueuedSequenceNumber + 1
+        (earliest, latest)
+      }
+    } catch {
+      case e: Exception => throw e
+    }
+  }
+
+  def earliestSeqNoF(partition: PartitionId): CompletableFuture[SequenceNumber] = {
+    try {
+      getRunTimeInfoF(partition).thenApply { r: PartitionRuntimeInformation =>
+        val seqNo = r.getBeginSequenceNumber
+        if (seqNo == -1L) 0L else seqNo
+      }
+    } catch {
+      case e: Exception => throw e
+    }
+  }
+
+  def latestSeqNoF(partition: PartitionId): CompletableFuture[SequenceNumber] = {
+    try {
+      getRunTimeInfoF(partition).thenApply { r: PartitionRuntimeInformation =>
+        r.getLastEnqueuedSequenceNumber + 1
+      }
+    } catch {
+      case e: Exception => throw e
+    }
+  }
+   */
 
   private def getRunTimeInfo(partitionId: PartitionId): PartitionRuntimeInformation = {
     retry(RetryCount) {
@@ -203,8 +247,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   override def translate(ehConf: EventHubsConf,
                          partitionCount: Int,
                          useStart: Boolean = true): Map[PartitionId, SequenceNumber] = {
-    val result = new ConcurrentHashMap[PartitionId, SequenceNumber]()
-    val needsTranslation = ArrayBuffer[NameAndPartition]()
+
+    val completed = mutable.Map[PartitionId, SequenceNumber]()
+    val needsTranslation = ArrayBuffer[(NameAndPartition, EventPosition)]()
 
     logInfo(s"translate: useStart is set to $useStart.")
     val positions = if (useStart) {
@@ -220,82 +265,50 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     logInfo(s"translate: PerPartitionPositions = $positions")
     logInfo(s"translate: Default position = $defaultPos")
 
-    // Partitions which have a sequence number position are put in result.
-    // All other partitions need to be translated into sequence numbers by the service.
     (0 until partitionCount).par.foreach { id =>
       val nAndP = NameAndPartition(ehConf.name, id)
       val position = positions.getOrElse(nAndP, defaultPos)
       if (position.seqNo >= 0L) {
-        result.put(id, position.seqNo)
+        // We don't need to translate a sequence number.
+        // Put it straight into the results.
+        synchronized(completed.put(id, position.seqNo))
       } else {
-        synchronized(needsTranslation += nAndP)
+        val tuple = (nAndP, position)
+        synchronized(needsTranslation += tuple)
       }
     }
     logInfo(s"translate: needsTranslation = $needsTranslation")
 
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-    val threads = ArrayBuffer[Thread]()
-    needsTranslation.foreach(nAndP => {
-      val partitionId = nAndP.partitionId
-      threads += new Thread {
-        override def run(): Unit = {
-          @volatile var receiver: PartitionReceiver = null
-          try {
-            receiver = client
-              .createReceiverSync(consumerGroup,
-                                  partitionId.toString,
-                                  positions.getOrElse(nAndP, defaultPos).convert)
-            receiver.setPrefetchCount(PrefetchCountMinimum)
-            receiver.setReceiveTimeout(Duration.ofSeconds(5))
-            val events = receiver.receiveSync(1) // get the first event that was received.
-            if (events == null || !events.iterator.hasNext) {
-              logWarning(
-                "translate: failed to translate event. There are three cases in which we fail" +
-                  "to translate events: 1) We are receiving from the EndOfStream and no new " +
-                  "events are being sent, 2) The partition is empty, or 3) The user passed" +
-                  "an invalid offset. In any case, when a failure occurs, we will start from" +
-                  "the end of the stream (e.g. the latest events in your partition). ")
-              val (earliest, latest) = boundedSeqNos(partitionId)
-              if (earliest >= latest) {
-                result.put(partitionId, earliest)
-              } else {
-                result.put(partitionId, latest)
+    val threads = for ((nAndP, pos) <- needsTranslation)
+      yield
+        Future {
+          pos.offset match {
+            case StartOfStream => (nAndP.partitionId, earliestSeqNo(nAndP.partitionId))
+            case EndOfStream   => (nAndP.partitionId, latestSeqNo(nAndP.partitionId))
+            case _ =>
+              retry(RetryCount) {
+                val receiver =
+                  client.createEpochReceiverSync(consumerGroup,
+                                                 nAndP.partitionId.toString,
+                                                 pos.convert,
+                                                 DefaultEpoch)
+                var event: java.lang.Iterable[EventData] = null
+                while (event == null) {
+                  event = receiver.receiveSync(1)
+                }
+                receiver.closeSync()
+                (nAndP.partitionId, event.iterator.next.getSystemProperties.getSequenceNumber)
               }
-            } else {
-              val event = events.iterator.next
-              result.put(partitionId, event.getSystemProperties.getSequenceNumber)
-            }
-          } catch {
-            case e: IllegalEntityException =>
-              logError("translate: IllegalEntityException. Consumer group may not exist.", e)
-              throw e
-          } finally {
-            if (receiver != null) {
-              receiver.closeSync()
-            }
           }
         }
-      }
-    })
-
-    logInfo("translate: Starting threads to translate to sequence number.")
-    threads.foreach(_.start())
-    threads.foreach(_.join())
-    logInfo("translate: Translation complete.")
-    logInfo(s"translate: result = $result")
-
-    assert(result.size == partitionCount,
-           s"translate: result size ${result.size} does not equal partition count $partitionCount")
-
-    result.asScala.toMap
-      .mapValues { seqNo =>
-        { if (seqNo == -1L) 0L else seqNo }
-      }
-      .map(identity)
+    val sequenced = Future.sequence(threads).map(x => x.toMap ++ completed).map(identity)
+    Await.result(sequenced, InternalOperationTimeout)
   }
 }
 
 private[spark] object EventHubsClient {
+
   private[spark] def apply(ehConf: EventHubsConf): EventHubsClient =
     new EventHubsClient(ehConf)
 

@@ -18,11 +18,12 @@
 package org.apache.spark
 
 import java.time.Duration
-import java.util.concurrent.{ ExecutorService, Executors }
 
 import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
+
+import scala.concurrent.duration._
 
 /**
  * A package object to constants, implicit conversion, and type
@@ -32,6 +33,8 @@ package object eventhubs {
 
   implicit val formats = Serialization.formats(NoTypeHints)
 
+  val StartOfStream: String = "-1"
+  val EndOfStream: String = "@latest"
   val DefaultEventPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
@@ -45,6 +48,7 @@ package object eventhubs {
   val StartingSequenceNumber = 0L
   val DefaultEpoch = 0L
   val RetryCount = 3
+  val InternalOperationTimeout = 300.seconds
 
   type PartitionId = Int
   val PartitionId = Int

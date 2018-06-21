@@ -86,7 +86,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   @annotation.tailrec
   final def retry[T](n: Int)(method: String)(fn: => T): T = {
-    logInfo(s"retry: attempt $n")
+    logInfo(s"retry: $method: attempts left: $n")
     Try { fn } match {
       case Success(x) => x
       case Failure(e: EventHubException) if e.getIsTransient && n > 1 =>

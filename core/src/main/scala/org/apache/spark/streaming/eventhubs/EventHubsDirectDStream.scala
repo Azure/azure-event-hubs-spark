@@ -82,10 +82,13 @@ private[spark] class EventHubsDirectDStream private[spark] (
   }
 
   protected def latestSeqNos(): Map[PartitionId, SequenceNumber] = {
-    (for {
-      partitionId <- 0 until partitionCount
-      endPoint = ehClient.latestSeqNo(partitionId)
-    } yield partitionId -> endPoint).toMap
+    ehClient
+      .allBoundedSeqNos(partitionCount)
+      .map {
+        case (p, (_, l)) =>
+          (p, l)
+      }
+      .toMap
   }
 
   protected def clamp(

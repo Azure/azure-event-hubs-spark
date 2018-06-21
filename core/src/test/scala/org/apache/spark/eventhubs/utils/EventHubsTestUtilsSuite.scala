@@ -149,6 +149,55 @@ class EventHubsTestUtilsSuite
     assert(client.latestSeqNo(3) == 1)
   }
 
+  test("earliestSeqNo") {
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+
+    eventHub.send(Some(0), Seq(1), None)
+    eventHub.send(Some(1), Seq(2, 3), None)
+    eventHub.send(Some(2), Seq(4, 5, 6), None)
+    eventHub.send(Some(3), Seq(7), None)
+
+    val conf = testUtils.getEventHubsConf(eventHub.name)
+    val client = SimulatedClient(conf)
+    assert(client.earliestSeqNo(0) == 0)
+    assert(client.earliestSeqNo(1) == 0)
+    assert(client.earliestSeqNo(2) == 0)
+    assert(client.earliestSeqNo(3) == 0)
+  }
+
+  test("boundedSeqNo") {
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+
+    eventHub.send(Some(0), Seq(1), None)
+    eventHub.send(Some(1), Seq(2, 3), None)
+    eventHub.send(Some(2), Seq(4, 5, 6), None)
+    eventHub.send(Some(3), Seq(7), None)
+
+    val conf = testUtils.getEventHubsConf(eventHub.name)
+    val client = SimulatedClient(conf)
+    assert(client.boundedSeqNos(0) == (0, 1))
+    assert(client.boundedSeqNos(1) == (0, 2))
+    assert(client.boundedSeqNos(2) == (0, 3))
+    assert(client.boundedSeqNos(3) == (0, 1))
+  }
+
+  test("allBoundedSeqNo") {
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+
+    eventHub.send(Some(0), Seq(1), None)
+    eventHub.send(Some(1), Seq(2, 3), None)
+    eventHub.send(Some(2), Seq(4, 5, 6), None)
+    eventHub.send(Some(3), Seq(7), None)
+
+    val conf = testUtils.getEventHubsConf(eventHub.name)
+    val client = SimulatedClient(conf)
+    val results = client.allBoundedSeqNos(eventHub.partitionCount).toMap
+    assert(results(0) == (0, 1))
+    assert(results(1) == (0, 2))
+    assert(results(2) == (0, 3))
+    assert(results(3) == (0, 1))
+  }
+
   test("partitionSize") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
 

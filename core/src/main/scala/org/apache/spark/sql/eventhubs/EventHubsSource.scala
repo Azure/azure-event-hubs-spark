@@ -167,8 +167,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     // This contains an array of the following elements:
     // (partition, (earliestSeqNo, latestSeqNo)
-    val futures = for { p <- 0 until partitionCount } yield Future(p, ehClient.boundedSeqNos(p))
-    val earliestAndLatest = Await.result(Future.sequence(futures), InternalOperationTimeout)
+    val earliestAndLatest = ehClient.allBoundedSeqNos(partitionCount)
 
     // There is a possibility that data from EventHubs will
     // expire before it can be consumed from Spark. We collect

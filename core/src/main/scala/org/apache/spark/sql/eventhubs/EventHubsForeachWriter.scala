@@ -31,23 +31,30 @@ import org.apache.spark.sql.ForeachWriter
  * should do all the initialization (e.g. opening a connection or
  * initiating a transaction) in the open method.
  *
+ * This also uses asynchronous send calls which are retried on failure.
+ * The retries happen with exponential backoff.
+ *
  * @param ehConf the [[EventHubsConf]] containing the connection string
  *               for the Event Hub which will receive the sent events
  */
 case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[String] {
-  var producer: EventHubClient = _
+  var client: EventHubClient = _
 
   def open(partitionId: Long, version: Long): Boolean = {
-    producer = ClientConnectionPool.borrowClient(ehConf)
+    client = ClientConnectionPool.borrowClient(ehConf)
     true
   }
 
   def process(body: String): Unit = {
     val event = EventData.create(s"$body".getBytes("UTF-8"))
-    producer.send(event)
+    retry(client.send(event), "ForeachWriter")
   }
 
   def close(errorOrNull: Throwable): Unit = {
-    producer.closeSync()
+    errorOrNull match {
+      case t: Throwable => throw t
+      case _ =>
+        ClientConnectionPool.returnClient(ehConf, client)
+    }
   }
 }

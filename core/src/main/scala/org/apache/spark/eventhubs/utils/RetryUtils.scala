@@ -88,6 +88,7 @@ private[spark] object RetryUtils extends Logging {
                      factor: Float = 1.5f,
                      init: Int = 1,
                      cur: Int = 0): Future[T] = {
+    logInfo(s"retry: first attempt. $opName")
     toScala(fn).recoverWith {
       case eh: EventHubException if eh.getIsTransient =>
         val delay = if (cur == 0) {

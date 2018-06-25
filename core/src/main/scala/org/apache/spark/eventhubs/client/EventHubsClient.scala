@@ -91,7 +91,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return [[PartitionRuntimeInformation]] for the partition
    */
   private def getRunTimeInfoF(partitionId: PartitionId): Future[PartitionRuntimeInformation] = {
-    toScala(client.getPartitionRuntimeInformation(partitionId.toString))
+    retry(client.getPartitionRuntimeInformation(partitionId.toString),
+          s"getRunTimeInfoF for partition: $partitionId")
   }
 
   /**
@@ -102,17 +103,15 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    */
   override def allBoundedSeqNos(
       partitionCount: Int): Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
-    retry(RetryCount)("allBoundedSeqNos") {
-      val futures = for (i <- 0 until partitionCount)
-        yield
-          getRunTimeInfoF(i) map { r =>
-            val earliest =
-              if (r.getBeginSequenceNumber == -1L) 0L else r.getBeginSequenceNumber
-            val latest = r.getLastEnqueuedSequenceNumber + 1
-            (i, (earliest, latest))
-          }
-      Await.result(Future.sequence(futures), InternalOperationTimeout)
-    }
+    val futures = for (i <- 0 until partitionCount)
+      yield
+        getRunTimeInfoF(i) map { r =>
+          val earliest =
+            if (r.getBeginSequenceNumber == -1L) 0L else r.getBeginSequenceNumber
+          val latest = r.getLastEnqueuedSequenceNumber + 1
+          (i, (earliest, latest))
+        }
+    Await.result(Future.sequence(futures), InternalOperationTimeout)
   }
 
   /**
@@ -123,11 +122,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return A [[Future]] containing the earliest sequence number for the specified partition
    */
   private def earliestSeqNoF(partition: PartitionId): Future[SequenceNumber] = {
-    retry(RetryCount)("earliestSeqNoF") {
-      getRunTimeInfoF(partition).map { r =>
-        val seqNo = r.getBeginSequenceNumber
-        if (seqNo == -1L) 0L else seqNo
-      }
+    getRunTimeInfoF(partition).map { r =>
+      val seqNo = r.getBeginSequenceNumber
+      if (seqNo == -1L) 0L else seqNo
     }
   }
 
@@ -139,10 +136,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return a [[Future]] containing the latest sequence number for the specified partition
    */
   private def latestSeqNoF(partition: PartitionId): Future[SequenceNumber] = {
-    retry(RetryCount)("latestSeqNoF") {
-      getRunTimeInfoF(partition).map { r =>
-        r.getLastEnqueuedSequenceNumber + 1
-      }
+    getRunTimeInfoF(partition).map { r =>
+      r.getLastEnqueuedSequenceNumber + 1
     }
   }
 

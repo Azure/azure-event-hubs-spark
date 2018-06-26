@@ -228,17 +228,17 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
           case StartOfStream => (nAndP.partitionId, earliestSeqNoF(nAndP.partitionId))
           case EndOfStream   => (nAndP.partitionId, latestSeqNoF(nAndP.partitionId))
           case _ =>
-            val receiver = toScala(
-              client.createEpochReceiver(consumerGroup,
-                                         nAndP.partitionId.toString,
-                                         pos.convert,
-                                         DefaultEpoch))
+            val receiver = retry(client.createEpochReceiver(consumerGroup,
+                                                            nAndP.partitionId.toString,
+                                                            pos.convert,
+                                                            DefaultEpoch),
+                                 "translate: epoch receiver creation.")
 
             val seqNo = receiver
               .flatMap { r =>
                 var event: Future[java.lang.Iterable[EventData]] = null
                 while (event == null) {
-                  event = toScala(r.receive(1))
+                  event = retry(r.receive(1), "translate: receive call.")
                 }
                 event
               }

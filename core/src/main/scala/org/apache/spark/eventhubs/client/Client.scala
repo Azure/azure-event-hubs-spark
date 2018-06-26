@@ -54,40 +54,12 @@ private[spark] trait Client extends Serializable {
            partitionKey: Option[String] = None): Unit
 
   /**
-   * Provides the earliest (lowest) sequence number that exists in the
-   * EventHubs instance for the given partition.
+   * Returns the earliest and latest sequence numbers for all partitions
+   * in an Event Hub.
    *
-   * @param partition the partition that will be queried
-   * @return the earliest sequence number for the specified partition
-   */
-  def earliestSeqNo(partition: PartitionId): SequenceNumber
-
-  /**
-   * Provides the latest (highest) sequence number that exists in the EventHubs
-   * instance for the given partition.
-   *
-   * @param partition the partition that will be queried
-   * @return the latest sequence number for the specified partition
-   */
-  def latestSeqNo(partition: PartitionId): SequenceNumber
-
-  /**
-   * Provides the earliest and the latest sequence numbers in the provided
-   * partition.
-   *
-   * @param partition the partition that will be queried
-   * @return the earliest and latest sequence numbers for the specified partition.
-   */
-  def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber)
-
-  /**
-   * Similar to [[boundedSeqNos()]] except the information is collected for all
-   * partitions.
-   *
-   * @param partitionCount the number of partitions in the Event Hub instance
    * @return the earliest and latest sequence numbers for all partitions in the Event Hub
    */
-  def allBoundedSeqNos(partitionCount: Int): Seq[(PartitionId, (SequenceNumber, SequenceNumber))]
+  def allBoundedSeqNos: Seq[(PartitionId, (SequenceNumber, SequenceNumber))]
 
   /**
    * Translates all [[EventPosition]]s provided in the [[EventHubsConf]] to

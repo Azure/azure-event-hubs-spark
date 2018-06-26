@@ -102,13 +102,12 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       i = try {
         receiver.receiveSync(1)
       } catch {
-        case r: ReceiverDisconnectedException => {
+        case r: ReceiverDisconnectedException =>
           throw new Exception(
             "You are likely running multiple Spark jobs with the same consumer group. " +
               "For each Spark job, please create and use a unique consumer group to avoid this issue.",
             r
           )
-        }
       }
     }
     event = i.iterator.next

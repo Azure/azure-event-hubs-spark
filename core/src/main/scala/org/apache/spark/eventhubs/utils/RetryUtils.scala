@@ -36,6 +36,8 @@ import scala.util.{ Failure, Success, Try }
  * to retry synchronous and asynchronous calls.
  */
 private[spark] object RetryUtils extends Logging {
+  import org.apache.spark.eventhubs._
+
   val scheduled: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
 
   /**
@@ -70,43 +72,35 @@ private[spark] object RetryUtils extends Logging {
   /**
    * This retries an operation which returns a [[CompletableFuture]].
    * The [[CompletableFuture]] is always converted to a Scala [[Future]].
-   * The retries are done indefinitely with exponential backoff.
+   * The retry happens after a fixed delay.
    *
    * Only retires if the exception received on failure is an
    * [[EventHubException]] where isTransient is true.
    *
    * @param fn the function which creates the [[CompletableFuture]]
-   * @param opName the name of the operation. This is to assit with logging.
-   * @param factor the factor by which the wait time scales.
-   * @param init initial wait time in milliseconds
-   * @param cur the current wait time (in milliseconds) before a retry is attempted
+   * @param opName the name of the operation. This is to assist with logging.
+   * @param maxRetry The number of times the operation will be retried.
+   * @param delay The delay (in milliseconds) before the Future is run again.
    * @tparam T the result type from the [[CompletableFuture]]
    * @return the [[Future]] returned by the async operation
    */
   final def retry[T](fn: => CompletableFuture[T],
                      opName: String,
-                     factor: Float = 1.5f,
-                     init: Int = 1,
-                     cur: Int = 0,
-                     deadline: Int = 250): Future[T] = {
+                     maxRetry: Int = RetryCount,
+                     delay: Int = 10): Future[T] = {
     logInfo(opName)
-    toScala(fn).recoverWith {
-      case eh: EventHubException if eh.getIsTransient =>
-        val delay = if (cur == 0) {
-          init
-        } else {
-          Math.ceil(cur * factor).toInt
-        }
-        if (delay >= deadline) {
+    def retryHelper(fn: => CompletableFuture[T], retryCount: Int): Future[T] = {
+      toScala(fn).recoverWith {
+        case eh: EventHubException if eh.getIsTransient =>
+          if (retryCount >= maxRetry) { throw eh }
+          logInfo(s"retrying $opName after $delay ms")
+          after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+        case t: Throwable =>
           logInfo(s"failure: $opName")
-          throw eh
-        }
-        logInfo(s"retrying $opName after $delay ms")
-        after(delay.milliseconds)(retry(fn, opName, factor, init, delay))
-      case t: Throwable =>
-        logInfo(s"failure: $opName")
-        throw t
+          throw t
+      }
     }
+    retryHelper(fn, 0)
   }
 
   /**

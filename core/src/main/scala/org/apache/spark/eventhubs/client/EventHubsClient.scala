@@ -98,11 +98,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   /**
    * Same as boundedSeqNos, but for all partitions in the Event Hub.
    *
-   * @param partitionCount the number of partitions in the Event Hub instance
    * @return the earliest and latest sequence numbers for all partitions in the Event Hub
    */
-  override def allBoundedSeqNos(
-      partitionCount: Int): Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
+  override def allBoundedSeqNos: Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
     val futures = for (i <- 0 until partitionCount)
       yield
         getRunTimeInfoF(i) map { r =>
@@ -139,58 +137,6 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     getRunTimeInfoF(partition).map { r =>
       r.getLastEnqueuedSequenceNumber + 1
     }
-  }
-
-  /**
-   * Retrieves partition runtime information for a specific partition.
-   *
-   * @param partitionId the partition to be queried.
-   * @return [[PartitionRuntimeInformation]] for the partition
-   */
-  private def getRunTimeInfo(partitionId: PartitionId): PartitionRuntimeInformation = {
-    retry(RetryCount)("getRunTimeInfo") {
-      client.getPartitionRuntimeInformation(partitionId.toString).get
-    }
-  }
-
-  /**
-   * Provides the earliest (lowest) sequence number that exists in the
-   * EventHubs instance for the given partition.
-   *
-   * @param partition the partition that will be queried
-   * @return the earliest sequence number for the specified partition
-   */
-  override def earliestSeqNo(partition: PartitionId): SequenceNumber = {
-    val runtimeInformation = getRunTimeInfo(partition)
-    val seqNo = runtimeInformation.getBeginSequenceNumber
-    if (seqNo == -1L) 0L else seqNo
-  }
-
-  /**
-   * Provides the latest (highest) sequence number that exists in the EventHubs
-   * instance for the given partition.
-   *
-   * @param partition the partition that will be queried
-   * @return the latest sequence number for the specified partition
-   */
-  override def latestSeqNo(partition: PartitionId): SequenceNumber = {
-    val runtimeInfo = getRunTimeInfo(partition)
-    runtimeInfo.getLastEnqueuedSequenceNumber + 1
-  }
-
-  /**
-   * Provides the earliest and the latest sequence numbers in the provided
-   * partition.
-   *
-   * @param partition the partition that will be queried
-   * @return the earliest and latest sequence numbers for the specified partition.
-   */
-  override def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber) = {
-    val runtimeInfo = getRunTimeInfo(partition)
-    val earliest =
-      if (runtimeInfo.getBeginSequenceNumber == -1L) 0L else runtimeInfo.getBeginSequenceNumber
-    val latest = runtimeInfo.getLastEnqueuedSequenceNumber + 1
-    (earliest, latest)
   }
 
   /**

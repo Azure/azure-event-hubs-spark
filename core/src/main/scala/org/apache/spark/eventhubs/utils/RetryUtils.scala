@@ -102,28 +102,4 @@ private[spark] object RetryUtils extends Logging {
     }
     retryHelper(fn, 0)
   }
-
-  /**
-   * Retries synchronous calls for a fixed number of attempts.
-   *
-   * Only retries if the exception thrown on failure is an
-   * [[EventHubException]] where isTransient is marked as true.
-   *
-   * @param n the number of retries that will be performed.
-   * @param method the method name. This is to help with logging.
-   * @param fn the operation to be retried
-   * @tparam T the result type of the passed operation
-   * @return the result of the passed operation
-   */
-  @annotation.tailrec
-  final def retry[T](n: Int)(method: String)(fn: => T): T = {
-    logInfo(s"retry: $method: attempts left: $n")
-    Try { fn } match {
-      case Success(x) => x
-      case Failure(e: EventHubException) if e.getIsTransient && n > 1 =>
-        logInfo(s"retry: $method failure.", e)
-        retry(n - 1)(method)(fn)
-      case Failure(e) => throw e
-    }
-  }
 }

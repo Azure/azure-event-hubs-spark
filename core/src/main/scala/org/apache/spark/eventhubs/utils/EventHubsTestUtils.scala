@@ -458,9 +458,7 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
 
   import EventHubsTestUtils._
 
-  private var rPartitionId: Int = _ // used in receivers
   private var sPartitionId: Int = _ // used in senders
-  private var currentSeqNo: SequenceNumber = _
   private val eventHub = eventHubs(ehConf.name)
 
   /**
@@ -494,45 +492,13 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
   }
 
   /**
-   * The earliest sequence number in a partition.
-   *
-   * @param partition the partition being queried
-   * @return the earliest sequence number for the specified partition
-   */
-  override def earliestSeqNo(partition: PartitionId): SequenceNumber = {
-    eventHub.earliestSeqNo(partition)
-  }
-
-  /**
-   * The latest sequence number in a partition.
-   *
-   * @param partition the partition being queried
-   * @return the latest sequence number for the specified partition
-   */
-  override def latestSeqNo(partition: PartitionId): SequenceNumber = {
-    eventHub.latestSeqNo(partition)
-  }
-
-  /**
-   * A tuple containing the earliest and latest sequence numbers
-   * in a partition.
-   *
-   * @param partition the partition that will be queried
-   * @return the earliest and latest sequence numbers for the specified partition.
-   */
-  override def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber) = {
-    (earliestSeqNo(partition), latestSeqNo(partition))
-  }
-
-  /**
    * Same as boundedSeqNos, but collects info for all partitions.
    *
-   * @param partitionCount the number of partitions in the Event Hub instance
    * @return the earliest and latest sequence numbers for all partitions in the Event Hub
    */
-  override def allBoundedSeqNos(
-      partitionCount: Int): Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
-    for (i <- 0 until partitionCount) yield (i, (earliestSeqNo(i), latestSeqNo(i)))
+  override def allBoundedSeqNos: Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
+    for (i <- 0 until partitionCount)
+      yield (i, (eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)))
   }
 
   /**
@@ -550,7 +516,7 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
 
     val positions = if (useStart) { ehConf.startingPositions } else { ehConf.endingPositions }
     val position = if (useStart) { ehConf.startingPosition } else { ehConf.endingPosition }
-    val apiCall = if (useStart) { earliestSeqNo _ } else { latestSeqNo _ }
+    val apiCall = if (useStart) { eventHub.earliestSeqNo _ } else { eventHub.latestSeqNo _ }
 
     if (positions.isEmpty && position.isEmpty) {
       (for { id <- 0 until eventHub.partitionCount } yield id -> apiCall(id)).toMap

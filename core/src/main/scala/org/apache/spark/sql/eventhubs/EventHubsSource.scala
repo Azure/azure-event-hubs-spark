@@ -167,7 +167,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     // This contains an array of the following elements:
     // (partition, (earliestSeqNo, latestSeqNo)
-    val earliestAndLatest = ehClient.allBoundedSeqNos(partitionCount)
+    val earliestAndLatest = ehClient.allBoundedSeqNos
 
     // There is a possibility that data from EventHubs will
     // expire before it can be consumed from Spark. We collect
@@ -187,9 +187,9 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       case None =>
         latest
       case Some(limit) if currentSeqNos.isEmpty =>
-        rateLimit(limit, initialPartitionSeqNos, latest)
+        rateLimit(limit, initialPartitionSeqNos, latest, earliestSeqNos.get)
       case Some(limit) =>
-        rateLimit(limit, currentSeqNos.get, latest)
+        rateLimit(limit, currentSeqNos.get, latest, earliestSeqNos.get)
     }
 
     currentSeqNos = Some(seqNos)
@@ -198,20 +198,12 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     Some(EventHubsSourceOffset(seqNos))
   }
 
-  def fetchEarliestSeqNos(
-      nameAndPartitions: Seq[NameAndPartition]): Map[NameAndPartition, SequenceNumber] = {
-    (for {
-      nameAndPartition <- nameAndPartitions
-      seqNo = ehClient.earliestSeqNo(nameAndPartition.partitionId)
-    } yield nameAndPartition -> seqNo).toMap
-  }
-
   /** Proportionally distribute limit number of offsets among partitions */
   private def rateLimit(
       limit: Long,
       from: Map[NameAndPartition, SequenceNumber],
-      until: Map[NameAndPartition, SequenceNumber]): Map[NameAndPartition, SequenceNumber] = {
-    val fromNew = fetchEarliestSeqNos(until.keySet.diff(from.keySet).toSeq)
+      until: Map[NameAndPartition, SequenceNumber],
+      fromNew: Map[NameAndPartition, SequenceNumber]): Map[NameAndPartition, SequenceNumber] = {
     val sizes = until.flatMap {
       case (nameAndPartition, end) =>
         // If begin isn't defined, something's wrong, but let alert logic in getBatch handle it

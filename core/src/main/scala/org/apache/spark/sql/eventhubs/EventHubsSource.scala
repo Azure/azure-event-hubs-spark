@@ -52,6 +52,8 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.jackson.Serialization
 
 import collection.JavaConverters._
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * A [[Source]] that reads data from Event Hubs.
@@ -165,10 +167,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     // This contains an array of the following elements:
     // (partition, (earliestSeqNo, latestSeqNo)
-    val earliestAndLatest = for {
-      p <- 0 until partitionCount
-      n = ehName
-    } yield (p, ehClient.boundedSeqNos(p))
+    val earliestAndLatest = ehClient.allBoundedSeqNos(partitionCount)
 
     // There is a possibility that data from EventHubs will
     // expire before it can be consumed from Spark. We collect

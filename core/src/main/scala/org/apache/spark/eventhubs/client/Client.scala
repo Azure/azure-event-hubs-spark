@@ -81,6 +81,15 @@ private[spark] trait Client extends Serializable {
   def boundedSeqNos(partition: PartitionId): (SequenceNumber, SequenceNumber)
 
   /**
+   * Similar to [[boundedSeqNos()]] except the information is collected for all
+   * partitions.
+   *
+   * @param partitionCount the number of partitions in the Event Hub instance
+   * @return the earliest and latest sequence numbers for all partitions in the Event Hub
+   */
+  def allBoundedSeqNos(partitionCount: Int): Seq[(PartitionId, (SequenceNumber, SequenceNumber))]
+
+  /**
    * Translates all [[EventPosition]]s provided in the [[EventHubsConf]] to
    * sequence numbers. Sequence numbers are zero-based indices. The 5th event
    * in an Event Hubs partition will have a sequence number of 4.

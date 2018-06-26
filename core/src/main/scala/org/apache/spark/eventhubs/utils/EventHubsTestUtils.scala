@@ -525,6 +525,17 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
   }
 
   /**
+   * Same as boundedSeqNos, but collects info for all partitions.
+   *
+   * @param partitionCount the number of partitions in the Event Hub instance
+   * @return the earliest and latest sequence numbers for all partitions in the Event Hub
+   */
+  override def allBoundedSeqNos(
+      partitionCount: Int): Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
+    for (i <- 0 until partitionCount) yield (i, (earliestSeqNo(i), latestSeqNo(i)))
+  }
+
+  /**
    * Translates starting (or ending) positions to sequence numbers.
    *
    * @param ehConf the [[EventHubsConf]] containing starting (or ending positions)

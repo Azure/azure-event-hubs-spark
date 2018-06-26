@@ -20,6 +20,7 @@ package org.apache.spark.eventhubs.client
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.impl.EventHubClientImpl
 import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.utils.RetryUtils._
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -29,7 +30,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.compat.java8.FutureConverters._
-import scala.util.{ Failure, Success, Try }
 
 /**
  * A [[Client]] which connects to an event hub instance. All interaction
@@ -81,18 +81,6 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       client.sendSync(event, partitionKey.get)
     } else {
       client.sendSync(event)
-    }
-  }
-
-  @annotation.tailrec
-  final def retry[T](n: Int)(method: String)(fn: => T): T = {
-    logInfo(s"retry: $method: attempts left: $n")
-    Try { fn } match {
-      case Success(x) => x
-      case Failure(e: EventHubException) if e.getIsTransient && n > 1 =>
-        logInfo("Retrying getRunTimeInfo failure.", e)
-        retry(n - 1)(method)(fn)
-      case Failure(e) => throw e
     }
   }
 

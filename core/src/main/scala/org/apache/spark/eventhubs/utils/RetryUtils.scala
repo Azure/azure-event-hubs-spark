@@ -27,7 +27,6 @@ import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
 
 // TODO tests
 
@@ -92,12 +91,25 @@ private[spark] object RetryUtils extends Logging {
     def retryHelper(fn: => CompletableFuture[T], retryCount: Int): Future[T] = {
       toScala(fn).recoverWith {
         case eh: EventHubException if eh.getIsTransient =>
-          if (retryCount >= maxRetry) { throw eh }
+          if (retryCount >= maxRetry) {
+            logInfo(s"failure: $opName")
+            throw eh
+          }
           logInfo(s"retrying $opName after $delay ms")
           after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
         case t: Throwable =>
-          logInfo(s"failure: $opName")
-          throw t
+          t.getCause match {
+            case eh: EventHubException if eh.getIsTransient =>
+              if (retryCount >= maxRetry) {
+                logInfo(s"failure: $opName")
+                throw eh
+              }
+              logInfo(s"retrying $opName after $delay ms")
+              after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+            case _ =>
+              logInfo(s"failure: $opName")
+              throw t
+          }
       }
     }
     retryHelper(fn, 0)

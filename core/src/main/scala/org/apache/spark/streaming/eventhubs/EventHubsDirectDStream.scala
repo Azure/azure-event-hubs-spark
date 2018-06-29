@@ -81,11 +81,16 @@ private[spark] class EventHubsDirectDStream private[spark] (
     None
   }
 
-  protected def latestSeqNos(): Map[PartitionId, SequenceNumber] = {
-    ehClient.allBoundedSeqNos.map {
-      case (p, (_, l)) =>
-        (p, l)
+  protected def earliestAndLatest()
+    : (Map[PartitionId, SequenceNumber], Map[PartitionId, SequenceNumber]) = {
+    val earliestAndLatest = ehClient.allBoundedSeqNos
+    val earliest = earliestAndLatest.map {
+      case (p, (e, _)) => p -> e
     }.toMap
+    val latest = earliestAndLatest.map {
+      case (p, (_, l)) => p -> l
+    }.toMap
+    (earliest, latest)
   }
 
   protected def clamp(
@@ -106,7 +111,14 @@ private[spark] class EventHubsDirectDStream private[spark] (
     val numExecutors = sortedExecutors.length
     logDebug("Sorted executors: " + sortedExecutors.mkString(", "))
 
-    val untilSeqNos = clamp(latestSeqNos())
+    val (earliest, latest) = earliestAndLatest()
+    // Make sure our fromSeqNos are greater than or equal
+    // to the earliest event in the service.
+    fromSeqNos = fromSeqNos.map {
+      case (p, seqNo) =>
+        if (earliest(p) > seqNo) p -> earliest(p) else p -> seqNo
+    }
+    val untilSeqNos = clamp(latest)
     val offsetRanges = (for {
       p <- 0 until partitionCount
       preferredLoc = if (numExecutors > 0) {

@@ -49,7 +49,7 @@ class EventHubsSourceOffsetSuite extends OffsetSuite with SharedSQLContext {
         EventHubsSourceOffset.getPartitionSeqNos(SerializedOffset(ehso1.json)))
   }
 
-  test("OffsetSeqLog serialization - deserialization") {
+  testWithUninterruptibleThread("OffsetSeqLog serialization - deserialization") {
     withTempDir { temp =>
       // use non-existent directory to test whether log make the dir
       val dir = new File(temp, "dir")

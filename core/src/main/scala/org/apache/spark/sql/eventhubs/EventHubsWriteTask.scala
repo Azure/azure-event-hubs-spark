@@ -28,9 +28,9 @@ import org.apache.spark.sql.catalyst.expressions.{
   UnsafeMapData,
   UnsafeProjection
 }
+import org.apache.spark.sql.eventhubs.UTF8StringHelper.IntWrapper
 import org.apache.spark.sql.types.{ BinaryType, MapType, StringType }
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 
 /**
  * Writes out data in a single Spark task, without any concerns about how
@@ -82,7 +82,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
       None
     } else {
       val wrapper = new IntWrapper
-      assert(partitionId.toInt(wrapper))
+      assert(UTF8StringHelper.toInt(partitionId, wrapper))
       Some(wrapper.value)
     }
   }

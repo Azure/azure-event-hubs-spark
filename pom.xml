@@ -23,10 +23,10 @@
 
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.microsoft.azure</groupId>
-    <artifactId>azure-eventhubs-spark-parent_2.11</artifactId>
-    <version>2.3.9</version>
-    <packaging>pom</packaging>
+  <groupId>com.microsoft.azure</groupId>
+  <artifactId>azure-eventhubs-spark-parent_2.11</artifactId>
+  <version>2.2.9</version>
+  <packaging>pom</packaging>
 
     <name>EventHubs+Spark Parent POM</name>
     <description>Libraries to connect (and demonstrate) Azure Event Hubs with Apache Spark.</description>
@@ -47,12 +47,14 @@
         </developer>
     </developers>
 
-    <properties>
-        <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
-        <scala.binary.version>2.11</scala.binary.version>
-        <spark.version>2.3.0</spark.version>
-        <github.global.server>github</github.global.server>
-    </properties>
+  <properties>
+    <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
+    <scala.binary.version>2.11</scala.binary.version>
+    <spark.version>2.1.0</spark.version>
+    <github.global.server>github</github.global.server>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+  </properties>
 
     <modules>
         <module>core</module>
@@ -121,55 +123,55 @@
         <url>https://github.com/Azure/azure-event-hubs-spark/tree/master</url>
     </scm>
 
-    <dependencies>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-streaming_${scala.binary.version}</artifactId>
-            <version>${spark.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_2.11</artifactId>
-            <version>${spark.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.microsoft.azure</groupId>
-            <artifactId>azure-eventhubs</artifactId>
-            <version>2.2.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.binary.version}</artifactId>
-            <version>${spark.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_2.11</artifactId>
-            <version>${spark.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.scala-lang.modules</groupId>
-            <artifactId>scala-java8-compat_2.11</artifactId>
-            <version>0.9.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>1.10.8</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_${scala.binary.version}</artifactId>
-            <scope>test</scope>
-            <version>3.0.3</version>
-        </dependency>
-    </dependencies>
+<dependencies>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-streaming_${scala.binary.version}</artifactId>
+      <version>${spark.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_2.11</artifactId>
+      <version>${spark.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.microsoft.azure</groupId>
+      <artifactId>azure-eventhubs</artifactId>
+      <version>2.2.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-core_${scala.binary.version}</artifactId>
+      <version>${spark.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-sql_2.11</artifactId>
+      <version>${spark.version}</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang.modules</groupId>
+      <artifactId>scala-java8-compat_2.11</artifactId>
+      <version>0.9.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <version>1.10.8</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_${scala.binary.version}</artifactId>
+      <scope>test</scope>
+      <version>2.2.6</version>
+    </dependency>
+  </dependencies>
 
     <build>
         <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>

@@ -246,9 +246,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       currentSeqNos = Some(untilSeqNos)
     }
     if (start.isDefined && start.get == end) {
-      return sqlContext.internalCreateDataFrame(sqlContext.sparkContext.emptyRDD,
-                                                schema,
-                                                isStreaming = true)
+      return sqlContext.internalCreateDataFrame(sqlContext.sparkContext.emptyRDD, schema)
     }
     val fromSeqNos = start match {
       case Some(prevBatchEndOffset) =>
@@ -344,7 +342,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       "GetBatch generating RDD of offset range: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
 
-    sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = true)
+    sqlContext.internalCreateDataFrame(rdd, schema)
   }
 
   /**
@@ -387,5 +385,39 @@ private[eventhubs] object EventHubsSource {
 
   private def compare(a: ExecutorCacheTaskLocation, b: ExecutorCacheTaskLocation): Boolean = {
     if (a.host == b.host) { a.executorId > b.executorId } else { a.host > b.host }
+  }
+
+  /**
+   * Parse the log version from the given `text` -- will throw exception when the parsed version
+   * exceeds `maxSupportedVersion`, or when `text` is malformed (such as "xyz", "v", "v-1",
+   * "v123xyz" etc.)
+   */
+  def parseVersion(text: String, maxSupportedVersion: Int): Int = {
+    if (text.length > 0 && text(0) == 'v') {
+      val version =
+        try {
+          text.substring(1, text.length).toInt
+        } catch {
+          case _: NumberFormatException =>
+            throw new IllegalStateException(
+              s"Log file was malformed: failed to read correct log " +
+                s"version from $text.")
+        }
+      if (version > 0) {
+        if (version > maxSupportedVersion) {
+          throw new IllegalStateException(
+            s"UnsupportedLogVersion: maximum supported log version " +
+              s"is v$maxSupportedVersion, but encountered v$version. The log file was produced " +
+              s"by a newer version of Spark and cannot be read by this version. Please upgrade.")
+        } else {
+          return version
+        }
+      }
+    }
+
+    // reaching here means we failed to read the correct log version
+    throw new IllegalStateException(
+      s"Log file was malformed: failed to read correct log " +
+        s"version from $text.")
   }
 }

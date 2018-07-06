@@ -211,7 +211,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     val writer = createEventHubsWriter(
       input.toDF,
       ehConf,
-      withOutputMode = Some(OutputMode.Update())
+      withOutputMode = Some(OutputMode.Append())
     )(s"'$targetPart' as partition", "body")
 
     val reader = (e: EventHubsConf) => createReader(e).as[String].map(_.toInt)

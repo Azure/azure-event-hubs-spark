@@ -125,6 +125,6 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
         }
       }
 
-    sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = false).rdd
+    sqlContext.internalCreateDataFrame(rdd, schema).rdd
   }
 }

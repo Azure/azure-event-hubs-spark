@@ -67,6 +67,6 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
 
     val rdd = EventHubsSourceProvider.toInternalRow(
       new EventHubsRDD(sqlContext.sparkContext, ehConf.trimmed, offsetRanges))
-    sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = false).rdd
+    sqlContext.internalCreateDataFrame(rdd, schema).rdd
   }
 }

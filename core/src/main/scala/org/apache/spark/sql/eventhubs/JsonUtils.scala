@@ -54,14 +54,8 @@ private object JsonUtils {
   /**
    * Write NameAndPartitions as json string
    */
-  def partitions(partitions: Iterable[NameAndPartition]): String = {
-    val result = new mutable.HashMap[String, List[PartitionId]]
-    partitions.foreach { nAndP =>
-      val parts: List[PartitionId] = result.getOrElse(nAndP.ehName, Nil)
-      result += nAndP.ehName -> (nAndP.partitionId :: parts)
-    }
-    Serialization.write(result)
-  }
+  def partitions(partitions: Iterable[NameAndPartition]): String =
+    Serialization.write(partitions.groupBy(_.ehName))
 
   /**
    * Write per-NameAndPartition seqNos as json string

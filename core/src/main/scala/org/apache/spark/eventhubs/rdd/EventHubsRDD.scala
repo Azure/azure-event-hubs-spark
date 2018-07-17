@@ -25,8 +25,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
-import scala.collection.mutable.ArrayBuffer
-
 /**
  * An [[RDD]] for consuming from Event Hubs.
  *
@@ -79,13 +77,11 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       }
     }
 
-    val buf = new ArrayBuffer[EventData]
-    val res = context.runJob(
+    context.runJob(
       this,
       (tc: TaskContext, it: Iterator[EventData]) => it.take(parts(tc.partitionId)).toArray,
-      parts.keys.toArray)
-    res.foreach(buf ++= _)
-    buf.toArray
+      parts.keys.toArray
+    ).flatten
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {

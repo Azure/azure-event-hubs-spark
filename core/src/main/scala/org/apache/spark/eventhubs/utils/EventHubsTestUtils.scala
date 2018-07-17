@@ -244,13 +244,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
    *
    * @return the number events in the entire [[SimulatedEventHubs]]
    */
-  def totalSize: Int = {
-    var totalSize = 0
-    for (part <- partitions.keySet) {
-      totalSize += partitions(part).size
-    }
-    totalSize
-  }
+  def totalSize: Int = partitions.foldLeft(0)((a, b) => a + b._2.size)
 
   /**
    * Receive an iterable of [[EventData]].

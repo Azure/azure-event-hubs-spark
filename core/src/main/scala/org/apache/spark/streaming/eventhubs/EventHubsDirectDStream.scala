@@ -50,7 +50,7 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
 private[spark] class EventHubsDirectDStream private[spark] (
     _ssc: StreamingContext,
     ehConf: EventHubsConf,
-    clientFactory: (EventHubsConf => Client))
+    clientFactory: EventHubsConf => Client)
     extends InputDStream[EventData](_ssc)
     with Logging {
 

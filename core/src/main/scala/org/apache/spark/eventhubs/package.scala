@@ -48,22 +48,22 @@ package object eventhubs {
   val StartingSequenceNumber = 0L
   val DefaultEpoch = 0L
   val RetryCount = 3
-  val InternalOperationTimeout = 300.seconds
+  val InternalOperationTimeout: FiniteDuration = 300.seconds
 
   type PartitionId = Int
-  val PartitionId = Int
+  val PartitionId: Int.type = Int
 
   type Rate = Int
-  val Rate = Int
+  val Rate: Int.type = Int
 
   type Offset = Long
-  val Offset = Long
+  val Offset: Long.type = Long
 
   type EnqueueTime = Long
-  val EnqueueTime = Long
+  val EnqueueTime: Long.type = Long
 
   type SequenceNumber = Long
-  val SequenceNumber = Long
+  val SequenceNumber: Long.type = Long
 
   // Allow Strings to be converted to types defined in this library.
   implicit class EventHubsString(val str: String) extends AnyVal {

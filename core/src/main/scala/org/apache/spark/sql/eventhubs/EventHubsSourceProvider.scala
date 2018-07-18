@@ -19,6 +19,7 @@ package org.apache.spark.sql.eventhubs
 
 import java.util.Locale
 
+import org.apache.spark.eventhubs.EventHubsConf.UseSimulatedClientKey
 import org.apache.spark.eventhubs.{ EventHubsConf, _ }
 import org.apache.spark.eventhubs.client.{ Client, EventHubsClient }
 import org.apache.spark.eventhubs.utils.SimulatedClient
@@ -40,8 +41,6 @@ private[sql] class EventHubsSourceProvider
     with CreatableRelationProvider
     with Logging {
 
-  import EventHubsConf._
-
   override def shortName(): String = "eventhubs"
 
   /**
@@ -62,14 +61,7 @@ private[sql] class EventHubsSourceProvider
     EventHubsClient.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
 
-    val caseInsensitiveParameters = parameters.map {
-      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
-    }
-
-    new EventHubsSource(sqlContext,
-                        parameters,
-                        clientFactory(caseInsensitiveParameters),
-                        metadataPath)
+    new EventHubsSource(sqlContext, parameters, metadataPath)
   }
 
   /**
@@ -80,9 +72,7 @@ private[sql] class EventHubsSourceProvider
     EventHubsClient.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
 
-    val caseInsensitiveMap = parameters.map { case (k, v) => (k.toLowerCase(Locale.ROOT), v) }
-
-    new EventHubsRelation(sqlContext, parameters, clientFactory(caseInsensitiveMap))
+    new EventHubsRelation(sqlContext, parameters)
   }
 
   override def createSink(sqlContext: SQLContext,
@@ -96,7 +86,7 @@ private[sql] class EventHubsSourceProvider
       case (k, v) => (k.toLowerCase(Locale.ROOT), v)
     }
 
-    new EventHubsSink(sqlContext, caseInsensitiveMap, clientFactory(caseInsensitiveMap))
+    new EventHubsSink(sqlContext, caseInsensitiveMap)
   }
 
   override def createRelation(outerSQLContext: SQLContext,
@@ -119,10 +109,7 @@ private[sql] class EventHubsSourceProvider
       case (k, v) => (k.toLowerCase(Locale.ROOT), v)
     }
 
-    EventHubsWriter.write(outerSQLContext.sparkSession,
-                          data.queryExecution,
-                          caseInsensitiveMap,
-                          clientFactory(caseInsensitiveMap))
+    EventHubsWriter.write(outerSQLContext.sparkSession, data.queryExecution, caseInsensitiveMap)
 
     /* This method is suppose to return a relation that reads the data that was written.
      * We cannot support this for EventHubs. Therefore, in order to make things consistent,
@@ -140,19 +127,9 @@ private[sql] class EventHubsSourceProvider
             "operation is not usable.")
     }
   }
-
-  private def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client = {
-    if (caseInsensitiveParams
-          .getOrElse(UseSimulatedClientKey.toLowerCase, DefaultUseSimulatedClient)
-          .toBoolean) {
-      SimulatedClient.apply
-    } else {
-      EventHubsClient.apply
-    }
-  }
 }
 
-private[sql] object EventHubsSourceProvider extends Serializable {
+object EventHubsSourceProvider extends Serializable {
   def eventHubsSchema: StructType = {
     StructType(
       Seq(
@@ -166,4 +143,13 @@ private[sql] object EventHubsSourceProvider extends Serializable {
         StructField("properties", MapType(StringType, StringType), nullable = true)
       ))
   }
+
+  def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client =
+    if (caseInsensitiveParams
+          .getOrElse(UseSimulatedClientKey.toLowerCase, DefaultUseSimulatedClient)
+          .toBoolean) {
+      SimulatedClient.apply
+    } else {
+      EventHubsClient.apply
+    }
 }

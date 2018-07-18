@@ -392,26 +392,6 @@ object EventHubsConf extends Logging {
     Serialization.write[T](value)
   }
 
-  /**
-   * This method removes all parameters that aren't needed by Spark executors.
-   *
-   * @param ehConf the [[EventHubsConf]] that will be trimmed
-   * @return trimmed [[EventHubsConf]]
-   */
-  private[spark] def trim(ehConf: EventHubsConf): EventHubsConf = {
-    // These are the options needed by Spark executors
-    val include = Seq("eventhubs.connectionString",
-                      "eventhubs.consumerGroup",
-                      "eventhubs.receiverTimeout",
-                      "eventhubs.operationTimeout",
-                      "useSimulatedClient").map(_.toLowerCase)
-
-    val filtered = ehConf.settings.asScala.filter(k => include.contains(k._1))
-    val newConf = EventHubsConf(ehConf.connectionString)
-    for ((k, v) <- filtered) { newConf.set(k, v) }
-    newConf
-  }
-
   // Option key values
   val ConnectionStringKey = "eventhubs.connectionString"
   val ConsumerGroupKey = "eventhubs.consumerGroup"

@@ -23,6 +23,7 @@ import org.apache.spark.eventhubs.client.{ CachedEventHubsReceiver, CachedReceiv
 import org.apache.spark.eventhubs.utils.SimulatedCachedReceiver
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.eventhubs.EventHubsSourceProvider
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
 /**
@@ -31,8 +32,8 @@ import org.apache.spark.{ Partition, SparkContext, TaskContext }
  * Starting and ending ranges are set before hand for improved
  * checkpointing, resiliency, and delivery-semantics.
  *
- * @param sc the [[SparkContext]]
- * @param ehConf the Event Hubs specific configurations
+ * @param sc           the [[SparkContext]]
+ * @param ehConf       the Event Hubs specific configurations
  * @param offsetRanges offset ranges that define which Event Hubs data
  *                     belongs to this RDD
  */
@@ -46,12 +47,40 @@ private[spark] class EventHubsRDD(sc: SparkContext,
   import org.apache.spark.eventhubs._
 
   override def getPartitions: Array[Partition] = {
-    for { o <- offsetRanges.sortWith(_.partitionId < _.partitionId) } yield
-      new EventHubsRDDPartition(o.partitionId,
-                                o.nameAndPartition,
-                                o.fromSeqNo,
-                                o.untilSeqNo,
-                                o.preferredLoc)
+    val eventHubClient = EventHubsSourceProvider.clientFactory(ehConf.toMap)(ehConf)
+    val eventHubPartitions = eventHubClient.allBoundedSeqNos
+
+    offsetRanges
+      .map(offset => {
+        val eventHubPartition = eventHubPartitions.get(offset.partitionId)
+
+        val (start, end) = eventHubPartition match {
+          case Some((earliest, latest)) =>
+            if (offset.fromSeqNo < earliest) {
+              log.warn(s"""
+                   | Starting for Partition ${offset.partitionId} from seq $earliest instead of ${offset.fromSeqNo}")
+                   | Cannot start off since data has been cleaned up already
+            """.stripMargin)
+              // We want to recompute the end, so we either want to read until the end, or read the number of
+              // intended messages, which ever comes first
+              val numRead = offset.untilSeqNo - offset.fromSeqNo
+              (earliest, Math.min(latest, earliest + numRead))
+            } else {
+              (offset.fromSeqNo, offset.untilSeqNo)
+            }
+          case None => (offset.fromSeqNo, offset.untilSeqNo)
+        }
+
+        new EventHubsRDDPartition(
+          offset.partitionId,
+          offset.nameAndPartition,
+          start,
+          end,
+          offset.preferredLoc
+        )
+      })
+      .sortBy(_.partitionId)
+      .toArray
   }
 
   override def count: Long = offsetRanges.map(_.count).sum
@@ -118,7 +147,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
    * de-queue. For cache misses, a receiver needs to be created and we wait for
    * events to be sent over the wire.
    *
-   * @param part the partition for which events will be consumed
+   * @param part    the partition for which events will be consumed
    * @param context the [[TaskContext]]
    */
   private class EventHubsRDDIterator(part: EventHubsRDDPartition, context: TaskContext)
@@ -148,4 +177,5 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       event
     }
   }
+
 }

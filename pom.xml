@@ -25,7 +25,7 @@
 
   <groupId>com.microsoft.azure</groupId>
   <artifactId>azure-eventhubs-spark-parent_2.11</artifactId>
-  <version>2.3.2</version>
+  <version>2.3.3</version>
   <packaging>pom</packaging>
 
   <name>EventHubs+Spark Parent POM</name>

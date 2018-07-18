@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.eventhubs
 
-import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{ AnalysisException, SparkSession }
 import org.apache.spark.sql.catalyst.expressions.Attribute
@@ -64,13 +62,12 @@ private[eventhubs] object EventHubsWriter extends Logging {
   def write(
       sparkSession: SparkSession,
       queryExecution: QueryExecution,
-      parameters: Map[String, String],
-      clientFactory: (EventHubsConf) => Client
+      parameters: Map[String, String]
   ): Unit = {
     val schema = queryExecution.analyzed.output
     validateQuery(schema, parameters)
     queryExecution.toRdd.foreachPartition { iter =>
-      val writeTask = new EventHubsWriteTask(parameters, schema, clientFactory)
+      val writeTask = new EventHubsWriteTask(parameters, schema)
       Utils.tryWithSafeFinally(block = writeTask.execute(iter))(
         finallyBlock = writeTask.close()
       )

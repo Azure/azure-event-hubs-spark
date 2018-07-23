@@ -29,7 +29,6 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.compat.java8.FutureConverters._
 
 /**
  * A [[Client]] which connects to an event hub instance. All interaction
@@ -133,11 +132,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @param partition the partition that will be queried
    * @return a [[Future]] containing the latest sequence number for the specified partition
    */
-  private def latestSeqNoF(partition: PartitionId): Future[SequenceNumber] = {
-    getRunTimeInfoF(partition).map { r =>
-      r.getLastEnqueuedSequenceNumber + 1
-    }
-  }
+  private def latestSeqNoF(partition: PartitionId): Future[SequenceNumber] =
+    getRunTimeInfoF(partition).map(_.getLastEnqueuedSequenceNumber + 1)
 
   /**
    * The number of partitions in the EventHubs instance.

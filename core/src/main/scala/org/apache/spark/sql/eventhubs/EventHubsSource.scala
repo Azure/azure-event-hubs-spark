@@ -84,7 +84,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
  */
 private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                          options: Map[String, String],
-                                                         clientFactory: (EventHubsConf => Client),
+                                                         clientFactory: EventHubsConf => Client,
                                                          metadataPath: String)
     extends Source
     with Logging {

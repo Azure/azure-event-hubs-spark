@@ -53,13 +53,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
   import org.apache.spark.eventhubs._
 
-  private var _client: EventHubClient = _
-  private def client: EventHubClient = {
-    if (_client == null) {
-      _client = ClientConnectionPool.borrowClient(ehConf)
-    }
-    _client
-  }
+  private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
   private def createReceiver(requestSeqNo: SequenceNumber): Unit = {
     logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")

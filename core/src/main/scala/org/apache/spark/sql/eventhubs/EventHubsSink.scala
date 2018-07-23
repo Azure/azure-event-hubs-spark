@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.streaming.Sink
  */
 private[eventhubs] class EventHubsSink(sqlContext: SQLContext,
                                        parameters: Map[String, String],
-                                       clientFactory: (EventHubsConf) => Client)
+                                       clientFactory: EventHubsConf => Client)
     extends Sink
     with Logging {
 

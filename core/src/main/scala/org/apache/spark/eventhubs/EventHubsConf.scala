@@ -109,13 +109,11 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param obj the object being compared
    * @return true if they are equal; otherwise, return false
    */
-  override def equals(obj: Any): Boolean = {
+  override def equals(obj: Any): Boolean =
     obj match {
       case that: EventHubsConf => self.settings.equals(that.settings)
       case _                   => false
     }
-
-  }
 
   /**
    * Sets the connection string which will be used to connect to
@@ -406,7 +404,7 @@ object EventHubsConf extends Logging {
                       "eventhubs.consumerGroup",
                       "eventhubs.receiverTimeout",
                       "eventhubs.operationTimeout",
-                      "useSimulatedClient").map(s => s.toLowerCase)
+                      "useSimulatedClient").map(_.toLowerCase)
 
     val filtered = ehConf.settings.asScala.filter(k => include.contains(k._1))
     val newConf = EventHubsConf(ehConf.connectionString)

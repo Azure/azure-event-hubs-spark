@@ -74,7 +74,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private def closeReceiver(): Unit = {
     Try(_receiver.closeSync()) match {
       case Success(_) => _receiver = null
-      case Failure(e) => logInfo("closeSync failed in cached receiver.", e)
+      case Failure(e) =>
+        logInfo("closeSync failed in cached receiver.", e)
+        _receiver = null
     }
   }
 
@@ -90,30 +92,33 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
 
   private def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
-    var event: EventData = null
-    var i: java.lang.Iterable[EventData] = null
-    while (i == null) {
-      i = try {
-        receiver.receiveSync(1)
-      } catch {
-        case r: ReceiverDisconnectedException =>
-          throw new Exception(
-            "You are likely running multiple Spark jobs with the same consumer group. " +
-              "For each Spark job, please create and use a unique consumer group to avoid this issue.",
-            r
-          )
+    def receiveOneEvent: EventData = {
+      var event: EventData = null
+      var i: java.lang.Iterable[EventData] = null
+      while (i == null) {
+        i = try {
+          receiver.receiveSync(1)
+        } catch {
+          case r: ReceiverDisconnectedException =>
+            throw new Exception(
+              "You are likely running multiple Spark jobs with the same consumer group. " +
+                "For each Spark job, please create and use a unique consumer group to avoid this issue.",
+              r
+            )
+        }
       }
+      event = i.iterator.next
+      event
     }
-    event = i.iterator.next
 
+    var event: EventData = receiveOneEvent
     if (requestSeqNo != event.getSystemProperties.getSequenceNumber) {
       logWarning(
         s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
           s"Recreating receiver for $nAndP")
       closeReceiver()
       createReceiver(requestSeqNo)
-      while (i == null) { i = receiver.receiveSync(1) }
-      event = i.iterator.next
+      event = receiveOneEvent
       assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
              errWrongSeqNo(requestSeqNo, event.getSystemProperties.getSequenceNumber))
     }

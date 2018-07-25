@@ -108,9 +108,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
           val latest = r.getLastEnqueuedSequenceNumber + 1
           i -> (earliest, latest)
         }
-    val result = Await.result(Future.sequence(futures), InternalOperationTimeout)
-
-    result.toMap
+    Await
+      .result(Future.sequence(futures), InternalOperationTimeout)
+      .toMap
   }
 
   /**

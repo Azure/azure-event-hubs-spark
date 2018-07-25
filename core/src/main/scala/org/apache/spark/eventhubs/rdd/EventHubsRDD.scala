@@ -23,7 +23,6 @@ import org.apache.spark.eventhubs.client.{ CachedEventHubsReceiver, CachedReceiv
 import org.apache.spark.eventhubs.utils.SimulatedCachedReceiver
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.eventhubs.EventHubsSourceProvider
 import org.apache.spark.{ Partition, SparkContext, TaskContext }
 
 /**
@@ -46,42 +45,18 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
   import org.apache.spark.eventhubs._
 
-  override def getPartitions: Array[Partition] = {
-    val eventHubClient = EventHubsSourceProvider.clientFactory(ehConf.toMap)(ehConf)
-    val eventHubPartitions = eventHubClient.allBoundedSeqNos
-
+  override def getPartitions: Array[Partition] =
     offsetRanges
-      .map(offset => {
-        val eventHubPartition = eventHubPartitions.get(offset.partitionId)
-
-        val (start, end) = eventHubPartition match {
-          case Some((earliest, latest)) =>
-            if (offset.fromSeqNo < earliest) {
-              log.warn(s"""
-                   | Starting for Partition ${offset.partitionId} from seq $earliest instead of ${offset.fromSeqNo}")
-                   | Cannot start off since data has been cleaned up already
-            """.stripMargin)
-              // We want to recompute the end, so we either want to read until the end, or read the number of
-              // intended messages, which ever comes first
-              val numRead = offset.untilSeqNo - offset.fromSeqNo
-              (earliest, Math.min(latest, earliest + numRead))
-            } else {
-              (offset.fromSeqNo, offset.untilSeqNo)
-            }
-          case None => (offset.fromSeqNo, offset.untilSeqNo)
-        }
-
-        new EventHubsRDDPartition(
-          offset.partitionId,
-          offset.nameAndPartition,
-          start,
-          end,
-          offset.preferredLoc
-        )
-      })
       .sortBy(_.partitionId)
-      .toArray
-  }
+      .map(
+        o =>
+          new EventHubsRDDPartition(
+            o.partitionId,
+            o.nameAndPartition,
+            o.fromSeqNo,
+            o.untilSeqNo,
+            o.preferredLoc
+        ))
 
   override def count: Long = offsetRanges.map(_.count).sum
 
@@ -106,11 +81,13 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       }
     }
 
-    context.runJob(
-      this,
-      (tc: TaskContext, it: Iterator[EventData]) => it.take(parts(tc.partitionId)).toArray,
-      parts.keys.toArray
-    ).flatten
+    context
+      .runJob(
+        this,
+        (tc: TaskContext, it: Iterator[EventData]) => it.take(parts(tc.partitionId)).toArray,
+        parts.keys.toArray
+      )
+      .flatten
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
@@ -177,5 +154,4 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       event
     }
   }
-
 }

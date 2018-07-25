@@ -47,10 +47,9 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
  * @param ehConf the configurations related to your EventHubs. See [[EventHubsConf]] for detail.
  * @param clientFactory the factory method that creates an EventHubsClient
  */
-private[spark] class EventHubsDirectDStream private[spark] (
-    _ssc: StreamingContext,
-    ehConf: EventHubsConf,
-    clientFactory: EventHubsConf => Client)
+private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingContext,
+                                                            ehConf: EventHubsConf,
+                                                            clientFactory: EventHubsConf => Client)
     extends InputDStream[EventData](_ssc)
     with Logging {
 

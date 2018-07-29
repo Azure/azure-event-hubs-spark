@@ -177,11 +177,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // If not, we'll report possible data loss.
     earliestSeqNos = Some(earliestAndLatest.map {
       case (p, (e, _)) => NameAndPartition(ehName, p) -> e
-    }.toMap)
+    })
 
     val latest = earliestAndLatest.map {
       case (p, (_, l)) => NameAndPartition(ehName, p) -> l
-    }.toMap
+    }
 
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>

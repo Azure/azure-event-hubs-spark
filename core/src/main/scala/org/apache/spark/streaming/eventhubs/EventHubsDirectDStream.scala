@@ -47,10 +47,9 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
  * @param ehConf the configurations related to your EventHubs. See [[EventHubsConf]] for detail.
  * @param clientFactory the factory method that creates an EventHubsClient
  */
-private[spark] class EventHubsDirectDStream private[spark] (
-    _ssc: StreamingContext,
-    ehConf: EventHubsConf,
-    clientFactory: EventHubsConf => Client)
+private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingContext,
+                                                            ehConf: EventHubsConf,
+                                                            clientFactory: EventHubsConf => Client)
     extends InputDStream[EventData](_ssc)
     with Logging {
 
@@ -84,13 +83,7 @@ private[spark] class EventHubsDirectDStream private[spark] (
   protected def earliestAndLatest()
     : (Map[PartitionId, SequenceNumber], Map[PartitionId, SequenceNumber]) = {
     val earliestAndLatest = ehClient.allBoundedSeqNos
-    val earliest = earliestAndLatest.map {
-      case (p, (e, _)) => p -> e
-    }.toMap
-    val latest = earliestAndLatest.map {
-      case (p, (_, l)) => p -> l
-    }.toMap
-    (earliest, latest)
+    (earliestAndLatest.mapValues(_._1), earliestAndLatest.mapValues(_._2))
   }
 
   protected def clamp(

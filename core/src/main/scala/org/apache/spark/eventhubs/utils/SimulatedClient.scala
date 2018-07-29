@@ -71,10 +71,10 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
    *
    * @return the earliest and latest sequence numbers for all partitions in the Event Hub
    */
-  override def allBoundedSeqNos: Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
-    for (i <- 0 until partitionCount)
-      yield (i, (eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)))
-  }
+  override def allBoundedSeqNos: Map[PartitionId, (SequenceNumber, SequenceNumber)] =
+    (0 until partitionCount)
+      .map(i => i -> (eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)))
+      .toMap
 
   /**
    * Translates starting (or ending) positions to sequence numbers.
@@ -102,8 +102,7 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
       require(positions.get.forall(x => x._2.seqNo >= 0L))
       require(positions.get.size == partitionCount)
       positions.get.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues {
-        seqNo =>
-          { if (seqNo == -1L) 0L else seqNo }
+        seqNo => { if (seqNo == -1L) 0L else seqNo }
       }
     }
   }

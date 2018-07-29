@@ -99,16 +99,17 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    *
    * @return the earliest and latest sequence numbers for all partitions in the Event Hub
    */
-  override def allBoundedSeqNos: Seq[(PartitionId, (SequenceNumber, SequenceNumber))] = {
+  override def allBoundedSeqNos: Map[PartitionId, (SequenceNumber, SequenceNumber)] = {
     val futures = for (i <- 0 until partitionCount)
       yield
         getRunTimeInfoF(i) map { r =>
           val earliest =
             if (r.getBeginSequenceNumber == -1L) 0L else r.getBeginSequenceNumber
           val latest = r.getLastEnqueuedSequenceNumber + 1
-          (i, (earliest, latest))
+
+          i -> (earliest, latest)
         }
-    Await.result(Future.sequence(futures), InternalOperationTimeout)
+    Await.result(Future.sequence(futures), InternalOperationTimeout).toMap
   }
 
   /**
@@ -118,12 +119,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @param partition the partition that will be queried
    * @return A [[Future]] containing the earliest sequence number for the specified partition
    */
-  private def earliestSeqNoF(partition: PartitionId): Future[SequenceNumber] = {
+  private def earliestSeqNoF(partition: PartitionId): Future[SequenceNumber] =
     getRunTimeInfoF(partition).map { r =>
       val seqNo = r.getBeginSequenceNumber
       if (seqNo == -1L) 0L else seqNo
     }
-  }
 
   /**
    * Provides a [[Future]] containing the latest (highest) sequence number that

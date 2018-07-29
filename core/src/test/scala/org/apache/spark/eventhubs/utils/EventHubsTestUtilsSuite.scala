@@ -143,7 +143,7 @@ class EventHubsTestUtilsSuite
 
     val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
-    val results = client.allBoundedSeqNos.toMap
+    val results = client.allBoundedSeqNos
     assert(results(0) == (0, 1))
     assert(results(1) == (0, 2))
     assert(results(2) == (0, 3))

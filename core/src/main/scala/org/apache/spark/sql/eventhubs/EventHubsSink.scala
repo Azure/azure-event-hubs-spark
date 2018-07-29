@@ -26,9 +26,7 @@ import org.apache.spark.sql.execution.streaming.Sink
 /**
  * A [[Sink]] to write data to an Event Hubs instance.
  */
-private[eventhubs] class EventHubsSink(sqlContext: SQLContext,
-                                       parameters: Map[String, String],
-                                       clientFactory: EventHubsConf => Client)
+private[eventhubs] class EventHubsSink(sqlContext: SQLContext, parameters: Map[String, String])
     extends Sink
     with Logging {
 
@@ -40,7 +38,7 @@ private[eventhubs] class EventHubsSink(sqlContext: SQLContext,
     if (batchId <= latestBatchId) {
       logInfo(s"Skipping already committed batch $batchId")
     } else {
-      EventHubsWriter.write(sqlContext.sparkSession, data.queryExecution, parameters, clientFactory)
+      EventHubsWriter.write(sqlContext.sparkSession, data.queryExecution, parameters)
       latestBatchId = batchId
     }
   }

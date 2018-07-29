@@ -31,8 +31,8 @@ import org.apache.spark.{ Partition, SparkContext, TaskContext }
  * Starting and ending ranges are set before hand for improved
  * checkpointing, resiliency, and delivery-semantics.
  *
- * @param sc the [[SparkContext]]
- * @param ehConf the Event Hubs specific configurations
+ * @param sc           the [[SparkContext]]
+ * @param ehConf       the Event Hubs specific configurations
  * @param offsetRanges offset ranges that define which Event Hubs data
  *                     belongs to this RDD
  */
@@ -45,14 +45,18 @@ private[spark] class EventHubsRDD(sc: SparkContext,
 
   import org.apache.spark.eventhubs._
 
-  override def getPartitions: Array[Partition] = {
-    for { o <- offsetRanges.sortWith(_.partitionId < _.partitionId) } yield
-      new EventHubsRDDPartition(o.partitionId,
-                                o.nameAndPartition,
-                                o.fromSeqNo,
-                                o.untilSeqNo,
-                                o.preferredLoc)
-  }
+  override def getPartitions: Array[Partition] =
+    offsetRanges
+      .sortBy(_.partitionId)
+      .map(
+        o =>
+          new EventHubsRDDPartition(
+            o.partitionId,
+            o.nameAndPartition,
+            o.fromSeqNo,
+            o.untilSeqNo,
+            o.preferredLoc
+        ))
 
   override def count: Long = offsetRanges.map(_.count).sum
 
@@ -77,11 +81,13 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       }
     }
 
-    context.runJob(
-      this,
-      (tc: TaskContext, it: Iterator[EventData]) => it.take(parts(tc.partitionId)).toArray,
-      parts.keys.toArray
-    ).flatten
+    context
+      .runJob(
+        this,
+        (tc: TaskContext, it: Iterator[EventData]) => it.take(parts(tc.partitionId)).toArray,
+        parts.keys.toArray
+      )
+      .flatten
   }
 
   override def getPreferredLocations(split: Partition): Seq[String] = {
@@ -118,7 +124,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
    * de-queue. For cache misses, a receiver needs to be created and we wait for
    * events to be sent over the wire.
    *
-   * @param part the partition for which events will be consumed
+   * @param part    the partition for which events will be consumed
    * @param context the [[TaskContext]]
    */
   private class EventHubsRDDIterator(part: EventHubsRDDPartition, context: TaskContext)

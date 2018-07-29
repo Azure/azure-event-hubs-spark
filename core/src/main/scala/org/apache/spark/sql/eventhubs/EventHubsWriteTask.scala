@@ -32,12 +32,11 @@ import org.apache.spark.unsafe.types.UTF8String.IntWrapper
  * class will automatically trigger task aborts.
  */
 private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
-                                            inputSchema: Seq[Attribute],
-                                            clientFactory: (EventHubsConf) => Client)
+                                            inputSchema: Seq[Attribute])
     extends EventHubsRowWriter(inputSchema) {
 
-  private var sender: Client = _
   private val ehConf = EventHubsConf.toConf(parameters)
+  private var sender: Client = _
 
   /**
    * Writers data out to EventHubs
@@ -45,7 +44,7 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
    * @param iterator contains all rows to be written to EventHubs
    */
   def execute(iterator: Iterator[InternalRow]): Unit = {
-    sender = clientFactory(ehConf)
+    sender = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
     while (iterator.hasNext) {
       val currentRow = iterator.next
       sendRow(currentRow, sender)

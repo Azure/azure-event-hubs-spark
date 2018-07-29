@@ -135,10 +135,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val parameters =
         getEventHubsConf(eventHub.name).toMap
 
-      val source = new EventHubsSource(sqlContext,
-                                       parameters,
-                                       SimulatedClient.apply,
-                                       metadataPath.getAbsolutePath)
+      val source = new EventHubsSource(sqlContext, parameters, metadataPath.getAbsolutePath)
 
       source.getOffset.get // Write initial offset
 
@@ -176,10 +173,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       val offset = EventHubsSourceOffset((eh, 0, 0L), (eh, 1, 0L), (eh, 2, 0L))
       futureMetadataLog.add(0, offset)
 
-      val source = new EventHubsSource(sqlContext,
-                                       parameters,
-                                       SimulatedClient.apply,
-                                       metadataPath.getAbsolutePath)
+      val source = new EventHubsSource(sqlContext, parameters, metadataPath.getAbsolutePath)
 
       val e = intercept[java.lang.IllegalStateException] {
         source.getOffset.get // Read initial offset

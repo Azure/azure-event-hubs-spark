@@ -52,8 +52,6 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.jackson.Serialization
 
 import collection.JavaConverters._
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * A [[Source]] that reads data from Event Hubs.
@@ -83,8 +81,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
  * This allows events to be prefetched before they're needed by Spark.
  */
 private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
-                                                         options: Map[String, String],
-                                                         clientFactory: EventHubsConf => Client,
+                                                         parameters: Map[String, String],
                                                          metadataPath: String)
     extends Source
     with Logging {
@@ -94,17 +91,17 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private lazy val partitionCount: Int = ehClient.partitionCount
 
-  private val ehConf = EventHubsConf.toConf(options)
+  private val ehConf = EventHubsConf.toConf(parameters)
   private val ehName = ehConf.name
 
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger: Option[Long] =
-    Option(options.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
+    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
 
   private var _client: Client = _
   private[spark] def ehClient = {
-    if (_client == null) _client = clientFactory(ehConf)
+    if (_client == null) _client = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
     _client
   }
 
@@ -307,7 +304,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       }
     }.toArray
 
-    val rdd = new EventHubsRDD(sc, EventHubsConf.trim(ehConf), offsetRanges)
+    val rdd = new EventHubsRDD(sc, ehConf.trimmed, offsetRanges)
       .mapPartitionsWithIndex { (p, iter) =>
         {
           iter.map { ed =>

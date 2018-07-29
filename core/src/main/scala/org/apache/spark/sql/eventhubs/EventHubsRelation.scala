@@ -28,9 +28,7 @@ import org.apache.qpid.proton.amqp.{
   UnsignedLong,
   UnsignedShort
 }
-import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
-import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -39,7 +37,6 @@ import org.apache.spark.sql.{ Row, SQLContext }
 import org.apache.spark.sql.sources.{ BaseRelation, TableScan }
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.types.UTF8String
-import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 import scala.language.postfixOps
@@ -49,24 +46,23 @@ import collection.JavaConverters._
  * A [[BaseRelation]] to allow batch queries against Event Hubs data.
  */
 private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
-                                           options: Map[String, String],
-                                           clientFactory: (EventHubsConf => Client))
+                                           parameters: Map[String, String])
     extends BaseRelation
     with TableScan
     with Logging {
 
   import org.apache.spark.eventhubs._
 
-  private val ehConf = EventHubsConf.toConf(options)
+  private val ehConf = EventHubsConf.toConf(parameters)
+  private val eventHubClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
 
   override def schema: StructType = EventHubsSourceProvider.eventHubsSchema
 
   override def buildScan(): RDD[Row] = {
-    val client = clientFactory(ehConf)
-    val partitionCount: Int = client.partitionCount
+    val partitionCount: Int = eventHubClient.partitionCount
 
-    val fromSeqNos = client.translate(ehConf, partitionCount)
-    val untilSeqNos = client.translate(ehConf, partitionCount, useStart = false)
+    val fromSeqNos = eventHubClient.translate(ehConf, partitionCount)
+    val untilSeqNos = eventHubClient.translate(ehConf, partitionCount, useStart = false)
 
     require(fromSeqNos.forall(f => f._2 >= 0L),
             "Currently only sequence numbers can be passed in your starting positions.")
@@ -79,13 +75,13 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
       val untilSeqNo = untilSeqNos(p)
       OffsetRange(ehConf.name, p, fromSeqNo, untilSeqNo, None)
     }.toArray
-    client.close()
+    eventHubClient.close()
 
     logInfo(
       "GetBatch generating RDD of with offsetRanges: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
 
-    val rdd = new EventHubsRDD(sqlContext.sparkContext, EventHubsConf.trim(ehConf), offsetRanges)
+    val rdd = new EventHubsRDD(sqlContext.sparkContext, ehConf.trimmed, offsetRanges)
       .mapPartitionsWithIndex { (p, iter) =>
         {
           iter.map { ed =>

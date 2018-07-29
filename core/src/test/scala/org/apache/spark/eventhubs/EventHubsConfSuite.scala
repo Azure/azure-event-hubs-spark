@@ -207,7 +207,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(actual.equals(expected))
   }
 
-  test("trim") {
+  test("trimmedConfig") {
     val originalConf = testUtils
       .getEventHubsConf()
       .setStartingPosition(EventPosition.fromStartOfStream)
@@ -220,7 +220,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setReceiverTimeout(Duration.ofSeconds(10))
       .setOperationTimeout(Duration.ofSeconds(10))
 
-    val newConf = EventHubsConf.trim(originalConf)
+    val newConf = originalConf.trimmed
 
     // original should be unmodified
     originalConf("eventhubs.connectionString")

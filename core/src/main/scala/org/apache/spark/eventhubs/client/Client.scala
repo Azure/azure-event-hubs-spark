@@ -59,7 +59,7 @@ private[spark] trait Client extends Serializable {
    *
    * @return the earliest and latest sequence numbers for all partitions in the Event Hub
    */
-  def allBoundedSeqNos: Seq[(PartitionId, (SequenceNumber, SequenceNumber))]
+  def allBoundedSeqNos: Map[PartitionId, (SequenceNumber, SequenceNumber)]
 
   /**
    * Translates all [[EventPosition]]s provided in the [[EventHubsConf]] to

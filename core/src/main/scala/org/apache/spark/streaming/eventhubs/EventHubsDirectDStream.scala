@@ -43,8 +43,8 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
  * sets the upper bound of events that will be received in a batch for
  * a single partition.
  *
- * @param _ssc the StreamingContext this stream belongs to
- * @param ehConf the configurations related to your EventHubs. See [[EventHubsConf]] for detail.
+ * @param _ssc          the StreamingContext this stream belongs to
+ * @param ehConf        the configurations related to your EventHubs. See [[EventHubsConf]] for detail.
  * @param clientFactory the factory method that creates an EventHubsClient
  */
 private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingContext,
@@ -59,6 +59,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
   private lazy val ehName = ehConf.name
 
   @transient private var _client: Client = _
+
   private[spark] def ehClient: Client = this.synchronized {
     if (_client == null) _client = clientFactory(ehConf)
     _client
@@ -69,6 +70,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
   private def init(): Unit = {
     fromSeqNos = ehClient.translate(ehConf, partitionCount)
   }
+
   init()
 
   protected[streaming] override val checkpointData = new EventHubDirectDStreamCheckpointData
@@ -80,20 +82,20 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
     None
   }
 
-  protected def earliestAndLatest()
+  protected def earliestAndLatest
     : (Map[PartitionId, SequenceNumber], Map[PartitionId, SequenceNumber]) = {
     val earliestAndLatest = ehClient.allBoundedSeqNos
     val earliest = earliestAndLatest.map {
       case (p, (e, _)) => p -> e
-    }.toMap
+    }
     val latest = earliestAndLatest.map {
       case (p, (_, l)) => p -> l
-    }.toMap
+    }
     (earliest, latest)
   }
 
   protected def clamp(
-      latestSeqNos: Map[PartitionId, SequenceNumber]): Map[PartitionId, SequenceNumber] = {
+                       latestSeqNos: Map[PartitionId, SequenceNumber]): Map[PartitionId, SequenceNumber] = {
     (for {
       (partitionId, latestSeqNo) <- latestSeqNos
       nAndP = NameAndPartition(ehConf.name, partitionId)
@@ -110,7 +112,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
     val numExecutors = sortedExecutors.length
     logDebug("Sorted executors: " + sortedExecutors.mkString(", "))
 
-    val (earliest, latest) = earliestAndLatest()
+    val (earliest, latest) = earliestAndLatest
     // Make sure our fromSeqNos are greater than or equal
     // to the earliest event in the service.
     fromSeqNos = fromSeqNos.map {
@@ -126,7 +128,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
     } yield
       OffsetRange(NameAndPartition(ehName, p), fromSeqNos(p), untilSeqNos(p), preferredLoc)).toArray
 
-    val rdd = new EventHubsRDD(context.sparkContext, ehConf, offsetRanges)
+    val rdd = new EventHubsRDD(context.sparkContext, ehConf.trimmed, offsetRanges)
 
     val description = offsetRanges.map(_.toString).mkString("\n")
     logInfo(s"Starting batch at $validTime for EH: $ehName with\n $description")
@@ -150,6 +152,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
   }
 
   private[eventhubs] class EventHubDirectDStreamCheckpointData extends DStreamCheckpointData(this) {
+
     import OffsetRange.OffsetRangeTuple
 
     def batchForTime: mutable.HashMap[Time, Array[OffsetRangeTuple]] = {
@@ -171,7 +174,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
         case (t, b) =>
           logInfo(s"Restoring EventHubsRDD for time $t ${b.mkString("[", ", ", "]")}")
           generatedRDDs += t -> new EventHubsRDD(context.sparkContext,
-                                                 ehConf,
+                                                 ehConf.trimmed,
                                                  b.map(OffsetRange(_)))
       }
     }
@@ -183,6 +186,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
       // publish nothing as there is no receiver
     }
   }
+
 }
 
 private[eventhubs] object EventHubsDirectDStream {
@@ -197,6 +201,10 @@ private[eventhubs] object EventHubsDirectDStream {
   }
 
   private def compare(a: ExecutorCacheTaskLocation, b: ExecutorCacheTaskLocation): Boolean = {
-    if (a.host == b.host) { a.executorId > b.executorId } else { a.host > b.host }
+    if (a.host == b.host) {
+      a.executorId > b.executorId
+    } else {
+      a.host > b.host
+    }
   }
 }

@@ -18,7 +18,6 @@
 package org.apache.spark.eventhubs
 
 import java.time.Duration
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.http.annotation.Experimental
@@ -63,11 +62,13 @@ final class EventHubsConf private (private val connectionStr: String)
       throw new NullPointerException(s"set: null value for $key")
     }
 
-    if (self.get(key.toLowerCase).isDefined) {
+    val lowerKey = key.toLowerCase
+
+    if (self.get(lowerKey).isDefined) {
       logWarning(s"$key has already been set to ${self.get(key).get}. Overwriting with $value")
     }
 
-    settings.put(key.toLowerCase, value.toString)
+    settings.put(lowerKey, value.toString)
     this
   }
 
@@ -145,6 +146,27 @@ final class EventHubsConf private (private val connectionStr: String)
   def setName(name: String): EventHubsConf = {
     val newConnStr = ConnectionStringBuilder(connectionString).setEventHubName(name).toString
     setConnectionString(newConnStr)
+  }
+
+  /**
+   * This method removes all parameters that aren't needed by Spark executors.
+   *
+   * @return trimmed [[EventHubsConf]]
+   */
+  private[spark] def trimmed: EventHubsConf = {
+    // These are the options needed by Spark executors
+    val include = Seq("eventhubs.connectionString",
+                      "eventhubs.consumerGroup",
+                      "eventhubs.receiverTimeout",
+                      "eventhubs.operationTimeout",
+                      "useSimulatedClient").map(_.toLowerCase).toSet
+
+    val trimmedConfig = EventHubsConf(connectionString)
+    settings.asScala
+      .filter(k => include.contains(k._1))
+      .foreach(setting => trimmedConfig.set(setting._1, setting._2))
+
+    trimmedConfig
   }
 
   /** The currently set EventHub name */
@@ -410,11 +432,9 @@ object EventHubsConf extends Logging {
   def apply(connectionString: String) = new EventHubsConf(connectionString)
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
-    val caseInsensitiveMap = params.map {
-      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
-    }
+    val connectionString = params.find(_._1.toLowerCase == ConnectionStringKey.toLowerCase).get._2
 
-    val ehConf = EventHubsConf(caseInsensitiveMap(ConnectionStringKey.toLowerCase))
+    val ehConf = EventHubsConf(connectionString)
 
     for ((k, v) <- params) { ehConf.set(k, v) }
 

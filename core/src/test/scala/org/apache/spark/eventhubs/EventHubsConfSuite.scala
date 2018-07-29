@@ -207,6 +207,50 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(actual.equals(expected))
   }
 
+  test("trimmedConfig") {
+    val originalConf = testUtils
+      .getEventHubsConf()
+      .setStartingPosition(EventPosition.fromStartOfStream)
+      .setStartingPositions(Map(NameAndPartition("foo", 0) -> EventPosition.fromEndOfStream))
+      .setEndingPosition(EventPosition.fromStartOfStream)
+      .setEndingPositions(Map(NameAndPartition("foo", 0) -> EventPosition.fromEndOfStream))
+      .setMaxRatePerPartition(1000)
+      .setMaxRatesPerPartition(Map(NameAndPartition("foo", 0) -> 12))
+      .setMaxEventsPerTrigger(100)
+      .setReceiverTimeout(Duration.ofSeconds(10))
+      .setOperationTimeout(Duration.ofSeconds(10))
+
+    val newConf = originalConf.trimmed
+
+    // original should be unmodified
+    originalConf("eventhubs.connectionString")
+    originalConf("eventhubs.consumerGroup")
+    originalConf("eventhubs.startingPosition")
+    originalConf("eventhubs.startingPositions")
+    originalConf("eventhubs.endingPosition")
+    originalConf("eventhubs.endingPositions")
+    originalConf("eventhubs.maxRatePerPartition")
+    originalConf("eventhubs.maxRatesPerPartition")
+    originalConf("eventhubs.receiverTimeout")
+    originalConf("eventhubs.operationTimeout")
+    originalConf("maxEventsPerTrigger")
+    originalConf("useSimulatedClient")
+
+    // newConf should be trimmed
+    newConf("eventhubs.connectionString")
+    newConf("eventhubs.consumerGroup")
+    intercept[NoSuchElementException] { newConf("eventhubs.startingPosition") }
+    intercept[NoSuchElementException] { newConf("eventhubs.startingPositions") }
+    intercept[NoSuchElementException] { newConf("eventhubs.endingPosition") }
+    intercept[NoSuchElementException] { newConf("eventhubs.endingPositions") }
+    intercept[NoSuchElementException] { newConf("eventhubs.maxRatePerPartition") }
+    intercept[NoSuchElementException] { newConf("eventhubs.maxRatesPerPartition") }
+    newConf("eventhubs.receiverTimeout")
+    newConf("eventhubs.operationTimeout")
+    intercept[NoSuchElementException] { newConf("maxEventsPerTrigger") }
+    newConf("useSimulatedClient")
+  }
+
   test("validate - with EntityPath") {
     assert(testUtils.getEventHubsConf().validate)
   }

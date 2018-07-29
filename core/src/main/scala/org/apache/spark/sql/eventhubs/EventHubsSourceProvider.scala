@@ -17,18 +17,16 @@
 
 package org.apache.spark.sql.eventhubs
 
-import java.util.Locale
-
 import org.apache.spark.eventhubs.EventHubsConf.UseSimulatedClientKey
-import org.apache.spark.eventhubs.{ EventHubsConf, _ }
 import org.apache.spark.eventhubs.client.{ Client, EventHubsClient }
 import org.apache.spark.eventhubs.utils.SimulatedClient
+import org.apache.spark.eventhubs.{ EventHubsConf, _ }
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{ AnalysisException, DataFrame, SQLContext, SaveMode }
 import org.apache.spark.sql.execution.streaming.{ Sink, Source }
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{ AnalysisException, DataFrame, SQLContext, SaveMode }
 
 /**
  * The provider class for the [[EventHubsSource]].
@@ -82,11 +80,7 @@ private[sql] class EventHubsSourceProvider
     EventHubsClient.userAgent =
       s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
 
-    val caseInsensitiveMap = parameters.map {
-      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
-    }
-
-    new EventHubsSink(sqlContext, caseInsensitiveMap)
+    new EventHubsSink(sqlContext, parameters)
   }
 
   override def createRelation(outerSQLContext: SQLContext,
@@ -105,11 +99,7 @@ private[sql] class EventHubsSourceProvider
       case _ => // good
     }
 
-    val caseInsensitiveMap = parameters.map {
-      case (k, v) => (k.toLowerCase(Locale.ROOT), v)
-    }
-
-    EventHubsWriter.write(outerSQLContext.sparkSession, data.queryExecution, caseInsensitiveMap)
+    EventHubsWriter.write(outerSQLContext.sparkSession, data.queryExecution, parameters)
 
     /* This method is suppose to return a relation that reads the data that was written.
      * We cannot support this for EventHubs. Therefore, in order to make things consistent,
@@ -129,7 +119,7 @@ private[sql] class EventHubsSourceProvider
   }
 }
 
-object EventHubsSourceProvider extends Serializable {
+private[sql] object EventHubsSourceProvider extends Serializable {
   def eventHubsSchema: StructType = {
     StructType(
       Seq(
@@ -144,8 +134,8 @@ object EventHubsSourceProvider extends Serializable {
       ))
   }
 
-  def clientFactory(caseInsensitiveParams: Map[String, String]): EventHubsConf => Client =
-    if (caseInsensitiveParams
+  def clientFactory(parameters: Map[String, String]): EventHubsConf => Client =
+    if (parameters
           .getOrElse(UseSimulatedClientKey.toLowerCase, DefaultUseSimulatedClient)
           .toBoolean) {
       SimulatedClient.apply

@@ -89,6 +89,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   import EventHubsConf._
   import EventHubsSource._
 
+  private lazy val ehClient =  EventHubsSourceProvider.clientFactory(parameters)(ehConf)
   private lazy val partitionCount: Int = ehClient.partitionCount
 
   private val ehConf = EventHubsConf.toConf(parameters)
@@ -99,11 +100,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val maxOffsetsPerTrigger: Option[Long] =
     Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
 
-  private var _client: Client = _
-  private[spark] def ehClient = {
-    if (_client == null) _client = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
-    _client
-  }
 
   private lazy val initialPartitionSeqNos = {
     val metadataLog =
@@ -370,7 +366,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
  * Companion object for [[EventHubsSource]].
  */
 private[eventhubs] object EventHubsSource {
-  val InstructionsForPotentialDataLoss =
+  val InstructionsForPotentialDataLoss: String =
     """
       |Some data may have been lost because they are not available in EventHubs any more; either the
       | data was aged out by EventHubs or the EventHubs instance may have been deleted before all the data in the

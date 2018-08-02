@@ -32,7 +32,7 @@ import scala.concurrent.duration._
 
 /**
  * A utility object which makes retrying calls easier. There are methods
- * to retry synchronous and asynchronous calls.
+ * to retryJava synchronous and asynchronous calls.
  */
 private[spark] object RetryUtils extends Logging {
   import org.apache.spark.eventhubs._
@@ -71,7 +71,7 @@ private[spark] object RetryUtils extends Logging {
   /**
    * This retries an operation which returns a [[CompletableFuture]].
    * The [[CompletableFuture]] is always converted to a Scala [[Future]].
-   * The retry happens after a fixed delay.
+   * The retryJava happens after a fixed delay.
    *
    * Only retires if the exception received on failure is an
    * [[EventHubException]] where isTransient is true.
@@ -83,13 +83,34 @@ private[spark] object RetryUtils extends Logging {
    * @tparam T the result type from the [[CompletableFuture]]
    * @return the [[Future]] returned by the async operation
    */
-  final def retry[T](fn: => CompletableFuture[T],
-                     opName: String,
-                     maxRetry: Int = RetryCount,
-                     delay: Int = 10): Future[T] = {
+  final def retryJava[T](fn: => CompletableFuture[T],
+                         opName: String,
+                         maxRetry: Int = RetryCount,
+                         delay: Int = 10): Future[T] = {
+    retryScala(toScala(fn), opName, maxRetry, delay)
+  }
+
+  /**
+   * This retries an operation which returns a [[Future]].
+   * The retryJava happens after a fixed delay.
+   *
+   * Only retires if the exception received on failure is an
+   * [[EventHubException]] where isTransient is true.
+   *
+   * @param fn the function which creates the [[Future]]
+   * @param opName the name of the operation. This is to assist with logging.
+   * @param maxRetry The number of times the operation will be retried.
+   * @param delay The delay (in milliseconds) before the Future is run again.
+   * @tparam T the result type from the [[Future]]
+   * @return the [[Future]] returned by the async operation
+   */
+  final def retryScala[T](fn: => Future[T],
+                          opName: String,
+                          maxRetry: Int = RetryCount,
+                          delay: Int = 10): Future[T] = {
     logInfo(opName)
-    def retryHelper(fn: => CompletableFuture[T], retryCount: Int): Future[T] = {
-      toScala(fn).recoverWith {
+    def retryHelper(fn: => Future[T], retryCount: Int): Future[T] = {
+      fn.recoverWith {
         case eh: EventHubException if eh.getIsTransient =>
           if (retryCount >= maxRetry) {
             logInfo(s"failure: $opName")
@@ -113,5 +134,28 @@ private[spark] object RetryUtils extends Logging {
       }
     }
     retryHelper(fn, 0)
+  }
+
+  /**
+   * The same retry policy as [[retryJava()]] and [[retryScala()]]
+   * is used here. There is an additional constraint: the Future
+   * must complete with a *not* null result. If the result is
+   * null, we'll redo the operation until we get a *not* null
+   * result.
+   *
+   * @param fn the operation to be retried
+   * @param opName the name of the operation. Used for logging.
+   * @tparam T the type returned by the [[Future]]
+   * @return the [[Future]] from the provided async operation.
+   */
+  def retryNotNull[T](fn: => CompletableFuture[T], opName: String): Future[T] = {
+    logInfo(s"retryNotNull: $opName")
+    retryJava(fn, opName).flatMap { result =>
+      if (result == null) {
+        retryNotNull(fn, opName)
+      } else {
+        Future.successful(result)
+      }
+    }
   }
 }

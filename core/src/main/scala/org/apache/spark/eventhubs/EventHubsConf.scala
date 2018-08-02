@@ -352,7 +352,7 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set the operation timeout. We will retry failures when contacting the
+   * Set the operation timeout. We will retryJava failures when contacting the
    * EventHubs service for the length of this timeout.
    * Default: [[DefaultOperationTimeout]]
    *

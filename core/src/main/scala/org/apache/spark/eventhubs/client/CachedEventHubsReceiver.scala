@@ -147,6 +147,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
                                           batchSize: Int): EventData = {
+    logInfo(s"EventHubsCachedReceiver look up. For ${key(ehConf, nAndP)}")
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
       receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {

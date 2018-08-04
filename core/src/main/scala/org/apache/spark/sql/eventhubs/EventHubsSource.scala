@@ -26,6 +26,7 @@ import org.apache.qpid.proton.amqp.{
   Decimal128,
   Decimal32,
   Decimal64,
+  DescribedType,
   Symbol,
   UnsignedByte,
   UnsignedInteger,
@@ -33,7 +34,6 @@ import org.apache.qpid.proton.amqp.{
   UnsignedShort
 }
 import org.apache.spark.SparkContext
-import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
@@ -89,7 +89,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   import EventHubsConf._
   import EventHubsSource._
 
-  private lazy val ehClient =  EventHubsSourceProvider.clientFactory(parameters)(ehConf)
+  private lazy val ehClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
   private lazy val partitionCount: Int = ehClient.partitionCount
 
   private val ehConf = EventHubsConf.toConf(parameters)
@@ -99,7 +99,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private val maxOffsetsPerTrigger: Option[Long] =
     Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
-
 
   private lazy val initialPartitionSeqNos = {
     val metadataLog =
@@ -330,6 +329,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                     case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
                     case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
                     case c: Character        => c.toString.asInstanceOf[AnyRef]
+                    case d: DescribedType    => d.getDescribed
                     case default             => default
                   }
                   .map { p =>

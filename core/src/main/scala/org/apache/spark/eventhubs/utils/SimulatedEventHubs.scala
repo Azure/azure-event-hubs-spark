@@ -108,14 +108,16 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
    * @param partition the partition to send events to
    * @param event the event being sent
    */
-  private[utils] def send(partition: Option[PartitionId], event: EventData): Unit = {
+  private[utils] def send(partition: Option[PartitionId],
+                          event: EventData,
+                          properties: Option[Map[String, Object]]): Unit = {
     if (partition.isDefined) {
-      synchronized(partitions(partition.get).send(event))
+      synchronized(partitions(partition.get).send(event, properties))
     } else {
       synchronized {
         val part = count % this.partitionCount
         count += 1
-        this.send(Some(part), event)
+        this.send(Some(part), event, properties)
       }
     }
   }
@@ -202,9 +204,9 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
      *
      * @param event event being sent
      */
-    private[utils] def send(event: EventData): Unit = {
+    private[utils] def send(event: EventData, properties: Option[Map[String, Object]]): Unit = {
       // Need to add a Seq No to the EventData to properly simulate the service.
-      val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong, None)
+      val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong, properties)
       synchronized(data = data :+ e)
     }
 

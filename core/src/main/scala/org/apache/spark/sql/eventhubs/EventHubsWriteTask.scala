@@ -18,12 +18,18 @@
 package org.apache.spark.sql.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-import com.sun.org.apache.xalan.internal.xsltc.compiler.util.IntType
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{ Attribute, Cast, Literal, UnsafeProjection }
-import org.apache.spark.sql.types.{ BinaryType, StringType }
+import org.apache.spark.sql.catalyst.expressions.{
+  Attribute,
+  Cast,
+  Literal,
+  UnsafeMapData,
+  UnsafeProjection
+}
+import org.apache.spark.sql.types.{ BinaryType, MapType, StringType }
+import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 
 /**
@@ -63,6 +69,37 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
   protected val projection: UnsafeProjection = createProjection
 
+  private def toPartitionKey(partitionKey: UTF8String): Option[String] = {
+    if (partitionKey == null) {
+      None
+    } else {
+      Some(partitionKey.toString)
+    }
+  }
+
+  private def toPartitionId(partitionId: UTF8String): Option[Int] = {
+    if (partitionId == null) {
+      None
+    } else {
+      val wrapper = new IntWrapper
+      assert(partitionId.toInt(wrapper))
+      Some(wrapper.value)
+    }
+  }
+
+  private def toProperties(unsafeMap: UnsafeMapData): Option[Map[String, String]] = {
+    if (unsafeMap == null) {
+      None
+    } else {
+      val keys = unsafeMap.keyArray()
+      val values = unsafeMap.valueArray()
+      Some(
+        (0 until keys.numElements)
+          .map(i => keys.getUTF8String(i).toString -> values.getUTF8String(i).toString)
+          .toMap)
+    }
+  }
+
   /**
    * Send the specified row to EventHubs.
    */
@@ -72,28 +109,17 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
   ): Unit = {
     val projectedRow = projection(row)
     val body = projectedRow.getBinary(0)
-    val partitionKey = projectedRow.getUTF8String(1)
-    val partitionId = projectedRow.getUTF8String(2)
+    val partitionKey = toPartitionKey(projectedRow.getUTF8String(1))
+    val partitionId = toPartitionId(projectedRow.getUTF8String(2))
+    val properties = toProperties(projectedRow.getMap(3))
 
     require(
-      partitionId == null || partitionKey == null,
-      s"Both a partitionKey ($partitionKey) and partition ($partitionId) have been detected. Both can not be set.")
+      partitionId.isEmpty || partitionKey.isEmpty,
+      s"Both a partitionKey (${partitionKey.get}) and partition (${partitionId.get}) have been detected. Both can not be set."
+    )
 
     val event = EventData.create(body)
-
-    if (partitionKey != null) {
-      sender.send(event, partitionKey = Some(partitionKey.toString))
-    } else if (partitionId != null) {
-      val wrapper = new IntWrapper
-      if (partitionId.toInt(wrapper)) {
-        sender.createPartitionSender(wrapper.value)
-        sender.send(event, partition = Some(wrapper.value))
-      } else {
-        throw new IllegalStateException(s"partition '$partitionId' could not be parsed to an int.")
-      }
-    } else {
-      sender.send(event)
-    }
+    sender.send(event, partitionId, partitionKey, properties)
   }
 
   private def createProjection = {
@@ -135,9 +161,27 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
         )
     }
 
-    UnsafeProjection.create(Seq(Cast(bodyExpression, BinaryType),
-                                Cast(partitionKeyExpression, StringType),
-                                Cast(partitionIdExpression, StringType)),
-                            inputSchema)
+    val propertiesExpression =
+      inputSchema
+        .find(_.name == EventHubsWriter.PropertiesAttributeName)
+        .getOrElse(Literal(null, MapType(StringType, StringType)))
+
+    propertiesExpression.dataType match {
+      case MapType(StringType, StringType, true) => // good
+      case t =>
+        throw new IllegalStateException(
+          s"${EventHubsWriter.PropertiesAttributeName} attribute unsupported type $t"
+        )
+    }
+
+    UnsafeProjection.create(
+      Seq(
+        Cast(bodyExpression, BinaryType),
+        Cast(partitionKeyExpression, StringType),
+        Cast(partitionIdExpression, StringType),
+        Cast(propertiesExpression, MapType(StringType, StringType))
+      ),
+      inputSchema
+    )
   }
 }

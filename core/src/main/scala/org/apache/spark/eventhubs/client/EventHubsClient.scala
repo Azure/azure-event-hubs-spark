@@ -90,8 +90,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return [[PartitionRuntimeInformation]] for the partition
    */
   private def getRunTimeInfoF(partitionId: PartitionId): Future[PartitionRuntimeInformation] = {
-    retry(client.getPartitionRuntimeInformation(partitionId.toString),
-          s"getRunTimeInfoF for partition: $partitionId")
+    retryJava(client.getPartitionRuntimeInformation(partitionId.toString),
+              s"getRunTimeInfoF for partition: $partitionId")
   }
 
   /**
@@ -226,19 +226,14 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
           case StartOfStream => (nAndP.partitionId, earliestSeqNoF(nAndP.partitionId))
           case EndOfStream   => (nAndP.partitionId, latestSeqNoF(nAndP.partitionId))
           case _ =>
-            val receiver = retry(client.createEpochReceiver(consumerGroup,
-                                                            nAndP.partitionId.toString,
-                                                            pos.convert,
-                                                            DefaultEpoch),
-                                 "translate: epoch receiver creation.")
-
+            val receiver = retryJava(client.createEpochReceiver(consumerGroup,
+                                                                nAndP.partitionId.toString,
+                                                                pos.convert,
+                                                                DefaultEpoch),
+                                     "translate: epoch receiver creation.")
             val seqNo = receiver
               .flatMap { r =>
-                var event: Future[java.lang.Iterable[EventData]] = null
-                while (event == null) {
-                  event = retry(r.receive(1), "translate: receive call.")
-                }
-                event
+                retryNotNull(r.receive(1), "translate: receive call")
               }
               .map { e =>
                 e.iterator.next.getSystemProperties.getSequenceNumber

@@ -22,6 +22,7 @@ import org.apache.qpid.proton.amqp.{
   Decimal128,
   Decimal32,
   Decimal64,
+  DescribedType,
   Symbol,
   UnsignedByte,
   UnsignedInteger,
@@ -111,6 +112,7 @@ private[eventhubs] class EventHubsRelation(override val sqlContext: SQLContext,
                     case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
                     case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
                     case c: Character        => c.toString.asInstanceOf[AnyRef]
+                    case d: DescribedType    => d.getDescribed
                     case default             => default
                   }
                   .map { p =>

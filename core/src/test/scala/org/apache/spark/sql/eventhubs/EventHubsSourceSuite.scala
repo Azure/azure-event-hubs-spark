@@ -26,7 +26,9 @@ import org.apache.qpid.proton.amqp.{
   Decimal128,
   Decimal32,
   Decimal64,
+  DescribedType,
   Symbol,
+  UnknownDescribedType,
   UnsignedByte,
   UnsignedInteger,
   UnsignedLong,
@@ -509,7 +511,8 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
         "M" -> new Decimal64(13),
         "N" -> new UnsignedByte(1.toByte),
         "O" -> new UnsignedLong(987654321L),
-        "P" -> new UnsignedShort(Short.box(1))
+        "P" -> new UnsignedShort(Short.box(1)),
+        "Q" -> new UnknownDescribedType("descriptor", "described")
       ))
 
     // The expected serializes to:
@@ -532,6 +535,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
         case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
         case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
         case c: Character        => c.toString.asInstanceOf[AnyRef]
+        case d: DescribedType    => d.getDescribed
         case default             => default
       }
       .map { p =>

@@ -111,47 +111,18 @@ private[spark] class EventHubsRDD(sc: SparkContext,
           s"on partition: ${part.partitionId}")
       Iterator.empty
     } else {
-      new EventHubsRDDIterator(part, context)
-    }
-  }
-
-  /**
-   * An iterator which consumes events from Event Hubs for the ranges specified in the
-   * partition.
-   *
-   * [[CachedEventHubsReceiver]] is always used for consumption to take advantage of
-   * pre-fetching. For receiver cache hits, consumption is essentially an in-memory
-   * de-queue. For cache misses, a receiver needs to be created and we wait for
-   * events to be sent over the wire.
-   *
-   * @param part    the partition for which events will be consumed
-   * @param context the [[TaskContext]]
-   */
-  private class EventHubsRDDIterator(part: EventHubsRDDPartition, context: TaskContext)
-      extends Iterator[EventData] {
-
-    val cachedReceiver: CachedReceiver = if (ehConf.useSimulatedClient) {
-      SimulatedCachedReceiver
-    } else {
-      CachedEventHubsReceiver
-    }
-
-    logInfo(
-      s"Computing EventHubs ${part.name}, partition ${part.partitionId} " +
-        s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
-
-    var requestSeqNo: SequenceNumber = part.fromSeqNo
-
-    override def hasNext(): Boolean = requestSeqNo < part.untilSeqNo
-
-    override def next(): EventData = {
-      assert(hasNext(), "Can't call next() once untilSeqNo has been reached.")
-      val event = cachedReceiver.receive(ehConf,
-                                         part.nameAndPartition,
-                                         requestSeqNo,
-                                         (part.untilSeqNo - part.fromSeqNo).toInt)
-      requestSeqNo += 1
-      event
+      logInfo(
+        s"Computing EventHubs ${part.name}, partition ${part.partitionId} " +
+          s"sequence numbers ${part.fromSeqNo} => ${part.untilSeqNo}")
+      val cachedReceiver = if (ehConf.useSimulatedClient) {
+        SimulatedCachedReceiver
+      } else {
+        CachedEventHubsReceiver
+      }
+      cachedReceiver.receive(ehConf,
+                             part.nameAndPartition,
+                             part.fromSeqNo,
+                             (part.untilSeqNo - part.fromSeqNo).toInt)
     }
   }
 }

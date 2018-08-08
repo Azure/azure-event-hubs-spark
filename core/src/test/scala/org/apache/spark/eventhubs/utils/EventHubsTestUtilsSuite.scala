@@ -127,10 +127,9 @@ class EventHubsTestUtilsSuite
       }
     }
     val conf = testUtils.getEventHubsConf(eventHub.name)
-    // batchSize is just a dummy value.
     val event =
-      SimulatedCachedReceiver.receive(conf, NameAndPartition(conf.name, 0), 20, batchSize = 0)
-    assert(event.getSystemProperties.getSequenceNumber === 20)
+      SimulatedCachedReceiver.receive(conf, NameAndPartition(conf.name, 0), 20, batchSize = 1)
+    assert(event.next.getSystemProperties.getSequenceNumber === 20)
   }
 
   test("allBoundedSeqNo") {

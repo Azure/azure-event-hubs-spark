@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.eventhubs
 
-import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.qpid.proton.amqp._
@@ -121,7 +120,8 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
         "M" -> new Decimal64(13),
         "N" -> new UnsignedByte(1.toByte),
         "O" -> new UnsignedLong(987654321L),
-        "P" -> new UnsignedShort(Short.box(1))
+        "P" -> new UnsignedShort(Short.box(1)),
+        "Q" -> new UnknownDescribedType("descriptor", "described")
       ))
 
     // The expected serializes to:
@@ -144,6 +144,7 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
         case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
         case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
         case c: Character        => c.toString.asInstanceOf[AnyRef]
+        case d: DescribedType    => d.getDescribed
         case default             => default
       }
       .map { p =>

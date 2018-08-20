@@ -60,41 +60,26 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
-  private var _receiver: Future[PartitionReceiver] = _
-  private def receiver: Future[PartitionReceiver] = {
-    if (_receiver == null) {
-      throw new IllegalStateException(s"No receiver for $nAndP")
-    }
-    _receiver
-  }
-  createReceiver(startSeqNo)
-
-  private def createReceiver(requestSeqNo: SequenceNumber): Unit = {
-    assert(_receiver == null)
+  private lazy val receiver: Future[PartitionReceiver] = {
     logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(false)
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
-    _receiver = retryJava(
+    val epochReceiver = retryJava(
       client.createEpochReceiver(consumerGroup,
                                  nAndP.partitionId.toString,
-                                 EventPosition.fromSequenceNumber(requestSeqNo).convert,
+                                 EventPosition.fromSequenceNumber(startSeqNo).convert,
                                  DefaultEpoch,
                                  receiverOptions),
       "CachedReceiver creation."
     )
-    _receiver.onComplete {
-      case Success(r) => r.setPrefetchCount(DefaultPrefetchCount)
+    epochReceiver.onComplete {
+      case Success(x) => x.setPrefetchCount(DefaultPrefetchCount)
       case _          =>
     }
-  }
-
-  private def closeReceiver(): Unit = {
-    val r = Await.result(receiver, InternalOperationTimeout)
-    _receiver = null
-    retryJava(r.close(), "CachedReceiver close.")
+    epochReceiver
   }
 
   private def receiveOne: Future[Iterable[EventData]] = {
@@ -102,20 +87,26 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .flatMap { r =>
         retryNotNull(r.receive(1), "CachedReceiver receive call")
       }
-      .map { e =>
-        e.asScala
-      }
+      .map { _.asScala }
   }
 
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
     val event = Await.result(receiveOne, InternalOperationTimeout)
-    if (requestSeqNo != event.head.getSystemProperties.getSequenceNumber) {
-      logWarning(
-        s"$requestSeqNo did not match ${event.head.getSystemProperties.getSequenceNumber}." +
-          s"Recreating receiver for $nAndP")
-      closeReceiver()
-      createReceiver(requestSeqNo)
+    val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
+    if (receivedSeqNo < requestSeqNo) {
+      // If the receivedSeqNo is less than the requestSeqNo,
+      // then some batches must have been completed on a
+      // separate executor. This can happen when an executor
+      // is added then removed.
+      logWarning(s"$requestSeqNo did not match $receivedSeqNo. Advancing cursor for $nAndP")
+      val advanceBy = requestSeqNo - receivedSeqNo - 1
+      // Wait until the cursor advances to the correct spot.
+      Await.result(Future.sequence(for { _ <- 0 until advanceBy.toInt } yield receiveOne),
+                   InternalOperationTimeout)
       receiveOne
+    } else if (receivedSeqNo > requestSeqNo) {
+      throw new IllegalStateException(
+        s"Request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo.")
     } else {
       Future { event }
     }

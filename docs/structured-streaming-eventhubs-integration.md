@@ -280,6 +280,7 @@ The Dataframe being written to EventHubs should have the following columns in th
 | body (required) | string or binary |
 | partitionId (*optional) | string |
 | partitionKey (*optional) | string |
+| properties (optional) | map[string, string] |
 
 * Only one (partitionId or partitionKey) can be set at a time. If both are set, your Structured Streaming job will be stopped. 
 
@@ -288,6 +289,8 @@ using a round-robin model. Alternatively, if a partitionId is provided, the quer
 Sending to a single partition is *not* a recommended pattern. Finally, if a partionKey is provided, each event will be sent with the
 provided partitionKey. For more information on how a partitionKey works, click 
 [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-programming-guide#partition-key).
+
+Users can also provided properties via a `map[string, string]` if they would like to send any additional properties with their events. 
 
 ### Creating an EventHubs Sink for Streaming Queries 
 

@@ -70,7 +70,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
   def receive(eventCount: Int,
               partition: Int,
               seqNo: SequenceNumber): java.lang.Iterable[EventData] = {
-    (for { _ <- 0 until eventCount } yield partitions(partition).get(seqNo)).asJava
+    (for { i <- 0 until eventCount } yield partitions(partition).get(seqNo + i)).asJava
   }
 
   /**

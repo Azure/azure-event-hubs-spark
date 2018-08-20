@@ -27,6 +27,7 @@ import org.json4s.jackson.Serialization
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import collection.JavaConverters._
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -72,9 +73,18 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   override def send(event: EventData,
                     partition: Option[Rate] = None,
-                    partitionKey: Option[String] = None): Unit = {
+                    partitionKey: Option[String] = None,
+                    properties: Option[Map[String, String]] = None): Unit = {
+    if (properties.isDefined) {
+      val p = event.getProperties
+      p.putAll(properties.get.asJava)
+    }
+
     if (partition.isDefined) {
-      require(partitionSender.getPartitionId.toInt == partition.get)
+      if (partitionSender.getPartitionId.toInt != partition.get) {
+        logInfo("Recreating partition sender.")
+        createPartitionSender(partition.get)
+      }
       partitionSender.sendSync(event)
     } else if (partitionKey.isDefined) {
       client.sendSync(event, partitionKey.get)

@@ -58,11 +58,12 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
    */
   override def send(event: EventData,
                     partition: Option[Int] = None,
-                    partitionKey: Option[String] = None): Unit = {
+                    partitionKey: Option[String] = None,
+                    properties: Option[Map[String, String]]): Unit = {
     if (partitionKey.isDefined) {
       throw new UnsupportedOperationException
     } else {
-      eventHub.send(partition, event)
+      eventHub.send(partition, event, properties)
     }
   }
 

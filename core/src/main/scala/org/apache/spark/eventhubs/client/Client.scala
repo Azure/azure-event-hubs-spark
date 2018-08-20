@@ -51,7 +51,8 @@ private[spark] trait Client extends Serializable {
    */
   def send(event: EventData,
            partition: Option[Int] = None,
-           partitionKey: Option[String] = None): Unit
+           partitionKey: Option[String] = None,
+           properties: Option[Map[String, String]] = None): Unit
 
   /**
    * Returns the earliest and latest sequence numbers for all partitions

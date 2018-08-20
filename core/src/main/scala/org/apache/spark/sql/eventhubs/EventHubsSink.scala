@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.eventhubs
 
-import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{ DataFrame, SQLContext }
 import org.apache.spark.sql.execution.streaming.Sink

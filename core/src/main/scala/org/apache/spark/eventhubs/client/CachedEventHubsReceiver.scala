@@ -18,17 +18,21 @@
 package org.apache.spark.eventhubs.client
 
 import com.microsoft.azure.eventhubs._
+import org.apache.spark.eventhubs.utils.RetryUtils.{ retryJava, retryNotNull }
 import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
 
-import scala.util.{ Failure, Success, Try }
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.collection.JavaConverters._
+import scala.util.Success
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
                                  nAndP: NameAndPartition,
                                  requestSeqNo: SequenceNumber,
-                                 batchSize: Int): EventData
+                                 batchSize: Int): Iterator[EventData]
 }
 
 /**
@@ -48,83 +52,85 @@ private[spark] trait CachedReceiver {
  * @param nAndP the Event Hub name and partition that the receiver is connected to.
  */
 private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
-                                                       nAndP: NameAndPartition)
+                                                       nAndP: NameAndPartition,
+                                                       startSeqNo: SequenceNumber)
     extends Logging {
 
   import org.apache.spark.eventhubs._
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
-  private def createReceiver(requestSeqNo: SequenceNumber): Unit = {
+  private lazy val receiver: Future[PartitionReceiver] = {
     logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(false)
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
-    _receiver = client.createEpochReceiverSync(
-      consumerGroup,
-      nAndP.partitionId.toString,
-      EventPosition.fromSequenceNumber(requestSeqNo).convert,
-      DefaultEpoch,
-      receiverOptions)
-    _receiver.setPrefetchCount(DefaultPrefetchCount)
-  }
-
-  private def closeReceiver(): Unit = {
-    Try(_receiver.closeSync()) match {
-      case Success(_) => _receiver = null
-      case Failure(e) =>
-        logInfo("closeSync failed in cached receiver.", e)
-        _receiver = null
+    val epochReceiver = retryJava(
+      client.createEpochReceiver(consumerGroup,
+                                 nAndP.partitionId.toString,
+                                 EventPosition.fromSequenceNumber(startSeqNo).convert,
+                                 DefaultEpoch,
+                                 receiverOptions),
+      "CachedReceiver creation."
+    )
+    epochReceiver.onComplete {
+      case Success(x) => x.setPrefetchCount(DefaultPrefetchCount)
+      case _          =>
     }
+    epochReceiver
   }
 
-  private var _receiver: PartitionReceiver = _
-  private def receiver: PartitionReceiver = {
-    if (_receiver == null) {
-      throw new IllegalStateException(s"No receiver for $nAndP")
-    }
-    _receiver
-  }
-
-  private def errWrongSeqNo(requestSeqNo: SequenceNumber, receivedSeqNo: SequenceNumber): String =
-    s"requestSeqNo $requestSeqNo does not match the received sequence number $receivedSeqNo"
-
-  private def receive(requestSeqNo: SequenceNumber, batchSize: Int): EventData = {
-    def receiveOneEvent: EventData = {
-      var event: EventData = null
-      var i: java.lang.Iterable[EventData] = null
-      while (i == null) {
-        i = try {
-          receiver.receiveSync(1)
-        } catch {
-          case r: ReceiverDisconnectedException =>
-            throw new Exception(
-              "You are likely running multiple Spark jobs with the same consumer group. " +
-                "For each Spark job, please create and use a unique consumer group to avoid this issue.",
-              r
-            )
-        }
+  private def receiveOne: Future[Iterable[EventData]] = {
+    receiver
+      .flatMap { r =>
+        retryNotNull(r.receive(1), "CachedReceiver receive call")
       }
-      event = i.iterator.next
-      event
-    }
+      .map { _.asScala }
+  }
 
-    var event: EventData = receiveOneEvent
-    if (requestSeqNo != event.getSystemProperties.getSequenceNumber) {
-      logWarning(
-        s"$requestSeqNo did not match ${event.getSystemProperties.getSequenceNumber}." +
-          s"Recreating receiver for $nAndP")
-      closeReceiver()
-      createReceiver(requestSeqNo)
-      event = receiveOneEvent
-      assert(requestSeqNo == event.getSystemProperties.getSequenceNumber,
-             errWrongSeqNo(requestSeqNo, event.getSystemProperties.getSequenceNumber))
+  private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
+    val event = Await.result(receiveOne, InternalOperationTimeout)
+    val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
+    if (receivedSeqNo < requestSeqNo) {
+      // If the receivedSeqNo is less than the requestSeqNo,
+      // then some batches must have been completed on a
+      // separate executor. This can happen when an executor
+      // is added then removed.
+      logWarning(s"$requestSeqNo did not match $receivedSeqNo. Advancing cursor for $nAndP")
+      val advanceBy = requestSeqNo - receivedSeqNo - 1
+      // Wait until the cursor advances to the correct spot.
+      Await.result(Future.sequence(for { _ <- 0 until advanceBy.toInt } yield receiveOne),
+                   InternalOperationTimeout)
+      receiveOne
+    } else if (receivedSeqNo > requestSeqNo) {
+      throw new IllegalStateException(
+        s"Request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo.")
+    } else {
+      Future { event }
+    }
+  }
+
+  private def receive(requestSeqNo: SequenceNumber, batchSize: Int): Iterator[EventData] = {
+    val first = checkCursor(requestSeqNo)
+    val theRest = Future.sequence(for { _ <- 1 until batchSize } yield receiveOne)
+    val combined = for {
+      theRestRes <- theRest
+      firstRes <- first
+    } yield firstRes ++ theRestRes.flatten
+    val sorted = combined.map { data =>
+      data.toSeq
+        .sortWith((e1, e2) =>
+          e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
+        .iterator
     }
     val newPrefetchCount = if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum else batchSize
-    receiver.setPrefetchCount(newPrefetchCount)
-    event
+    receiver.onComplete {
+      case Success(r) => r.setPrefetchCount(newPrefetchCount)
+      case _          =>
+    }
+    Await.result(sorted, InternalOperationTimeout)
   }
 }
 
@@ -146,7 +152,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   private[eventhubs] override def receive(ehConf: EventHubsConf,
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
-                                          batchSize: Int): EventData = {
+                                          batchSize: Int): Iterator[EventData] = {
     logInfo(s"EventHubsCachedReceiver look up. For ${key(ehConf, nAndP)}")
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
@@ -160,8 +166,6 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   def apply(ehConf: EventHubsConf,
             nAndP: NameAndPartition,
             startSeqNo: SequenceNumber): CachedEventHubsReceiver = {
-    val cr = new CachedEventHubsReceiver(ehConf, nAndP)
-    cr.createReceiver(startSeqNo)
-    cr
+    new CachedEventHubsReceiver(ehConf, nAndP, startSeqNo)
   }
 }

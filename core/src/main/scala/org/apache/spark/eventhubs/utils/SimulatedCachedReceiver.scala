@@ -21,6 +21,8 @@ import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.eventhubs.client.CachedReceiver
 
+import scala.collection.JavaConverters._
+
 /**
  * Simulated version of the cached receivers.
  */
@@ -40,7 +42,7 @@ private[spark] object SimulatedCachedReceiver extends CachedReceiver {
   override def receive(ehConf: EventHubsConf,
                        nAndP: NameAndPartition,
                        requestSeqNo: SequenceNumber,
-                       batchSize: Int): EventData = {
-    eventHubs(ehConf.name).receive(1, nAndP.partitionId, requestSeqNo).iterator().next()
+                       batchSize: Int): Iterator[EventData] = {
+    eventHubs(ehConf.name).receive(batchSize, nAndP.partitionId, requestSeqNo).iterator.asScala
   }
 }

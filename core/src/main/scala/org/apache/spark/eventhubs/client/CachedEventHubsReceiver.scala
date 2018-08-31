@@ -103,10 +103,18 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       // Wait until the cursor advances to the correct spot.
       Await.result(Future.sequence(for { _ <- 0 until advanceBy.toInt } yield receiveOne),
                    InternalOperationTimeout)
-      receiveOne
+      val scrooch = Await.result(receiveOne, InternalOperationTimeout)
+      assert(scrooch.head.getSystemProperties.getSequenceNumber == requestSeqNo)
+      Future { scrooch }
     } else if (receivedSeqNo > requestSeqNo) {
+      val info = Await.result(
+        retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
+                  "partitionRuntime"),
+        InternalOperationTimeout)
       throw new IllegalStateException(
-        s"Request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo.")
+        s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, request seqNo " +
+          s"$requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
+          s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
     } else {
       Future { event }
     }
@@ -125,12 +133,15 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
           e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
         .iterator
     }
-    val newPrefetchCount = if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum else batchSize
+    val newPrefetchCount =
+      if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum else batchSize * 2
     receiver.onComplete {
       case Success(r) => r.setPrefetchCount(newPrefetchCount)
       case _          =>
     }
-    Await.result(sorted, InternalOperationTimeout)
+    val (result, validate) = Await.result(sorted, InternalOperationTimeout).duplicate
+    assert(validate.size == batchSize)
+    result
   }
 }
 
@@ -153,7 +164,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
                                           batchSize: Int): Iterator[EventData] = {
-    logInfo(s"EventHubsCachedReceiver look up. For ${key(ehConf, nAndP)}")
+    logInfo(s"EventHubsCachedReceiver look up. For $nAndP, ${ehConf.consumerGroup}")
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
       receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {

@@ -108,7 +108,6 @@ private[spark] object RetryUtils extends Logging {
                           opName: String,
                           maxRetry: Int = RetryCount,
                           delay: Int = 10): Future[T] = {
-    logInfo(opName)
     def retryHelper(fn: => Future[T], retryCount: Int): Future[T] = {
       fn.recoverWith {
         case eh: EventHubException if eh.getIsTransient =>
@@ -149,7 +148,6 @@ private[spark] object RetryUtils extends Logging {
    * @return the [[Future]] from the provided async operation.
    */
   def retryNotNull[T](fn: => CompletableFuture[T], opName: String): Future[T] = {
-    logInfo(s"retryNotNull: $opName")
     retryJava(fn, opName).flatMap { result =>
       if (result == null) {
         retryNotNull(fn, opName)

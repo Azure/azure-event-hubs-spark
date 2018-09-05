@@ -69,14 +69,10 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
   private def createEventHubsWriter(
       input: DataFrame,
       ehConf: EventHubsConf,
-      withOutputMode: Option[OutputMode] = None,
-      properties: Option[Map[String, String]] = None)(withSelectExrp: String*): StreamingQuery = {
+      withOutputMode: Option[OutputMode] = None)(withSelectExrp: String*): StreamingQuery = {
     var stream: DataStreamWriter[Row] = null
     withTempDir { checkpointDir =>
       var df = input.toDF().withColumnRenamed("value", "body")
-      if (properties.isDefined) {
-        df = df.withColumn("properties", typedLit(properties.get))
-      }
       if (withSelectExrp.nonEmpty) {
         df = df.selectExpr(withSelectExrp: _*)
       }
@@ -229,89 +225,6 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
       }
       assert(testUtils.getEventHubs(eh).getPartitions(targetPart.toPartitionId).size == 9)
       checkDatasetUnorderly(reader(ehConf), 1, 2, 2, 3, 3, 3, 1, 2, 3)
-    } finally {
-      writer.stop()
-    }
-  }
-
-  test("streaming - write with properties and partition") {
-    val targetPart = "0"
-    val targetProperties = Map("a" -> "3", "b" -> "bar", "c" -> "spark")
-    val input = MemoryStream[String]
-    val eh = newEventHub()
-    testUtils.createEventHubs(eh, partitionCount = 10)
-    val ehConf = getEventHubsConf(eh)
-
-    val writer = createEventHubsWriter(
-      input.toDF,
-      ehConf,
-      withOutputMode = Some(OutputMode.Update()),
-      properties = Some(targetProperties)
-    )("properties", "body", s"'$targetPart' as partition")
-
-    val reader = (e: EventHubsConf) => createReader(e).as[String].map(_.toInt)
-
-    try {
-      input.addData("1", "2", "2", "3", "3", "3")
-      failAfter(streamingTimeout) {
-        writer.processAllAvailable()
-      }
-      assert(testUtils.getEventHubs(eh).getPartitions(targetPart.toPartitionId).size == 6)
-      checkDatasetUnorderly(reader(ehConf), 1, 2, 2, 3, 3, 3)
-      input.addData("1", "2", "3")
-      failAfter(streamingTimeout) {
-        writer.processAllAvailable()
-      }
-      assert(testUtils.getEventHubs(eh).getPartitions(targetPart.toPartitionId).size == 9)
-      checkDatasetUnorderly(reader(ehConf), 1, 2, 2, 3, 3, 3, 1, 2, 3)
-      assert(
-        testUtils
-          .getEventHubs(eh)
-          .getPartitions(targetPart.toPartitionId)
-          .getEvents
-          .head
-          .getProperties
-          .asScala == targetProperties)
-    } finally {
-      writer.stop()
-    }
-  }
-
-  test("streaming - write with properties") {
-    val targetProperties = Map("property" -> "foo", "another" -> "bar")
-    val input = MemoryStream[String]
-    val eh = newEventHub()
-    testUtils.createEventHubs(eh, partitionCount = 10)
-    val ehConf = getEventHubsConf(eh)
-
-    val writer = createEventHubsWriter(
-      input.toDF,
-      ehConf,
-      withOutputMode = Some(OutputMode.Update()),
-      properties = Some(targetProperties)
-    )("properties", "body")
-
-    val reader = (e: EventHubsConf) => createReader(e).as[String].map(_.toInt)
-
-    try {
-      input.addData("1", "2", "2", "3", "3", "3")
-      failAfter(streamingTimeout) {
-        writer.processAllAvailable()
-      }
-      checkDatasetUnorderly(reader(ehConf), 1, 2, 2, 3, 3, 3)
-      input.addData("1", "2", "3")
-      failAfter(streamingTimeout) {
-        writer.processAllAvailable()
-      }
-      checkDatasetUnorderly(reader(ehConf), 1, 2, 2, 3, 3, 3, 1, 2, 3)
-      assert(
-        testUtils
-          .getEventHubs(eh)
-          .getPartitions(0)
-          .getEvents
-          .head
-          .getProperties
-          .asScala == targetProperties)
     } finally {
       writer.stop()
     }

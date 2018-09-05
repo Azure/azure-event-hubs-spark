@@ -23,7 +23,7 @@ Structured streaming integration for Azure Event Hubs is ultimately run on the J
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.2
+  version = 2.3.3
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.

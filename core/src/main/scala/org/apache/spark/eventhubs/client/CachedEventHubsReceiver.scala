@@ -60,7 +60,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
-  private lazy val receiver: Future[PartitionReceiver] = {
+  private var receiver: Future[PartitionReceiver] = createReceiver(startSeqNo)
+
+  private def createReceiver(seqNo: SequenceNumber): Future[PartitionReceiver] = {
     logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val receiverOptions = new ReceiverOptions
@@ -70,7 +72,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val epochReceiver = retryJava(
       client.createEpochReceiver(consumerGroup,
                                  nAndP.partitionId.toString,
-                                 EventPosition.fromSequenceNumber(startSeqNo).convert,
+                                 EventPosition.fromSequenceNumber(seqNo).convert,
                                  DefaultEpoch,
                                  receiverOptions),
       "CachedReceiver creation."
@@ -93,28 +95,29 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
     val event = Await.result(receiveOne, InternalOperationTimeout)
     val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
-    if (receivedSeqNo < requestSeqNo) {
-      // If the receivedSeqNo is less than the requestSeqNo,
-      // then some batches must have been completed on a
-      // separate executor. This can happen when an executor
-      // is added then removed.
-      logWarning(s"$requestSeqNo did not match $receivedSeqNo. Advancing cursor for $nAndP")
-      val advanceBy = requestSeqNo - receivedSeqNo - 1
-      // Wait until the cursor advances to the correct spot.
-      Await.result(Future.sequence(for { _ <- 0 until advanceBy.toInt } yield receiveOne),
-                   InternalOperationTimeout)
-      val scrooch = Await.result(receiveOne, InternalOperationTimeout)
-      assert(scrooch.head.getSystemProperties.getSequenceNumber == requestSeqNo)
-      Future { scrooch }
-    } else if (receivedSeqNo > requestSeqNo) {
-      val info = Await.result(
-        retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
-                  "partitionRuntime"),
-        InternalOperationTimeout)
-      throw new IllegalStateException(
-        s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, request seqNo " +
-          s"$requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
-          s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
+
+    if (receivedSeqNo != requestSeqNo) {
+      // This can happen in two cases:
+      // 1) Your desired event is still in the service, but the receiver
+      //    cursor is in the wrong spot.
+      // 2) Your desired event has expired from the service.
+      // First, we'll check for case (1).
+      receiver = createReceiver(requestSeqNo)
+      val movedEvent = Await.result(receiveOne, InternalOperationTimeout)
+      val movedSeqNo = movedEvent.head.getSystemProperties.getSequenceNumber
+      if (movedSeqNo != requestSeqNo) {
+        // The event still isn't present. It must be (2).
+        val info = Await.result(
+          retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
+                    "partitionRuntime"),
+          InternalOperationTimeout)
+        throw new IllegalStateException(
+          s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, request seqNo " +
+            s"$requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
+            s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
+      } else {
+        Future { movedEvent }
+      }
     } else {
       Future { event }
     }

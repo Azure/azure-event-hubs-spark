@@ -46,7 +46,7 @@ Then add the following dependency declaration:
 ### SBT Dependency
 
     // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
-    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.3"
+    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.4"
  
 ## Filing Issues
 

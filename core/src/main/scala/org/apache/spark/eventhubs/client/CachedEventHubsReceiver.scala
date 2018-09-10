@@ -111,9 +111,12 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
           retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
                     "partitionRuntime"),
           InternalOperationTimeout)
+
+        val consumerGroup = ehConf.consumerGroup.getOrElse("$Default")
+        
         throw new IllegalStateException(
-          s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, request seqNo " +
-            s"$requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
+          s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
+            s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
             s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
       } else {
         Future { movedEvent }

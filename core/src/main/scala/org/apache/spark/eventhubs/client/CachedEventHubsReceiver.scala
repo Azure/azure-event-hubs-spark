@@ -84,16 +84,16 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     epochReceiver
   }
 
-  private def receiveOne: Future[Iterable[EventData]] = {
+  private def receiveOne(msg: String): Future[Iterable[EventData]] = {
     receiver
       .flatMap { r =>
-        retryNotNull(r.receive(1), "CachedReceiver receive call")
+        retryNotNull(r.receive(1), msg)
       }
       .map { _.asScala }
   }
 
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
-    val event = Await.result(receiveOne, InternalOperationTimeout)
+    val event = Await.result(receiveOne("checkCursor initial"), InternalOperationTimeout)
     val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
 
     if (receivedSeqNo != requestSeqNo) {
@@ -103,7 +103,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       // 2) Your desired event has expired from the service.
       // First, we'll check for case (1).
       receiver = createReceiver(requestSeqNo)
-      val movedEvent = Await.result(receiveOne, InternalOperationTimeout)
+      val movedEvent = Await.result(receiveOne("checkCursor move"), InternalOperationTimeout)
       val movedSeqNo = movedEvent.head.getSystemProperties.getSequenceNumber
       if (movedSeqNo != requestSeqNo) {
         // The event still isn't present. It must be (2).
@@ -125,25 +125,26 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def receive(requestSeqNo: SequenceNumber, batchSize: Int): Iterator[EventData] = {
-    val first = checkCursor(requestSeqNo)
-    val theRest = Future.sequence(for { _ <- 1 until batchSize } yield receiveOne)
-    val combined = for {
-      theRestRes <- theRest
-      firstRes <- first
-    } yield firstRes ++ theRestRes.flatten
-    val sorted = combined.map { data =>
-      data.toSeq
-        .sortWith((e1, e2) =>
-          e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
-        .iterator
-    }
+    // Retrieve the events. First, we get the first event in the batch.
+    // Then, if the succeeds, we collect the rest of the data.
+    val first = Await.result(checkCursor(requestSeqNo), InternalOperationTimeout)
+    val theRest = for { i <- 1 until batchSize } yield
+      Await.result(receiveOne(s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
+                   InternalOperationTimeout)
+    // Combine and sort the data.
+    val combined = first ++ theRest.flatten
+    val sorted = combined.toSeq
+      .sortWith((e1, e2) =>
+        e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
+      .iterator
+
     val newPrefetchCount =
       if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum else batchSize * 2
     receiver.onComplete {
       case Success(r) => r.setPrefetchCount(newPrefetchCount)
       case _          =>
     }
-    val (result, validate) = Await.result(sorted, InternalOperationTimeout).duplicate
+    val (result, validate) = sorted.duplicate
     assert(validate.size == batchSize)
     result
   }

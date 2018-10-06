@@ -21,25 +21,11 @@ import java.io._
 import java.nio.charset.StandardCharsets
 
 import org.apache.commons.io.IOUtils
-import org.apache.qpid.proton.amqp.{
-  Binary,
-  Decimal128,
-  Decimal32,
-  Decimal64,
-  DescribedType,
-  Symbol,
-  UnsignedByte,
-  UnsignedInteger,
-  UnsignedLong,
-  UnsignedShort
-}
 import org.apache.spark.SparkContext
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.util.{ ArrayBasedMapData, DateTimeUtils }
 import org.apache.spark.sql.execution.streaming.{
   HDFSMetadataLog,
   Offset,
@@ -48,10 +34,6 @@ import org.apache.spark.sql.execution.streaming.{
 }
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ DataFrame, SQLContext }
-import org.apache.spark.unsafe.types.UTF8String
-import org.json4s.jackson.Serialization
-
-import collection.JavaConverters._
 
 /**
  * A [[Source]] that reads data from Event Hubs.
@@ -299,51 +281,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       }
     }.toArray
 
-    val rdd = new EventHubsRDD(sc, ehConf.trimmed, offsetRanges)
-      .mapPartitionsWithIndex { (p, iter) =>
-        {
-          iter.map { ed =>
-            InternalRow(
-              ed.getBytes,
-              UTF8String.fromString(p.toString),
-              UTF8String.fromString(ed.getSystemProperties.getOffset),
-              ed.getSystemProperties.getSequenceNumber,
-              DateTimeUtils.fromJavaTimestamp(
-                new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
-              UTF8String.fromString(ed.getSystemProperties.getPublisher),
-              UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
-              ArrayBasedMapData(
-                ed.getProperties.asScala
-                  .mapValues {
-                    case b: Binary =>
-                      val buf = b.asByteBuffer()
-                      val arr = new Array[Byte](buf.remaining)
-                      buf.get(arr)
-                      arr.asInstanceOf[AnyRef]
-                    case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
-                    case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
-                    case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
-                    case s: Symbol           => s.toString.asInstanceOf[AnyRef]
-                    case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
-                    case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
-                    case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
-                    case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
-                    case c: Character        => c.toString.asInstanceOf[AnyRef]
-                    case d: DescribedType    => d.getDescribed
-                    case default             => default
-                  }
-                  .map { p =>
-                    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
-                  })
-            )
-          }
-        }
-      }
-
+    val rdd =
+      EventHubsSourceProvider.toInternalRow(new EventHubsRDD(sc, ehConf.trimmed, offsetRanges))
     logInfo(
       "GetBatch generating RDD of offset range: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
-
     sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = true)
   }
 

@@ -151,7 +151,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
         StructField("publisher", StringType),
         StructField("partitionKey", StringType),
         StructField("properties", MapType(StringType, StringType), nullable = true),
-        StructField("connectionDeviceID", StringType)
+        StructField("systemProperties", MapType(StringType, StringType), nullable = true)
       ))
   }
 
@@ -191,7 +191,9 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                 .map { p =>
                   UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
                 }),
-            ed.getSystemProperties.asScala.getOrElse("ConnectionDeviceId", null)
+            ArrayBasedMapData(ed.getSystemProperties.asScala.map { p =>
+              UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+            })
           )
         }
       }

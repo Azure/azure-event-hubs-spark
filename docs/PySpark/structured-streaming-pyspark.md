@@ -249,6 +249,7 @@ Each row in the source has the following schema:
 | partitionKey | string |
 | properties | map[string, json] |
 | connectionDeviceID | string |
+| systemProperties | map[string, json] |
 
 ## Writing Data to Event Hubs
 

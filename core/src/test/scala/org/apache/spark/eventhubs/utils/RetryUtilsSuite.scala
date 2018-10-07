@@ -29,47 +29,40 @@ import scala.concurrent.Future
 
 class RetryUtilsSuite extends FunSuite with ScalaFutures {
 
-  def failedWithEHE: Future[Int] = Future.failed(new EventHubException(true, "failedWith"))
-  def causedByEHE: Future[Int] = {
-    val causedBy = new EventHubException(true, "causedBy")
-    Future.failed(new IOException(causedBy))
-  }
-  def nonTransientEHE: Future[Int] = Future.failed(new EventHubException(false, "nonTransient"))
-
-  def incrementFutureStream(value: Int = 0): Stream[Future[Int]] =
-    Future(value) #:: incrementFutureStream(value + 1)
+  import RetryUtilsSuite._
 
   test("don't retry successful Future") {
-    val tries = incrementFutureStream(1).iterator
+    val tries = incrementFutureIterator(1)
     val result = RetryUtils.retryScala(tries.next, "test", maxRetry = 3, delay = 1).futureValue
     assert(1 === result)
   }
 
   test("don't retry failed Future with normal exception") {
-    val tries = (Future.failed(new IOException("not retry")) #:: incrementFutureStream(1)).iterator
+    val fails = Iterator(Future.failed(new IOException("not retry")))
+    val tries = fails ++ incrementFutureIterator(1)
     val exception =
       RetryUtils.retryScala(tries.next, "test", maxRetry = 3, delay = 1).failed.futureValue
     assert("not retry" === exception.getMessage)
   }
 
   test("don't retry failed Future with non-transient EventHubException") {
-    val tries = (nonTransientEHE #:: incrementFutureStream(1)).iterator
+    val tries = Iterator(nonTransientEHE()) ++ incrementFutureIterator(1)
     val exception =
       RetryUtils.retryScala(tries.next, "test", maxRetry = 3, delay = 1).failed.futureValue
     assert("nonTransient" === exception.getMessage)
   }
 
   test("retry maxRetry times until success") {
-    val fails = Stream(failedWithEHE, causedByEHE, failedWithEHE)
-    val tries = (fails #::: incrementFutureStream(4)).iterator
+    val fails = Iterator(failedWithEHE(), causedByEHE(), failedWithEHE())
+    val tries = fails ++ incrementFutureIterator(4)
 
     val result = RetryUtils.retryScala(tries.next, "test", maxRetry = 3, delay = 1).futureValue
     assert(4 === result)
   }
 
   test("retry maxRetry times until failure") {
-    val fails = Stream(failedWithEHE, causedByEHE, failedWithEHE, causedByEHE)
-    val tries = (fails #::: incrementFutureStream(4)).iterator
+    val fails = Iterator(failedWithEHE(), causedByEHE(), failedWithEHE(), causedByEHE())
+    val tries = fails ++ incrementFutureIterator(4)
 
     val exception =
       RetryUtils.retryScala(tries.next, "test", maxRetry = 3, delay = 1).failed.futureValue
@@ -82,8 +75,22 @@ class RetryUtilsSuite extends FunSuite with ScalaFutures {
     val normalFuture: CompletableFuture[Int] =
       CompletableFuture.completedFuture(10)
 
-    val tries = (Stream.continually(nullFuture).take(9) #::: Stream(normalFuture)).iterator
+    val tries = Iterator.continually(nullFuture).take(9) ++ Iterator(normalFuture)
     val result = RetryUtils.retryNotNull(tries.next, "test").futureValue
     assert(10 === result)
   }
+}
+
+object RetryUtilsSuite {
+  def failedWithEHE(): Future[Int] = Future.failed(new EventHubException(true, "failedWith"))
+
+  def causedByEHE(): Future[Int] = {
+    val causedBy = new EventHubException(true, "causedBy")
+    Future.failed(new IOException(causedBy))
+  }
+
+  def nonTransientEHE(): Future[Int] = Future.failed(new EventHubException(false, "nonTransient"))
+
+  def incrementFutureIterator(value: Int = 0): Iterator[Future[Int]] =
+    Iterator.from(value).map(Future(_))
 }

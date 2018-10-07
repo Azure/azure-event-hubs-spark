@@ -330,6 +330,25 @@ df.selectExpr("partitionKey", "body")
   .save()
 ```
 
+### ForeachWriter
+
+An implementation of `ForeachWriter` is also offered by the `EventHubsForeachWriter`. For simple round-robin sends, this is 
+the fastest way to write your data from Spark to Event Hubs. For sends involving properties, partition keys, etc, then you 
+need to use the `EventHubsSink`. A sample is shown below:
+
+```scala
+val ehConf = EventHubsConf("YOUR_CONNECTION_STRING") 
+val writer = EventHubsForeachWriter(ehConf)
+
+val query =
+  streamingSelectDF
+    .writeStream
+    .foreach(writer)
+    .outputMode("update")
+    .trigger(ProcessingTime("25 seconds"))
+    .start()
+```
+
 ## Managing Throughput
 
 When you create an Event Hubs namespace, you are prompted to choose how many throughput units you want for your namespace. 

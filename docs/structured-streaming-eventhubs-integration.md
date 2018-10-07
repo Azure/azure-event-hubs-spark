@@ -332,9 +332,9 @@ df.selectExpr("partitionKey", "body")
 
 ### ForeachWriter
 
-An implementation of `ForeachWriter` is also offered by the `EventHubsForeachWriter`. For simple round-robin sends, this is 
-the fastest way to write your data from Spark to Event Hubs. For sends involving properties, partition keys, etc, then you 
-need to use the `EventHubsSink`. A sample is shown below:
+An implementation of `ForeachWriter` is offered by the `EventHubsForeachWriter`. For simple round-robin sends, this is 
+the fastest way to write your data from Spark to Event Hubs. For any other send pattern, you 
+must use the `EventHubsSink`. A sample is shown below:
 
 ```scala
 val ehConf = EventHubsConf("YOUR_CONNECTION_STRING") 

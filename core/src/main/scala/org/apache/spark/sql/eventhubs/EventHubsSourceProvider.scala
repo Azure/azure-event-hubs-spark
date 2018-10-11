@@ -191,9 +191,14 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                 .map { p =>
                   UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
                 }),
-            ArrayBasedMapData(ed.getSystemProperties.asScala.map { p =>
-              UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
-            })
+            ArrayBasedMapData(
+              // Don't duplicate offset, enqueued time, and seqNo
+              (ed.getSystemProperties.asScala -- Seq(OffsetAnnotation,
+                                                     SequenceNumberAnnotation,
+                                                     EnqueuedTimeAnnotation))
+                .map { p =>
+                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                })
           )
         }
       }

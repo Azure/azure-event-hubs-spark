@@ -50,6 +50,10 @@ package object eventhubs {
   val RetryCount = 3
   val InternalOperationTimeout: FiniteDuration = 300.seconds
 
+  val OffsetAnnotation = "x-opt-offset"
+  val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
+  val SequenceNumberAnnotation = "x-opt-sequence-number"
+
   type PartitionId = Int
   val PartitionId: Int.type = Int
 

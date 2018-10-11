@@ -17,16 +17,36 @@
 
 package org.apache.spark.sql.eventhubs
 
+import org.apache.qpid.proton.amqp.{
+  Binary,
+  Decimal128,
+  Decimal32,
+  Decimal64,
+  DescribedType,
+  Symbol,
+  UnsignedByte,
+  UnsignedInteger,
+  UnsignedLong,
+  UnsignedShort
+}
 import org.apache.spark.eventhubs.EventHubsConf.UseSimulatedClientKey
 import org.apache.spark.eventhubs.client.{ Client, EventHubsClient }
+import org.apache.spark.eventhubs.rdd.EventHubsRDD
 import org.apache.spark.eventhubs.utils.SimulatedClient
 import org.apache.spark.eventhubs.{ EventHubsConf, _ }
 import org.apache.spark.internal.Logging
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.util.{ ArrayBasedMapData, DateTimeUtils }
 import org.apache.spark.sql.execution.streaming.{ Sink, Source }
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.streaming.OutputMode
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ AnalysisException, DataFrame, SQLContext, SaveMode }
+import org.apache.spark.unsafe.types.UTF8String
+import org.json4s.jackson.Serialization
+
+import collection.JavaConverters._
 
 /**
  * The provider class for the [[EventHubsSource]].
@@ -130,8 +150,59 @@ private[sql] object EventHubsSourceProvider extends Serializable {
         StructField("enqueuedTime", TimestampType),
         StructField("publisher", StringType),
         StructField("partitionKey", StringType),
-        StructField("properties", MapType(StringType, StringType), nullable = true)
+        StructField("properties", MapType(StringType, StringType), nullable = true),
+        StructField("systemProperties", MapType(StringType, StringType), nullable = true)
       ))
+  }
+
+  def toInternalRow(rdd: EventHubsRDD): RDD[InternalRow] = {
+    rdd.mapPartitionsWithIndex { (p, iter) =>
+      {
+        iter.map { ed =>
+          InternalRow(
+            ed.getBytes,
+            UTF8String.fromString(p.toString),
+            UTF8String.fromString(ed.getSystemProperties.getOffset),
+            ed.getSystemProperties.getSequenceNumber,
+            DateTimeUtils.fromJavaTimestamp(
+              new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
+            UTF8String.fromString(ed.getSystemProperties.getPublisher),
+            UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
+            ArrayBasedMapData(
+              ed.getProperties.asScala
+                .mapValues {
+                  case b: Binary =>
+                    val buf = b.asByteBuffer()
+                    val arr = new Array[Byte](buf.remaining)
+                    buf.get(arr)
+                    arr.asInstanceOf[AnyRef]
+                  case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
+                  case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
+                  case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
+                  case s: Symbol           => s.toString.asInstanceOf[AnyRef]
+                  case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
+                  case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
+                  case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
+                  case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
+                  case c: Character        => c.toString.asInstanceOf[AnyRef]
+                  case d: DescribedType    => d.getDescribed
+                  case default             => default
+                }
+                .map { p =>
+                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                }),
+            ArrayBasedMapData(
+              // Don't duplicate offset, enqueued time, and seqNo
+              (ed.getSystemProperties.asScala -- Seq(OffsetAnnotation,
+                                                     SequenceNumberAnnotation,
+                                                     EnqueuedTimeAnnotation))
+                .map { p =>
+                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                })
+          )
+        }
+      }
+    }
   }
 
   def clientFactory(parameters: Map[String, String]): EventHubsConf => Client =

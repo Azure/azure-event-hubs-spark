@@ -16,37 +16,10 @@ To build and test this locally, make sure you install:
 After that, cloning the code and running `mvn clean package` should successfully 
 run all unit/integration tests and build a JAR. 
  
-## Getting the Staging Version
-
-We also publish a staging version of the Azure EventHubs + Apache Spark connector 
-in GitHub. To use the staging version, two things need to be added to your pom.xml. 
-First add a new repository like so:
-
-```XML
-	<repository>
-		<id>azure-event-hubs-spark</id>
-		<url>https://raw.github.com/Azure/azure-event-hubs-spark/maven-repo/</url>
-		<snapshots>
-			<enabled>true</enabled>
-			<updatePolicy>always</updatePolicy>
-		</snapshots>
-	</repository>
-```
-
-Then add the following dependency declaration:
-
-```XML
-    <dependency>
-        <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-eventhubs-spark_[2.XX]</artifactId>
-        <version>2.3.4-SNAPSHOT</version>
-    </dependency>
-```
-
 ### SBT Dependency
 
     // https://mvnrepository.com/artifact/com.microsoft.azure/azure-eventhubs-spark_2.11
-    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.4"
+    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.5"
  
 ## Filing Issues
 

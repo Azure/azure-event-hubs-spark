@@ -64,7 +64,7 @@ final class EventHubsConf private (private val connectionStr: String)
 
     val lowerKey = key.toLowerCase
 
-    if (self.get(lowerKey).isDefined) {
+    if (self.get(lowerKey).isDefined && lowerKey != ConnectionStringKey.toLowerCase) {
       logWarning(s"$key has already been set to ${self.get(key).get}. Overwriting with $value")
     }
 

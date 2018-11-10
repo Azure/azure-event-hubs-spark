@@ -85,7 +85,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
    */
   private[utils] def send(partition: Option[PartitionId],
                           events: Seq[Int],
-                          properties: Option[Map[String, Object]]): Seq[Int] = {
+                          properties: Option[Map[String, Object]] = None): Seq[Int] = {
     if (partition.isDefined) {
       partitions(partition.get).send(events, properties)
     } else {
@@ -100,14 +100,19 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     events
   }
 
+  def clear(): Unit = synchronized {
+    partitions.foreach(_._2.clear())
+  }
+
   /**
-   * Send events to a [[SimulatedEventHubs]]. This send API is used in the
-   * [[SimulatedClient]] which needs send capabilities for writing stream
-   * and batch queries in Structured Streaming.
-   *
-   * @param partition the partition to send events to
-   * @param event the event being sent
-   */
+    * Send events to a [[SimulatedEventHubs]]. This send API is used in the
+    * [[SimulatedClient]] which needs send capabilities for writing stream
+    * and batch queries in Structured Streaming.
+    *
+    * @param partition the partition to send events to
+    * @param event the event being sent
+    * @param properties Optional properties of the event
+    */
   private[utils] def send(partition: Option[PartitionId],
                           event: EventData,
                           properties: Option[Map[String, Object]]): Unit = {
@@ -120,6 +125,19 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
         this.send(Some(part), event, properties)
       }
     }
+  }
+
+  /**
+    * Send events to a [[SimulatedEventHubs]]. This send API is used in the
+    * [[SimulatedClient]] which needs send capabilities for writing stream
+    * and batch queries in Structured Streaming.
+    *
+    * @param partition the partition to send events to
+    * @param event the event being sent
+    */
+  private[utils] def send(partition: PartitionId,
+                          event: EventData): Unit = {
+    synchronized(partitions(partition).send(event))
   }
 
   /**
@@ -189,22 +207,21 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
      * @param events events being sent
      * @param properties [[ApplicationProperties]] to append to each event
      */
-    private[utils] def send(events: Seq[Int], properties: Option[Map[String, Object]]): Unit = {
-      synchronized {
-        for (event <- events) {
-          val seqNo = data.size.toLong
-          val e = EventHubsTestUtils.createEventData(s"$event".getBytes("UTF-8"), seqNo, properties)
-          data = data :+ e
-        }
+    private[utils] def send(events: Seq[Int], properties: Option[Map[String, Object]]): Unit = synchronized {
+      for (event <- events) {
+        val seqNo = data.size.toLong
+        val e = EventHubsTestUtils.createEventData(s"$event".getBytes("UTF-8"), seqNo, properties)
+        data = data :+ e
       }
     }
+
 
     /**
      * Appends sent events to the partition.
      *
      * @param event event being sent
      */
-    private[utils] def send(event: EventData, properties: Option[Map[String, Object]]): Unit = {
+    private[utils] def send(event: EventData, properties: Option[Map[String, Object]] = None): Unit = {
       // Need to add a Seq No to the EventData to properly simulate the service.
       val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong, properties)
       synchronized(data = data :+ e)
@@ -236,7 +253,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       if (data.isEmpty) {
         0L
       } else {
-        data.head.getSystemProperties.getSequenceNumber
+        data.map(_.getSystemProperties.getSequenceNumber).min
       }
     }
 
@@ -249,8 +266,13 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       if (data.isEmpty) {
         0L
       } else {
-        data.size
+        1L + data.map(_.getSystemProperties.getSequenceNumber).max
       }
     }
+
+    /**
+      * Clears the buffer
+      */
+    private[utils] def clear(): Unit = data = Seq.empty
   }
 }

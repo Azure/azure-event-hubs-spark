@@ -56,7 +56,7 @@ class EventHubsDirectDStreamSuite
 
   private var testUtils: EventHubsTestUtils = _
 
-  val sparkConf = new SparkConf().setMaster("local[4]").setAppName(this.getClass.getSimpleName)
+  val sparkConf: SparkConf = new SparkConf().setMaster("local[4]").setAppName(this.getClass.getSimpleName)
 
   private var ssc: StreamingContext = _
   private var testDir: File = _

@@ -102,9 +102,12 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
     } else {
       require(positions.get.forall(x => x._2.seqNo >= 0L))
       require(positions.get.size == partitionCount)
-      positions.get.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues {
-        seqNo =>
-          { if (seqNo == -1L) 0L else seqNo }
+      positions.get.map {
+        case (k, v) => k.partitionId -> v
+      }.mapValues(_.seqNo).mapValues {
+        seqNo => {
+          if (seqNo == -1L) 0L else seqNo
+        }
       }
     }
   }

@@ -20,19 +20,13 @@ package org.apache.spark.eventhubs.utils
 import java.util.Date
 
 import com.microsoft.azure.eventhubs.EventData
-import com.microsoft.azure.eventhubs.impl.AmqpConstants.{
-  ENQUEUED_TIME_UTC,
-  OFFSET,
-  SEQUENCE_NUMBER
-}
+import com.microsoft.azure.eventhubs.impl.AmqpConstants.{ENQUEUED_TIME_UTC, OFFSET, SEQUENCE_NUMBER}
 import com.microsoft.azure.eventhubs.impl.EventDataImpl
 import org.apache.qpid.proton.amqp.Binary
-import org.apache.qpid.proton.amqp.messaging.{ ApplicationProperties, Data, MessageAnnotations }
+import org.apache.qpid.proton.amqp.messaging.{ApplicationProperties, Data, MessageAnnotations}
 import org.apache.qpid.proton.message.Message
 import org.apache.qpid.proton.message.Message.Factory
-import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
-import org.apache.spark.eventhubs.client.{ CachedReceiver, Client }
-import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.{EventHubsConf, NameAndPartition, _}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -54,19 +48,34 @@ private[spark] class EventHubsTestUtils {
   import EventHubsTestUtils._
 
   /**
-   * Sends events to the specified simulated event hub.
-   *
-   * @param ehName the event hub to send to
-   * @param partition the partition id that will receive the data
-   * @param data the data being sent
-   * @param properties additional application properties
-   * @return
-   */
+    * Sends events to the specified simulated event hub.
+    *
+    * @param ehName the event hub to send to
+    * @param partition the partition id that will receive the data
+    * @param data the data being sent
+    * @param properties additional application properties
+    * @return
+    */
   def send(ehName: String,
            partition: Option[PartitionId] = None,
            data: Seq[Int],
            properties: Option[Map[String, Object]] = None): Seq[Int] = {
     eventHubs(ehName).send(partition, data, properties)
+  }
+
+  /**
+    * Sends events to the specified simulated event hub.
+    *
+    * @param ehName the event hub to send to
+    * @param partition the partition id that will receive the data
+    * @param data the data being sent
+    * @return
+    */
+  def send(ehName: String,
+           partition: PartitionId,
+           data: Seq[EventData]): Unit = {
+    val eh = eventHubs(ehName)
+    data.foreach(event => eh.send(partition, event))
   }
 
   /**
@@ -197,7 +206,7 @@ private[spark] object EventHubsTestUtils {
     constructor.setAccessible(true)
 
     val s = seqNo.toLong.asInstanceOf[AnyRef]
-    // This value is not accurate. However, "offet" is never used in testing.
+    // This value is not accurate. However, "offset" is never used in testing.
     // Placing dummy value here because one is required in order for EventData
     // to serialize/de-serialize properly during tests.
     val o = s.toString.asInstanceOf[AnyRef]

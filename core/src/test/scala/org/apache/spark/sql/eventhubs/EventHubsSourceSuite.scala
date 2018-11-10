@@ -17,104 +17,21 @@
 
 package org.apache.spark.sql.eventhubs
 
-import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
+import java.io.{BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.qpid.proton.amqp.{
-  Binary,
-  Decimal128,
-  Decimal32,
-  Decimal64,
-  DescribedType,
-  Symbol,
-  UnknownDescribedType,
-  UnsignedByte,
-  UnsignedInteger,
-  UnsignedLong,
-  UnsignedShort
-}
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
-import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
+import org.apache.qpid.proton.amqp.{Binary, Decimal128, Decimal32, Decimal64, DescribedType, Symbol, UnknownDescribedType, UnsignedByte, UnsignedInteger, UnsignedLong, UnsignedShort}
+import org.apache.spark.eventhubs.utils.EventHubsTestUtils
+import org.apache.spark.eventhubs.{EventHubsConf, EventPosition, NameAndPartition}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
-import org.apache.spark.sql.functions.{ count, window }
+import org.apache.spark.sql.functions.{count, window}
 import org.apache.spark.sql.streaming.util.StreamManualClock
-import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.streaming.{OutputMode, ProcessingTime}
 import org.apache.spark.util.Utils
-import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.time.SpanSugar._
-
-abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
-
-  protected var testUtils: EventHubsTestUtils = _
-
-  implicit val formats = Serialization.formats(NoTypeHints)
-
-  override def beforeAll: Unit = {
-    super.beforeAll
-    testUtils = new EventHubsTestUtils
-  }
-
-  override def afterAll(): Unit = {
-    if (testUtils != null) {
-      testUtils.destroyAllEventHubs()
-      testUtils = null
-    }
-    super.afterAll()
-  }
-
-  override val streamingTimeout = 30.seconds
-
-  protected def makeSureGetOffsetCalled = AssertOnQuery { q =>
-    // Because EventHubsSource's initialPartitionOffsets is set lazily, we need to make sure
-    // its "getOffset" is called before pushing any data. Otherwise, because of the race condition,
-    // we don't know which data should be fetched when `startingOffsets` is latest.
-    q.processAllAvailable()
-    true
-  }
-
-  case class AddEventHubsData(conf: EventHubsConf, data: Int*)(implicit concurrent: Boolean = false,
-                                                               message: String = "")
-      extends AddData {
-
-    override def addData(query: Option[StreamExecution]): (Source, Offset) = {
-      if (query.get.isActive) {
-        query.get.processAllAvailable()
-      }
-
-      val sources = query.get.logicalPlan.collect {
-        case StreamingExecutionRelation(source, _) if source.isInstanceOf[EventHubsSource] =>
-          source.asInstanceOf[EventHubsSource]
-      }
-      if (sources.isEmpty) {
-        throw new Exception(
-          "Could not find EventHubs source in the StreamExecution logical plan to add data to")
-      } else if (sources.size > 1) {
-        throw new Exception(
-          "Could not select the EventHubs source in the StreamExecution logical plan as there" +
-            "are multiple EventHubs sources:\n\t" + sources.mkString("\n\t"))
-      }
-
-      val ehSource = sources.head
-      testUtils.send(conf.name, data = data)
-
-      val seqNos = testUtils.getLatestSeqNos(conf)
-      require(seqNos.size == testUtils.getEventHubs(conf.name).partitionCount)
-
-      val offset = EventHubsSourceOffset(seqNos)
-      logInfo(s"Added data, expected offset $offset")
-      (ehSource, offset)
-    }
-
-    override def toString: String = {
-      s"AddEventHubsData(data: $data)"
-    }
-  }
-}
 
 class EventHubsSourceSuite extends EventHubsSourceTest {
 
@@ -184,8 +101,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       Seq(
         s"maximum supported log version is v${EventHubsSource.VERSION}, but encountered v99999",
         "produced by a newer version of Spark and cannot be read by this version"
-      ).foreach { message =>
-        assert(e.getMessage.contains(message))
+      ).foreach { message => assert(e.getMessage.contains(message))
       }
     }
   }
@@ -260,7 +176,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   test("maxOffsetsPerTrigger with non-uniform partitions") {
     val name = newEventHubs()
-    val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)
+    testUtils.createEventHubs(name, DefaultPartitionCount)
 
     testUtils.send(name, partition = Some(0), data = 100 to 200)
     testUtils.send(name, partition = Some(1), data = 10 to 20)
@@ -409,7 +325,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   private def testFromEarliestSeqNos(eh: String): Unit = {
-    val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
+    testUtils.createEventHubs(eh, DefaultPartitionCount)
 
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
     testUtils.send(eh, data = 1 to 3) // round robin events across partitions
@@ -538,8 +454,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
         case d: DescribedType    => d.getDescribed
         case default             => default
       }
-      .map { p =>
-        p._1 -> Serialization.write(p._2)
+      .map { p => p._1 -> Serialization.write(p._2)
       }
 
     val eventHub = testUtils.createEventHubs(newEventHubs(), partitionCount = 1)
@@ -583,7 +498,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   test("input row metrics") {
     val eh = newEventHubs()
-    val eventHub = testUtils.createEventHubs(eh, DefaultPartitionCount)
+    testUtils.createEventHubs(eh, DefaultPartitionCount)
 
     testUtils.send(eh, data = Seq(-1))
     require(testUtils.getEventHubs(eh).getPartitions.size === 4)
@@ -639,7 +554,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val query = eventhubs.writeStream
       .format("memory")
-      .outputMode("append")
+      .outputMode(OutputMode.Append)
       .queryName("eventhubsColumnTypes")
       .start()
 
@@ -687,7 +602,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val query = windowedAggregation.writeStream
       .format("memory")
-      .outputMode("complete")
+      .outputMode(OutputMode.Complete)
       .queryName("eventhubsWatermark")
       .start()
     query.processAllAvailable()
@@ -702,5 +617,63 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
            s"Unexpected results: $row")
     assert(row.getAs[Int]("count") === 1, s"Unexpected results: $row")
     query.stop()
+  }
+
+  test("EventHubsSource with removed events due to EventHub retention") {
+    val eh = newEventHubs()
+    testUtils.createEventHubs(eh, partitionCount = 1)
+
+    val conf = getEventHubsConf(eh)
+
+    require(testUtils.getEventHubs(eh).getPartitions.size === 1)
+
+    // Send the [0, 10) messages.
+    testUtils.send(
+      ehName = eh,
+      partition = 0,
+      data = (0L until 10L).map(seq => EventHubsTestUtils.createEventData(Array(), seq, None))
+    )
+
+    val eventhubs = spark.readStream
+      .format("eventhubs")
+      .options(conf.toMap)
+      .load()
+
+    val firstStream = eventhubs.writeStream
+      .format("memory")
+      .outputMode(OutputMode.Append)
+      .queryName("eventhubsRetention")
+      .start()
+
+    val query = spark.table("eventhubsRetention")
+
+    assert(query.count == 10)
+
+    // Lets stop this stream
+    firstStream.stop()
+
+    // Lets assume that the retention of the event hub is 24 hours. The stream has been stopped
+    // for more than this period, so messages will be pruned, in our example this will be [10, 20)
+    // Clear the eventhub, and push new messages [20, 30) to it.
+
+    testUtils.getEventHubs(eh).clear()
+
+    // Send the message [20, 30) messages.
+    testUtils.send(
+      ehName = eh,
+      partition = 0,
+      data = (20L until 30L).map(seq => EventHubsTestUtils.createEventData(Array(), seq, None))
+    )
+
+    val secondStream = eventhubs.writeStream
+      .format("memory")
+      .outputMode(OutputMode.Append)
+      .queryName("eventhubsRetention")
+      .start()
+
+    assert(query.count == 10)
+
+    // Lets stop this stream
+    secondStream.stop()
   }
 }

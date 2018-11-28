@@ -374,8 +374,9 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(OperationTimeoutKey) map (str => Duration.parse(str))
   }
 
-  /** Internal operation timeout. */
-  private[spark] def internalOperationTimeout: FiniteDuration = {
+  /** it is the same as operationTimeout.
+   * The only difference is in the type and it returns a Scala FiniteDuration) */
+  private[spark] lazy val internalOperationTimeout: FiniteDuration = {
     scala.concurrent.duration.Duration
       .fromNanos(operationTimeout.getOrElse(DefaultOperationTimeout).toNanos)
   }

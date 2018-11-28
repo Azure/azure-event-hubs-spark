@@ -19,14 +19,14 @@ package org.apache.spark
 
 import java.time.Duration
 
-import com.microsoft.azure.eventhubs.{EventHubClient, PartitionReceiver}
+import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 /**
-  * A package object to constants, implicit conversion, and type
-  * aliases used throughout the connector.
-  */
+ * A package object to constants, implicit conversion, and type
+ * aliases used throughout the connector.
+ */
 package object eventhubs {
 
   implicit val formats = Serialization.formats(NoTypeHints)

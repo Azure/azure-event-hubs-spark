@@ -27,27 +27,29 @@ import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
 
 /**
- * Configuration for your EventHubs instance when being used with Apache Spark.
- *
- * Namespace, name, keyName, key, and consumerGroup are required.
- *
- * EventHubsConf is case insensitive.
- *
- * You can start from the beginning of a stream, end of a stream, from particular offsets, or from
- * particular enqueue times. If none of those are provided, we will start from the beginning of your stream.
- * If more than one of those are provided, you will get a runtime error.
- *
- * @param connectionStr a valid connection string which will be used to connect to
- *                         an EventHubs instance. A connection string can be obtained from
- *                         the Azure portal or by using [[ConnectionStringBuilder]].
- */
-final class EventHubsConf private (private val connectionStr: String)
-    extends Serializable
+  * Configuration for your EventHubs instance when being used with Apache Spark.
+  *
+  * Namespace, name, keyName, key, and consumerGroup are required.
+  *
+  * EventHubsConf is case insensitive.
+  *
+  * You can start from the beginning of a stream, end of a stream, from particular offsets, or from
+  * particular enqueue times. If none of those are provided, we will start from the beginning of your stream.
+  * If more than one of those are provided, you will get a runtime error.
+  *
+  * @param connectionStr a valid connection string which will be used to connect to
+  *                      an EventHubs instance. A connection string can be obtained from
+  *                      the Azure portal or by using [[ConnectionStringBuilder]].
+  */
+final class EventHubsConf private(private val connectionStr: String)
+  extends Serializable
     with Logging
-    with Cloneable { self =>
+    with Cloneable {
+  self =>
 
   import EventHubsConf._
 
@@ -86,19 +88,19 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Converts the [[EventHubsConf]] instance to a [[Map[String,String]]].
-   *
-   * @return a [[Map[String,String]] with all the current settings in the [[EventHubsConf]]
-   */
+    * Converts the [[EventHubsConf]] instance to a [[Map[String,String]]].
+    *
+    * @return a [[Map[String,String]] with all the current settings in the [[EventHubsConf]]
+    */
   def toMap: Map[String, String] = {
     CaseInsensitiveMap(settings.asScala.toMap)
   }
 
   /**
-   * Clones your [[EventHubsConf]] instance.
-   *
-   * @return a copy of your [[EventHubsConf]]
-   */
+    * Clones your [[EventHubsConf]] instance.
+    *
+    * @return a copy of your [[EventHubsConf]]
+    */
   override def clone: EventHubsConf = {
     val newConf = EventHubsConf(self.connectionString)
     newConf.settings.putAll(self.settings)
@@ -106,24 +108,25 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Indicates if some EventHubsConf is equal to this one.
-   * @param obj the object being compared
-   * @return true if they are equal; otherwise, return false
-   */
+    * Indicates if some EventHubsConf is equal to this one.
+    *
+    * @param obj the object being compared
+    * @return true if they are equal; otherwise, return false
+    */
   override def equals(obj: Any): Boolean =
     obj match {
       case that: EventHubsConf => self.settings.equals(that.settings)
-      case _                   => false
+      case _ => false
     }
 
   /**
-   * Sets the connection string which will be used to connect to
-   * an EventHubs instance. Connection strings can be obtained from
-   * the Azure portal or using the [[ConnectionStringBuilder]].
-   *
-   * @param connectionString a valid connection string
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * Sets the connection string which will be used to connect to
+    * an EventHubs instance. Connection strings can be obtained from
+    * the Azure portal or using the [[ConnectionStringBuilder]].
+    *
+    * @param connectionString a valid connection string
+    * @return the updated [[EventHubsConf]] instance
+    */
   @Experimental
   def setConnectionString(connectionString: String): EventHubsConf = {
     set(ConnectionStringKey, connectionString)
@@ -136,12 +139,12 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Sets the name of your EventHub instance. The connection string used to
-   * construct the [[EventHubsConf]] is updated as well.
-   *
-   * @param name the name of an EventHub instance
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * Sets the name of your EventHub instance. The connection string used to
+    * construct the [[EventHubsConf]] is updated as well.
+    *
+    * @param name the name of an EventHub instance
+    * @return the updated [[EventHubsConf]] instance
+    */
   @Experimental
   def setName(name: String): EventHubsConf = {
     val newConnStr = ConnectionStringBuilder(connectionString).setEventHubName(name).toString
@@ -149,17 +152,17 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * This method removes all parameters that aren't needed by Spark executors.
-   *
-   * @return trimmed [[EventHubsConf]]
-   */
+    * This method removes all parameters that aren't needed by Spark executors.
+    *
+    * @return trimmed [[EventHubsConf]]
+    */
   private[spark] def trimmed: EventHubsConf = {
     // These are the options needed by Spark executors
     val include = Seq("eventhubs.connectionString",
-                      "eventhubs.consumerGroup",
-                      "eventhubs.receiverTimeout",
-                      "eventhubs.operationTimeout",
-                      "useSimulatedClient").map(_.toLowerCase).toSet
+      "eventhubs.consumerGroup",
+      "eventhubs.receiverTimeout",
+      "eventhubs.operationTimeout",
+      "useSimulatedClient").map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
     settings.asScala
@@ -174,11 +177,11 @@ final class EventHubsConf private (private val connectionStr: String)
   def name: String = ConnectionStringBuilder(connectionString).getEventHubName
 
   /** Set the consumer group for your EventHubs instance. If no consumer
-   * group is provided, then [[DefaultConsumerGroup]] will be used.
-   *
-   * @param consumerGroup the consumer group to be used
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * group is provided, then [[DefaultConsumerGroup]] will be used.
+    *
+    * @param consumerGroup the consumer group to be used
+    * @return the updated [[EventHubsConf]] instance
+    */
   def setConsumerGroup(consumerGroup: String): EventHubsConf = {
     set(ConsumerGroupKey, consumerGroup)
   }
@@ -189,50 +192,52 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Sets the default starting position for all partitions.
-   *
-   * If you would like to start from a different position for a specific partition,
-   * please see [[setStartingPositions()]]. If a position is set for particiular partition,
-   * we will use that position instead of the one set by this method.
-   *
-   * If no starting position is set, then [[DefaultEventPosition]] is used
-   * (i.e. we will start from the beginning of the EventHub partition.)
-   *
-   * @param eventPosition the default position to start receiving events from.
-   * @return the updated [[EventHubsConf]] instance
-   * @see [[EventPosition]]
-   */
+    * Sets the default starting position for all partitions.
+    *
+    * If you would like to start from a different position for a specific partition,
+    * please see [[setStartingPositions()]]. If a position is set for particiular partition,
+    * we will use that position instead of the one set by this method.
+    *
+    * If no starting position is set, then [[DefaultEventPosition]] is used
+    * (i.e. we will start from the beginning of the EventHub partition.)
+    *
+    * @param eventPosition the default position to start receiving events from.
+    * @return the updated [[EventHubsConf]] instance
+    * @see [[EventPosition]]
+    */
   def setStartingPosition(eventPosition: EventPosition): EventHubsConf = {
     set(StartingPositionKey, EventHubsConf.write(eventPosition))
   }
 
   /**
-   * The currently set starting position.
-   * @see [[EventPosition]]
-   */
+    * The currently set starting position.
+    *
+    * @see [[EventPosition]]
+    */
   def startingPosition: Option[EventPosition] = {
     self.get(StartingPositionKey) map EventHubsConf.read[EventPosition]
   }
 
   /**
-   * Sets starting positions on a per partition basis. This takes precedent over all
-   * other configurations. If nothing is set here, then we will defer to what has been set
-   * in [[setStartingPosition()]]. If nothing is set in [[setStartingPosition()]], then
-   * we will start consuming from the start of the EventHub partition.
-   *
-   * @param eventPositions a map of parition ids (ints) to [[EventPosition]]s
-   * @return the updated [[EventHubsConf]] instance
-   * @see [[EventPosition]]
-   */
+    * Sets starting positions on a per partition basis. This takes precedent over all
+    * other configurations. If nothing is set here, then we will defer to what has been set
+    * in [[setStartingPosition()]]. If nothing is set in [[setStartingPosition()]], then
+    * we will start consuming from the start of the EventHub partition.
+    *
+    * @param eventPositions a map of parition ids (ints) to [[EventPosition]]s
+    * @return the updated [[EventHubsConf]] instance
+    * @see [[EventPosition]]
+    */
   def setStartingPositions(eventPositions: Map[NameAndPartition, EventPosition]): EventHubsConf = {
     val m = eventPositions.map { case (k, v) => k.toString -> v }
     set(StartingPositionsKey, EventHubsConf.write[Map[String, EventPosition]](m))
   }
 
   /**
-   * The currently set positions for particular partitions.
-   * @see [[EventPosition]]
-   */
+    * The currently set positions for particular partitions.
+    *
+    * @see [[EventPosition]]
+    */
   def startingPositions: Option[Map[NameAndPartition, EventPosition]] = {
     val m = self.get(StartingPositionsKey) map EventHubsConf
       .read[Map[String, EventPosition]] getOrElse Map.empty
@@ -240,47 +245,49 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Sets the default ending position for all partitions. Only relevant for batch style queries
-   * in Structured Streaming.
-   *
-   * Per partition configuration is allowed using [[setEndingPositions()]]. If nothing is set
-   * in [[setEndingPositions()]], then the value set here (in [[setEndingPosition()]]) is used.
-   * If nothing is set here, then we will use the default value (which is the end of the stream).
-   *
-   * @param eventPosition the default position to start receiving events from.
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * Sets the default ending position for all partitions. Only relevant for batch style queries
+    * in Structured Streaming.
+    *
+    * Per partition configuration is allowed using [[setEndingPositions()]]. If nothing is set
+    * in [[setEndingPositions()]], then the value set here (in [[setEndingPosition()]]) is used.
+    * If nothing is set here, then we will use the default value (which is the end of the stream).
+    *
+    * @param eventPosition the default position to start receiving events from.
+    * @return the updated [[EventHubsConf]] instance
+    */
   def setEndingPosition(eventPosition: EventPosition): EventHubsConf = {
     set(EndingPositionKey, EventHubsConf.write(eventPosition))
   }
 
   /**
-   * The currently set starting position.
-   * @see [[EventPosition]]
-   */
+    * The currently set starting position.
+    *
+    * @see [[EventPosition]]
+    */
   def endingPosition: Option[EventPosition] = {
     self.get(EndingPositionKey) map EventHubsConf.read[EventPosition]
   }
 
   /**
-   * Sets ending positions on a per partition basis. This is only relevant for batch-styled
-   * queries in Structured Streaming. If nothing is set here, then the position set in
-   * [[setEndingPosition]] is used. If nothing is set in [[setEndingPosition]], then the default
-   * value is used. The default value is the end of the stream.
-   *
-   * @param eventPositions a map of partition ids (ints) to [[EventPosition]]s
-   * @return the updated [[EventHubsConf]] instance
-   * @see [[EventPosition]]
-   */
+    * Sets ending positions on a per partition basis. This is only relevant for batch-styled
+    * queries in Structured Streaming. If nothing is set here, then the position set in
+    * [[setEndingPosition]] is used. If nothing is set in [[setEndingPosition]], then the default
+    * value is used. The default value is the end of the stream.
+    *
+    * @param eventPositions a map of partition ids (ints) to [[EventPosition]]s
+    * @return the updated [[EventHubsConf]] instance
+    * @see [[EventPosition]]
+    */
   def setEndingPositions(eventPositions: Map[NameAndPartition, EventPosition]): EventHubsConf = {
     val m = eventPositions.map { case (k, v) => k.toString -> v }
     set(EndingPositionsKey, EventHubsConf.write[Map[String, EventPosition]](m))
   }
 
   /**
-   * the currently set positions for particular partitions.
-   * @see [[EventPosition]]
-   */
+    * the currently set positions for particular partitions.
+    *
+    * @see [[EventPosition]]
+    */
   def endingPositions: Option[Map[NameAndPartition, EventPosition]] = {
     val m = self.get(EndingPositionsKey) map EventHubsConf
       .read[Map[String, EventPosition]] getOrElse Map.empty
@@ -288,19 +295,19 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * maxRatePerPartition defines an upper bound for how many events will be
-   * in a partition per batch. This method sets a max rate per partition for
-   * all partitions.
-   *
-   * If you would like to set a different max rate for a particular partition,
-   * then see [[setMaxRatesPerPartition()]]. If a max rate per partition has been set
-   * using [[setMaxRatesPerPartition()]], that rate will be used. If nothing has been
-   * set, then the max rate set by this method will be used. If nothing has been
-   * set by the user, then we will use [[DefaultMaxRatePerPartition]].
-   *
-   * @param rate the default maxRatePerPartition for all partitions.
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * maxRatePerPartition defines an upper bound for how many events will be
+    * in a partition per batch. This method sets a max rate per partition for
+    * all partitions.
+    *
+    * If you would like to set a different max rate for a particular partition,
+    * then see [[setMaxRatesPerPartition()]]. If a max rate per partition has been set
+    * using [[setMaxRatesPerPartition()]], that rate will be used. If nothing has been
+    * set, then the max rate set by this method will be used. If nothing has been
+    * set by the user, then we will use [[DefaultMaxRatePerPartition]].
+    *
+    * @param rate the default maxRatePerPartition for all partitions.
+    * @return the updated [[EventHubsConf]] instance
+    */
   def setMaxRatePerPartition(rate: Rate): EventHubsConf = {
     set(MaxRatePerPartitionKey, rate)
   }
@@ -311,16 +318,16 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * For information on maxRatePerPartition, see [[setMaxRatePerPartition()]].
-   *
-   * This method allows users to set max rates per partition on a per partition basis.
-   * If a maxRatePerPartition is set here, it will be used. If one isn't set, then the value
-   * set in [[setMaxRatePerPartition()]] will be used. If no value has been set in either
-   * setter method, then we will use [[DefaultMaxRatePerPartition]].
-   *
-   * @param rates a map of partition ids (ints) to their desired rates.
-   * @return
-   */
+    * For information on maxRatePerPartition, see [[setMaxRatePerPartition()]].
+    *
+    * This method allows users to set max rates per partition on a per partition basis.
+    * If a maxRatePerPartition is set here, it will be used. If one isn't set, then the value
+    * set in [[setMaxRatePerPartition()]] will be used. If no value has been set in either
+    * setter method, then we will use [[DefaultMaxRatePerPartition]].
+    *
+    * @param rates a map of partition ids (ints) to their desired rates.
+    * @return
+    */
   def setMaxRatesPerPartition(rates: Map[NameAndPartition, Rate]): EventHubsConf = {
     val m = rates.map { case (k, v) => k.toString -> v }
     set(MaxRatesPerPartitionKey, EventHubsConf.write[Map[String, Rate]](m))
@@ -334,13 +341,13 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set the receiver timeout. We will try to receive the expected batch for
-   * the length of this timeout.
-   * Default: [[DefaultReceiverTimeout]]
-   *
-   * @param d the new receiver timeout
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * Set the receiver timeout. We will try to receive the expected batch for
+    * the length of this timeout.
+    * Default: [[DefaultReceiverTimeout]]
+    *
+    * @param d the new receiver timeout
+    * @return the updated [[EventHubsConf]] instance
+    */
   def setReceiverTimeout(d: Duration): EventHubsConf = {
     set(ReceiverTimeoutKey, d)
   }
@@ -348,17 +355,16 @@ final class EventHubsConf private (private val connectionStr: String)
   /** The current receiver timeout.  */
   def receiverTimeout: Option[Duration] = {
     self.get(ReceiverTimeoutKey) map (str => Duration.parse(str))
-
   }
 
   /**
-   * Set the operation timeout. We will retryJava failures when contacting the
-   * EventHubs service for the length of this timeout.
-   * Default: [[DefaultOperationTimeout]]
-   *
-   * @param d the new operation timeout
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * Set the operation timeout. We will retryJava failures when contacting the
+    * EventHubs service for the length of this timeout.
+    * Default: [[DefaultOperationTimeout]]
+    *
+    * @param d the new operation timeout
+    * @return the updated [[EventHubsConf]] instance
+    */
   def setOperationTimeout(d: Duration): EventHubsConf = {
     set(OperationTimeoutKey, d)
   }
@@ -368,14 +374,19 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(OperationTimeoutKey) map (str => Duration.parse(str))
   }
 
+  /** Internal operation timeout. */
+  private[spark] def internalOperationTimeout: FiniteDuration = {
+    scala.concurrent.duration.Duration.fromNanos(operationTimeout.getOrElse(DefaultOperationTimeout).toNanos)
+  }
+
   /**
-   * Rate limit on maximum number of events processed per trigger interval.
-   * Only valid for Structured Streaming. The specified total number of events
-   * will be proportionally split across partitions of different volume.
-   *
-   * @param limit the maximum number of events to be processed per trigger interval
-   * @return the updated [[EventHubsConf]] instance
-   */
+    * Rate limit on maximum number of events processed per trigger interval.
+    * Only valid for Structured Streaming. The specified total number of events
+    * will be proportionally split across partitions of different volume.
+    *
+    * @param limit the maximum number of events to be processed per trigger interval
+    * @return the updated [[EventHubsConf]] instance
+    */
   def setMaxEventsPerTrigger(limit: Long): EventHubsConf = {
     set(MaxEventsPerTriggerKey, limit)
   }
@@ -436,7 +447,9 @@ object EventHubsConf extends Logging {
 
     val ehConf = EventHubsConf(connectionString)
 
-    for ((k, v) <- params) { ehConf.set(k, v) }
+    for ((k, v) <- params) {
+      ehConf.set(k, v)
+    }
 
     ehConf
   }

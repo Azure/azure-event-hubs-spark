@@ -19,16 +19,14 @@ package org.apache.spark
 
 import java.time.Duration
 
-import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+import com.microsoft.azure.eventhubs.{EventHubClient, PartitionReceiver}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
-import scala.concurrent.duration._
-
 /**
- * A package object to constants, implicit conversion, and type
- * aliases used throughout the connector.
- */
+  * A package object to constants, implicit conversion, and type
+  * aliases used throughout the connector.
+  */
 package object eventhubs {
 
   implicit val formats = Serialization.formats(NoTypeHints)
@@ -39,7 +37,7 @@ package object eventhubs {
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
-  val DefaultOperationTimeout: Duration = Duration.ofSeconds(60)
+  val DefaultOperationTimeout: Duration = Duration.ofSeconds(300)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
   val DefaultPrefetchCount: Int = 2000
@@ -48,7 +46,6 @@ package object eventhubs {
   val StartingSequenceNumber = 0L
   val DefaultEpoch = 0L
   val RetryCount = 3
-  val InternalOperationTimeout: FiniteDuration = 300.seconds
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
@@ -72,9 +69,13 @@ package object eventhubs {
   // Allow Strings to be converted to types defined in this library.
   implicit class EventHubsString(val str: String) extends AnyVal {
     def toPartitionId: PartitionId = str.toInt
+
     def toRate: Rate = str.toInt
+
     def toOffset: Offset = str.toLong
+
     def toEnqueueTime: EnqueueTime = str.toLong
+
     def toSequenceNumber: SequenceNumber = str.toLong
   }
 }

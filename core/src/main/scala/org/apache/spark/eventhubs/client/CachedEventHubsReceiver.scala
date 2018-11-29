@@ -19,13 +19,13 @@ package org.apache.spark.eventhubs.client
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.utils.RetryUtils.{ retryJava, retryNotNull }
-import org.apache.spark.{ SparkEnv, TaskContext }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
 import org.apache.spark.internal.Logging
+import org.apache.spark.{ SparkEnv, TaskContext }
 
-import scala.concurrent.{ Await, Future }
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ Await, Future }
 import scala.util.Success
 
 private[spark] trait CachedReceiver {
@@ -49,7 +49,7 @@ private[spark] trait CachedReceiver {
  * [[NameAndPartition]].
  *
  * @param ehConf the [[EventHubsConf]] which contains the connection string used to connect to Event Hubs
- * @param nAndP the Event Hub name and partition that the receiver is connected to.
+ * @param nAndP  the Event Hub name and partition that the receiver is connected to.
  */
 private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                                        nAndP: NameAndPartition,
@@ -89,11 +89,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .flatMap { r =>
         retryNotNull(r.receive(1), msg)
       }
-      .map { _.asScala }
+      .map {
+        _.asScala
+      }
   }
 
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
-    val event = Await.result(receiveOne("checkCursor initial"), InternalOperationTimeout)
+    val event = Await.result(receiveOne("checkCursor initial"), ehConf.internalOperationTimeout)
     val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
 
     if (receivedSeqNo != requestSeqNo) {
@@ -103,34 +105,38 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       // 2) Your desired event has expired from the service.
       // First, we'll check for case (1).
       receiver = createReceiver(requestSeqNo)
-      val movedEvent = Await.result(receiveOne("checkCursor move"), InternalOperationTimeout)
+      val movedEvent = Await.result(receiveOne("checkCursor move"), ehConf.internalOperationTimeout)
       val movedSeqNo = movedEvent.head.getSystemProperties.getSequenceNumber
       if (movedSeqNo != requestSeqNo) {
         // The event still isn't present. It must be (2).
         val info = Await.result(
           retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
                     "partitionRuntime"),
-          InternalOperationTimeout)
+          ehConf.internalOperationTimeout)
         val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
         throw new IllegalStateException(
           s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
             s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
             s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
       } else {
-        Future { movedEvent }
+        Future {
+          movedEvent
+        }
       }
     } else {
-      Future { event }
+      Future {
+        event
+      }
     }
   }
 
   private def receive(requestSeqNo: SequenceNumber, batchSize: Int): Iterator[EventData] = {
     // Retrieve the events. First, we get the first event in the batch.
     // Then, if the succeeds, we collect the rest of the data.
-    val first = Await.result(checkCursor(requestSeqNo), InternalOperationTimeout)
+    val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
     val theRest = for { i <- 1 until batchSize } yield
       Await.result(receiveOne(s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
-                   InternalOperationTimeout)
+                   ehConf.internalOperationTimeout)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten
     val sorted = combined.toSeq

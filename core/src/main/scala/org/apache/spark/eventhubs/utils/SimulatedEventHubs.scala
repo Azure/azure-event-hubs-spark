@@ -236,7 +236,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       if (data.isEmpty) {
         0L
       } else {
-        data.head.getSystemProperties.getSequenceNumber
+        data.map(_.getSystemProperties.getSequenceNumber).min
       }
     }
 
@@ -249,7 +249,9 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
       if (data.isEmpty) {
         0L
       } else {
-        data.size
+        // The sequence number will start from 0L onwards
+        // In the case there is 1 single message, this will be 1L + 0L
+        1L + data.map(_.getSystemProperties.getSequenceNumber).max
       }
     }
   }

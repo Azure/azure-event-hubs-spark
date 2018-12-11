@@ -383,6 +383,23 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
+   * Set the prefetch count for the underlying receiver.
+   * PrefetchCount controls how many events are received in advance.
+   * Default: [[DefaultPrefetchCount]]
+   *
+   * @param count the new prefetch count
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setPrefetchCount(count: Int): EventHubsConf = {
+    set(PrefetchCountKey, count)
+  }
+
+  /** The current prefetch count.  */
+  def prefetchCount: Option[Int] = {
+    self.get(PrefetchCountKey) map (str => str.toInt)
+  }
+
+  /**
    * Rate limit on maximum number of events processed per trigger interval.
    * Only valid for Structured Streaming. The specified total number of events
    * will be proportionally split across partitions of different volume.
@@ -439,6 +456,7 @@ object EventHubsConf extends Logging {
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
+  val PrefetchCountKey = "eventhubs.prefetchCount"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
 

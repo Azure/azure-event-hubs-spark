@@ -65,6 +65,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private def createReceiver(seqNo: SequenceNumber): Future[PartitionReceiver] = {
     logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+    val prefetchCount =
+      Math.min(ehConf.prefetchCount.getOrElse(DefaultPrefetchCount), PrefetchCountMaximum)
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(false)
     receiverOptions.setIdentifier(
@@ -78,7 +80,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       "CachedReceiver creation."
     )
     epochReceiver.onComplete {
-      case Success(x) => x.setPrefetchCount(DefaultPrefetchCount)
+      case Success(x) => x.setPrefetchCount(prefetchCount)
       case _          =>
     }
     epochReceiver
@@ -145,7 +147,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .iterator
 
     val newPrefetchCount =
-      if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum else batchSize * 2
+      if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum
+      else Math.min(batchSize * 2, PrefetchCountMaximum)
     receiver.onComplete {
       case Success(r) => r.setPrefetchCount(newPrefetchCount)
       case _          =>

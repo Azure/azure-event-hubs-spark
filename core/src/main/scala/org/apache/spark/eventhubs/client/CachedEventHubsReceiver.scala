@@ -26,7 +26,6 @@ import org.apache.spark.{ SparkEnv, TaskContext }
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ Await, Future }
-import scala.util.Success
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
@@ -63,12 +62,11 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private var receiver: Future[PartitionReceiver] = createReceiver(startSeqNo)
 
   private def createReceiver(seqNo: SequenceNumber): Future[PartitionReceiver] = {
-    logInfo(s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}")
+    logInfo(
+      s"creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. seqNo: $seqNo")
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-    val prefetchCount =
-      Math.min(ehConf.prefetchCount.getOrElse(DefaultPrefetchCount), PrefetchCountMaximum)
     val receiverOptions = new ReceiverOptions
-    receiverOptions.setReceiverRuntimeMetricEnabled(false)
+    receiverOptions.setReceiverRuntimeMetricEnabled(true)
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
     val epochReceiver = retryJava(
@@ -79,11 +77,18 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                  receiverOptions),
       "CachedReceiver creation."
     )
-    epochReceiver.onComplete {
-      case Success(x) => x.setPrefetchCount(prefetchCount)
-      case _          =>
-    }
     epochReceiver
+  }
+
+  private def lastReceivedOffset(): Future[Long] = {
+    receiver
+      .flatMap { r =>
+        if (r.getEventPosition.getSequenceNumber != null) {
+          Future.successful(r.getEventPosition.getSequenceNumber)
+        } else {
+          Future.successful(-1)
+        }
+      }
   }
 
   private def receiveOne(msg: String): Future[Iterable[EventData]] = {
@@ -97,6 +102,15 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
+    val lastReceivedSeqNo =
+      Await.result(lastReceivedOffset(), ehConf.internalOperationTimeout)
+
+    if (lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) {
+      logInfo(
+        s"checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo")
+      receiver = createReceiver(requestSeqNo)
+    }
+
     val event = Await.result(receiveOne("checkCursor initial"), ehConf.internalOperationTimeout)
     val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
 
@@ -106,6 +120,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       //    cursor is in the wrong spot.
       // 2) Your desired event has expired from the service.
       // First, we'll check for case (1).
+      logInfo(
+        s"checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, receivedSeqNo: $lastReceivedSeqNo")
       receiver = createReceiver(requestSeqNo)
       val movedEvent = Await.result(receiveOne("checkCursor move"), ehConf.internalOperationTimeout)
       val movedSeqNo = movedEvent.head.getSystemProperties.getSequenceNumber
@@ -146,13 +162,6 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
         e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
       .iterator
 
-    val newPrefetchCount =
-      if (batchSize < PrefetchCountMinimum) PrefetchCountMinimum
-      else Math.min(batchSize * 2, PrefetchCountMaximum)
-    receiver.onComplete {
-      case Success(r) => r.setPrefetchCount(newPrefetchCount)
-      case _          =>
-    }
     val (result, validate) = sorted.duplicate
     assert(validate.size == batchSize)
     result
@@ -178,7 +187,8 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
                                           batchSize: Int): Iterator[EventData] = {
-    logInfo(s"EventHubsCachedReceiver look up. For $nAndP, ${ehConf.consumerGroup}")
+    logInfo(
+      s"EventHubsCachedReceiver look up. For $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, batchSize: $batchSize")
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
       receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {

@@ -17,8 +17,8 @@
 
 package org.apache.spark.eventhubs.client
 
-import java.util.concurrent.{ ConcurrentLinkedQueue, ExecutorService, Executors }
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.{ ConcurrentLinkedQueue, Executors, ScheduledExecutorService }
 
 import com.microsoft.azure.eventhubs.EventHubClient
 import org.apache.spark.eventhubs._
@@ -147,5 +147,5 @@ object ClientConnectionPool extends Logging {
  * Threads are created on demand if none are available.
  */
 object ClientThreadPool {
-  val pool: ExecutorService = Executors.newCachedThreadPool
+  val pool: ScheduledExecutorService = Executors.newScheduledThreadPool(DefaultThreadPoolSize)
 }

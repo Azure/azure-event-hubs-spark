@@ -116,7 +116,10 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       yield
         getRunTimeInfoF(i) map { r =>
           val earliest =
-            if (r.getBeginSequenceNumber == -1L) 0L else r.getBeginSequenceNumber
+            if (r.getBeginSequenceNumber == -1L) 0L
+            else {
+              if (r.getIsEmpty) r.getLastEnqueuedSequenceNumber + 1 else r.getBeginSequenceNumber
+            }
           val latest = r.getLastEnqueuedSequenceNumber + 1
           i -> (earliest, latest)
         }
@@ -134,7 +137,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    */
   private def earliestSeqNoF(partition: PartitionId): Future[SequenceNumber] = {
     getRunTimeInfoF(partition).map { r =>
-      val seqNo = r.getBeginSequenceNumber
+      val seqNo =
+        if (r.getIsEmpty) r.getLastEnqueuedSequenceNumber + 1 else r.getBeginSequenceNumber
       if (seqNo == -1L) 0L else seqNo
     }
   }
@@ -238,20 +242,31 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
           case StartOfStream => (nAndP.partitionId, earliestSeqNoF(nAndP.partitionId))
           case EndOfStream   => (nAndP.partitionId, latestSeqNoF(nAndP.partitionId))
           case _ =>
-            val receiver = retryJava(client.createEpochReceiver(consumerGroup,
-                                                                nAndP.partitionId.toString,
-                                                                pos.convert,
-                                                                DefaultEpoch),
-                                     "translate: epoch receiver creation.")
-            val seqNo = receiver
-              .flatMap { r =>
-                retryNotNull(r.receive(1), "translate: receive call")
-              }
-              .map { e =>
-                e.iterator.next.getSystemProperties.getSequenceNumber
+            val runtimeInfo =
+              Await.result(getRunTimeInfoF(nAndP.partitionId), ehConf.internalOperationTimeout)
+            val seqNo =
+              if (runtimeInfo.getIsEmpty || (pos.enqueuedTime != null &&
+                  runtimeInfo.getLastEnqueuedTimeUtc.isBefore(pos.enqueuedTime.toInstant))) {
+                Future.successful(runtimeInfo.getLastEnqueuedSequenceNumber + 1)
+              } else {
+                logInfo(
+                  s"translate: creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. filter: ${pos.convert}")
+                val receiver = retryJava(client.createEpochReceiver(consumerGroup,
+                                                                    nAndP.partitionId.toString,
+                                                                    pos.convert,
+                                                                    DefaultEpoch),
+                                         "translate: epoch receiver creation.")
+                receiver
+                  .flatMap { r =>
+                    retryNotNull(r.receive(1), "translate: receive call")
+                  }
+                  .map { e =>
+                    e.iterator.next.getSystemProperties.getSequenceNumber
+                  }
               }
             (nAndP.partitionId, seqNo)
         }
+
     val future = Future
       .traverse(futures) {
         case (p, f) =>

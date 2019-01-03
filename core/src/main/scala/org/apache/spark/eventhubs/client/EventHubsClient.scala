@@ -247,7 +247,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
             val seqNo =
               if (runtimeInfo.getIsEmpty || (pos.enqueuedTime != null &&
                   runtimeInfo.getLastEnqueuedTimeUtc.isBefore(pos.enqueuedTime.toInstant))) {
-                latestSeqNoF(nAndP.partitionId)
+                Future.successful(runtimeInfo.getLastEnqueuedSequenceNumber + 1)
               } else {
                 logInfo(
                   s"translate: creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. filter: ${pos.convert}")

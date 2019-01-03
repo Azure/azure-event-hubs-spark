@@ -251,13 +251,17 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
               } else {
                 logInfo(
                   s"translate: creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. filter: ${pos.convert}")
+                val receiverOptions = new ReceiverOptions
+                receiverOptions.setPrefetchCount(1)
                 val receiver = retryJava(client.createEpochReceiver(consumerGroup,
                                                                     nAndP.partitionId.toString,
                                                                     pos.convert,
-                                                                    DefaultEpoch),
+                                                                    DefaultEpoch,
+                                                                    receiverOptions),
                                          "translate: epoch receiver creation.")
                 receiver
                   .flatMap { r =>
+                    r.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
                     retryNotNull(r.receive(1), "translate: receive call")
                   }
                   .map { e =>

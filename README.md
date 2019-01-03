@@ -30,15 +30,15 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Spark
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
-|Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.6-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.6%7Cjar)|
+|Spark 2.3|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.7-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.7%7Cjar)|
 |Spark 2.2|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.2.6-blue.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.6%7Cjar)|
 |Spark 2.1|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.2.6-blue.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.2.6%7Cjar)|
 
 #### Databricks
 |Databricks Runtime Version|Artifact Id|Package Version|
 |-------------|------------|----------------|
-|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.6-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.6%7Cjar)|
-|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.6-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.6%7Cjar)|
+|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.7-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.7%7Cjar)|
+|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.7-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.7%7Cjar)|
 
 #### Roadmap
 
@@ -53,7 +53,7 @@ For Scala/Java applications using SBT/Maven project definitions, link your appli
 
     groupId = com.microsoft.azure
     artifactId = azure-eventhubs-spark_2.11
-    version = 2.3.6
+    version = 2.3.7
 
 ### Documentation
 

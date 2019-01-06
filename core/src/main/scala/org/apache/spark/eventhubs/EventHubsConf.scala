@@ -158,11 +158,14 @@ final class EventHubsConf private (private val connectionStr: String)
    */
   private[spark] def trimmed: EventHubsConf = {
     // These are the options needed by Spark executors
-    val include = Seq("eventhubs.connectionString",
-                      "eventhubs.consumerGroup",
-                      "eventhubs.receiverTimeout",
-                      "eventhubs.operationTimeout",
-                      "useSimulatedClient").map(_.toLowerCase).toSet
+    val include = Seq(
+      "eventhubs.connectionString",
+      "eventhubs.consumerGroup",
+      "eventhubs.receiverTimeout",
+      "eventhubs.operationTimeout",
+      "eventhubs.prefetchCount",
+      "useSimulatedClient"
+    ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
     settings.asScala

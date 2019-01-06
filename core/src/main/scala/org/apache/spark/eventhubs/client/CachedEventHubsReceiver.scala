@@ -17,6 +17,8 @@
 
 package org.apache.spark.eventhubs.client
 
+import java.time.Duration
+
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.eventhubs.utils.RetryUtils.{ retryJava, retryNotNull }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, SequenceNumber }
@@ -67,6 +69,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(true)
+    receiverOptions.setPrefetchCount(ehConf.prefetchCount.getOrElse(DefaultPrefetchCount))
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
     val epochReceiver = retryJava(
@@ -91,9 +94,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       }
   }
 
-  private def receiveOne(msg: String): Future[Iterable[EventData]] = {
+  private def receiveOne(timeout: Duration, msg: String): Future[Iterable[EventData]] = {
     receiver
       .flatMap { r =>
+        r.setReceiveTimeout(timeout)
         retryNotNull(r.receive(1), msg)
       }
       .map {
@@ -111,7 +115,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       receiver = createReceiver(requestSeqNo)
     }
 
-    val event = Await.result(receiveOne("checkCursor initial"), ehConf.internalOperationTimeout)
+    val event = Await.result(
+      receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor initial"),
+      ehConf.internalOperationTimeout)
     val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
 
     if (receivedSeqNo != requestSeqNo) {
@@ -123,7 +129,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       logInfo(
         s"checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, receivedSeqNo: $lastReceivedSeqNo")
       receiver = createReceiver(requestSeqNo)
-      val movedEvent = Await.result(receiveOne("checkCursor move"), ehConf.internalOperationTimeout)
+      val movedEvent = Await.result(
+        receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor move"),
+        ehConf.internalOperationTimeout)
       val movedSeqNo = movedEvent.head.getSystemProperties.getSequenceNumber
       if (movedSeqNo != requestSeqNo) {
         // The event still isn't present. It must be (2).
@@ -153,7 +161,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
     val theRest = for { i <- 1 until batchSize } yield
-      Await.result(receiveOne(s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
+      Await.result(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
+                              s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
                    ehConf.internalOperationTimeout)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten

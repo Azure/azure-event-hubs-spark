@@ -51,7 +51,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
       connStr.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
       while (client == null) {
-        client = EventHubClient.createSync(connStr.toString, ClientThreadPool.pool)
+        client = EventHubClient.createSync(connStr.toString, ClientThreadPool.get(ehConf))
       }
     } else {
       logInfo(s"Borrowing client. EventHub name: ${ehConf.name}")
@@ -143,9 +143,23 @@ object ClientConnectionPool extends Logging {
 }
 
 /**
- * Thread pool for [[EventHubClient]]s. We create one thread pool per JVM.
- * Threads are created on demand if none are available.
+ * Cache for [[ScheduledExecutorService]]s.
  */
 object ClientThreadPool {
-  val pool: ScheduledExecutorService = Executors.newScheduledThreadPool(DefaultThreadPoolSize)
+  type MutableMap[A, B] = scala.collection.mutable.HashMap[A, B]
+
+  private[this] val pools = new MutableMap[String, ScheduledExecutorService]()
+
+  private def key(ehConf: EventHubsConf): String = {
+    ehConf.connectionString.toLowerCase
+  }
+
+  def get(ehConf: EventHubsConf): ScheduledExecutorService = {
+    pools.synchronized {
+      val keyName = key(ehConf)
+      pools.getOrElseUpdate(
+        keyName,
+        Executors.newScheduledThreadPool(ehConf.threadPoolSize.getOrElse(DefaultThreadPoolSize)))
+    }
+  }
 }

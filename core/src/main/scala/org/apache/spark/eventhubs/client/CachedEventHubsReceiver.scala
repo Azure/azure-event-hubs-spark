@@ -27,7 +27,7 @@ import org.apache.spark.{ SparkEnv, TaskContext }
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.{ Await, Awaitable, Future }
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
@@ -56,6 +56,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                                        nAndP: NameAndPartition,
                                                        startSeqNo: SequenceNumber)
     extends Logging {
+
+  type AwaitTimeoutException = java.util.concurrent.TimeoutException
 
   import org.apache.spark.eventhubs._
 
@@ -115,9 +117,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       receiver = createReceiver(requestSeqNo)
     }
 
-    val event = Await.result(
+    val event = awaitReceiveMessage(
       receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor initial"),
-      ehConf.internalOperationTimeout)
+      requestSeqNo)
     val receivedSeqNo = event.head.getSystemProperties.getSequenceNumber
 
     if (receivedSeqNo != requestSeqNo) {
@@ -129,9 +131,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       logInfo(
         s"checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, receivedSeqNo: $lastReceivedSeqNo")
       receiver = createReceiver(requestSeqNo)
-      val movedEvent = Await.result(
+      val movedEvent = awaitReceiveMessage(
         receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor move"),
-        ehConf.internalOperationTimeout)
+        requestSeqNo)
       val movedSeqNo = movedEvent.head.getSystemProperties.getSequenceNumber
       if (movedSeqNo != requestSeqNo) {
         // The event still isn't present. It must be (2).
@@ -161,9 +163,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
     val theRest = for { i <- 1 until batchSize } yield
-      Await.result(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
-                              s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
-                   ehConf.internalOperationTimeout)
+      awaitReceiveMessage(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
+                                     s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
+                          requestSeqNo)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten
     val sorted = combined.toSeq
@@ -174,6 +176,17 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val (result, validate) = sorted.duplicate
     assert(validate.size == batchSize)
     result
+  }
+
+  private def awaitReceiveMessage[T](awaitable: Awaitable[T], requestSeqNo: SequenceNumber): T = {
+    try {
+      Await.result(awaitable, ehConf.internalOperationTimeout)
+    } catch {
+      case e: AwaitTimeoutException => {
+        receiver = createReceiver(requestSeqNo)
+        throw e
+      }
+    }
   }
 }
 

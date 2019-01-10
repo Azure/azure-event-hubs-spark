@@ -219,6 +219,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setMaxEventsPerTrigger(100)
       .setReceiverTimeout(Duration.ofSeconds(10))
       .setOperationTimeout(Duration.ofSeconds(10))
+      .setThreadPoolSize(16)
       .setPrefetchCount(100)
 
     val newConf = originalConf.trimmed
@@ -235,6 +236,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     originalConf("eventhubs.receiverTimeout")
     originalConf("eventhubs.operationTimeout")
     originalConf("eventhubs.prefetchCount")
+    originalConf("eventhubs.threadPoolSize")
     originalConf("maxEventsPerTrigger")
     originalConf("useSimulatedClient")
 
@@ -250,6 +252,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     newConf("eventhubs.receiverTimeout")
     newConf("eventhubs.operationTimeout")
     newConf("eventhubs.prefetchCount")
+    newConf("eventhubs.threadPoolSize")
     intercept[NoSuchElementException] { newConf("maxEventsPerTrigger") }
     newConf("useSimulatedClient")
   }

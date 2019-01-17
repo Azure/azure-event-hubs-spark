@@ -77,7 +77,7 @@ private[sql] class EventHubsSourceProvider
                             providerName: String,
                             parameters: Map[String, String]): Source = {
     EventHubsClient.userAgent =
-      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
+      s"Structured-Streaming-$SparkConnectorVersion-${sqlContext.sparkSession.sparkContext.version}"
 
     new EventHubsSource(sqlContext, parameters, metadataPath)
   }
@@ -88,7 +88,7 @@ private[sql] class EventHubsSourceProvider
   override def createRelation(sqlContext: SQLContext,
                               parameters: Map[String, String]): BaseRelation = {
     EventHubsClient.userAgent =
-      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
+      s"Structured-Streaming-$SparkConnectorVersion-${sqlContext.sparkSession.sparkContext.version}"
 
     new EventHubsRelation(sqlContext, parameters)
   }
@@ -98,7 +98,7 @@ private[sql] class EventHubsSourceProvider
                           partitionColumns: Seq[String],
                           outputMode: OutputMode): Sink = {
     EventHubsClient.userAgent =
-      s"Structured-Streaming-${sqlContext.sparkSession.sparkContext.version}"
+      s"Structured-Streaming-$SparkConnectorVersion-${sqlContext.sparkSession.sparkContext.version}"
 
     new EventHubsSink(sqlContext, parameters)
   }
@@ -108,7 +108,7 @@ private[sql] class EventHubsSourceProvider
                               parameters: Map[String, String],
                               data: DataFrame): BaseRelation = {
     EventHubsClient.userAgent =
-      s"Structured-Streaming-${outerSQLContext.sparkSession.sparkContext.version}"
+      s"Structured-Streaming-$SparkConnectorVersion-${outerSQLContext.sparkSession.sparkContext.version}"
 
     mode match {
       case SaveMode.Overwrite | SaveMode.Ignore =>

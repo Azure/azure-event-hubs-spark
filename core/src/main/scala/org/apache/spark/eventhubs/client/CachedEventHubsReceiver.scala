@@ -129,7 +129,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       // 2) Your desired event has expired from the service.
       // First, we'll check for case (1).
       logInfo(
-        s"checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, receivedSeqNo: $lastReceivedSeqNo")
+        s"checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo, receivedSeqNo: $receivedSeqNo")
       receiver = createReceiver(requestSeqNo)
       val movedEvent = awaitReceiveMessage(
         receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor move"),
@@ -141,11 +141,19 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
           retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
                     "partitionRuntime"),
           ehConf.internalOperationTimeout)
-        val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
-        throw new IllegalStateException(
-          s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
-            s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
-            s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
+
+        if (requestSeqNo < info.getBeginSequenceNumber &&
+            movedSeqNo == info.getBeginSequenceNumber) {
+          Future {
+            movedEvent
+          }
+        } else {
+          val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+          throw new IllegalStateException(
+            s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
+              s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
+              s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
+        }
       } else {
         Future {
           movedEvent
@@ -162,7 +170,14 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     // Retrieve the events. First, we get the first event in the batch.
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
-    val theRest = for { i <- 1 until batchSize } yield
+    val firstSeqNo = first.head.getSystemProperties.getSequenceNumber
+    val newBatchSize = (requestSeqNo + batchSize - firstSeqNo).toInt
+
+    if (newBatchSize <= 0) {
+      return Iterator.empty
+    }
+
+    val theRest = for { i <- 1 until newBatchSize } yield
       awaitReceiveMessage(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
                                      s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
                           requestSeqNo)
@@ -174,7 +189,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .iterator
 
     val (result, validate) = sorted.duplicate
-    assert(validate.size == batchSize)
+    assert(validate.size == newBatchSize)
     result
   }
 
@@ -182,10 +197,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     try {
       Await.result(awaitable, ehConf.internalOperationTimeout)
     } catch {
-      case e: AwaitTimeoutException => {
+      case e: AwaitTimeoutException =>
         receiver = createReceiver(requestSeqNo)
         throw e
-      }
     }
   }
 }

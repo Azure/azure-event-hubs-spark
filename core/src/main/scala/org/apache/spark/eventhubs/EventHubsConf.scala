@@ -395,6 +395,10 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    */
   def setPrefetchCount(count: Int): EventHubsConf = {
+    if (count > PrefetchCountMaximum || count < PrefetchCountMinimum) {
+      throw new IllegalArgumentException("setPrefetchCount: count value is out of range.")
+    }
+
     set(PrefetchCountKey, count)
   }
 

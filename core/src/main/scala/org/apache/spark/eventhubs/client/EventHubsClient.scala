@@ -19,6 +19,7 @@ package org.apache.spark.eventhubs.client
 
 import com.microsoft.azure.eventhubs._
 import com.microsoft.azure.eventhubs.impl.EventHubClientImpl
+import org.apache.spark.SparkEnv
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.utils.RetryUtils._
 import org.apache.spark.internal.Logging
@@ -253,6 +254,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                   s"translate: creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. filter: ${pos.convert}")
                 val receiverOptions = new ReceiverOptions
                 receiverOptions.setPrefetchCount(1)
+                receiverOptions.setIdentifier(s"spark-${SparkEnv.get.executorId}")
+
                 val receiver = retryJava(client.createEpochReceiver(consumerGroup,
                                                                     nAndP.partitionId.toString,
                                                                     pos.convert,

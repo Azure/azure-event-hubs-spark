@@ -198,6 +198,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       Await.result(awaitable, ehConf.internalOperationTimeout)
     } catch {
       case e: AwaitTimeoutException =>
+        logError(
+          s"awaitReceiveMessage call failed with timeout. Event Hub $nAndP, ConsumerGroup ${ehConf.consumerGroup}. requestSeqNo: $requestSeqNo")
+
         receiver = createReceiver(requestSeqNo)
         throw e
     }

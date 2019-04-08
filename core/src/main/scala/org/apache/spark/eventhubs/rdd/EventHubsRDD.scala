@@ -19,7 +19,7 @@ package org.apache.spark.eventhubs.rdd
 
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.client.{ CachedEventHubsReceiver, CachedReceiver }
+import org.apache.spark.eventhubs.client.CachedEventHubsReceiver
 import org.apache.spark.eventhubs.utils.SimulatedCachedReceiver
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -42,8 +42,6 @@ private[spark] class EventHubsRDD(sc: SparkContext,
     extends RDD[EventData](sc, Nil)
     with Logging
     with HasOffsetRanges {
-
-  import org.apache.spark.eventhubs._
 
   override def getPartitions: Array[Partition] =
     offsetRanges

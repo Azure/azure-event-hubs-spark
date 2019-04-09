@@ -96,10 +96,12 @@ Additionally, the following configurations are optional:
 | startingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | streaming and batch | Sets starting positions for specific partitions. If any positions are set in this option, they take priority over any other option. If nothing is configured within this option, then the setting in `startingPosition` is used. If no position has been set in either option, we will start consuming from the beginning of the partition. |
 | startingPosition | `EventPosition` | end of stream | streaming and batch | The starting position for your Structured Streaming job. Please read `startingPositions` for detail on which order the options are read. |
 | endingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | batch query | The ending position of a batch query on a per partition basis. This works the same as `startingPositions`. |
-| endingPosition | `EventPosition` | end of stream | batch query | The ending position of a batch query. This workds the same as `startingPosition`.  | 
+| endingPosition | `EventPosition` | end of stream | batch query | The ending position of a batch query. This works the same as `startingPosition`.  | 
 | maxEventsPerTrigger | `long` | `partitionCount * 1000` | streaming query | Rate limit on maximum number of events processed per trigger interval. The specified total number of events will be proportionally split across partitions of different volume. | 
 | receiverTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
-| operationTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub API calls will be retried before throwing an exception. |
+| operationTimeout | `java.time.Duration` | 300 seconds | streaming and batch | The amount of time Event Hub API calls will be retried before throwing an exception. |
+| prefetchCount | `int` | `500` | streaming and batch | Sets the prefetch count for the underlying receiver and controls how many events are received in advance. |
+| threadPoolSize | `int` | `16` | streaming and batch | Sets the size of thread pool. |
 
 For each option, there exists a corresponding setter in the EventHubsConf. For example:
 

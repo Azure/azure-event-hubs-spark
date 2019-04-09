@@ -99,8 +99,9 @@ Additionally, the following configurations are optional:
 | endingPosition | `EventPosition` | end of stream | batch query | The ending position of a batch query. This workds the same as `startingPosition`.  | 
 | maxEventsPerTrigger | `long` | `partitionCount * 1000` | streaming query | Rate limit on maximum number of events processed per trigger interval. The specified total number of events will be proportionally split across partitions of different volume. | 
 | receiverTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
-| operationTimeout | `java.time.Duration` | 60 seconds | streaming and batch | The amount of time Event Hub API calls will be retried before throwing an exception. |
-
+| operationTimeout | `java.time.Duration` | 300 seconds | streaming and batch | The amount of time Event Hub API calls will be retried before throwing an exception. |
+| prefetchCount | `int` | `500` | streaming and batch | Sets the prefetch count for the underlying receiver and controls how many events are received in advance.
+| threadPoolSize | `int` | `16` | streaming and batch | Sets the size of thread pool.
 For each option, there exists a corresponding setter in the EventHubsConf. For example:
 
 ```scala

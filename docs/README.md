@@ -1,6 +1,6 @@
 # EventHub Connector Documentation
 
-Hello! This connector supports Strucutred Streaming and Spark Streaming. For documentation on using this connector, please read our integration guides.
+Hello! This connector supports Structured Streaming and Spark Streaming. For documentation on using this connector, please read our integration guides.
 
 - [Structured Streaming + Event Hubs Integration Guide](structured-streaming-eventhubs-integration.md)
 - [Spark Streaming + Event Hubs Integration Guide](spark-streaming-eventhubs-integration.md)

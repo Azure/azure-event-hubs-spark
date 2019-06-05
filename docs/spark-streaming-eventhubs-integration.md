@@ -187,7 +187,7 @@ import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, EventHubsUtils
 
 val connectionString = "YOUR.CONNECTION.STRING"
 val ehConf = EventHubsConf(connectionString)
-  .setStartingPosition(EventPosition.endOfStream)
+  .setStartingPosition(EventPosition.fromEndOfStream)
   .setMaxRatePerPartition(10000)
 
 val stream = EventHubsUtils.createDirectStream(streamingContext, ehConf)

@@ -266,6 +266,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
           case _ =>
             val runtimeInfo =
               Await.result(getRunTimeInfoF(nAndP.partitionId), ehConf.internalOperationTimeout)
+            var receiver: Future[PartitionReceiver] = null
             val seqNo =
               if (runtimeInfo.getIsEmpty || (pos.enqueuedTime != null &&
                   runtimeInfo.getLastEnqueuedTimeUtc.isBefore(pos.enqueuedTime.toInstant))) {
@@ -277,12 +278,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                 receiverOptions.setPrefetchCount(1)
                 receiverOptions.setIdentifier(s"spark-${SparkEnv.get.executorId}")
 
-                val receiver = retryJava(client.createEpochReceiver(consumerGroup,
-                                                                    nAndP.partitionId.toString,
-                                                                    pos.convert,
-                                                                    DefaultEpoch,
-                                                                    receiverOptions),
-                                         "translate: epoch receiver creation.")
+                receiver = retryJava(client.createReceiver(consumerGroup,
+                                                           nAndP.partitionId.toString,
+                                                           pos.convert,
+                                                           receiverOptions),
+                                     "translate: epoch receiver creation.")
                 receiver
                   .flatMap { r =>
                     r.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
@@ -292,6 +292,12 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                     e.iterator.next.getSystemProperties.getSequenceNumber
                   }
               }
+            if (receiver != null) {
+              receiver
+                .flatMap { r =>
+                  Future.successful(r.close())
+                }
+            }
             (nAndP.partitionId, seqNo)
         }
 

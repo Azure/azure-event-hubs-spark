@@ -45,16 +45,21 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
    */
   private def borrowClient: EventHubClient = {
     var client = pool.poll()
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (client == null) {
       logInfo(
-        s"No clients left to borrow. EventHub name: ${ehConf.name}. Creating client ${count.incrementAndGet()}")
+        s"No clients left to borrow. EventHub name: ${ehConf.name}, " +
+          s"ConsumerGroup name: $consumerGroup. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
       connStr.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
+      EventHubsClient.userAgent =
+        s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
         client = EventHubClient.createSync(connStr.toString, ClientThreadPool.get(ehConf))
       }
     } else {
-      logInfo(s"Borrowing client. EventHub name: ${ehConf.name}")
+      logInfo(
+        s"Borrowing client. EventHub name: ${ehConf.name}, ConsumerGroup name: $consumerGroup")
     }
     logInfo(s"Available clients: {${pool.size}}. Total clients: ${count.get}")
     client

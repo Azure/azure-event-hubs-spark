@@ -44,6 +44,7 @@ package object eventhubs {
   val DefaultPrefetchCount: Int = PartitionReceiver.DEFAULT_PREFETCH_COUNT
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
+  val DefaultUseExclusiveReceiver = "true"
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
@@ -82,5 +83,4 @@ package object eventhubs {
 
     def toSequenceNumber: SequenceNumber = str.toLong
   }
-
 }

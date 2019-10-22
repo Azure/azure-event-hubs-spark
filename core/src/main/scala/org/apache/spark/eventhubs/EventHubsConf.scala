@@ -435,6 +435,22 @@ final class EventHubsConf private (private val connectionStr: String)
     set(MaxEventsPerTriggerKey, limit)
   }
 
+  /**
+   * Set the size of thread pool.
+   * Default: [[DefaultUseExclusiveReceiver]]
+   *
+   * @param b the flag which specifies whether the connector uses an epoch receiver
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setUseExclusiveReceiver(b: Boolean): EventHubsConf = {
+    set(UseExclusiveReceiverKey, b)
+  }
+
+  /** The current thread pool size.  */
+  def useExclusiveReceiver: Boolean = {
+    self.get(UseExclusiveReceiverKey).getOrElse(DefaultUseExclusiveReceiver).toBoolean
+  }
+
   // The simulated client (and simulated eventhubs) will be used. These
   // can be found in EventHubsTestUtils.
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
@@ -484,6 +500,7 @@ object EventHubsConf extends Logging {
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
+  val UseExclusiveReceiverKey = "useExclusiveReceiver"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

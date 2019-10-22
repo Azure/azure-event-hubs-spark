@@ -17,7 +17,14 @@
 
 package org.apache.spark.eventhubs
 
-import com.microsoft.azure.eventhubs.EventData
+import java.util.concurrent.CompletableFuture
+
+import com.microsoft.azure.eventhubs.{
+  EventData,
+  EventHubClient,
+  PartitionReceiver,
+  ReceiverOptions
+}
 import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.streaming.StreamingContext
@@ -25,6 +32,7 @@ import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
 import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
+import com.microsoft.azure.eventhubs.{ EventPosition => ehep }
 
 /**
  * Helper to create Direct DStreams which consume events from Event Hubs.
@@ -86,5 +94,24 @@ object EventHubsUtils {
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): JavaRDD[EventData] = {
     new JavaRDD(createRDD(jsc.sc, ehConf, offsetRanges))
+  }
+
+  def createReceiverInner(
+      client: EventHubClient,
+      useExclusiveReceiver: Boolean,
+      consumerGroup: String,
+      partitionId: String,
+      eventPosition: ehep,
+      receiverOptions: ReceiverOptions): CompletableFuture[PartitionReceiver] = {
+    if (useExclusiveReceiver) {
+      client.createEpochReceiver(consumerGroup,
+                                 partitionId,
+                                 eventPosition,
+                                 DefaultEpoch,
+                                 receiverOptions)
+
+    } else {
+      client.createReceiver(consumerGroup, partitionId, eventPosition, receiverOptions)
+    }
   }
 }

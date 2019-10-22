@@ -75,10 +75,12 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiverOptions.setIdentifier(
       s"spark-${SparkEnv.get.executorId}-${TaskContext.get.taskAttemptId}")
     val consumer = retryJava(
-      client.createReceiver(consumerGroup,
-                            nAndP.partitionId.toString,
-                            EventPosition.fromSequenceNumber(seqNo).convert,
-                            receiverOptions),
+      EventHubsUtils.createReceiverInner(client,
+                                         ehConf.useExclusiveReceiver,
+                                         consumerGroup,
+                                         nAndP.partitionId.toString,
+                                         EventPosition.fromSequenceNumber(seqNo).convert,
+                                         receiverOptions),
       "CachedReceiver creation."
     )
     Await.result(consumer, ehConf.internalOperationTimeout)

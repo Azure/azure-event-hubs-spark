@@ -278,11 +278,15 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                 receiverOptions.setPrefetchCount(1)
                 receiverOptions.setIdentifier(s"spark-${SparkEnv.get.executorId}")
 
-                receiver = retryJava(client.createReceiver(consumerGroup,
-                                                           nAndP.partitionId.toString,
-                                                           pos.convert,
-                                                           receiverOptions),
-                                     "translate: epoch receiver creation.")
+                receiver = retryJava(
+                  EventHubsUtils.createReceiverInner(client,
+                                                     ehConf.useExclusiveReceiver,
+                                                     consumerGroup,
+                                                     nAndP.partitionId.toString,
+                                                     pos.convert,
+                                                     receiverOptions),
+                  "translate: receiver creation."
+                )
                 receiver
                   .flatMap { r =>
                     r.setReceiveTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))

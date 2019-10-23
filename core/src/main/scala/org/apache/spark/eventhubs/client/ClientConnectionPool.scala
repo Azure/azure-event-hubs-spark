@@ -55,7 +55,8 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        client = EventHubClient.createSync(connStr.toString, ClientThreadPool.get(ehConf))
+        client = EventHubClient.createFromConnectionStringSync(connStr.toString,
+                                                               ClientThreadPool.get(ehConf))
       }
     } else {
       logInfo(

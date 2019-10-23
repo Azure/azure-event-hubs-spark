@@ -49,12 +49,13 @@ package object eventhubs {
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
   val RetryCount = 3
+  val WaitInterval = 3000
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
   val SequenceNumberAnnotation = "x-opt-sequence-number"
 
-  val SparkConnectorVersion = "2.3.14-beta-6"
+  val SparkConnectorVersion = "2.3.14"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int

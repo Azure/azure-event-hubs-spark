@@ -21,7 +21,8 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 
 import com.microsoft.azure.eventhubs._
-import org.apache.spark.eventhubs.utils.RetryUtils.{ retryJava, retryNotNull }
+import org.apache.spark.SparkEnv
+import org.apache.spark.eventhubs.utils.RetryUtils.{ after, retryJava, retryNotNull }
 import org.apache.spark.eventhubs.{
   DefaultConsumerGroup,
   EventHubsConf,
@@ -30,10 +31,10 @@ import org.apache.spark.eventhubs.{
   SequenceNumber
 }
 import org.apache.spark.internal.Logging
-import org.apache.spark.{ SparkEnv, TaskContext }
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.concurrent.{ Await, Awaitable, Future }
 
 private[spark] trait CachedReceiver {
@@ -102,10 +103,24 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def receiveOne(timeout: Duration, msg: String): Future[Iterable[EventData]] = {
-    receiver.setReceiveTimeout(timeout)
-    retryNotNull(receiver.receive(1), msg).map(
-      _.asScala
-    )
+    def receiveOneWithRetry(timeout: Duration,
+                            msg: String,
+                            retryCount: Int): Future[Iterable[EventData]] = {
+      if (!receiver.getIsOpen && retryCount < RetryCount) {
+        val taskId = EventHubsUtils.getTaskId
+        logInfo(
+          s"(TID $taskId) receiver is not opened yet. Will retry.. $nAndP, consumer group: ${ehConf.consumerGroup
+            .getOrElse(DefaultConsumerGroup)}")
+
+        after(WaitInterval.milliseconds)(receiveOneWithRetry(timeout, msg, retryCount + 1))
+      }
+
+      receiver.setReceiveTimeout(timeout)
+      retryNotNull(receiver.receive(1), msg).map(
+        _.asScala
+      )
+    }
+    receiveOneWithRetry(timeout, msg, retryCount = 0)
   }
 
   private def closeReceiver(): Future[Void] = {
@@ -218,8 +233,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     assert(validate.size == newBatchSize)
 
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
-    logInfo(s"(TID $taskId) elapsed time for receive $nAndP, ${ehConf.consumerGroup.getOrElse(
-      DefaultConsumerGroup)}: $elapsedTimeMs ms")
+    logInfo(s"(TID $taskId) Finished receiving for $nAndP, consumer group: ${ehConf.consumerGroup
+      .getOrElse(DefaultConsumerGroup)}, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
 
     result
   }

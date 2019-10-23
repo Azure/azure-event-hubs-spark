@@ -296,12 +296,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                     e.iterator.next.getSystemProperties.getSequenceNumber
                   }
               }
-            if (receiver != null) {
-              receiver
-                .flatMap { r =>
-                  Future.successful(r.close())
-                }
-            }
+
             (nAndP.partitionId, seqNo)
         }
 

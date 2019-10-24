@@ -29,6 +29,7 @@ import com.microsoft.azure.eventhubs.{
 import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
 import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
+import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
@@ -37,7 +38,7 @@ import org.apache.spark.{ SparkContext, TaskContext }
 /**
  * Helper to create Direct DStreams which consume events from Event Hubs.
  */
-object EventHubsUtils {
+object EventHubsUtils extends Logging {
 
   /**
    * Creates a Direct DStream which consumes from  the Event Hubs instance
@@ -103,6 +104,11 @@ object EventHubsUtils {
       partitionId: String,
       eventPosition: ehep,
       receiverOptions: ReceiverOptions): CompletableFuture[PartitionReceiver] = {
+    val taskId = EventHubsUtils.getTaskId
+    logInfo(
+      s"(TID $taskId) creating receiver for Event Hub partition $partitionId, consumer group $consumerGroup " +
+        s"with epoch receiver option $useExclusiveReceiver")
+
     if (useExclusiveReceiver) {
       client.createEpochReceiver(consumerGroup,
                                  partitionId,

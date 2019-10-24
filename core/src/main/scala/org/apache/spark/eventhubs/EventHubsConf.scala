@@ -165,6 +165,7 @@ final class EventHubsConf private (private val connectionStr: String)
       "eventhubs.operationTimeout",
       "eventhubs.prefetchCount",
       "eventhubs.threadPoolSize",
+      "eventhubs.useExclusiveReceiver",
       "useSimulatedClient"
     ).map(_.toLowerCase).toSet
 
@@ -498,9 +499,9 @@ object EventHubsConf extends Logging {
   val OperationTimeoutKey = "eventhubs.operationTimeout"
   val PrefetchCountKey = "eventhubs.prefetchCount"
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"
+  val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
-  val UseExclusiveReceiverKey = "useExclusiveReceiver"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

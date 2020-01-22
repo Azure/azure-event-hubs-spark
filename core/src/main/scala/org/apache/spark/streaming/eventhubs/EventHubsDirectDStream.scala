@@ -24,13 +24,14 @@ import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs._
 import org.apache.spark.eventhubs.client.EventHubsClient
-import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
+import org.apache.spark.eventhubs.rdd.{EventHubsRDD, OffsetRange}
+import org.apache.spark.eventhubs.utils.EventHubsReceiverListener
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
-import org.apache.spark.streaming.{ StreamingContext, Time }
-import org.apache.spark.streaming.dstream.{ DStreamCheckpointData, InputDStream }
-import org.apache.spark.streaming.scheduler.{ RateController, StreamInputInfo }
+import org.apache.spark.streaming.{StreamingContext, Time}
+import org.apache.spark.streaming.dstream.{DStreamCheckpointData, InputDStream}
+import org.apache.spark.streaming.scheduler.{RateController, StreamInputInfo}
 import org.apache.spark.streaming.scheduler.rate.RateEstimator
 
 /**
@@ -49,7 +50,8 @@ import org.apache.spark.streaming.scheduler.rate.RateEstimator
  */
 private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingContext,
                                                             ehConf: EventHubsConf,
-                                                            clientFactory: EventHubsConf => Client)
+                                                            clientFactory: EventHubsConf => Client,
+                                                            eventHubsReceiverListener: Option[EventHubsReceiverListener] = None)
     extends InputDStream[EventData](_ssc)
     with Logging {
 
@@ -128,7 +130,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
     } yield
       OffsetRange(NameAndPartition(ehName, p), fromSeqNos(p), untilSeqNos(p), preferredLoc)).toArray
 
-    val rdd = new EventHubsRDD(context.sparkContext, ehConf.trimmed, offsetRanges)
+    val rdd = new EventHubsRDD(context.sparkContext, ehConf.trimmed, offsetRanges, eventHubsReceiverListener)
 
     val description = offsetRanges.map(_.toString).mkString("\n")
     logInfo(s"Starting batch at $validTime for EH: $ehName with\n$description")
@@ -175,7 +177,8 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
           logInfo(s"Restoring EventHubsRDD for time $t ${b.mkString("[", ", ", "]")}")
           generatedRDDs += t -> new EventHubsRDD(context.sparkContext,
                                                  ehConf.trimmed,
-                                                 b.map(OffsetRange(_)))
+                                                 b.map(OffsetRange(_)),
+                                                 eventHubsReceiverListener)
       }
     }
   }

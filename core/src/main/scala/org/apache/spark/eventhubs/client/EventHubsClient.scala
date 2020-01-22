@@ -110,7 +110,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    */
   private def getRunTimeInfoF(partitionId: PartitionId): Future[PartitionRuntimeInformation] = {
     retryJava(client.getPartitionRuntimeInformation(partitionId.toString),
-              s"getRunTimeInfoF for partition: $partitionId")
+              s"getRunTimeInfoF for partition: $partitionId",
+      ehConf.operationRetryTimes.getOrElse(RetryCount),
+      ehConf.operationRetryExponentialDelayMs.getOrElse(10))
   }
 
   /**
@@ -165,7 +167,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    *
    * @return partition count
    */
-  override lazy val partitionCount: Int = {
+  override def partitionCount: Int = {
     try {
       val runtimeInfo = client.getRuntimeInformation.get
       runtimeInfo.getPartitionCount
@@ -285,7 +287,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
                                                      nAndP.partitionId.toString,
                                                      pos.convert,
                                                      receiverOptions),
-                  "translate: receiver creation."
+                  "translate: receiver creation.",
+                  ehConf.operationRetryTimes.getOrElse(RetryCount),
+                  ehConf.operationRetryExponentialDelayMs.getOrElse(10)
                 )
                 receiver
                   .flatMap { r =>

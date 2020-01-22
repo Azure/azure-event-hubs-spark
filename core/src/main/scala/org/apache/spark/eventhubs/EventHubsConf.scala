@@ -21,15 +21,17 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.http.annotation.Experimental
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.json4s.NoTypeHints
+import org.apache.spark.eventhubs.utils.{EventHubsReceiverListener, EventHubsSenderListener}
+import org.apache.spark.internal.Logging
+import org.json4s.{DefaultFormats, NoTypeHints}
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
-
+import scala.util.Try
+import org.apache.spark.sql.eventhubs._
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *
@@ -52,7 +54,6 @@ final class EventHubsConf private (private val connectionStr: String)
   self =>
 
   import EventHubsConf._
-
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionStr)
 
@@ -362,6 +363,22 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(ReceiverTimeoutKey) map (str => Duration.parse(str))
   }
 
+  def operationRetryTimes: Option[Int] = {
+    self.get(OperationRetryTimes) map (str => Integer.parseInt(str))
+  }
+
+  def setOperationRetryTimes(times: Int): EventHubsConf = {
+    set(OperationRetryTimes, times)
+  }
+
+  def operationRetryExponentialDelayMs: Option[Int] = {
+    self.get(OperationRetryExponentialDelayMs) map (str => Integer.parseInt(str))
+  }
+
+  def setOperationRetryExponentialDelayMs(times: Int): EventHubsConf = {
+    set(OperationRetryExponentialDelayMs, times)
+  }
+
   /**
    * Set the operation timeout. We will retryJava failures when contacting the
    * EventHubs service for the length of this timeout.
@@ -436,6 +453,27 @@ final class EventHubsConf private (private val connectionStr: String)
     set(MaxEventsPerTriggerKey, limit)
   }
 
+  def setReceiverListener(listener: EventHubsReceiverListener): EventHubsConf = {
+    set(ReceiverListenerSerializedObjectKey, SerializationUtils.serialize(listener))
+  }
+
+  def receiverListener(): Option[EventHubsReceiverListener] = {
+    self.get(ReceiverListenerSerializedObjectKey).map(SerializationUtils.deserialize[EventHubsReceiverListener])
+  }
+
+  def setSenderListener(listener: EventHubsSenderListener): EventHubsConf = {
+    set(SenderListenerSerializedObjectKey, SerializationUtils.serialize(listener))
+  }
+
+  def senderListener(): Option[EventHubsSenderListener] = {
+    self.get(SenderListenerSerializedObjectKey).map{SerializationUtils.deserialize[EventHubsSenderListener]}
+  }
+
+  def namespace: String = {
+    ConnectionStringBuilder(this.connectionString).getNamespace
+  }
+
+
   /**
    * Set the size of thread pool.
    * Default: [[DefaultUseExclusiveReceiver]]
@@ -497,14 +535,20 @@ object EventHubsConf extends Logging {
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
+  val ReceiveRetryTimes = "eventhubs.receiveRetryTimes"
+  val OperationRetryTimes = "eventhubs.operationRetryTimes"
+  val OperationRetryExponentialDelayMs = "eventhubs.operationRetryExponentialDelayMs"
   val PrefetchCountKey = "eventhubs.prefetchCount"
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"
   val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
+  val SenderListenerSerializedObjectKey = "eventhubs.senderListenerSerializedObject"
+  val ReceiverListenerSerializedObjectKey = "eventhubs.receiverListenerSerializedObject"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)
+
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
     val connectionString = params.find(_._1.toLowerCase == ConnectionStringKey.toLowerCase).get._2

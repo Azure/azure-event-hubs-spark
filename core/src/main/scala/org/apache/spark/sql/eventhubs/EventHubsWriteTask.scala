@@ -28,9 +28,9 @@ import org.apache.spark.sql.catalyst.expressions.{
   UnsafeMapData,
   UnsafeProjection
 }
+import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 import org.apache.spark.sql.types.{ BinaryType, MapType, StringType }
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 
 /**
  * Writes out data in a single Spark task, without any concerns about how
@@ -43,6 +43,9 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private var sender: Client = _
+  var totalMessageSizeInBytes = 0
+  var totalMessageCount = 0
+  var writerOpenTime = 0L
 
   /**
    * Writers data out to EventHubs
@@ -51,14 +54,19 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
    */
   def execute(iterator: Iterator[InternalRow]): Unit = {
     sender = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
+    writerOpenTime = System.nanoTime()
     while (iterator.hasNext) {
       val currentRow = iterator.next
-      sendRow(currentRow, sender)
+      totalMessageSizeInBytes += sendRow(currentRow, sender)
+      totalMessageCount += 1
     }
   }
 
   def close(): Unit = {
     if (sender != null) {
+      val senderListener = ehConf.senderListener()
+      senderListener.foreach(_.onWriterClose(
+        totalMessageCount, totalMessageSizeInBytes, System.nanoTime() - writerOpenTime, None, None))
       sender.close()
       sender = null
     }
@@ -106,7 +114,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
   protected def sendRow(
       row: InternalRow,
       sender: Client
-  ): Unit = {
+  ): Int = {
     val projectedRow = projection(row)
     val body = projectedRow.getBinary(0)
     val partitionKey = toPartitionKey(projectedRow.getUTF8String(1))
@@ -120,6 +128,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
     val event = EventData.create(body)
     sender.send(event, partitionId, partitionKey, properties)
+    event.getBytes.length
   }
 
   private def createProjection = {

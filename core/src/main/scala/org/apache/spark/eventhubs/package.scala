@@ -19,9 +19,12 @@ package org.apache.spark
 
 import java.time.Duration
 
-import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+import com.microsoft.azure.eventhubs.{EventHubClient, PartitionReceiver}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
+
+import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 /**
  * A package object to constants, implicit conversion, and type
@@ -49,6 +52,8 @@ package object eventhubs {
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
   val RetryCount = 3
+  val InternalOperationTimeout: FiniteDuration = 300.seconds
+  val DefaultReceiveRetryTimes: Int = 3
   val WaitInterval = 3000
 
   val OffsetAnnotation = "x-opt-offset"

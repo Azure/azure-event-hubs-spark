@@ -10,8 +10,6 @@ trait EventHubsSenderListener extends Serializable {
 
   def onWriterClose(totalMessageCount: Int,
                     totalMessageSizeInBytes: Int,
-                    endToEndElapsedTimeInNanos: Long,
-                    totalRetryTimes: Option[Int],
-                    totalBatches: Option[Int])
+                    endToEndElapsedTimeInNanos: Long)
 
 }

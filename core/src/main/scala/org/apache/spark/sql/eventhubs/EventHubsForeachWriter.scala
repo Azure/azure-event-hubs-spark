@@ -68,9 +68,7 @@ case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[S
         ehConf.senderListener().foreach(_.onWriterClose(
           totalMessageCount,
           totalMessageSizeInBytes,
-          System.nanoTime() - writerOpenTime,
-          None,
-          None))
+          System.nanoTime() - writerOpenTime))
         ClientConnectionPool.returnClient(ehConf, client)
     }
   }

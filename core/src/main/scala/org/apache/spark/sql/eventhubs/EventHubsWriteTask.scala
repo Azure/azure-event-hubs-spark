@@ -66,7 +66,7 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
     if (sender != null) {
       val senderListener = ehConf.senderListener()
       senderListener.foreach(_.onWriterClose(
-        totalMessageCount, totalMessageSizeInBytes, System.nanoTime() - writerOpenTime, None, None))
+        totalMessageCount, totalMessageSizeInBytes, System.nanoTime() - writerOpenTime))
       sender.close()
       sender = null
     }

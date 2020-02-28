@@ -52,9 +52,7 @@ case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[S
 
   def process(body: String): Unit = {
     val event = EventData.create(s"$body".getBytes("UTF-8"))
-    retryJava(client.send(event), "ForeachWriter",
-      ehConf.operationRetryTimes.getOrElse(RetryCount),
-      ehConf.operationRetryExponentialDelayMs.getOrElse(10))
+    retryJava(client.send(event), "ForeachWriter")
     totalMessageCount += 1
     totalMessageSizeInBytes += event.getBytes.length
   }

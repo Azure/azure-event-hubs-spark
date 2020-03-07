@@ -267,8 +267,14 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       fromSeqNo = fromSeqNos
         .getOrElse(np, throw new IllegalStateException(s"$np doesn't have a fromSeqNo"))
       untilSeqNo = untilSeqNos(np)
+      preferredPartitionLocation = ehConf.partitionPreferredLocationStrategy match {
+        case PartitionPreferredLocationStrategy.Hash => np.hashCode
+        case PartitionPreferredLocationStrategy.BalancedHash => np.ehName.hashCode() + np.partitionId
+        case _ => throw new IllegalArgumentException("Unsupported partition strategy: " +
+                   ehConf.partitionPreferredLocationStrategy)
+      }
       preferredLoc = if (numExecutors > 0) {
-        Some(sortedExecutors(Math.floorMod(np.hashCode, numExecutors)))
+        Some(sortedExecutors(Math.floorMod(preferredPartitionLocation, numExecutors)))
       } else None
     } yield OffsetRange(np, fromSeqNo, untilSeqNo, preferredLoc)).filter { range =>
       if (range.untilSeqNo < range.fromSeqNo) {

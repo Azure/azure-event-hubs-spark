@@ -269,4 +269,26 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[IllegalStateException] { EventHubsConf(without).validate }
   }
 
+  test("validate partitions strategy config") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+
+    //check default options to make sure it defaults to hash
+    assert(eventHubConfig.partitionPreferredLocationStrategy ==
+           PartitionPreferredLocationStrategy.Hash)
+
+    //check exceptions
+    intercept[IllegalStateException] {
+      eventHubConfig
+        .set(EventHubsConf.PartitionPreferredLocationStrategyKey, "illegalconfigoption")
+        .partitionPreferredLocationStrategy
+    }
+
+    //check setting string types match expected types
+    eventHubConfig.set(EventHubsConf.PartitionPreferredLocationStrategyKey, "Hash")
+    assert(eventHubConfig.partitionPreferredLocationStrategy ==
+           PartitionPreferredLocationStrategy.Hash)
+    eventHubConfig.set(EventHubsConf.PartitionPreferredLocationStrategyKey, "BalancedHash")
+    assert(eventHubConfig.partitionPreferredLocationStrategy ==
+           PartitionPreferredLocationStrategy.BalancedHash)
+  }
 }

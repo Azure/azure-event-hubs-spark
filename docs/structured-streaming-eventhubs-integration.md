@@ -23,7 +23,7 @@ For Scala/Java applications using SBT/Maven project defnitions, link your applic
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.13
+  version = 2.3.14.1
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -93,7 +93,7 @@ Additionally, the following configurations are optional:
 | Option | value | default | query type | meaning |
 | ------ | ----- | ------- | ---------- | ------- |
 | consumerGroup | `String` | "$Default" | streaming and batch | A consumer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
-| startingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | streaming and batch | Sets starting positions for specific partitions. If any positions are set in this option, they take priority over any other option. If nothing is configured within this option, then the setting in `startingPosition` is used. If no position has been set in either option, we will start consuming from the beginning of the partition. |
+| startingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | streaming and batch | Sets starting positions for specific partitions. If any positions are set in this option, they take priority over any other option. If nothing is configured within this option, then the setting in `startingPosition` is used. If no position has been set in either option, we will start consuming from the end of the partition. |
 | startingPosition | `EventPosition` | end of stream | streaming and batch | The starting position for your Structured Streaming job. Please read `startingPositions` for detail on which order the options are read. |
 | endingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | batch query | The ending position of a batch query on a per partition basis. This works the same as `startingPositions`. |
 | endingPosition | `EventPosition` | end of stream | batch query | The ending position of a batch query. This works the same as `startingPosition`.  | 

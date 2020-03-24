@@ -32,7 +32,7 @@ Now, if we open a new receiver, `receiverB`, for the same consumer group and par
 In order to avoid this issue, please have one consumer group per Spark application being run. In general, you 
 should have a unique consumer group for each consuming application being run. 
 
-**Why am I getting events from the `EndofStreamAlthough`, despite using `setStartingPositions`**
+**Why am I getting events from the `EndofStream`, despite using `setStartingPositions`?**
 
 When you start reading events from Event Hubs, the initial starting positions must be determined. 
 If checkpoints are present, then the appropriate offset is found and used. If not, the user-provided `EventHubsConf` 

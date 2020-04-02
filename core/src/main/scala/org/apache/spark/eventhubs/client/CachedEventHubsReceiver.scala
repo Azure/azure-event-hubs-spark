@@ -132,7 +132,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val startTimeNs = System.nanoTime()
     def elapsedTimeNs = System.nanoTime() - startTimeNs
 
-    Await.result(closeReceiver(), ehConf.internalOperationTimeout)
+    if (!ehConf.useExclusiveReceiver) {
+      Await.result(closeReceiver(), ehConf.internalOperationTimeout)
+    }
+
     receiver = createReceiver(seqNo)
 
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)

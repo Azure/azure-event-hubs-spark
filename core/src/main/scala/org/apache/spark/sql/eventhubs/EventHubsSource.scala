@@ -160,8 +160,13 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>
         latest
+
+      case Some(limit) if currentSeqNos.isEmpty =>
+        val startingSeqNos = adjustStartingOffset(initialPartitionSeqNos)
+        rateLimit(limit, startingSeqNos, latest, earliestSeqNos.get)
+
       case Some(limit) =>
-        val startingSeqNos = getStartingOffset
+        val startingSeqNos = adjustStartingOffset(currentSeqNos.get)
         rateLimit(limit, startingSeqNos, latest, earliestSeqNos.get)
     }
 
@@ -171,25 +176,15 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     Some(EventHubsSourceOffset(seqNos))
   }
 
-  private def getStartingOffset: Map[NameAndPartition, SequenceNumber] = {
-    if (currentSeqNos.isEmpty) {
-      initialPartitionSeqNos.map {
-        case (nAndP, seqNo) =>
-          if (seqNo < earliestSeqNos.get(nAndP)) {
-            nAndP -> earliestSeqNos.get(nAndP)
-          } else {
-            nAndP -> seqNo
-          }
-      }
-    } else {
-      currentSeqNos.get.map {
-        case (nAndP, seqNo) =>
-          if (seqNo < earliestSeqNos.get(nAndP)) {
-            nAndP -> earliestSeqNos.get(nAndP)
-          } else {
-            nAndP -> seqNo
-          }
-      }
+  private def adjustStartingOffset(
+      from: Map[NameAndPartition, SequenceNumber]): Map[NameAndPartition, SequenceNumber] = {
+    from.map {
+      case (nAndP, seqNo) =>
+        if (seqNo < earliestSeqNos.get(nAndP)) {
+          nAndP -> earliestSeqNos.get(nAndP)
+        } else {
+          nAndP -> seqNo
+        }
     }
   }
 
@@ -264,25 +259,10 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val fromSeqNos = start match {
       // recovery mode ..
       case Some(prevBatchEndOffset) =>
-        val startSeqNos = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
-        startSeqNos.map {
-          case (nAndP, seqNo) =>
-            if (seqNo < earliestSeqNos.get(nAndP)) {
-              nAndP -> earliestSeqNos.get(nAndP)
-            } else {
-              nAndP -> seqNo
-            }
-        }
+        val startingSeqNos = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+        adjustStartingOffset(startingSeqNos)
 
-      case None =>
-        initialPartitionSeqNos.map {
-          case (nAndP, seqNo) =>
-            if (seqNo < earliestSeqNos.get(nAndP)) {
-              nAndP -> earliestSeqNos.get(nAndP)
-            } else {
-              nAndP -> seqNo
-            }
-        }
+      case None => adjustStartingOffset(initialPartitionSeqNos)
     }
 
     val nameAndPartitions = untilSeqNos.keySet.toSeq
@@ -297,6 +277,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       fromSeqNo = fromSeqNos.getOrElse(
         np,
         throw new IllegalStateException(s"$np doesn't have a fromSeqNo"))
+
       untilSeqNo = untilSeqNos(np)
       preferredPartitionLocation = ehConf.partitionPreferredLocationStrategy match {
         case PartitionPreferredLocationStrategy.Hash => np.hashCode

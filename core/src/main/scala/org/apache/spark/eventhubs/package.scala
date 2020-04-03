@@ -49,8 +49,8 @@ package object eventhubs {
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
-  val RetryCount = 3
-  val WaitInterval = 3000
+  val RetryCount = 10
+  val WaitInterval = 5000
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
@@ -75,7 +75,7 @@ package object eventhubs {
 
   object PartitionPreferredLocationStrategy extends Enumeration {
     type PartitionPreferredLocationStrategy = Value
-    val Hash,BalancedHash = Value
+    val Hash, BalancedHash = Value
   }
 
   // Allow Strings to be converted to types defined in this library.

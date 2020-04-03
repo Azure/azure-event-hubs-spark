@@ -109,18 +109,19 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       if (!receiver.getIsOpen && retryCount < RetryCount) {
         val taskId = EventHubsUtils.getTaskId
         logInfo(
-          s"(TID $taskId) receiver is not opened yet. Will retry.. $nAndP, consumer group: ${ehConf.consumerGroup
+          s"(TID $taskId) receiver is not opened yet. Will retry {$retryCount} $nAndP, consumer group: ${ehConf.consumerGroup
             .getOrElse(DefaultConsumerGroup)}")
 
-        after(WaitInterval.milliseconds)(receiveOneWithRetry(timeout, msg, retryCount + 1))
+        val retry = retryCount + 1
+        after(WaitInterval.milliseconds)(receiveOneWithRetry(timeout, msg, retry))
+      } else {
+        receiver.setReceiveTimeout(timeout)
+        retryNotNull(receiver.receive(1), msg).map(
+          _.asScala
+        )
       }
-
-      receiver.setReceiveTimeout(timeout)
-      retryNotNull(receiver.receive(1), msg).map(
-        _.asScala
-      )
     }
-    receiveOneWithRetry(timeout, msg, retryCount = 0)
+    receiveOneWithRetry(timeout, msg, 0)
   }
 
   private def closeReceiver(): Future[Void] = {
@@ -149,9 +150,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val lastReceivedSeqNo =
       Await.result(lastReceivedOffset(), ehConf.internalOperationTimeout)
 
-    if (lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) {
+    if ((lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) ||
+        !receiver.getIsOpen) {
       logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
-        DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo")
+        DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
 
       recreateReceiver(requestSeqNo)
     }
@@ -167,6 +169,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       //    cursor is in the wrong spot.
       // 2) Your desired event has expired from the service.
       // First, we'll check for case (1).
+
       logInfo(
         s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
           DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, receivedSeqNo: $receivedSeqNo")
@@ -192,7 +195,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
           throw new IllegalStateException(
             s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
               s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
-              s"${info.getBeginSequenceNumber} and the last seqNo is ${info.getLastEnqueuedSequenceNumber}")
+              s"${info.getBeginSequenceNumber}, the last seqNo is ${info.getLastEnqueuedSequenceNumber}, and " +
+              s"received seqNo $movedSeqNo")
         }
       } else {
         Future {

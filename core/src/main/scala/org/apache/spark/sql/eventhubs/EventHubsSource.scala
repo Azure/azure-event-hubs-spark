@@ -160,16 +160,37 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>
         latest
-      case Some(limit) if currentSeqNos.isEmpty =>
-        rateLimit(limit, initialPartitionSeqNos, latest, earliestSeqNos.get)
       case Some(limit) =>
-        rateLimit(limit, currentSeqNos.get, latest, earliestSeqNos.get)
+        val startingSeqNos = getStartingOffset
+        rateLimit(limit, startingSeqNos, latest, earliestSeqNos.get)
     }
 
     currentSeqNos = Some(seqNos)
-    logDebug(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
+    logInfo(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
 
     Some(EventHubsSourceOffset(seqNos))
+  }
+
+  private def getStartingOffset: Map[NameAndPartition, SequenceNumber] = {
+    if (currentSeqNos.isEmpty) {
+      initialPartitionSeqNos.map {
+        case (nAndP, seqNo) =>
+          if (seqNo < earliestSeqNos.get(nAndP)) {
+            nAndP -> earliestSeqNos.get(nAndP)
+          } else {
+            nAndP -> seqNo
+          }
+      }
+    } else {
+      currentSeqNos.get.map {
+        case (nAndP, seqNo) =>
+          if (seqNo < earliestSeqNos.get(nAndP)) {
+            nAndP -> earliestSeqNos.get(nAndP)
+          } else {
+            nAndP -> seqNo
+          }
+      }
+    }
   }
 
   /** Proportionally distribute limit number of offsets among partitions */
@@ -232,26 +253,35 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                 schema,
                                                 isStreaming = true)
     }
-    val fromSeqNos = start match {
-      case Some(prevBatchEndOffset) =>
-        EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
-      case None =>
-        // we need to
-        initialPartitionSeqNos
-    }
+
     if (earliestSeqNos.isEmpty) {
-      earliestSeqNos = Some(fromSeqNos)
+      val earliestAndLatest = ehClient.allBoundedSeqNos
+      earliestSeqNos = Some(earliestAndLatest.map {
+        case (p, (e, _)) => NameAndPartition(ehName, p) -> e
+      }.toMap)
     }
-    fromSeqNos.map {
-      case (nAndP, seqNo) =>
-        if (seqNo < earliestSeqNos.get(nAndP)) {
-          reportDataLoss(
-            s"Starting seqNo $seqNo in partition ${nAndP.partitionId} of EventHub ${nAndP.ehName} " +
-              s"is behind the earliest sequence number ${earliestSeqNos.get(nAndP)} " +
-              s"present in the service. Some events may have expired and been missed.")
-          nAndP -> earliestSeqNos.get(nAndP)
-        } else {
-          nAndP -> seqNo
+
+    val fromSeqNos = start match {
+      // recovery mode ..
+      case Some(prevBatchEndOffset) =>
+        val startSeqNos = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+        startSeqNos.map {
+          case (nAndP, seqNo) =>
+            if (seqNo < earliestSeqNos.get(nAndP)) {
+              nAndP -> earliestSeqNos.get(nAndP)
+            } else {
+              nAndP -> seqNo
+            }
+        }
+
+      case None =>
+        initialPartitionSeqNos.map {
+          case (nAndP, seqNo) =>
+            if (seqNo < earliestSeqNos.get(nAndP)) {
+              nAndP -> earliestSeqNos.get(nAndP)
+            } else {
+              nAndP -> seqNo
+            }
         }
     }
 
@@ -264,14 +294,18 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // Calculate offset ranges
     val offsetRanges = (for {
       np <- nameAndPartitions
-      fromSeqNo = fromSeqNos
-        .getOrElse(np, throw new IllegalStateException(s"$np doesn't have a fromSeqNo"))
+      fromSeqNo = fromSeqNos.getOrElse(
+        np,
+        throw new IllegalStateException(s"$np doesn't have a fromSeqNo"))
       untilSeqNo = untilSeqNos(np)
       preferredPartitionLocation = ehConf.partitionPreferredLocationStrategy match {
         case PartitionPreferredLocationStrategy.Hash => np.hashCode
-        case PartitionPreferredLocationStrategy.BalancedHash => np.ehName.hashCode() + np.partitionId
-        case _ => throw new IllegalArgumentException("Unsupported partition strategy: " +
-                   ehConf.partitionPreferredLocationStrategy)
+        case PartitionPreferredLocationStrategy.BalancedHash =>
+          np.ehName.hashCode() + np.partitionId
+        case _ =>
+          throw new IllegalArgumentException(
+            "Unsupported partition strategy: " +
+              ehConf.partitionPreferredLocationStrategy)
       }
       preferredLoc = if (numExecutors > 0) {
         Some(sortedExecutors(Math.floorMod(preferredPartitionLocation, numExecutors)))

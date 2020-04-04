@@ -84,7 +84,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       ).map { case (k, v) => k.toString -> v }
     )
 
-    assert(map(ConnectionStringKey) == expectedConnStr)
+    assert(map(ConnectionStringKey) == EventHubsUtils.encrypt(expectedConnStr))
     assert(map(ConsumerGroupKey) == "consumerGroup")
     intercept[Exception] { map(StartingPositionKey) }
     assert(map(StartingPositionsKey) == expectedPositions)
@@ -107,7 +107,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     val actualConf = EventHubsConf.toConf(
       Map(
-        ConnectionStringKey -> expectedConnStr,
+        ConnectionStringKey -> EventHubsUtils.encrypt(expectedConnStr),
         ConsumerGroupKey -> "consumerGroup",
         StartingPositionKey -> Serialization.write(expectedPosition),
         StartingPositionsKey -> Serialization.write(expectedPositions.map {
@@ -273,8 +273,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val eventHubConfig = testUtils.getEventHubsConf()
 
     //check default options to make sure it defaults to hash
-    assert(eventHubConfig.partitionPreferredLocationStrategy ==
-           PartitionPreferredLocationStrategy.Hash)
+    assert(
+      eventHubConfig.partitionPreferredLocationStrategy ==
+        PartitionPreferredLocationStrategy.Hash)
 
     //check exceptions
     intercept[IllegalStateException] {
@@ -285,10 +286,12 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     //check setting string types match expected types
     eventHubConfig.set(EventHubsConf.PartitionPreferredLocationStrategyKey, "Hash")
-    assert(eventHubConfig.partitionPreferredLocationStrategy ==
-           PartitionPreferredLocationStrategy.Hash)
+    assert(
+      eventHubConfig.partitionPreferredLocationStrategy ==
+        PartitionPreferredLocationStrategy.Hash)
     eventHubConfig.set(EventHubsConf.PartitionPreferredLocationStrategyKey, "BalancedHash")
-    assert(eventHubConfig.partitionPreferredLocationStrategy ==
-           PartitionPreferredLocationStrategy.BalancedHash)
+    assert(
+      eventHubConfig.partitionPreferredLocationStrategy ==
+        PartitionPreferredLocationStrategy.BalancedHash)
   }
 }

@@ -17,7 +17,13 @@
 
 package org.apache.spark.eventhubs
 
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
+import java.util.Base64
+import javax.crypto.Cipher
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
 
 import com.microsoft.azure.eventhubs.{
   EventData,
@@ -26,6 +32,7 @@ import com.microsoft.azure.eventhubs.{
   ReceiverOptions,
   EventPosition => ehep
 }
+
 import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
 import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
@@ -126,5 +133,36 @@ object EventHubsUtils extends Logging {
     if (taskContext != null) {
       taskContext.taskAttemptId()
     } else -1
+  }
+
+  def encode(inputStr: String): String = {
+    java.util.Base64.getEncoder
+      .encodeToString(inputStr.getBytes(StandardCharsets.UTF_8))
+  }
+
+  def decode(inputString: String): String = {
+    new String(java.util.Base64.getDecoder.decode(inputString), StandardCharsets.UTF_8)
+  }
+
+  def encrypt(inputStr: String): String = {
+    val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+
+    cipher.init(Cipher.ENCRYPT_MODE, getSecretKeySpec)
+    Base64.getEncoder.encodeToString(cipher.doFinal(inputStr.getBytes(StandardCharsets.UTF_8)))
+  }
+
+  def decrypt(inputString: String): String = {
+    val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+
+    cipher.init(Cipher.DECRYPT_MODE, getSecretKeySpec)
+    new String(cipher.doFinal(Base64.getDecoder.decode(inputString)), StandardCharsets.UTF_8)
+  }
+
+  private def getSecretKeySpec: SecretKeySpec = {
+    val secretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+    val keySpec =
+      new PBEKeySpec(SparkConnectorVersion.toCharArray, SparkConnectorVersion.getBytes, 1000, 256)
+    val secretKey = secretKeyFactory.generateSecret(keySpec)
+    new SecretKeySpec(secretKey.getEncoded, "AES")
   }
 }

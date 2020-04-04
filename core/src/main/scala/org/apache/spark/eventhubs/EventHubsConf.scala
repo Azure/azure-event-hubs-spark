@@ -130,13 +130,13 @@ final class EventHubsConf private (private val connectionStr: String)
    */
   @Experimental
   def setConnectionString(connectionString: String): EventHubsConf = {
-    set(ConnectionStringKey, connectionString)
+    set(ConnectionStringKey, EventHubsUtils.encrypt(connectionString))
   }
 
   /** The currently set connection string */
   @Experimental
   def connectionString: String = {
-    self.get(ConnectionStringKey).get
+    EventHubsUtils.decrypt(self.get(ConnectionStringKey).get)
   }
 
   /**
@@ -460,17 +460,22 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param partitionStrategy The partition strategy to use (e.g. Hash, BalancedHash)
    * @return the updated [[EventHubsConf]] instance
    */
-  def setPartitionPreferredLocationStrategy(partitionStrategy: PartitionPreferredLocationStrategy): EventHubsConf = {
+  def setPartitionPreferredLocationStrategy(
+      partitionStrategy: PartitionPreferredLocationStrategy): EventHubsConf = {
     set(PartitionPreferredLocationStrategyKey, partitionStrategy.toString)
   }
 
   /** The current partitionPreferredLocationStrategy.  */
   def partitionPreferredLocationStrategy: PartitionPreferredLocationStrategy = {
-    val strategyType = self.get(PartitionPreferredLocationStrategyKey).
-      getOrElse(DefaultPartitionPreferredLocationStrategy)
-    PartitionPreferredLocationStrategy.values.find(_.toString == strategyType).
-      getOrElse(throw new IllegalStateException(s"Illegal partition strategy $strategyType, available types " +
-        s"${PartitionPreferredLocationStrategy.values.mkString(",")}"))
+    val strategyType = self
+      .get(PartitionPreferredLocationStrategyKey)
+      .getOrElse(DefaultPartitionPreferredLocationStrategy)
+    PartitionPreferredLocationStrategy.values
+      .find(_.toString == strategyType)
+      .getOrElse(
+        throw new IllegalStateException(
+          s"Illegal partition strategy $strategyType, available types " +
+            s"${PartitionPreferredLocationStrategy.values.mkString(",")}"))
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -529,7 +534,9 @@ object EventHubsConf extends Logging {
   def apply(connectionString: String) = new EventHubsConf(connectionString)
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
-    val connectionString = params.find(_._1.toLowerCase == ConnectionStringKey.toLowerCase).get._2
+    val connectionString =
+      EventHubsUtils.decrypt(
+        params.find(_._1.toLowerCase == ConnectionStringKey.toLowerCase).get._2)
 
     val ehConf = EventHubsConf(connectionString)
 

@@ -51,7 +51,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
         s"No clients left to borrow. EventHub name: ${ehConf.name}, " +
           s"ConsumerGroup name: $consumerGroup. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
-      connStr.setOperationTimeout(ehConf.operationTimeout.getOrElse(DefaultOperationTimeout))
+      connStr.setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultOperationTimeout))
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {

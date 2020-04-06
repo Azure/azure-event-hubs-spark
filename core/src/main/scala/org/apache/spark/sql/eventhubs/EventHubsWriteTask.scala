@@ -96,9 +96,9 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
       Some(
         (0 until keys.numElements)
           .map{i =>
-            if(keys.isNullAt(i))  throw new IllegalStateException("Properties cannot have a null key")
-            if(values.isNullAt(i))  throw new IllegalStateException("Properties cannot have a null value")
-            keys.getUTF8String(i).toString -> values.getUTF8String(i).toString
+            if(keys.isNullAt(i))  throw new NullPointerException("Properties cannot have a null key.")
+            val value = if(values.isNullAt(i)) null else values.getUTF8String(i).toString
+            keys.getUTF8String(i).toString -> value
           }.toMap)
     }
   }

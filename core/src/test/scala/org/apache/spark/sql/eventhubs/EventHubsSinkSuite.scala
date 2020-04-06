@@ -458,30 +458,4 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
       writer.stop()
     }
   }
-
-  test("streaming - write with bad properties - null key in properties") {
-    val initialProperties = Map("a" -> "3", "b" -> "bar")
-    val targetProperties = initialProperties updated (null, "spark")
-    val input = MemoryStream[String]
-    val eh = newEventHub()
-    testUtils.createEventHubs(eh, partitionCount = 10)
-    val ehConf = getEventHubsConf(eh)
-
-    var writer: StreamingQuery = null
-    var ex: Exception = null
-    try {
-      ex = intercept[StreamingQueryException] {
-        writer = createEventHubsWriter(input.toDF(), ehConf, properties = Some(targetProperties))(
-          "properties", "body")
-        input.addData("1", "2", "3", "4", "5")
-        writer.processAllAvailable()
-      }
-    } finally {
-      writer.stop()
-    }
-    assert(
-      ex.getMessage
-        .toLowerCase(Locale.ROOT)
-        .contains("properties cannot have a null key"))
-  }
 }

@@ -355,6 +355,10 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    */
   def setReceiverTimeout(d: Duration): EventHubsConf = {
+    if (d.toMillis > operationTimeout.getOrElse(DefaultOperationTimeout).toMillis) {
+      throw new IllegalArgumentException("receiver timeout is greater than operation timeout")
+    }
+
     set(ReceiverTimeoutKey, d)
   }
 
@@ -372,6 +376,10 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    */
   def setOperationTimeout(d: Duration): EventHubsConf = {
+    if (d.toMillis < receiverTimeout.getOrElse(DefaultReceiverTimeout).toMillis) {
+      throw new IllegalArgumentException("operation timeout is less than receiver timeout")
+    }
+
     set(OperationTimeoutKey, d)
   }
 

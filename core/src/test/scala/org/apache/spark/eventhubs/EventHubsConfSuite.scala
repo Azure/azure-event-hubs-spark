@@ -295,13 +295,21 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         PartitionPreferredLocationStrategy.BalancedHash)
   }
 
-  test("validate - receiver timeout") {
+  test("validate - receiver and operation timeout") {
     val eventHubConfig = testUtils.getEventHubsConf()
     intercept[IllegalArgumentException] {
       eventHubConfig.setOperationTimeout(Duration.ofMinutes(10))
       eventHubConfig.setReceiverTimeout(Duration.ofMinutes(11))
     }
+    intercept[IllegalArgumentException] {
+      eventHubConfig.setReceiverTimeout(Duration.ofMinutes(2))
+      eventHubConfig.setOperationTimeout(Duration.ofMinutes(1))
+    }
+
     eventHubConfig.setReceiverTimeout(Duration.ofMinutes(2))
     assert(eventHubConfig.receiverTimeout.get.toMinutes == 2)
+
+    eventHubConfig.setOperationTimeout(Duration.ofMinutes(3))
+    assert(eventHubConfig.operationTimeout.get.toMinutes == 3)
   }
 }

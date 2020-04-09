@@ -44,7 +44,6 @@ package object eventhubs {
   val DefaultPrefetchCount: Int = PartitionReceiver.DEFAULT_PREFETCH_COUNT
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
-  val DefaultPartitionPreferredLocationStrategy = "Hash"
   val DefaultUseExclusiveReceiver = "true"
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16

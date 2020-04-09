@@ -21,7 +21,7 @@ import java.time.Duration
 import java.util.NoSuchElementException
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.utils.{EventHubsSenderListener, EventHubsTestUtils, MetricPlugin, MetricPluginMock}
+import org.apache.spark.eventhubs.utils.{EventHubsTestUtils, MetricPlugin, MetricPluginMock}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read => sread}

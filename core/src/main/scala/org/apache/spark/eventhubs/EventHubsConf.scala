@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.http.annotation.Experimental
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.{MetricPlugin, EventHubsSenderListener}
+import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.internal.Logging
 import org.json4s.{DefaultFormats, NoTypeHints}
 import org.json4s.jackson.Serialization
@@ -438,11 +438,11 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   def setMetricPlugin(metricPlugin: MetricPlugin): EventHubsConf = {
-    set(ReceiverListenerSerializedObjectKey, metricPlugin.getClass.getName)
+    set(MetricPluginKey, metricPlugin.getClass.getName)
   }
 
   def metricPlugin(): Option[MetricPlugin] = {
-    self.get(ReceiverListenerSerializedObjectKey).map(
+    self.get(MetricPluginKey).map(
       className => {
         Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
       }
@@ -515,8 +515,7 @@ object EventHubsConf extends Logging {
   val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
-  val SenderListenerSerializedObjectKey = "eventhubs.senderListenerSerializedObject"
-  val ReceiverListenerSerializedObjectKey = "eventhubs.receiverListenerSerializedObject"
+  val MetricPluginKey = "eventhubs.metricPlugin"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

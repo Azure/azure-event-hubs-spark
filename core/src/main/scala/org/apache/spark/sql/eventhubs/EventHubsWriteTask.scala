@@ -64,9 +64,9 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
 
   def close(): Unit = {
     if (sender != null) {
-      val senderListener = ehConf.senderListener()
-      senderListener.foreach(_.onWriterClose(
-        totalMessageCount, totalMessageSizeInBytes, System.nanoTime() - writerOpenTime))
+      val senderListener = ehConf.metricPlugin()
+      senderListener.foreach(_.onSendMetric(
+        totalMessageCount, totalMessageSizeInBytes, System.nanoTime() - writerOpenTime, isSuccess = true))
       sender.close()
       sender = null
     }

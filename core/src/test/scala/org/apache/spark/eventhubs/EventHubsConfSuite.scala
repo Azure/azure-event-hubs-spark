@@ -21,7 +21,7 @@ import java.time.Duration
 import java.util.NoSuchElementException
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.utils.{EventHubsReceiverListener, EventHubsSenderListener, EventHubsTestUtils}
+import org.apache.spark.eventhubs.utils.{EventHubsSenderListener, EventHubsTestUtils, MetricPlugin, MetricPluginMock}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{read => sread}
@@ -209,40 +209,11 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   }
 
   test("receiverListener serialization / deserialization") {
-    val expectedListener = new EventHubsReceiverListener {
 
-      val id = 1
+    val expectedListener = new MetricPluginMock
 
-      override def onBatchReceiveSuccess(nAndP: NameAndPartition, elapsedTime: SequenceNumber, batchSize: Rate, receivedBytes: SequenceNumber): Unit = ???
-
-      override def onBatchReceiveSkip(nAndP: NameAndPartition, requestSeqNo: SequenceNumber, batchSize: Rate): Unit = ???
-
-      override def onReceiveFirstEvent(nAndP: NameAndPartition, firstEvent: EventData): Unit = ???
-    }
-
-    val conf = testUtils.getEventHubsConf().setReceiverListener(expectedListener)
-    val actualListener = conf.receiverListener().get
-    val idField = actualListener.getClass.getDeclaredField("id")
-    idField.setAccessible(true)
-    assert(idField.getInt(actualListener) == expectedListener.id)
-  }
-
-  test("senderListener serialization / deserialization") {
-    val expectedListener = new EventHubsSenderListener {
-
-      val id = 1
-
-      override def onBatchSendSuccess(messageCount: Rate, messageSizeInBytes: Rate, sendElapsedTimeInNanos: SequenceNumber, retryTimes: Rate): Unit = ???
-
-      override def onBatchSendFail(exception: Throwable): Unit = ???
-
-      override def onWriterOpen(partitionId: SequenceNumber, version: SequenceNumber): Unit = ???
-
-      override def onWriterClose(totalMessageCount: Rate, totalMessageSizeInBytes: Rate, endToEndElapsedTimeInNanos: SequenceNumber): Unit = ???
-    }
-
-    val conf = testUtils.getEventHubsConf().setSenderListener(expectedListener)
-    val actualListener = conf.senderListener().get
+    val conf = testUtils.getEventHubsConf().setMetricPlugin(expectedListener)
+    val actualListener = conf.metricPlugin().get
     val idField = actualListener.getClass.getDeclaredField("id")
     idField.setAccessible(true)
     assert(idField.getInt(actualListener) == expectedListener.id)

@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.http.annotation.Experimental
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.{EventHubsReceiverListener, EventHubsSenderListener}
+import org.apache.spark.eventhubs.utils.{MetricPlugin, EventHubsSenderListener}
 import org.apache.spark.internal.Logging
 import org.json4s.{DefaultFormats, NoTypeHints}
 import org.json4s.jackson.Serialization
@@ -437,26 +437,17 @@ final class EventHubsConf private (private val connectionStr: String)
     set(MaxEventsPerTriggerKey, limit)
   }
 
-  def setReceiverListener(listener: EventHubsReceiverListener): EventHubsConf = {
-    set(ReceiverListenerSerializedObjectKey, SerializationUtils.serialize(listener))
+  def setMetricPlugin(metricPlugin: MetricPlugin): EventHubsConf = {
+    set(ReceiverListenerSerializedObjectKey, metricPlugin.getClass.getName)
   }
 
-  def receiverListener(): Option[EventHubsReceiverListener] = {
-    self.get(ReceiverListenerSerializedObjectKey).map(SerializationUtils.deserialize[EventHubsReceiverListener])
+  def metricPlugin(): Option[MetricPlugin] = {
+    self.get(ReceiverListenerSerializedObjectKey).map(
+      className => {
+        Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
+      }
+    )
   }
-
-  def setSenderListener(listener: EventHubsSenderListener): EventHubsConf = {
-    set(SenderListenerSerializedObjectKey, SerializationUtils.serialize(listener))
-  }
-
-  def senderListener(): Option[EventHubsSenderListener] = {
-    self.get(SenderListenerSerializedObjectKey).map{SerializationUtils.deserialize[EventHubsSenderListener]}
-  }
-
-  def namespace: String = {
-    ConnectionStringBuilder(this.connectionString).getNamespace
-  }
-
 
   /**
    * Set the size of thread pool.

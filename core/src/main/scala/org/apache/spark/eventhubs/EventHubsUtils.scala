@@ -23,7 +23,7 @@ import com.microsoft.azure.eventhubs.{EventData, EventHubClient, PartitionReceiv
 import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
 import org.apache.spark.eventhubs.client.EventHubsClient
 import org.apache.spark.eventhubs.rdd.{EventHubsRDD, OffsetRange}
-import org.apache.spark.eventhubs.utils.EventHubsReceiverListener
+import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.api.java.{JavaInputDStream, JavaStreamingContext}
@@ -43,7 +43,7 @@ object EventHubsUtils extends Logging {
    * @param ehConf the parameters for your EventHubs instance
    * @return An [[EventHubsDirectDStream]]
    */
-  def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf, eventHubsReceiverListener: Option[EventHubsReceiverListener] = None): EventHubsDirectDStream = {
+  def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf, eventHubsReceiverListener: Option[MetricPlugin] = None): EventHubsDirectDStream = {
     new EventHubsDirectDStream(ssc, ehConf, EventHubsClient.apply, eventHubsReceiverListener)
   }
 

@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.SparkEnv
-import org.apache.spark.eventhubs.utils.EventHubsReceiverListener
+import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.eventhubs.utils.RetryUtils.{after, retryJava, retryNotNull}
 import org.apache.spark.eventhubs.{DefaultConsumerGroup, EventHubsConf, EventHubsUtils, NameAndPartition, SequenceNumber}
 import org.apache.spark.internal.Logging
@@ -37,7 +37,7 @@ private[spark] trait CachedReceiver {
                                  nAndP: NameAndPartition,
                                  requestSeqNo: SequenceNumber,
                                  batchSize: Int,
-                                 eventHubsReceiverListener: Option[EventHubsReceiverListener]): Iterator[EventData]
+                                 eventHubsReceiverListener: Option[MetricPlugin]): Iterator[EventData]
 }
 
 /**
@@ -59,7 +59,7 @@ private[spark] trait CachedReceiver {
 private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                                        nAndP: NameAndPartition,
                                                        startSeqNo: SequenceNumber,
-                                                       eventHubsReceiverListener: Option[EventHubsReceiverListener])
+                                                       eventHubsReceiverListener: Option[MetricPlugin])
   extends Logging {
 
   type AwaitTimeoutException = java.util.concurrent.TimeoutException
@@ -208,15 +208,14 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     // Retrieve the events. First, we get the first event in the batch.
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
-    eventHubsReceiverListener.foreach(_.onReceiveFirstEvent(nAndP, first.head))
     val firstSeqNo = first.head.getSystemProperties.getSequenceNumber
-    val newBatchSize = (requestSeqNo + batchSize - firstSeqNo).toInt
+    val batchCount = (requestSeqNo + batchSize - firstSeqNo).toInt
 
-    if (newBatchSize <= 0) {
+    if (batchCount <= 0) {
       return Iterator.empty
     }
 
-    val theRest = for { i <- 1 until newBatchSize } yield
+    val theRest = for { i <- 1 until batchCount } yield
       awaitReceiveMessage(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
                               s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
                           requestSeqNo)
@@ -228,16 +227,16 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .iterator
 
     val (result, validate) = sorted.duplicate
-    val (validateSize, totalBytes) = validate.map(eventData => (1, eventData.getBytes.length.toLong)).reduce{
+    val (validateSize, batchSizeInBytes) = validate.map(eventData => (1, eventData.getBytes.length.toLong)).reduce{
       (countAndSize1, countAndSize2) => (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
     }
-    assert(validateSize == newBatchSize)
+    assert(validateSize == batchCount)
 
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
     logInfo(s"(TID $taskId) Finished receiving for $nAndP, consumer group: ${ehConf.consumerGroup
       .getOrElse(DefaultConsumerGroup)}, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
     eventHubsReceiverListener.foreach(listener => {
-      listener.onBatchReceiveSuccess(nAndP, elapsedTimeMs, newBatchSize, totalBytes)
+      listener.onReceiveMetric(nAndP, batchCount, batchSizeInBytes, elapsedTimeMs)
     })
     result
   }
@@ -278,8 +277,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
                                           batchSize: Int,
-                                          eventHubsReceiverListener: Option[EventHubsReceiverListener]
-
+                                          eventHubsReceiverListener: Option[MetricPlugin]
                                          ): Iterator[EventData] = {
     val taskId = EventHubsUtils.getTaskId
 
@@ -297,7 +295,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   def apply(ehConf: EventHubsConf,
             nAndP: NameAndPartition,
             startSeqNo: SequenceNumber,
-            eventHubsReceiverListener: Option[EventHubsReceiverListener]): CachedEventHubsReceiver = {
+            eventHubsReceiverListener: Option[MetricPlugin] = None): CachedEventHubsReceiver = {
     new CachedEventHubsReceiver(ehConf, nAndP, startSeqNo, eventHubsReceiverListener)
   }
 }

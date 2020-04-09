@@ -20,7 +20,7 @@ package org.apache.spark.eventhubs.rdd
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.CachedEventHubsReceiver
-import org.apache.spark.eventhubs.utils.{EventHubsReceiverListener, SimulatedCachedReceiver}
+import org.apache.spark.eventhubs.utils.{MetricPlugin, SimulatedCachedReceiver}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partition, SparkContext, TaskContext}
@@ -39,7 +39,7 @@ import org.apache.spark.{Partition, SparkContext, TaskContext}
 private[spark] class EventHubsRDD(sc: SparkContext,
                                   val ehConf: EventHubsConf,
                                   val offsetRanges: Array[OffsetRange],
-                                  eventHubsReceiverListener: Option[EventHubsReceiverListener] = None)
+                                  eventHubsReceiverListener: Option[MetricPlugin] = None)
     extends RDD[EventData](sc, Nil)
     with Logging
     with HasOffsetRanges {

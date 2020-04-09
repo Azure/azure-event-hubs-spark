@@ -43,7 +43,7 @@ private[spark] object SimulatedCachedReceiver extends CachedReceiver {
                        nAndP: NameAndPartition,
                        requestSeqNo: SequenceNumber,
                        batchSize: Int,
-                       eventHubsReceiverListener: Option[EventHubsReceiverListener] = None): Iterator[EventData] = {
+                       eventHubsReceiverListener: Option[MetricPlugin] = None): Iterator[EventData] = {
     eventHubs(ehConf.name).receive(batchSize, nAndP.partitionId, requestSeqNo).iterator.asScala
   }
 }

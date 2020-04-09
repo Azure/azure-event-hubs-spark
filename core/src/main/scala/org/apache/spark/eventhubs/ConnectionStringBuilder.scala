@@ -240,10 +240,6 @@ class ConnectionStringBuilder private () {
     this
   }
 
-  def getNamespace: String = {
-    this.getEndpoint.getHost.dropRight(".servicebus.windows.net".length)
-  }
-
   /**
    * Identical to [[build]].
    */

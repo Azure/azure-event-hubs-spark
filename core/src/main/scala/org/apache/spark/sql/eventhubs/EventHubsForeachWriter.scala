@@ -46,7 +46,6 @@ case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[S
   def open(partitionId: Long, version: Long): Boolean = {
     writerOpenTime = System.nanoTime()
     client = ClientConnectionPool.borrowClient(ehConf)
-    ehConf.senderListener().foreach(_.onWriterOpen(partitionId, version))
     true
   }
 
@@ -60,13 +59,18 @@ case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[S
   def close(errorOrNull: Throwable): Unit = {
     errorOrNull match {
       case t: Throwable =>
-        ehConf.senderListener().foreach(_.onBatchSendFail(t))
-        throw t
-      case _ =>
-        ehConf.senderListener().foreach(_.onWriterClose(
+        ehConf.metricPlugin().foreach(_.onSendMetric(
           totalMessageCount,
           totalMessageSizeInBytes,
-          System.nanoTime() - writerOpenTime))
+          System.nanoTime() - writerOpenTime,
+          isSuccess = false))
+        throw t
+      case _ =>
+        ehConf.metricPlugin().foreach(_.onSendMetric(
+          totalMessageCount,
+          totalMessageSizeInBytes,
+          System.nanoTime() - writerOpenTime,
+          isSuccess = false))
         ClientConnectionPool.returnClient(ehConf, client)
     }
   }

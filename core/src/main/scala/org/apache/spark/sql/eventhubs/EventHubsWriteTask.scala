@@ -50,7 +50,7 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
    */
   def execute(iterator: Iterator[InternalRow]): Unit = {
     sender = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
-    writerOpenTime = System.nanoTime()
+    writerOpenTime = System.currentTimeMillis()
     while (iterator.hasNext) {
       val currentRow = iterator.next
       totalMessageSizeInBytes += sendRow(currentRow, sender)
@@ -64,7 +64,7 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
         ehConf.name,
         totalMessageCount,
         totalMessageSizeInBytes,
-        System.nanoTime() - writerOpenTime,
+        System.currentTimeMillis() - writerOpenTime,
         isSuccess = true)
       )
       sender.close()

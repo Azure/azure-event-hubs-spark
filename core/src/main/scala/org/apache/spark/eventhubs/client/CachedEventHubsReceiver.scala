@@ -298,8 +298,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   def apply(ehConf: EventHubsConf,
             nAndP: NameAndPartition,
-            startSeqNo: SequenceNumber,
-            metricPlugin: Option[MetricPlugin] = None): CachedEventHubsReceiver = {
+            startSeqNo: SequenceNumber): CachedEventHubsReceiver = {
     new CachedEventHubsReceiver(ehConf, nAndP, startSeqNo)
   }
 }

@@ -22,9 +22,15 @@ import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, Cast, Literal, UnsafeMapData, UnsafeProjection}
+import org.apache.spark.sql.catalyst.expressions.{
+  Attribute,
+  Cast,
+  Literal,
+  UnsafeMapData,
+  UnsafeProjection
+}
 import org.apache.spark.unsafe.types.UTF8String.IntWrapper
-import org.apache.spark.sql.types.{BinaryType, MapType, StringType}
+import org.apache.spark.sql.types.{ BinaryType, MapType, StringType }
 import org.apache.spark.unsafe.types.UTF8String
 
 /**
@@ -60,13 +66,12 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
 
   def close(): Unit = {
     if (sender != null) {
-      metricPlugin.foreach(_.onSendMetric(
-        ehConf.name,
-        totalMessageCount,
-        totalMessageSizeInBytes,
-        System.currentTimeMillis() - writerOpenTime,
-        isSuccess = true)
-      )
+      metricPlugin.foreach(
+        _.onSendMetric(ehConf.name,
+                       totalMessageCount,
+                       totalMessageSizeInBytes,
+                       System.currentTimeMillis() - writerOpenTime,
+                       isSuccess = true))
       sender.close()
       sender = null
     }

@@ -167,7 +167,7 @@ final class EventHubsConf private (private val connectionStr: String)
       "eventhubs.threadPoolSize",
       "eventhubs.useExclusiveReceiver",
       "useSimulatedClient",
-      MetricPluginKey
+      "eventhubs.metricPlugin"
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)

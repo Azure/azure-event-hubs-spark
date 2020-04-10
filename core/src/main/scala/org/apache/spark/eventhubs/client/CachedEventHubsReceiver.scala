@@ -233,7 +233,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
         validate.map(eventData => (1, eventData.getBytes.length.toLong)).reduceOption {
           (countAndSize1, countAndSize2) =>
             (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
-        }.getOrElse((0, 0))
+        }.getOrElse((0, 0L))
       metricPlugin.foreach(listener => {
         listener.onReceiveMetric(nAndP, batchCount, batchSizeInBytes, elapsedTimeMs)
       })
@@ -299,7 +299,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   def apply(ehConf: EventHubsConf,
             nAndP: NameAndPartition,
             startSeqNo: SequenceNumber,
-            eventHubsReceiverListener: Option[MetricPlugin] = None): CachedEventHubsReceiver = {
+            metricPlugin: Option[MetricPlugin] = None): CachedEventHubsReceiver = {
     new CachedEventHubsReceiver(ehConf, nAndP, startSeqNo)
   }
 }

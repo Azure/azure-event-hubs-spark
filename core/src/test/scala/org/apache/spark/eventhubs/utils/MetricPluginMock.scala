@@ -11,7 +11,8 @@ class MetricPluginMock extends MetricPlugin {
                                  batchSizeInBytes: SequenceNumber,
                                  elapsedTimeInMillis: SequenceNumber): Unit = ???
 
-    override def onSendMetric(batchCount: Rate,
+    override def onSendMetric(eventHubName: String,
+                              batchCount: Rate,
                               batchSizeInBytes: SequenceNumber,
                               elapsedTimeInMillis: SequenceNumber,
                               isSuccess: Boolean): Unit = ???

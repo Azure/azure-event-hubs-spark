@@ -43,8 +43,8 @@ object EventHubsUtils extends Logging {
    * @param ehConf the parameters for your EventHubs instance
    * @return An [[EventHubsDirectDStream]]
    */
-  def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf, eventHubsReceiverListener: Option[MetricPlugin] = None): EventHubsDirectDStream = {
-    new EventHubsDirectDStream(ssc, ehConf, EventHubsClient.apply, eventHubsReceiverListener)
+  def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf): EventHubsDirectDStream = {
+    new EventHubsDirectDStream(ssc, ehConf, EventHubsClient.apply)
   }
 
   /**

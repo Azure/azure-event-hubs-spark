@@ -20,12 +20,12 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.NoSuchElementException
 
-import org.apache.spark.eventhubs.utils.EventHubsTestUtils
+import org.apache.spark.eventhubs.utils.{EventHubsTestUtils, MetricPluginMock}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.{ read => sread }
-import org.json4s.jackson.Serialization.{ write => swrite }
-import org.scalatest.{ BeforeAndAfterAll, FunSuite }
+import org.json4s.jackson.Serialization.{read => sread}
+import org.json4s.jackson.Serialization.{write => swrite}
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 /**
  * Tests [[EventHubsConf]] for correctness.
@@ -207,7 +207,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(actual.equals(expected))
   }
 
-  test("receiverListener serialization / deserialization") {
+  test("metricPlugin set/get") {
 
     val expectedListener = new MetricPluginMock
 

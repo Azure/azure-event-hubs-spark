@@ -21,6 +21,8 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.http.annotation.Experimental
+import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.internal.Logging
@@ -129,13 +131,13 @@ final class EventHubsConf private (private val connectionStr: String)
    */
   @Experimental
   def setConnectionString(connectionString: String): EventHubsConf = {
-    set(ConnectionStringKey, connectionString)
+    set(ConnectionStringKey, EventHubsUtils.encrypt(connectionString))
   }
 
   /** The currently set connection string */
   @Experimental
   def connectionString: String = {
-    self.get(ConnectionStringKey).get
+    EventHubsUtils.decrypt(self.get(ConnectionStringKey).get)
   }
 
   /**
@@ -355,6 +357,10 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    */
   def setReceiverTimeout(d: Duration): EventHubsConf = {
+    if (d.toMillis > operationTimeout.getOrElse(DefaultOperationTimeout).toMillis) {
+      throw new IllegalArgumentException("receiver timeout is greater than operation timeout")
+    }
+
     set(ReceiverTimeoutKey, d)
   }
 
@@ -372,6 +378,10 @@ final class EventHubsConf private (private val connectionStr: String)
    * @return the updated [[EventHubsConf]] instance
    */
   def setOperationTimeout(d: Duration): EventHubsConf = {
+    if (d.toMillis < receiverTimeout.getOrElse(DefaultReceiverTimeout).toMillis) {
+      throw new IllegalArgumentException("operation timeout is less than receiver timeout")
+    }
+
     set(OperationTimeoutKey, d)
   }
 
@@ -465,6 +475,31 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(UseExclusiveReceiverKey).getOrElse(DefaultUseExclusiveReceiver).toBoolean
   }
 
+  /**
+   * Sets the partition preferred location strategy, default is to use Hash, BalancedHash also available
+   * Default: [[DefaultPartitionPreferredLocationStrategy]]
+   *
+   * @param partitionStrategy The partition strategy to use (e.g. Hash, BalancedHash)
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setPartitionPreferredLocationStrategy(
+      partitionStrategy: PartitionPreferredLocationStrategy): EventHubsConf = {
+    set(PartitionPreferredLocationStrategyKey, partitionStrategy.toString)
+  }
+
+  /** The current partitionPreferredLocationStrategy.  */
+  def partitionPreferredLocationStrategy: PartitionPreferredLocationStrategy = {
+    val strategyType = self
+      .get(PartitionPreferredLocationStrategyKey)
+      .getOrElse(DefaultPartitionPreferredLocationStrategy)
+    PartitionPreferredLocationStrategy.values
+      .find(_.toString == strategyType)
+      .getOrElse(
+        throw new IllegalStateException(
+          s"Illegal partition strategy $strategyType, available types " +
+            s"${PartitionPreferredLocationStrategy.values.mkString(",")}"))
+  }
+
   // The simulated client (and simulated eventhubs) will be used. These
   // can be found in EventHubsTestUtils.
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
@@ -516,13 +551,16 @@ object EventHubsConf extends Logging {
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
   val MetricPluginKey = "eventhubs.metricPlugin"
+  val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)
 
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
-    val connectionString = params.find(_._1.toLowerCase == ConnectionStringKey.toLowerCase).get._2
+    val connectionString =
+      EventHubsUtils.decrypt(
+        params.find(_._1.toLowerCase == ConnectionStringKey.toLowerCase).get._2)
 
     val ehConf = EventHubsConf(connectionString)
 

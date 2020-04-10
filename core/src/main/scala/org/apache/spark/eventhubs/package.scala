@@ -44,18 +44,19 @@ package object eventhubs {
   val DefaultPrefetchCount: Int = PartitionReceiver.DEFAULT_PREFETCH_COUNT
   val DefaultFailOnDataLoss = "true"
   val DefaultUseSimulatedClient = "false"
+  val DefaultPartitionPreferredLocationStrategy = "Hash"
   val DefaultUseExclusiveReceiver = "true"
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
-  val RetryCount = 3
-  val WaitInterval = 3000
+  val RetryCount = 10
+  val WaitInterval = 5000
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
   val SequenceNumberAnnotation = "x-opt-sequence-number"
 
-  val SparkConnectorVersion = "2.3.14.1"
+  val SparkConnectorVersion = "2.3.15"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int
@@ -71,6 +72,11 @@ package object eventhubs {
 
   type SequenceNumber = Long
   val SequenceNumber: Long.type = Long
+
+  object PartitionPreferredLocationStrategy extends Enumeration {
+    type PartitionPreferredLocationStrategy = Value
+    val Hash, BalancedHash = Value
+  }
 
   // Allow Strings to be converted to types defined in this library.
   implicit class EventHubsString(val str: String) extends AnyVal {

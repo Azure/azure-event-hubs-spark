@@ -84,7 +84,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       ).map { case (k, v) => k.toString -> v }
     )
 
-    assert(map(ConnectionStringKey) == expectedConnStr)
+    assert(map(ConnectionStringKey) == EventHubsUtils.encrypt(expectedConnStr))
     assert(map(ConsumerGroupKey) == "consumerGroup")
     intercept[Exception] { map(StartingPositionKey) }
     assert(map(StartingPositionsKey) == expectedPositions)
@@ -107,7 +107,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     val actualConf = EventHubsConf.toConf(
       Map(
-        ConnectionStringKey -> expectedConnStr,
+        ConnectionStringKey -> EventHubsUtils.encrypt(expectedConnStr),
         ConsumerGroupKey -> "consumerGroup",
         StartingPositionKey -> Serialization.write(expectedPosition),
         StartingPositionsKey -> Serialization.write(expectedPositions.map {
@@ -280,4 +280,47 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[IllegalStateException] { EventHubsConf(without).validate }
   }
 
+  test("validate partitions strategy config") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+
+    //check default options to make sure it defaults to hash
+    assert(
+      eventHubConfig.partitionPreferredLocationStrategy ==
+        PartitionPreferredLocationStrategy.Hash)
+
+    //check exceptions
+    intercept[IllegalStateException] {
+      eventHubConfig
+        .set(EventHubsConf.PartitionPreferredLocationStrategyKey, "illegalconfigoption")
+        .partitionPreferredLocationStrategy
+    }
+
+    //check setting string types match expected types
+    eventHubConfig.set(EventHubsConf.PartitionPreferredLocationStrategyKey, "Hash")
+    assert(
+      eventHubConfig.partitionPreferredLocationStrategy ==
+        PartitionPreferredLocationStrategy.Hash)
+    eventHubConfig.set(EventHubsConf.PartitionPreferredLocationStrategyKey, "BalancedHash")
+    assert(
+      eventHubConfig.partitionPreferredLocationStrategy ==
+        PartitionPreferredLocationStrategy.BalancedHash)
+  }
+
+  test("validate - receiver and operation timeout") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+    intercept[IllegalArgumentException] {
+      eventHubConfig.setOperationTimeout(Duration.ofMinutes(10))
+      eventHubConfig.setReceiverTimeout(Duration.ofMinutes(11))
+    }
+    intercept[IllegalArgumentException] {
+      eventHubConfig.setReceiverTimeout(Duration.ofMinutes(2))
+      eventHubConfig.setOperationTimeout(Duration.ofMinutes(1))
+    }
+
+    eventHubConfig.setReceiverTimeout(Duration.ofMinutes(2))
+    assert(eventHubConfig.receiverTimeout.get.toMinutes == 2)
+
+    eventHubConfig.setOperationTimeout(Duration.ofMinutes(3))
+    assert(eventHubConfig.operationTimeout.get.toMinutes == 3)
+  }
 }

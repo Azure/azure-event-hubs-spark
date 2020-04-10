@@ -32,5 +32,20 @@ Now, if we open a new receiver, `receiverB`, for the same consumer group and par
 In order to avoid this issue, please have one consumer group per Spark application being run. In general, you 
 should have a unique consumer group for each consuming application being run. 
 
+**Why am I getting events from the `EndofStream`, despite using `setStartingPositions`?**
+
+When you start reading events from Event Hubs, the initial starting positions must be determined. 
+If checkpoints are present, then the appropriate offset is found and used. If not, the user-provided `EventHubsConf` 
+is queried for starting positions. If none have been set, then we start from the latest sequence numbers available 
+in each partition.
+
+There are two options to set the starting positions in `EventHubsConf`. 
+`setStartingPosition` which sets the starting position for all partitions and `setStartingPositions` which sets
+starting positions on a per partition basis. Note that per partition `setStartingPositions` takes precedent 
+over `setStartingPosition`. You can read more about it [here](https://github.com/Azure/azure-event-hubs-spark/blob/master/docs/structured-streaming-eventhubs-integration.md#per-partition-configuration).
+So if you set the starting positions for a subset of partitions, the starting positions for other partitions would be 
+set to the latest sequence numbers available in those partitions.
+
+
 **What else? If you have suggestions for this FAQ please share them on the 
 [gitter chat](https://gitter.im/azure-event-hubs-spark/Lobby) or open an issue!**

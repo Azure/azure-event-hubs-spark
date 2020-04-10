@@ -19,16 +19,21 @@ package org.apache.spark.eventhubs
 
 import java.util.concurrent.CompletableFuture
 
-import com.microsoft.azure.eventhubs.{EventData, EventHubClient, PartitionReceiver, ReceiverOptions, EventPosition => ehep}
-import org.apache.spark.api.java.{JavaRDD, JavaSparkContext}
+import com.microsoft.azure.eventhubs.{
+  EventData,
+  EventHubClient,
+  PartitionReceiver,
+  ReceiverOptions,
+  EventPosition => ehep
+}
+import org.apache.spark.api.java.{ JavaRDD, JavaSparkContext }
 import org.apache.spark.eventhubs.client.EventHubsClient
-import org.apache.spark.eventhubs.rdd.{EventHubsRDD, OffsetRange}
-import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.api.java.{JavaInputDStream, JavaStreamingContext}
+import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
-import org.apache.spark.{SparkContext, TaskContext}
+import org.apache.spark.{ SparkContext, TaskContext }
 
 /**
  * Helper to create Direct DStreams which consume events from Event Hubs.

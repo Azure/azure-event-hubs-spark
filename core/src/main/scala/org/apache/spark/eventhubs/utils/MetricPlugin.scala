@@ -7,6 +7,6 @@ trait MetricPlugin extends Serializable {
 
   def onReceiveMetric(partitionInfo: NameAndPartition, batchCount: Int, batchSizeInBytes: Long,  elapsedTimeInMillis: Long): Unit
 
-  def onSendMetric(batchCount: Int, batchSizeInBytes: Long,  elapsedTimeInMillis: Long, isSuccess: Boolean): Unit
+  def onSendMetric(partitionInfo: String, batchCount: Int, batchSizeInBytes: Long,  elapsedTimeInMillis: Long, isSuccess: Boolean): Unit
 
 }

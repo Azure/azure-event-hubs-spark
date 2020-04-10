@@ -30,8 +30,7 @@ import org.json4s.jackson.Serialization
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
-import scala.util.Try
-import org.apache.spark.sql.eventhubs._
+
 /**
  * Configuration for your EventHubs instance when being used with Apache Spark.
  *
@@ -167,7 +166,8 @@ final class EventHubsConf private (private val connectionStr: String)
       "eventhubs.prefetchCount",
       "eventhubs.threadPoolSize",
       "eventhubs.useExclusiveReceiver",
-      "useSimulatedClient"
+      "useSimulatedClient",
+      MetricPluginKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)

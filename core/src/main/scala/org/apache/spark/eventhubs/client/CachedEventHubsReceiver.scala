@@ -36,8 +36,7 @@ private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
                                  nAndP: NameAndPartition,
                                  requestSeqNo: SequenceNumber,
-                                 batchSize: Int,
-                                 eventHubsReceiverListener: Option[MetricPlugin]): Iterator[EventData]
+                                 batchSize: Int): Iterator[EventData]
 }
 
 /**
@@ -58,13 +57,14 @@ private[spark] trait CachedReceiver {
 */
 private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                                        nAndP: NameAndPartition,
-                                                       startSeqNo: SequenceNumber,
-                                                       eventHubsReceiverListener: Option[MetricPlugin])
+                                                       startSeqNo: SequenceNumber)
   extends Logging {
 
   type AwaitTimeoutException = java.util.concurrent.TimeoutException
 
   import org.apache.spark.eventhubs._
+
+  private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
@@ -227,17 +227,22 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .iterator
 
     val (result, validate) = sorted.duplicate
-    val (validateSize, batchSizeInBytes) = validate.map(eventData => (1, eventData.getBytes.length.toLong)).reduce{
-      (countAndSize1, countAndSize2) => (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
-    }
-    assert(validateSize == batchCount)
-
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
+    if (metricPlugin.isDefined) {
+      val (validateSize, batchSizeInBytes) =
+        validate.map(eventData => (1, eventData.getBytes.length.toLong)).reduceOption {
+          (countAndSize1, countAndSize2) =>
+            (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
+        }.getOrElse((0, 0))
+      metricPlugin.foreach(listener => {
+        listener.onReceiveMetric(nAndP, batchCount, batchSizeInBytes, elapsedTimeMs)
+      })
+      assert(validateSize == batchCount)
+    } else {
+      assert(validate.size == batchCount)
+    }
     logInfo(s"(TID $taskId) Finished receiving for $nAndP, consumer group: ${ehConf.consumerGroup
       .getOrElse(DefaultConsumerGroup)}, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
-    eventHubsReceiverListener.foreach(listener => {
-      listener.onReceiveMetric(nAndP, batchCount, batchSizeInBytes, elapsedTimeMs)
-    })
     result
   }
 
@@ -276,8 +281,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   private[eventhubs] override def receive(ehConf: EventHubsConf,
                                           nAndP: NameAndPartition,
                                           requestSeqNo: SequenceNumber,
-                                          batchSize: Int,
-                                          eventHubsReceiverListener: Option[MetricPlugin]
+                                          batchSize: Int
                                          ): Iterator[EventData] = {
     val taskId = EventHubsUtils.getTaskId
 
@@ -286,7 +290,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
       receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {
-        CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo, eventHubsReceiverListener)
+        CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo)
       })
     }
     receiver.receive(requestSeqNo, batchSize)
@@ -296,6 +300,6 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
             nAndP: NameAndPartition,
             startSeqNo: SequenceNumber,
             eventHubsReceiverListener: Option[MetricPlugin] = None): CachedEventHubsReceiver = {
-    new CachedEventHubsReceiver(ehConf, nAndP, startSeqNo, eventHubsReceiverListener)
+    new CachedEventHubsReceiver(ehConf, nAndP, startSeqNo)
   }
 }

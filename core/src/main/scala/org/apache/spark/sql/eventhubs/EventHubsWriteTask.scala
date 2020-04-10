@@ -20,16 +20,11 @@ package org.apache.spark.sql.eventhubs
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{
-  Attribute,
-  Cast,
-  Literal,
-  UnsafeMapData,
-  UnsafeProjection
-}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Cast, Literal, UnsafeMapData, UnsafeProjection}
 import org.apache.spark.unsafe.types.UTF8String.IntWrapper
-import org.apache.spark.sql.types.{ BinaryType, MapType, StringType }
+import org.apache.spark.sql.types.{BinaryType, MapType, StringType}
 import org.apache.spark.unsafe.types.UTF8String
 
 /**
@@ -43,6 +38,7 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private var sender: Client = _
+  private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
   var totalMessageSizeInBytes = 0
   var totalMessageCount = 0
   var writerOpenTime = 0L
@@ -64,9 +60,13 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
 
   def close(): Unit = {
     if (sender != null) {
-      val senderListener = ehConf.metricPlugin()
-      senderListener.foreach(_.onSendMetric(
-        totalMessageCount, totalMessageSizeInBytes, System.nanoTime() - writerOpenTime, isSuccess = true))
+      metricPlugin.foreach(_.onSendMetric(
+        ehConf.name,
+        totalMessageCount,
+        totalMessageSizeInBytes,
+        System.nanoTime() - writerOpenTime,
+        isSuccess = true)
+      )
       sender.close()
       sender = null
     }

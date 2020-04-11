@@ -106,13 +106,12 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     } else {
       val keys = unsafeMap.keyArray()
       val values = unsafeMap.valueArray()
-      Some(
-        (0 until keys.numElements)
-          .map{i =>
-            if(keys.isNullAt(i))  throw new IllegalStateException("Properties cannot have a null key")
-            if(values.isNullAt(i))  throw new IllegalStateException("Properties cannot have a null value")
-            keys.getUTF8String(i).toString -> values.getUTF8String(i).toString
-          }.toMap)
+      Some((0 until keys.numElements).map { i =>
+        if (keys.isNullAt(i)) throw new IllegalStateException("Properties cannot have a null key")
+        if (values.isNullAt(i))
+          throw new IllegalStateException("Properties cannot have a null value")
+        keys.getUTF8String(i).toString -> values.getUTF8String(i).toString
+      }.toMap)
     }
   }
 

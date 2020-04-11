@@ -20,13 +20,11 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
-import org.apache.http.annotation.Experimental
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.internal.Logging
-import org.json4s.{DefaultFormats, NoTypeHints}
+import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
@@ -129,13 +127,11 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param connectionString a valid connection string
    * @return the updated [[EventHubsConf]] instance
    */
-  @Experimental
   def setConnectionString(connectionString: String): EventHubsConf = {
     set(ConnectionStringKey, EventHubsUtils.encrypt(connectionString))
   }
 
   /** The currently set connection string */
-  @Experimental
   def connectionString: String = {
     EventHubsUtils.decrypt(self.get(ConnectionStringKey).get)
   }
@@ -147,7 +143,6 @@ final class EventHubsConf private (private val connectionStr: String)
    * @param name the name of an EventHub instance
    * @return the updated [[EventHubsConf]] instance
    */
-  @Experimental
   def setName(name: String): EventHubsConf = {
     val newConnStr = ConnectionStringBuilder(connectionString).setEventHubName(name).toString
     setConnectionString(newConnStr)
@@ -161,15 +156,15 @@ final class EventHubsConf private (private val connectionStr: String)
   private[spark] def trimmed: EventHubsConf = {
     // These are the options needed by Spark executors
     val include = Seq(
-      "eventhubs.connectionString",
-      "eventhubs.consumerGroup",
-      "eventhubs.receiverTimeout",
-      "eventhubs.operationTimeout",
-      "eventhubs.prefetchCount",
-      "eventhubs.threadPoolSize",
-      "eventhubs.useExclusiveReceiver",
-      "useSimulatedClient",
-      "eventhubs.metricPlugin"
+      ConnectionStringKey,
+      ConsumerGroupKey,
+      ReceiverTimeoutKey,
+      OperationTimeoutKey,
+      PrefetchCountKey,
+      ThreadPoolSizeKey,
+      UseExclusiveReceiverKey,
+      UseSimulatedClientKey,
+      MetricPluginKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -181,7 +176,6 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /** The currently set EventHub name */
-  @Experimental
   def name: String = ConnectionStringBuilder(connectionString).getEventHubName
 
   /** Set the consumer group for your EventHubs instance. If no consumer
@@ -452,11 +446,13 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   def metricPlugin(): Option[MetricPlugin] = {
-    self.get(MetricPluginKey).map(
-      className => {
-        Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
-      }
-    )
+    self
+      .get(MetricPluginKey)
+      .map(
+        className => {
+          Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
+        }
+      )
   }
 
   /**
@@ -555,7 +551,6 @@ object EventHubsConf extends Logging {
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)
-
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
     val connectionString =

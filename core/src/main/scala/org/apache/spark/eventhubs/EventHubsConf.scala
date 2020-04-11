@@ -24,7 +24,9 @@ import org.apache.http.annotation.Experimental
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.json4s.NoTypeHints
+import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.internal.Logging
+import org.json4s.{DefaultFormats, NoTypeHints}
 import org.json4s.jackson.Serialization
 
 import scala.collection.JavaConverters._
@@ -53,7 +55,6 @@ final class EventHubsConf private (private val connectionStr: String)
   self =>
 
   import EventHubsConf._
-
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionStr)
 
@@ -167,7 +168,8 @@ final class EventHubsConf private (private val connectionStr: String)
       "eventhubs.prefetchCount",
       "eventhubs.threadPoolSize",
       "eventhubs.useExclusiveReceiver",
-      "useSimulatedClient"
+      "useSimulatedClient",
+      "eventhubs.metricPlugin"
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -445,6 +447,18 @@ final class EventHubsConf private (private val connectionStr: String)
     set(MaxEventsPerTriggerKey, limit)
   }
 
+  def setMetricPlugin(metricPlugin: MetricPlugin): EventHubsConf = {
+    set(MetricPluginKey, metricPlugin.getClass.getName)
+  }
+
+  def metricPlugin(): Option[MetricPlugin] = {
+    self.get(MetricPluginKey).map(
+      className => {
+        Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
+      }
+    )
+  }
+
   /**
    * Set the size of thread pool.
    * Default: [[DefaultUseExclusiveReceiver]]
@@ -536,10 +550,12 @@ object EventHubsConf extends Logging {
   val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
+  val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)
+
 
   private[spark] def toConf(params: Map[String, String]): EventHubsConf = {
     val connectionString =

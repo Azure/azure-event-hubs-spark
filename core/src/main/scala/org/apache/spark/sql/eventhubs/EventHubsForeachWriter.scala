@@ -17,9 +17,10 @@
 
 package org.apache.spark.sql.eventhubs
 
-import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubs.EventHubsConf
+import com.microsoft.azure.eventhubs.{EventData, EventHubClient}
+import org.apache.spark.eventhubs.{EventHubsConf, RetryCount}
 import org.apache.spark.eventhubs.client.ClientConnectionPool
+import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.eventhubs.utils.RetryUtils._
 import org.apache.spark.sql.ForeachWriter
 
@@ -38,9 +39,14 @@ import org.apache.spark.sql.ForeachWriter
  *               for the Event Hub which will receive the sent events
  */
 case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[String] {
+  private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
   var client: EventHubClient = _
+  var totalMessageSizeInBytes = 0
+  var totalMessageCount = 0
+  var writerOpenTime = 0L
 
   def open(partitionId: Long, version: Long): Boolean = {
+    writerOpenTime = System.currentTimeMillis()
     client = ClientConnectionPool.borrowClient(ehConf)
     true
   }
@@ -48,12 +54,27 @@ case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[S
   def process(body: String): Unit = {
     val event = EventData.create(s"$body".getBytes("UTF-8"))
     retryJava(client.send(event), "ForeachWriter")
+    totalMessageCount += 1
+    totalMessageSizeInBytes += event.getBytes.length
   }
 
   def close(errorOrNull: Throwable): Unit = {
     errorOrNull match {
-      case t: Throwable => throw t
+      case t: Throwable =>
+        metricPlugin.foreach(_.onSendMetric(
+          ehConf.name,
+          totalMessageCount,
+          totalMessageSizeInBytes,
+          System.currentTimeMillis() - writerOpenTime,
+          isSuccess = false))
+        throw t
       case _ =>
+        metricPlugin.foreach(_.onSendMetric(
+          ehConf.name,
+          totalMessageCount,
+          totalMessageSizeInBytes,
+          System.currentTimeMillis() - writerOpenTime,
+          isSuccess = true))
         ClientConnectionPool.returnClient(ehConf, client)
     }
   }

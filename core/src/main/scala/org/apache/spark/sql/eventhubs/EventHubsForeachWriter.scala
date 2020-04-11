@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.eventhubs
 
-import com.microsoft.azure.eventhubs.{EventData, EventHubClient}
-import org.apache.spark.eventhubs.{EventHubsConf, RetryCount}
+import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
+import org.apache.spark.eventhubs.EventHubsConf
 import org.apache.spark.eventhubs.client.ClientConnectionPool
 import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.eventhubs.utils.RetryUtils._
@@ -61,20 +61,20 @@ case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[S
   def close(errorOrNull: Throwable): Unit = {
     errorOrNull match {
       case t: Throwable =>
-        metricPlugin.foreach(_.onSendMetric(
-          ehConf.name,
-          totalMessageCount,
-          totalMessageSizeInBytes,
-          System.currentTimeMillis() - writerOpenTime,
-          isSuccess = false))
+        metricPlugin.foreach(
+          _.onSendMetric(ehConf.name,
+                         totalMessageCount,
+                         totalMessageSizeInBytes,
+                         System.currentTimeMillis() - writerOpenTime,
+                         isSuccess = false))
         throw t
       case _ =>
-        metricPlugin.foreach(_.onSendMetric(
-          ehConf.name,
-          totalMessageCount,
-          totalMessageSizeInBytes,
-          System.currentTimeMillis() - writerOpenTime,
-          isSuccess = true))
+        metricPlugin.foreach(
+          _.onSendMetric(ehConf.name,
+                         totalMessageCount,
+                         totalMessageSizeInBytes,
+                         System.currentTimeMillis() - writerOpenTime,
+                         isSuccess = true))
         ClientConnectionPool.returnClient(ehConf, client)
     }
   }

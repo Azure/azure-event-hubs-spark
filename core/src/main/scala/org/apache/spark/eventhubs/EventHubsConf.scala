@@ -446,13 +446,9 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   def metricPlugin(): Option[MetricPlugin] = {
-    self
-      .get(MetricPluginKey)
-      .map(
-        className => {
-          Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
-        }
-      )
+    self.get(MetricPluginKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
+    })
   }
 
   /**

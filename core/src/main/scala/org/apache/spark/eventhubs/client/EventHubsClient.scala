@@ -165,7 +165,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    *
    * @return partition count
    */
-  override lazy val partitionCount: Int = {
+  override def partitionCount: Int = {
     try {
       val runtimeInfo = client.getRuntimeInformation.get
       runtimeInfo.getPartitionCount

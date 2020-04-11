@@ -34,6 +34,7 @@ package object eventhubs {
   val StartOfStream: String = "-1"
   val EndOfStream: String = "@latest"
   val DefaultEventPosition: EventPosition = EventPosition.fromEndOfStream
+  val DefaultEventPositionForNewPartitions: EventPosition = EventPosition.fromStartOfStream
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)

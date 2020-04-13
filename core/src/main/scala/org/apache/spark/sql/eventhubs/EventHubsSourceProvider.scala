@@ -196,6 +196,14 @@ private[sql] object EventHubsSourceProvider extends Serializable {
               (ed.getSystemProperties.asScala -- Seq(OffsetAnnotation,
                                                      SequenceNumberAnnotation,
                                                      EnqueuedTimeAnnotation))
+                .mapValues {
+                  case b: Binary =>
+                    val buf = b.asByteBuffer()
+                    val arr = new Array[Byte](buf.remaining)
+                    buf.get(arr)
+                    arr.asInstanceOf[AnyRef]
+                  case default             => default
+                }
                 .map { p =>
                   UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
                 })

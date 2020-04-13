@@ -155,7 +155,12 @@ object EventHubsUtils extends Logging {
     val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
 
     cipher.init(Cipher.DECRYPT_MODE, getSecretKeySpec)
-    new String(cipher.doFinal(Base64.getDecoder.decode(inputString)), StandardCharsets.UTF_8)
+    try {
+      new String(cipher.doFinal(Base64.getDecoder.decode(inputString)), StandardCharsets.UTF_8)
+    } catch {
+      case iae: IllegalArgumentException => inputString
+      case e: Exception                  => throw e
+    }
   }
 
   private def getSecretKeySpec: SecretKeySpec = {

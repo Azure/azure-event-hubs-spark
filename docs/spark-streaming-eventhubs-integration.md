@@ -18,12 +18,18 @@ partitions and Spark partitions, and access to sequence numbers and metadata.
 * [Deploying](#deploying)
 
 ## Linking
-For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
+For Scala/Java applications using SBT/Maven project definitions, link your application with the following artifact:
 
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.13
+  version = 2.3.15
+
+or
+
+  groupId = com.microsoft.azure
+  artifactId = azure-eventhubs-spark_2.12
+  version = 2.3.15
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.

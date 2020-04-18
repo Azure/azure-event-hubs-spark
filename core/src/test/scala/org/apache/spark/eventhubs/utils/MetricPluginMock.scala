@@ -17,18 +17,20 @@
 
 package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.{ NameAndPartition, Rate, SequenceNumber }
+import org.apache.spark.eventhubs.{ NameAndPartition, Rate, SequenceNumber, TaskContextSlim }
 
 class MetricPluginMock extends MetricPlugin {
 
   val id = 1
 
-  override def onReceiveMetric(partitionInfo: NameAndPartition,
+  override def onReceiveMetric(taskContextSlim: TaskContextSlim,
+                               partitionInfo: NameAndPartition,
                                batchCount: Rate,
                                batchSizeInBytes: SequenceNumber,
                                elapsedTimeInMillis: SequenceNumber): Unit = {}
 
-  override def onSendMetric(eventHubName: String,
+  override def onSendMetric(taskContextSlim: TaskContextSlim,
+                            eventHubName: String,
                             batchCount: Rate,
                             batchSizeInBytes: SequenceNumber,
                             elapsedTimeInMillis: SequenceNumber,

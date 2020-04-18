@@ -29,7 +29,6 @@ import org.json4s.jackson.Serialization
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.{ ArrayBuffer, ListBuffer }
-import scala.compat.java8.FutureConverters
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ Await, Future }
 import scala.util.{ Failure, Success }
@@ -99,7 +98,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       client.send(event)
     }
 
-    pendingWorks += FutureConverters.toScala(sendTask)
+    pendingWorks += retryJava(sendTask, "send", 1)
   }
 
   /**
@@ -182,16 +181,21 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * [[PartitionSender]] is closed.
    */
   override def close(): Unit = {
-    logInfo("close: Closing EventHubsClient.")
+    logInfo(s"close is called. ${EventHubsUtils.getTaskContextSlim}")
 
-    Future.sequence(pendingWorks).onComplete {
+    val future = Future.sequence(pendingWorks)
+    future.onComplete {
       case Success(_) => cleanup()
       case Failure(e) =>
-        logError(s"failed to complete pending tasks. $ehConf: ", e)
+        logError(
+          s"failed to complete pending tasks. event hubs: ${ehConf.name}, ${EventHubsUtils.getTaskContextSlim}",
+          e)
         cleanup()
 
         throw e
     }
+
+    Await.result(future, ehConf.internalOperationTimeout)
   }
 
   private def cleanup(): Unit = {

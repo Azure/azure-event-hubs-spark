@@ -249,7 +249,12 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
             (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
           }
           .getOrElse((0, 0L))
-      metricPlugin.foreach(_.onReceiveMetric(nAndP, batchCount, batchSizeInBytes, elapsedTimeMs))
+      metricPlugin.foreach(
+        _.onReceiveMetric(EventHubsUtils.getTaskContextSlim,
+                          nAndP,
+                          batchCount,
+                          batchSizeInBytes,
+                          elapsedTimeMs))
       assert(validateSize == batchCount)
     } else {
       assert(validate.size == batchCount)

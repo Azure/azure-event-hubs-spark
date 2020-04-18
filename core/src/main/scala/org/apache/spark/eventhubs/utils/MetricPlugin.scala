@@ -17,19 +17,20 @@
 
 package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.NameAndPartition
+import org.apache.spark.eventhubs.{ NameAndPartition, TaskContextSlim }
 
 trait MetricPlugin extends Serializable {
 
-  def onReceiveMetric(partitionInfo: NameAndPartition,
+  def onReceiveMetric(taskContextSlim: TaskContextSlim,
+                      partitionInfo: NameAndPartition,
                       batchCount: Int,
                       batchSizeInBytes: Long,
                       elapsedTimeInMillis: Long): Unit
 
-  def onSendMetric(eventHubName: String,
+  def onSendMetric(taskContextSlim: TaskContextSlim,
+                   eventHubName: String,
                    batchCount: Int,
                    batchSizeInBytes: Long,
                    elapsedTimeInMillis: Long,
                    isSuccess: Boolean): Unit
-
 }

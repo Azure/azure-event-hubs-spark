@@ -17,24 +17,26 @@
 
 package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.NameAndPartition
+import org.apache.spark.eventhubs.{ NameAndPartition, TaskContextSlim }
 import org.apache.spark.internal.Logging
 
 class SimpleLogMetricPlugin extends MetricPlugin with Logging {
-  override def onReceiveMetric(partitionInfo: NameAndPartition,
+  override def onReceiveMetric(taskContextSlim: TaskContextSlim,
+                               partitionInfo: NameAndPartition,
                                batchCount: Int,
                                batchSizeInBytes: Long,
                                elapsedTimeInMillis: Long): Unit = {
-    log.info(s"[ReceiveMetrics] " +
-      s"partitionInfo: $partitionInfo, batchCount: $batchCount, batchSizeInBytes: $batchSizeInBytes, elapsed: $elapsedTimeInMillis (ms)")
+    log.info(s"[Receive] $taskContextSlim, eventhub partitionInfo: $partitionInfo, " +
+      s"batchCount: $batchCount, batchSizeInBytes: $batchSizeInBytes, elapsed: $elapsedTimeInMillis (ms)")
   }
 
-  override def onSendMetric(entityName: String,
+  override def onSendMetric(taskContextSlim: TaskContextSlim,
+                            eventHubName: String,
                             batchCount: Int,
                             batchSizeInBytes: Long,
                             elapsedTimeInMillis: Long,
                             isSuccess: Boolean): Unit = {
-    log.info(s"[SendMetrics] " +
-      s"entityName: $entityName, batchCount: $batchCount, batchSizeInBytes: $batchSizeInBytes, elapsed: $elapsedTimeInMillis (ms)")
+    log.info(s"[Send] $taskContextSlim, eventhub name: $eventHubName, " +
+      s"batchCount: $batchCount, batchSizeInBytes: $batchSizeInBytes, elapsed: $elapsedTimeInMillis (ms), isSuccess: $isSuccess")
   }
 }

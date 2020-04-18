@@ -18,9 +18,10 @@
 package org.apache.spark.sql.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.{ EventHubsConf, EventHubsUtils }
 import org.apache.spark.eventhubs.client.Client
 import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{
   Attribute,
@@ -40,7 +41,8 @@ import org.apache.spark.unsafe.types.UTF8String
  */
 private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
                                             inputSchema: Seq[Attribute])
-    extends EventHubsRowWriter(inputSchema) {
+    extends EventHubsRowWriter(inputSchema)
+    with Logging {
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private var sender: Client = _
@@ -65,16 +67,29 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
   }
 
   def close(): Unit = {
+    log.info(s"close is called. ${EventHubsUtils.getTaskContextSlim}")
+
+    var success = false
     if (sender != null) {
-      metricPlugin.foreach(
-        _.onSendMetric(ehConf.name,
-                       totalMessageCount,
-                       totalMessageSizeInBytes,
-                       System.currentTimeMillis() - writerOpenTime,
-                       isSuccess = true))
-      sender.close()
+      try {
+        sender.close()
+        success = true
+      } catch {
+        case e: Exception =>
+          log.warn(s"an error occurred. eventhub name = ${ehConf.name}, error = ${e.getMessage}")
+          throw e
+      }
       sender = null
     }
+
+    metricPlugin.foreach(
+      _.onSendMetric(EventHubsUtils.getTaskContextSlim,
+                     ehConf.name,
+                     totalMessageCount,
+                     totalMessageSizeInBytes,
+                     System.currentTimeMillis() - writerOpenTime,
+                     isSuccess = success))
+
   }
 }
 

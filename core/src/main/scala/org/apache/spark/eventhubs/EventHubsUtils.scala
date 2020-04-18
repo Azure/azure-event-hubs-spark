@@ -135,6 +135,17 @@ object EventHubsUtils extends Logging {
     } else -1
   }
 
+  def getTaskContextSlim: TaskContextSlim = {
+    val taskContext = TaskContext.get()
+    if (taskContext != null) {
+      new TaskContextSlim(taskContext.stageId(),
+                          taskContext.taskAttemptId(),
+                          taskContext.partitionId())
+    } else {
+      new TaskContextSlim(-1, -1, -1)
+    }
+  }
+
   def encode(inputStr: String): String = {
     java.util.Base64.getEncoder
       .encodeToString(inputStr.getBytes(StandardCharsets.UTF_8))

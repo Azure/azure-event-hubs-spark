@@ -19,13 +19,16 @@ package org.apache.spark.sql.eventhubs
 
 import java.io._
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
+import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
+import org.apache.spark.SparkEnv
 import org.apache.spark.sql.execution.streaming.{
   HDFSMetadataLog,
   Offset,
@@ -81,6 +84,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private val maxOffsetsPerTrigger: Option[Long] =
     Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
+
+  // set the max batch receive time in the partitionPerformanceReceiver instance
+  private val maxBatchReceiveTime : Duration =
+    parameters.get(MaxBatchReceiveTimeKey).map(str => Duration.parse(str)).getOrElse(DefaultMaxBatchReceiveTime)
+  EventHubsSource.partitionPerformanceReceiver.setMaxBatchReceiveTime(maxBatchReceiveTime)
 
   private lazy val initialPartitionSeqNos = {
     val metadataLog =
@@ -341,6 +349,11 @@ private[eventhubs] object EventHubsSource {
     """.stripMargin
 
   private[eventhubs] val VERSION = 1
+
+  val partitionPerformanceReceiver: PartitionPerformanceReceiver = new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv)
+
+  val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv.setupEndpoint(
+    PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
 
   def getSortedExecutorList(sc: SparkContext): Array[String] = {
     val bm = sc.env.blockManager

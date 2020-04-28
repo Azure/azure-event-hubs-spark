@@ -29,9 +29,11 @@ import org.apache.spark.eventhubs.{
   EventHubsConf,
   EventHubsUtils,
   NameAndPartition,
-  SequenceNumber
+  SequenceNumber,
+  PartitionPerformanceReceiver
 }
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.RpcUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -241,6 +243,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     val (result, validate) = sorted.duplicate
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
+
+    //Navid
+    //CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(PartitionPerformanceMetric(s"RPC msg from Partition: $nAndP -- spark-${SparkEnv.get.executorId}-$taskId -- received $batchCount messages"))
+    sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, batchCount, elapsedTimeMs))
+    logInfo(s"PartitionPerformanceReceiverRef.send completed in spark-${SparkEnv.get.executorId}-$taskId")
+    // Divan
+
     if (metricPlugin.isDefined) {
       val (validateSize, batchSizeInBytes) =
         validate
@@ -279,6 +288,12 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
         throw e
     }
   }
+
+  // send the partition perforamcne metric (elapsed time for receiving events in the batch) to the
+  // driver without waiting fro any response.
+  private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
+    CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
+  }
 }
 
 /**
@@ -291,6 +306,9 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   type MutableMap[A, B] = scala.collection.mutable.HashMap[A, B]
 
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
+
+  val partitionPerformanceReceiverRef =
+    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME, SparkEnv.get.conf, SparkEnv.get.rpcEnv)
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase

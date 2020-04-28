@@ -140,6 +140,7 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
+
   def eventHubsSchema: StructType = {
     StructType(
       Seq(

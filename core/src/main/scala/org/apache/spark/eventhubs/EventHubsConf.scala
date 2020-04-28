@@ -164,7 +164,8 @@ final class EventHubsConf private (private val connectionStr: String)
       ThreadPoolSizeKey,
       UseExclusiveReceiverKey,
       UseSimulatedClientKey,
-      MetricPluginKey
+      MetricPluginKey,
+      MaxBatchReceiveTimeKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -441,6 +442,25 @@ final class EventHubsConf private (private val connectionStr: String)
     set(MaxEventsPerTriggerKey, limit)
   }
 
+  /**
+   * Set the max batch receive time. If a partition takes more than
+   * the length of this time for a batch we will mark that  partition
+   * as a slow partition and decrease the number of events in the next
+   * batch for this partition.
+   * Default: [[DefaultMaxBatchReceiveTime]]
+   *
+   * @param d the new max batch receive time
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setMaxBatchReceiveTime(d: Duration): EventHubsConf = {
+    set(MaxBatchReceiveTimeKey, d)
+  }
+
+  /** The current max batch receive time.  */
+  def maxBatchReceiveTime: Option[Duration] = {
+    self.get(MaxBatchReceiveTimeKey) map (str => Duration.parse(str))
+  }
+
   def setMetricPlugin(metricPlugin: MetricPlugin): EventHubsConf = {
     set(MetricPluginKey, metricPlugin.getClass.getName)
   }
@@ -544,6 +564,7 @@ object EventHubsConf extends Logging {
   val UseSimulatedClientKey = "useSimulatedClient"
   val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
+  val MaxBatchReceiveTimeKey = "eventhubs.maxBatchReceiveTime"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

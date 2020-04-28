@@ -703,4 +703,80 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     assert(row.getAs[Int]("count") === 1, s"Unexpected results: $row")
     query.stop()
   }
+
+  test("setSlowPartitionAdjustment without any slow partition") {
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 500)
+
+    val parameters =
+      getEventHubsConf(eventHub.name)
+        .setMaxEventsPerTrigger(4)
+        .setSlowPartitionAdjustment(true)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // we'll get one event per partition per trigger
+      CheckAnswer(0, 0, 0, 0),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5),
+      StopStream,
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8)
+    )
+    }
 }

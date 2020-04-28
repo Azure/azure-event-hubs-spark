@@ -244,11 +244,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val (result, validate) = sorted.duplicate
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
 
-    //Navid
-    //CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(PartitionPerformanceMetric(s"RPC msg from Partition: $nAndP -- spark-${SparkEnv.get.executorId}-$taskId -- received $batchCount messages"))
-    sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, batchCount, elapsedTimeMs))
-    logInfo(s"PartitionPerformanceReceiverRef.send completed in spark-${SparkEnv.get.executorId}-$taskId")
-    // Divan
+    // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
+    if(ehConf.slowPartitionAdjustment) {
+      sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, requestSeqNo, batchCount, elapsedTimeMs))
+    }
 
     if (metricPlugin.isDefined) {
       val (validateSize, batchSizeInBytes) =
@@ -293,6 +292,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   // driver without waiting fro any response.
   private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
     CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
+    logDebug(s"spark-${SparkEnv.get.executorId}-${EventHubsUtils.getTaskId} sent PartitionPerformanceMetric " +
+      s"$PartitionPerformanceMetric to the driver.")
   }
 }
 
@@ -307,6 +308,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
 
+  // RPC endpoint for partition performacne communciation in the executor
   val partitionPerformanceReceiverRef =
     RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME, SparkEnv.get.conf, SparkEnv.get.rpcEnv)
 

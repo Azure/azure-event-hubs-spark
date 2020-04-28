@@ -38,7 +38,6 @@ package object eventhubs {
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(300)
-  val DefaultMaxBatchReceiveTime: Duration = Duration.ofSeconds(5)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
   val PrefetchCountMaximum: Int = PartitionReceiver.MAXIMUM_PREFETCH_COUNT
@@ -47,6 +46,7 @@ package object eventhubs {
   val DefaultUseSimulatedClient = "false"
   val DefaultPartitionPreferredLocationStrategy = "Hash"
   val DefaultUseExclusiveReceiver = "true"
+  val DefaultSlowPartitionAdjustment = "false"
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L

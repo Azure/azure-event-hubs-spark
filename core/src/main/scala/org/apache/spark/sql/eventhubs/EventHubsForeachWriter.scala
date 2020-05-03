@@ -17,10 +17,11 @@
 
 package org.apache.spark.sql.eventhubs
 
-import com.microsoft.azure.eventhubs.{ EventData, EventHubClient }
-import org.apache.spark.eventhubs.EventHubsConf
-import org.apache.spark.eventhubs.client.ClientConnectionPool
-import org.apache.spark.eventhubs.utils.RetryUtils._
+import com.microsoft.azure.eventhubs.EventData
+import org.apache.spark.eventhubs.{ EventHubsConf, EventHubsUtils }
+import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.ForeachWriter
 
 /**
@@ -37,24 +38,62 @@ import org.apache.spark.sql.ForeachWriter
  * @param ehConf the [[EventHubsConf]] containing the connection string
  *               for the Event Hub which will receive the sent events
  */
-case class EventHubsForeachWriter(ehConf: EventHubsConf) extends ForeachWriter[String] {
-  var client: EventHubClient = _
+case class EventHubsForeachWriter(ehConf: EventHubsConf)
+    extends ForeachWriter[String]
+    with Logging {
+  private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
+  var client: Client = _
+  var totalMessageSizeInBytes = 0
+  var totalMessageCount = 0
+  var writerOpenTime = 0L
 
   def open(partitionId: Long, version: Long): Boolean = {
-    client = ClientConnectionPool.borrowClient(ehConf)
+    log.info(s"open is called. ${EventHubsUtils.getTaskContextSlim}")
+
+    writerOpenTime = System.currentTimeMillis()
+    client = EventHubsSourceProvider.clientFactory(ehConf.toMap)(ehConf)
     true
   }
 
   def process(body: String): Unit = {
     val event = EventData.create(s"$body".getBytes("UTF-8"))
-    retryJava(client.send(event), "ForeachWriter")
+    client.send(event)
+    totalMessageCount += 1
+    totalMessageSizeInBytes += event.getBytes.length
   }
 
   def close(errorOrNull: Throwable): Unit = {
+    log.info(s"close is called. ${EventHubsUtils.getTaskContextSlim}")
+
     errorOrNull match {
-      case t: Throwable => throw t
-      case _ =>
-        ClientConnectionPool.returnClient(ehConf, client)
+      case t: Throwable =>
+        log.warn(s"an error occurred. eventhub name = ${ehConf.name}, error = ${t.getMessage}")
+        closeInner(false)
+        throw t
+      case _ => closeInner(true)
     }
+  }
+
+  private def closeInner(isSuccess: Boolean): Unit = {
+    var success = false
+    if (client != null) {
+      try {
+        client.close()
+        success = true
+      } catch {
+        case e: Exception =>
+          log.warn(s"an error occurred. eventhub name = ${ehConf.name}, error = ${e.getMessage}")
+          throw e
+      }
+      client = null
+    }
+
+    metricPlugin.foreach(
+      _.onSendMetric(EventHubsUtils.getTaskContextSlim,
+                     ehConf.name,
+                     totalMessageCount,
+                     totalMessageSizeInBytes,
+                     System.currentTimeMillis() - writerOpenTime,
+                     isSuccess && success))
   }
 }

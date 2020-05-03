@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.SparkEnv
+import org.apache.spark.eventhubs.utils.MetricPlugin
 import org.apache.spark.eventhubs.utils.RetryUtils.{ after, retryJava, retryNotNull }
 import org.apache.spark.eventhubs.{
   DefaultConsumerGroup,
@@ -68,6 +69,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   type AwaitTimeoutException = java.util.concurrent.TimeoutException
 
   import org.apache.spark.eventhubs._
+
+  private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
@@ -219,13 +222,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
     val firstSeqNo = first.head.getSystemProperties.getSequenceNumber
-    val newBatchSize = (requestSeqNo + batchSize - firstSeqNo).toInt
+    val batchCount = (requestSeqNo + batchSize - firstSeqNo).toInt
 
-    if (newBatchSize <= 0) {
+    if (batchCount <= 0) {
       return Iterator.empty
     }
 
-    val theRest = for { i <- 1 until newBatchSize } yield
+    val theRest = for { i <- 1 until batchCount } yield
       awaitReceiveMessage(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
                                      s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
                           requestSeqNo)
@@ -237,12 +240,27 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       .iterator
 
     val (result, validate) = sorted.duplicate
-    assert(validate.size == newBatchSize)
-
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
+    if (metricPlugin.isDefined) {
+      val (validateSize, batchSizeInBytes) =
+        validate
+          .map(eventData => (1, eventData.getBytes.length.toLong))
+          .reduceOption { (countAndSize1, countAndSize2) =>
+            (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
+          }
+          .getOrElse((0, 0L))
+      metricPlugin.foreach(
+        _.onReceiveMetric(EventHubsUtils.getTaskContextSlim,
+                          nAndP,
+                          batchCount,
+                          batchSizeInBytes,
+                          elapsedTimeMs))
+      assert(validateSize == batchCount)
+    } else {
+      assert(validate.size == batchCount)
+    }
     logInfo(s"(TID $taskId) Finished receiving for $nAndP, consumer group: ${ehConf.consumerGroup
       .getOrElse(DefaultConsumerGroup)}, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
-
     result
   }
 

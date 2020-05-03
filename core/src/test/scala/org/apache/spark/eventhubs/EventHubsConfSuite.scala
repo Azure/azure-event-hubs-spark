@@ -20,7 +20,7 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.NoSuchElementException
 
-import org.apache.spark.eventhubs.utils.EventHubsTestUtils
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, MetricPluginMock }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{ read => sread }
@@ -205,6 +205,17 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val actual = conf.startingPositions.get
 
     assert(actual.equals(expected))
+  }
+
+  test("metricPlugin set/get") {
+
+    val expectedListener = new MetricPluginMock
+
+    val conf = testUtils.getEventHubsConf().setMetricPlugin(expectedListener)
+    val actualListener = conf.metricPlugin().get
+    val idField = actualListener.getClass.getDeclaredField("id")
+    idField.setAccessible(true)
+    assert(idField.getInt(actualListener) == expectedListener.id)
   }
 
   test("trimmedConfig") {

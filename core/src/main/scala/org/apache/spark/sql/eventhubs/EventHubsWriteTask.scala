@@ -18,8 +18,10 @@
 package org.apache.spark.sql.eventhubs
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.EventHubsConf
+import org.apache.spark.eventhubs.{ EventHubsConf, EventHubsUtils }
 import org.apache.spark.eventhubs.client.Client
+import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{
   Attribute,
@@ -28,9 +30,9 @@ import org.apache.spark.sql.catalyst.expressions.{
   UnsafeMapData,
   UnsafeProjection
 }
+import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 import org.apache.spark.sql.types.{ BinaryType, MapType, StringType }
 import org.apache.spark.unsafe.types.UTF8String
-import org.apache.spark.unsafe.types.UTF8String.IntWrapper
 
 /**
  * Writes out data in a single Spark task, without any concerns about how
@@ -39,10 +41,15 @@ import org.apache.spark.unsafe.types.UTF8String.IntWrapper
  */
 private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
                                             inputSchema: Seq[Attribute])
-    extends EventHubsRowWriter(inputSchema) {
+    extends EventHubsRowWriter(inputSchema)
+    with Logging {
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private var sender: Client = _
+  private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
+  var totalMessageSizeInBytes = 0
+  var totalMessageCount = 0
+  var writerOpenTime = 0L
 
   /**
    * Writers data out to EventHubs
@@ -51,17 +58,38 @@ private[eventhubs] class EventHubsWriteTask(parameters: Map[String, String],
    */
   def execute(iterator: Iterator[InternalRow]): Unit = {
     sender = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
+    writerOpenTime = System.currentTimeMillis()
     while (iterator.hasNext) {
       val currentRow = iterator.next
-      sendRow(currentRow, sender)
+      totalMessageSizeInBytes += sendRow(currentRow, sender)
+      totalMessageCount += 1
     }
   }
 
   def close(): Unit = {
+    log.info(s"close is called. ${EventHubsUtils.getTaskContextSlim}")
+
+    var success = false
     if (sender != null) {
-      sender.close()
+      try {
+        sender.close()
+        success = true
+      } catch {
+        case e: Exception =>
+          log.warn(s"an error occurred. eventhub name = ${ehConf.name}, error = ${e.getMessage}")
+          throw e
+      }
       sender = null
     }
+
+    metricPlugin.foreach(
+      _.onSendMetric(EventHubsUtils.getTaskContextSlim,
+                     ehConf.name,
+                     totalMessageCount,
+                     totalMessageSizeInBytes,
+                     System.currentTimeMillis() - writerOpenTime,
+                     isSuccess = success))
+
   }
 }
 
@@ -93,13 +121,12 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
     } else {
       val keys = unsafeMap.keyArray()
       val values = unsafeMap.valueArray()
-      Some(
-        (0 until keys.numElements)
-          .map{i =>
-            if(keys.isNullAt(i))  throw new IllegalStateException("Properties cannot have a null key")
-            if(values.isNullAt(i))  throw new IllegalStateException("Properties cannot have a null value")
-            keys.getUTF8String(i).toString -> values.getUTF8String(i).toString
-          }.toMap)
+      Some((0 until keys.numElements).map { i =>
+        if (keys.isNullAt(i)) throw new IllegalStateException("Properties cannot have a null key")
+        if (values.isNullAt(i))
+          throw new IllegalStateException("Properties cannot have a null value")
+        keys.getUTF8String(i).toString -> values.getUTF8String(i).toString
+      }.toMap)
     }
   }
 
@@ -109,7 +136,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
   protected def sendRow(
       row: InternalRow,
       sender: Client
-  ): Unit = {
+  ): Int = {
     val projectedRow = projection(row)
     val body = projectedRow.getBinary(0)
     val partitionKey = toPartitionKey(projectedRow.getUTF8String(1))
@@ -123,6 +150,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
     val event = EventData.create(body)
     sender.send(event, partitionId, partitionKey, properties)
+    event.getBytes.length
   }
 
   private def createProjection = {
@@ -171,6 +199,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
     propertiesExpression.dataType match {
       case MapType(StringType, StringType, true) => // good
+      case MapType(StringType, StringType, false) => // good
       case t =>
         throw new IllegalStateException(
           s"${EventHubsWriter.PropertiesAttributeName} attribute unsupported type $t"

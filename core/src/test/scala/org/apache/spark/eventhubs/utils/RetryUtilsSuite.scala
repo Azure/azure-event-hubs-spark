@@ -70,8 +70,8 @@ class RetryUtilsSuite extends FunSuite with ScalaFutures {
   }
 
   test("retryNotNull") {
-    val nullFuture: CompletableFuture[Int] =
-      CompletableFuture.completedFuture(null.asInstanceOf[Int])
+    val nullFuture: CompletableFuture[AnyRef] =
+      CompletableFuture.completedFuture(null.asInstanceOf[AnyRef])
     val normalFuture: CompletableFuture[Int] =
       CompletableFuture.completedFuture(10)
 

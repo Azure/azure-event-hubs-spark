@@ -220,6 +220,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
           val size = end - begin
           logDebug(s"rateLimit $nameAndPartition size is $size")
           // if slowPartitionAdjustment is on, adjust the batch sizes based on partition performance percentages
+          /*
           if(slowPartitionAdjustment) {
             val adjustedSize = Math.ceil(size * partitionsPerformancePercentage(nameAndPartition)).toLong
             logDebug(s"Slow partition adjustment is on, so adjust rateLimit $nameAndPartition size to $adjustedSize " +
@@ -229,9 +230,12 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
           else {
             if (size > 0) Some(nameAndPartition -> size) else None
           }
+           */
+          if (size > 0) Some(nameAndPartition -> size) else None
         }
     }
     val total = sizes.values.sum.toDouble
+    val averagePerforamnceFactor: Double = partitionsPerformancePercentage.values.sum.toDouble / partitionCount
     if (total < 1) {
       until
     } else {
@@ -241,7 +245,15 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
             .get(nameAndPartition)
             .map { size =>
               val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
-              val prorate = limit * (size / total)
+              // adjust performance performance pewrcentages to use as much as events possible in the batch
+              val perforamnceFactor: Double = if(slowPartitionAdjustment) {
+                partitionsPerformancePercentage(nameAndPartition) / averagePerforamnceFactor
+              } else 1.0
+
+              if(slowPartitionAdjustment)
+                logDebug(s"Slow partition adjustment is on, so prorate amount for $nameAndPartition will be adjusted by" +
+                  s" the perfromanceFactor = $perforamnceFactor")
+              val prorate = limit * (size / total) * perforamnceFactor
               logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
               // Don't completely starve small partitions
               val off = begin + (if (prorate < 1) Math.ceil(prorate) else Math.floor(prorate)).toLong
@@ -394,7 +406,7 @@ private[eventhubs] object EventHubsSource {
   // RPC endpoint for partition performacne communciation in the driver
   private val TRACKING_BATCH_COUNT = 3
   private var localBatchId = -1
-  val partitionsStatusTracker = PartitionsStatusTracker.apply
+  val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
   val partitionPerformanceReceiver: PartitionPerformanceReceiver = new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
   val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv.setupEndpoint(
     PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)

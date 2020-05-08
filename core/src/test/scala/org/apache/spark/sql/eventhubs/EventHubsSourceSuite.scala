@@ -34,7 +34,7 @@ import org.apache.qpid.proton.amqp.{
   UnsignedLong,
   UnsignedShort
 }
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient }
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient, SimulatedPartitionStatusTracker}
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
@@ -128,6 +128,13 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   }
 
   private def getEventHubsConf(ehName: String): EventHubsConf = testUtils.getEventHubsConf(ehName)
+
+  case class PartitionsStatusTrackerUpdate(updates: List[(NameAndPartition, Long, Int, Long)]) extends ExternalAction {
+    override def runAction(): Unit = {
+      updates.foreach{ u =>
+        SimulatedPartitionStatusTracker.updatePartitionPerformance(u._1, u._2, u._3, u._4)}
+    }
+  }
 
   testWithUninterruptibleThread("deserialization of initial offset with Spark 2.1.0") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
@@ -707,11 +714,124 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
   test("setSlowPartitionAdjustment without any slow partition") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
     testUtils.populateUniformly(eventHub.name, 500)
+    val partitions: List[NameAndPartition] = List(NameAndPartition(eventHub.name, 0),
+                                                  NameAndPartition(eventHub.name, 1),
+                                                  NameAndPartition(eventHub.name, 2),
+                                                  NameAndPartition(eventHub.name, 3))
 
     val parameters =
       getEventHubsConf(eventHub.name)
-        .setMaxEventsPerTrigger(4)
+        .setMaxEventsPerTrigger(20)
         .setSlowPartitionAdjustment(true)
+        .setStartingPosition(EventPosition.fromSequenceNumber(0L))
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    val noSlowPartition: Map[NameAndPartition, Double] =
+      Map(partitions(0) -> 1.0, partitions(1) -> 1.0, partitions(2) -> 1.0, partitions(3) -> 1.0)
+
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // we'll get 5 events per partition per trigger
+      Assert(Set[Long](0).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4),
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 0L, 5, 9L), (partitions(1), 0L, 5, 11L),
+                                          (partitions(2), 0L, 5, 9L), (partitions(3), 0L, 5, 11L))),
+      Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // we should get 5 events per partition per trigger
+      Assert(Set[Long](0, 1).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(5, 6, 7, 8, 9, 5, 6, 7, 8, 9, 5, 6, 7, 8, 9, 5, 6, 7, 8, 9),
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 5L, 5, 16L), (partitions(1), 5L, 5, 13L),
+                                          (partitions(2), 5L, 5, 16L), (partitions(3), 5L, 5, 15L))),
+      Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // we should get 5 events per partition per trigger
+      Assert(Set[Long](0, 1, 2).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(10, 11, 12, 13, 14, 10, 11, 12, 13, 14, 10, 11, 12, 13, 14, 10, 11, 12, 13, 14),
+      // miss the perforamnce update for this batch. Next round every partitions is considered as normal speed
+      Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // we should get 5 events per partition per trigger
+      Assert(Set[Long](1, 2, 3).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(15, 16, 17, 18, 19, 15, 16, 17, 18, 19, 15, 16, 17, 18, 19, 15, 16, 17, 18, 19),
+      // get update for three partitions (missing partition 1)
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 15L, 5, 55L),
+                                          (partitions(2), 15L, 5, 52L), (partitions(3), 15L, 5, 43L))),
+      Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // we should get 5 events per partition per trigger
+      Assert(Set[Long](2, 3, 4).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(20, 21, 22, 23, 24, 20, 21, 22, 23, 24, 20, 21, 22, 23, 24, 20, 21, 22, 23, 24),
+      StopStream,
+      StartStream(ProcessingTime(100), clock),
+      // get update for the last batch before stopping the stream. It should be ignored because the tracker
+      // state should be clean at the start of the stream
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 20L, 5, 100L), (partitions(1), 20L, 5, 13L),
+                                          (partitions(2), 20L, 5, 16L), (partitions(3), 20L, 5, 15L))),
+      Assert(SimulatedPartitionStatusTracker.getPerformancePercentages.isEmpty),
+      waitUntilBatchProcessed,
+      // last received status update should be ignored since it belongs to a batch before restarting the stream
+      // we should get 5 events per partition per trigger
+      Assert(Set[Long](0, 1).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(25, 26, 27, 28, 29, 25, 26, 27, 28, 29, 25, 26, 27, 28, 29, 25, 26, 27, 28, 29),
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 25L, 5, 73L), (partitions(1), 25L, 5, 72L),
+                                          (partitions(2), 25L, 5, 66L), (partitions(3), 25L, 5, 73L))),
+      Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // we should get 5 events per partition per trigger
+      Assert(Set[Long](0, 1, 2).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(30, 31, 32, 33, 34, 30, 31, 32, 33, 34, 30, 31, 32, 33, 34, 30, 31, 32, 33, 34)
+    )
+    }
+
+  test("setSlowPartitionAdjustment with slow partitions") {
+    val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 1000)
+    val partitions: List[NameAndPartition] = List(NameAndPartition(eventHub.name, 0),
+      NameAndPartition(eventHub.name, 1),
+      NameAndPartition(eventHub.name, 2),
+      NameAndPartition(eventHub.name, 3))
+
+    val parameters =
+      getEventHubsConf(eventHub.name)
+        .setMaxEventsPerTrigger(20)
+        .setSlowPartitionAdjustment(true)
+        .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
 
     val reader = spark.readStream
@@ -742,41 +862,113 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     testStream(mapped)(
       StartStream(ProcessingTime(100), clock),
       waitUntilBatchProcessed,
-      // we'll get one event per partition per trigger
-      CheckAnswer(0, 0, 0, 0),
+      // we'll get 5 events per partition per trigger
+      Assert(Set[Long](0).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4),
+      // for the next batch, let's make partition 2 slow
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 0L, 5, 18L), (partitions(1), 0L, 5, 21L),
+                                          (partitions(2), 0L, 5, 42L), (partitions(3), 0L, 5, 25L))),
+      Assert(Map(partitions(0) -> 1.0, partitions(1) -> 1.0, partitions(2) -> 0.63, partitions(3) -> 1.0)
+              .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1),
+      // we should get 3 events for partition 2, 5 events for other partitions
+      Assert(Set[Long](0, 1).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(5, 6, 7, 8, 9, 5, 6, 7, 8, 9, 5, 6, 7, 5, 6, 7, 8, 9),
+      // for the next batch, let's make partition 1 slow and recover partition 2 from being slow
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 5L, 5, 18L), (partitions(1), 5L, 5, 163L),
+                                          (partitions(2), 5L, 3, 10L), (partitions(3), 5L, 5, 15L))),
+      Assert(Map(partitions(0) -> 1.0, partitions(1) -> 0.33, partitions(2) -> 1.0, partitions(3) -> 1.0)
+              .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2),
+      // we should get 6 events for partitions 0, 2, and 3, and just 1 event for partition 1
+      Assert(Set[Long](0, 1, 2).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(10, 11, 12, 13, 14, 15, 10, 8, 9, 10, 11, 12, 13, 10, 11, 12, 13, 14, 15),
+      // for the next batch, let's only have 2 updates (one slow, on fast parttion)
+      // since we don't have enough updated partitions, we should continue with the previous partition performance
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 10L, 6, 20L), (partitions(3), 10L, 6, 252L))),
+      Assert(Map(partitions(0) -> 1.0, partitions(1) -> 0.33, partitions(2) -> 1.0, partitions(3) -> 1.0)
+              .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3),
+      // we should get 6 events for partitions 0, 2, and 3, and just 1 event for partition 1
+      Assert(Set[Long](1, 2, 3).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(16, 17, 18, 19, 20, 21, 11, 14, 15, 16, 17, 18, 19, 16, 17, 18, 19, 20, 21),
+      // let's get back to normal fro all partitions
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 16L, 6, 18L), (partitions(1), 11L, 1, 3L),
+                                          (partitions(2), 14L, 6, 17L), (partitions(3), 16L, 6, 17L))),
+      Assert( Map(partitions(0) -> 1.0, partitions(1) -> 1.0, partitions(2) -> 1.0, partitions(3) -> 1.0)
+                .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4),
-      AdvanceManualClock(100),
-      waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5),
-      StopStream,
+      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // Since partition 1 is behind, the prorate logic (irrelevent of slow partitions logics) tries to catch it up
+      // therefore, partition 1 gets 5 events and other partitions are getting 4 each
+      Assert(Set[Long](2, 3, 4).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(22, 23, 24, 25, 12, 13, 14, 15, 16, 20, 21, 22, 23, 22, 23, 24, 25)
+    )
+  }
+
+  test("setSlowPartitionAdjustment with more than one slow partitions") {
+    val eventHub = testUtils.createEventHubs(newEventHubs(), 5)
+    testUtils.populateUniformly(eventHub.name, 1000)
+    val partitions: List[NameAndPartition] = List(NameAndPartition(eventHub.name, 0),
+      NameAndPartition(eventHub.name, 1),
+      NameAndPartition(eventHub.name, 2),
+      NameAndPartition(eventHub.name, 3),
+      NameAndPartition(eventHub.name, 4))
+
+    val parameters =
+      getEventHubsConf(eventHub.name)
+        .setMaxEventsPerTrigger(50)
+        .setSlowPartitionAdjustment(true)
+        .setStartingPosition(EventPosition.fromSequenceNumber(0L))
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(mapped)(
       StartStream(ProcessingTime(100), clock),
       waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6),
+      // we'll get 10 events per partition per trigger
+      Assert(Set[Long](0).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+      // for the next batch, let's make partitions 0 and 4 slow
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 0L, 10, 62L), (partitions(1), 0L, 10, 21L),
+                    (partitions(2), 0L, 10, 20L), (partitions(3), 0L, 10, 40L),  (partitions(4), 0L, 10, 65L))),
+      Assert(Map(partitions(0) -> 0.67, partitions(1) -> 1.0, partitions(2) -> 1.0, partitions(3) -> 1.0, partitions(4) -> 0.64)
+              .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7),
-      AdvanceManualClock(100),
-      waitUntilBatchProcessed,
-      // four additional events
-      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8)
+      // we should get 11 events for partition 1, 2, 3 and 7 events for partitions 0, 4
+      Assert(Set[Long](0, 1).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
+      CheckLastBatch(10, 11, 12, 13, 14, 15, 16, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+          10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 10, 11, 12, 13, 14, 15, 16)
     )
-    }
+  }
 }

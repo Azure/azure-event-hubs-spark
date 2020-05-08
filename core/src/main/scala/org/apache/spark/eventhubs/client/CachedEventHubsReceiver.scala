@@ -289,7 +289,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   // send the partition perforamcne metric (elapsed time for receiving events in the batch) to the
-  // driver without waiting fro any response.
+  // driver without waiting for any response.
   private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
     CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
     logDebug(s"spark-${SparkEnv.get.executorId}-${EventHubsUtils.getTaskId} sent PartitionPerformanceMetric " +

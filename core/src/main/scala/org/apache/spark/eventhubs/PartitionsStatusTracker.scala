@@ -22,6 +22,7 @@ import java.util.logging.Logger
 import scala.collection.mutable
 import scala.collection.breakOut
 import org.apache.spark.eventhubs.rdd.OffsetRange
+import org.apache.spark.eventhubs.utils.ThrottlingStatusPlugin
 import org.apache.spark.internal.Logging
 
 
@@ -179,7 +180,14 @@ class PartitionsStatusTracker extends Logging{
         }
         case Some(batch) => {
           logDebug(s"Batch ${batch.batchId} is the latest batch with enough updates. Caculate and return its perforamnce.")
-          batch.getPerformancePercentages
+          val performancePercentages = batch.getPerformancePercentages
+          PartitionsStatusTracker.throttlingStatusPlugin.foreach(
+            _.onPartitionsPerformanceStatusUpdate ( batch.batchId,
+                                                    batch.paritionsStatus.map(par => (par._1, par._2.batchSize))(breakOut),
+                                                    batch.paritionsStatus.map(par => (par._1, par._2.batchReceiveTimeInMillis))(breakOut),
+                                                    performancePercentages)
+          )
+          performancePercentages
         }
       }
     }
@@ -208,11 +216,14 @@ object PartitionsStatusTracker {
   var partitionsCount: Int = 1
   var receiverTimeOutInMillis: Long = 60000
   var enoughUpdatesCount: Int = 1
+  var throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = None
 
-  def setDefaultValuesInTracker(numOfPartitions: Int, ehName: String, receiverMaxTime: Long) = {
+
+  def setDefaultValuesInTracker(numOfPartitions: Int, ehName: String, receiverMaxTime: Long, throttlingSP: Option[ThrottlingStatusPlugin]) = {
     partitionsCount = numOfPartitions
     receiverTimeOutInMillis = receiverMaxTime
     enoughUpdatesCount = (partitionsCount/2) + 1
+    throttlingStatusPlugin = throttlingSP
   }
 
   private def partitionSeqNoKey(nAndP: NameAndPartition, seqNo: SequenceNumber): String =
@@ -295,9 +306,9 @@ private[eventhubs] class PartitionStatus(val nAndP: NameAndPartition,
 
   var performancePercentage: Double = 1
 
-  private var batchSize: Int = if(emptyBatch) 0 else -1
+  var batchSize: Int = if(emptyBatch) 0 else -1
   // total receive time for the batch in milli seconds
-  private var batchReceiveTimeInMillis: Long = if(emptyBatch) 0 else -1
+  var batchReceiveTimeInMillis: Long = if(emptyBatch) 0 else -1
 
   var timePerEventInMillis: Double = if(emptyBatch) 0 else -1
 

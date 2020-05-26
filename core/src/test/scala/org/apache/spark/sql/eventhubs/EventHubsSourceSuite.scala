@@ -34,7 +34,7 @@ import org.apache.qpid.proton.amqp.{
   UnsignedLong,
   UnsignedShort
 }
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient, SimulatedPartitionStatusTracker}
+import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient, SimulatedPartitionStatusTracker, SimpleThrottlingStatusPlugin}
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
@@ -831,6 +831,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       getEventHubsConf(eventHub.name)
         .setMaxEventsPerTrigger(20)
         .setSlowPartitionAdjustment(true)
+        .setThrottlingStatusPlugin(new SimpleThrottlingStatusPlugin)
         .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
 

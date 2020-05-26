@@ -22,10 +22,12 @@ import java.nio.charset.StandardCharsets
 import java.time.Duration
 
 import scala.collection.breakOut
+import scala.collection.mutable
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
 import org.apache.spark.eventhubs.rdd.{EventHubsRDD, OffsetRange}
+import org.apache.spark.eventhubs.utils.ThrottlingStatusPlugin
 import org.apache.spark.eventhubs.{EventHubsConf, NameAndPartition, _}
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.RpcEndpointRef
@@ -85,7 +87,15 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   // set slow partition adjustment flag and static values in the tracker
   private val slowPartitionAdjustment: Boolean =
     parameters.get(SlowPartitionAdjustmentKey).map(_.toBoolean).getOrElse(false)
-  PartitionsStatusTracker.setDefaultValuesInTracker(partitionCount, ehName, ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout).toMillis)
+
+  private lazy val throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = ehConf.throttlingStatusPlugin()
+
+  PartitionsStatusTracker.setDefaultValuesInTracker(partitionCount, ehName,
+    ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout).toMillis, throttlingStatusPlugin)
+
+  var partitionsThrottleFactor: mutable.Map[NameAndPartition, Double] =
+    (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
+
   val defaultPartitionsPerformancePercentage: Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
 
@@ -219,18 +229,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         from.get(nameAndPartition).orElse(fromNew.get(nameAndPartition)).flatMap { begin =>
           val size = end - begin
           logDebug(s"rateLimit $nameAndPartition size is $size")
-          // if slowPartitionAdjustment is on, adjust the batch sizes based on partition performance percentages
-          /*
-          if(slowPartitionAdjustment) {
-            val adjustedSize = Math.ceil(size * partitionsPerformancePercentage(nameAndPartition)).toLong
-            logDebug(s"Slow partition adjustment is on, so adjust rateLimit $nameAndPartition size to $adjustedSize " +
-              s"instead of $size because of the performance percentage = ${partitionsPerformancePercentage(nameAndPartition)}")
-            if (adjustedSize > 0) Some(nameAndPartition -> adjustedSize) else None
-          }
-          else {
-            if (size > 0) Some(nameAndPartition -> size) else None
-          }
-           */
           if (size > 0) Some(nameAndPartition -> size) else None
         }
     }
@@ -250,9 +248,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                 partitionsPerformancePercentage(nameAndPartition) / averagePerforamnceFactor
               } else 1.0
 
-              if(slowPartitionAdjustment)
+              if(slowPartitionAdjustment) {
+                partitionsThrottleFactor(nameAndPartition) = perforamnceFactor
                 logDebug(s"Slow partition adjustment is on, so prorate amount for $nameAndPartition will be adjusted by" +
                   s" the perfromanceFactor = $perforamnceFactor")
+              }
               val prorate = limit * (size / total) * perforamnceFactor
               logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
               // Don't completely starve small partitions
@@ -345,6 +345,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // if slowPartitionAdjustment is on, add the current batch to the perforamnce tracker
     if(slowPartitionAdjustment) {
       addCurrentBatchToStatusTracker(offsetRanges)
+      throttlingStatusPlugin.foreach( _.onBatchCreation(localBatchId, offsetRanges, partitionsThrottleFactor) )
     }
     val rdd =
       EventHubsSourceProvider.toInternalRow(new EventHubsRDD(sc, ehConf.trimmed, offsetRanges))
@@ -366,7 +367,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     if(batchIdToRemove >= 0) {
       partitionsStatusTracker.removeBatch(batchIdToRemove)
     }
-    partitionsStatusTracker.addBatch(localBatchId, offsetRanges: Array[OffsetRange])
+    partitionsStatusTracker.addBatch(localBatchId, offsetRanges)
   }
 
   /**

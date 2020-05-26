@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.eventhubs.utils.{ MetricPlugin, ThrottlingStatusPlugin }
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -165,7 +165,8 @@ final class EventHubsConf private (private val connectionStr: String)
       UseExclusiveReceiverKey,
       UseSimulatedClientKey,
       MetricPluginKey,
-      SlowPartitionAdjustmentKey
+      SlowPartitionAdjustmentKey,
+      ThrottlingStatusPluginKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -468,6 +469,16 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
   }
 
+  def setThrottlingStatusPlugin(throttlingStatusPlugin: ThrottlingStatusPlugin): EventHubsConf = {
+    set(ThrottlingStatusPluginKey, throttlingStatusPlugin.getClass.getName)
+  }
+
+  def throttlingStatusPlugin(): Option[ThrottlingStatusPlugin] = {
+    self.get(ThrottlingStatusPluginKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[ThrottlingStatusPlugin]
+    })
+  }
+
   /**
    * Set the size of thread pool.
    * Default: [[DefaultUseExclusiveReceiver]]
@@ -562,6 +573,7 @@ object EventHubsConf extends Logging {
   val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
+  val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

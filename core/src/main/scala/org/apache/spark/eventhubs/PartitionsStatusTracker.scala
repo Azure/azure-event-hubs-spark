@@ -213,17 +213,21 @@ class PartitionsStatusTracker extends Logging{
 object PartitionsStatusTracker {
   private val _partitionsStatusTrackerInstance = new PartitionsStatusTracker
   val BATCH_NOT_FOUND: Long = -1
+  val ACCEPTABLE_RECEIVE_TIME_PER_EVENT_MS: Double = 1.0
+  val ACCEPTABLE_DIFFERENCE_TIME_PER_EVENT_MS: Double = 1.0
   var partitionsCount: Int = 1
   var receiverTimeOutInMillis: Long = 60000
   var enoughUpdatesCount: Int = 1
   var throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = None
-
+  var defaultPartitionsPerformancePercentage: Option[Map[NameAndPartition, Double]] = None
 
   def setDefaultValuesInTracker(numOfPartitions: Int, ehName: String, receiverMaxTime: Long, throttlingSP: Option[ThrottlingStatusPlugin]) = {
     partitionsCount = numOfPartitions
     receiverTimeOutInMillis = receiverMaxTime
     enoughUpdatesCount = (partitionsCount/2) + 1
     throttlingStatusPlugin = throttlingSP
+    defaultPartitionsPerformancePercentage =
+      Some((for (pid <- 0 until partitionsCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut))
   }
 
   private def partitionSeqNoKey(nAndP: NameAndPartition, seqNo: SequenceNumber): String =
@@ -261,14 +265,22 @@ private[eventhubs] class BatchStatus(val batchId: Long,
       case Some(completedPerformancePercentages) => performancePercentages
       case None => {
         // just use partitions which have batchSize > 0 and have been updated
+        logInfo(s"Calculate partition performacne percenatges for batch = $batchId with partitions status = $paritionsStatus")
         val partitionsTimePerEvent = paritionsStatus.filter(p =>
           (p._2.hasBeenUpdated && !p._2.emptyBatch)).values.map(ps => ps.timePerEventInMillis)
 
         // check if there is no updated partition with batchSize > 0
         if(partitionsTimePerEvent.isEmpty) {
-          logDebug(s"There is no updated partition with batchSize greater than 0 in batch $batchId, " +
+          logInfo(s"There is no updated partition with batchSize greater than 0 in batch $batchId, " +
             s"so return None ")
           None
+        }
+        else if(performanceDifferenceIsNegligible) {
+          logInfo(s"All partitions are within the range of normal perforamnce because either " +
+            s"max_receive_time_per_event is less than ${PartitionsStatusTracker.ACCEPTABLE_RECEIVE_TIME_PER_EVENT_MS} or " +
+            s"the difference between max and min receive time per event is less than " +
+            s"${PartitionsStatusTracker.ACCEPTABLE_DIFFERENCE_TIME_PER_EVENT_MS}")
+          PartitionsStatusTracker.defaultPartitionsPerformancePercentage
         }
         else {
           // calculate the standard deviation
@@ -276,7 +288,7 @@ private[eventhubs] class BatchStatus(val batchId: Long,
           val stdDevTimePerEvent: Double = math.sqrt(
             partitionsTimePerEvent.map(_.toDouble).map(time => math.pow(time - avgTimePerEvent, 2)).sum / partitionsTimePerEvent.size)
           // average + standard deviation can't go beyond the receiver timeout
-          logDebug(s"Calculated the average time per event = $avgTimePerEvent and the standard deviation = $stdDevTimePerEvent" +
+          logInfo(s"Calculated the average time per event = $avgTimePerEvent and the standard deviation = $stdDevTimePerEvent" +
             s" for updated partitions in the batch $batchId.")
           assert(avgTimePerEvent + stdDevTimePerEvent <= PartitionsStatusTracker.receiverTimeOutInMillis)
 
@@ -289,6 +301,19 @@ private[eventhubs] class BatchStatus(val batchId: Long,
           }
           Some(ppp)
       }
+    }
+  }
+
+  private def performanceDifferenceIsNegligible: Boolean = {
+    val updatedPartitionsTimePerEvent = paritionsStatus.filter(p =>
+      (p._2.hasBeenUpdated && !p._2.emptyBatch)).values.map(ps => ps.timePerEventInMillis)
+    if(updatedPartitionsTimePerEvent.isEmpty)
+      true
+    else {
+      val maxReceiveTime = updatedPartitionsTimePerEvent.max
+      val minReceiveTime = updatedPartitionsTimePerEvent.min
+      (maxReceiveTime < PartitionsStatusTracker.ACCEPTABLE_RECEIVE_TIME_PER_EVENT_MS) ||
+        ((maxReceiveTime - minReceiveTime) < PartitionsStatusTracker.ACCEPTABLE_DIFFERENCE_TIME_PER_EVENT_MS)
     }
   }
 
@@ -335,7 +360,7 @@ private[eventhubs] class PartitionStatus(val nAndP: NameAndPartition,
   override def toString: String = {
     val partitionInfo: String = s"(${nAndP.ehName}/${nAndP.partitionId}/$requestSeqNo)"
     if(hasBeenUpdated)
-      s"PartitionStatus[$partitionInfo -> (batchSize=$batchSize, time(ms)=$batchReceiveTimeInMillis)]"
+      s"PartitionStatus[$partitionInfo -> (batchSize=$batchSize, time(ms)=$batchReceiveTimeInMillis, timePerEvent(ms)= $timePerEventInMillis)]"
     else
       s"PartitionStatus[$partitionInfo -> (No Update)]"
   }

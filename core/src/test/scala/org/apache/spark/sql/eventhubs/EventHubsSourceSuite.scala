@@ -723,6 +723,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       getEventHubsConf(eventHub.name)
         .setMaxEventsPerTrigger(20)
         .setSlowPartitionAdjustment(true)
+        .setThrottlingStatusPlugin(new SimpleThrottlingStatusPlugin)
         .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
 
@@ -762,24 +763,27 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       CheckLastBatch(0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4),
       PartitionsStatusTrackerUpdate(List( (partitions(0), 0L, 5, 9L), (partitions(1), 0L, 5, 11L),
                                           (partitions(2), 0L, 5, 9L), (partitions(3), 0L, 5, 11L))),
+      //Assert(SimulatedPartitionStatusTracker.getPerformancePercentages.isEmpty),
       Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // the difference between max and min time per event is less than the acceptable time difference (1 MS)
       // we should get 5 events per partition per trigger
       Assert(Set[Long](0, 1).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
       CheckLastBatch(5, 6, 7, 8, 9, 5, 6, 7, 8, 9, 5, 6, 7, 8, 9, 5, 6, 7, 8, 9),
       PartitionsStatusTrackerUpdate(List( (partitions(0), 5L, 5, 16L), (partitions(1), 5L, 5, 13L),
                                           (partitions(2), 5L, 5, 16L), (partitions(3), 5L, 5, 15L))),
       Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      //Assert(SimulatedPartitionStatusTracker.getPerformancePercentages.isEmpty),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // all partitions have receiveTimePerEvent <= avg + stdDev
+      // the difference between max and min time per event is less than the acceptable time difference (1 MS)
       // we should get 5 events per partition per trigger
       Assert(Set[Long](0, 1, 2).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
       CheckLastBatch(10, 11, 12, 13, 14, 10, 11, 12, 13, 14, 10, 11, 12, 13, 14, 10, 11, 12, 13, 14),
       // miss the perforamnce update for this batch. Next round every partitions is considered as normal speed
       Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      //Assert(SimulatedPartitionStatusTracker.getPerformancePercentages.isEmpty),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
       // we should get 5 events per partition per trigger
@@ -789,6 +793,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       PartitionsStatusTrackerUpdate(List( (partitions(0), 15L, 5, 55L),
                                           (partitions(2), 15L, 5, 52L), (partitions(3), 15L, 5, 43L))),
       Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      //Assert(SimulatedPartitionStatusTracker.getPerformancePercentages.isEmpty),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
       // all partitions have receiveTimePerEvent <= avg + stdDev
@@ -810,6 +815,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       PartitionsStatusTrackerUpdate(List( (partitions(0), 25L, 5, 73L), (partitions(1), 25L, 5, 72L),
                                           (partitions(2), 25L, 5, 66L), (partitions(3), 25L, 5, 73L))),
       Assert(noSlowPartition.equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
+      //Assert(SimulatedPartitionStatusTracker.getPerformancePercentages.isEmpty),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
       // all partitions have receiveTimePerEvent <= avg + stdDev
@@ -911,6 +917,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
+
   test("setSlowPartitionAdjustment with more than one slow partitions") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), 5)
     testUtils.populateUniformly(eventHub.name, 1000)
@@ -924,6 +931,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       getEventHubsConf(eventHub.name)
         .setMaxEventsPerTrigger(50)
         .setSlowPartitionAdjustment(true)
+        .setThrottlingStatusPlugin(new SimpleThrottlingStatusPlugin)
         .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
 
@@ -972,4 +980,5 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
           10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 10, 11, 12, 13, 14, 15, 16)
     )
   }
+
 }

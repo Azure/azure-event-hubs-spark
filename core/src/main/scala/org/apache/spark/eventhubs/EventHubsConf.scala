@@ -166,7 +166,8 @@ final class EventHubsConf private (private val connectionStr: String)
       UseSimulatedClientKey,
       MetricPluginKey,
       SlowPartitionAdjustmentKey,
-      ThrottlingStatusPluginKey
+      ThrottlingStatusPluginKey,
+      MaxAcceptableBatchReceiveTime
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -469,6 +470,15 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
   }
 
+  def setMaxAcceptableBatchReceiveTime(d: Duration): EventHubsConf = {
+    set(MaxAcceptableBatchReceiveTime, d)
+  }
+
+  /** The current receiver timeout.  */
+  def maxAcceptableBatchReceiveTime: Option[Duration] = {
+    self.get(MaxAcceptableBatchReceiveTime) map (str => Duration.parse(str))
+  }
+
   def setThrottlingStatusPlugin(throttlingStatusPlugin: ThrottlingStatusPlugin): EventHubsConf = {
     set(ThrottlingStatusPluginKey, throttlingStatusPlugin.getClass.getName)
   }
@@ -574,6 +584,7 @@ object EventHubsConf extends Logging {
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
   val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
+  val MaxAcceptableBatchReceiveTime = "eventhubs.maxAcceptableBatchReceiveTime"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

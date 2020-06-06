@@ -17,30 +17,19 @@
 
 package org.apache.spark.sql.eventhubs
 
-import java.io.{ BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter }
+import java.io.{BufferedWriter, FileInputStream, OutputStream, OutputStreamWriter}
 import java.nio.charset.StandardCharsets.UTF_8
+import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
 
-import org.apache.qpid.proton.amqp.{
-  Binary,
-  Decimal128,
-  Decimal32,
-  Decimal64,
-  DescribedType,
-  Symbol,
-  UnknownDescribedType,
-  UnsignedByte,
-  UnsignedInteger,
-  UnsignedLong,
-  UnsignedShort
-}
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, SimulatedClient, SimulatedPartitionStatusTracker, SimpleThrottlingStatusPlugin}
-import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
+import org.apache.qpid.proton.amqp.{Binary, Decimal128, Decimal32, Decimal64, DescribedType, Symbol, UnknownDescribedType, UnsignedByte, UnsignedInteger, UnsignedLong, UnsignedShort}
+import org.apache.spark.eventhubs.utils.{EventHubsTestUtils, SimpleThrottlingStatusPlugin, SimulatedClient, SimulatedPartitionStatusTracker}
+import org.apache.spark.eventhubs.{EventHubsConf, EventPosition, NameAndPartition}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
-import org.apache.spark.sql.functions.{ count, window }
+import org.apache.spark.sql.functions.{count, window}
 import org.apache.spark.sql.streaming.util.StreamManualClock
-import org.apache.spark.sql.streaming.{ ProcessingTime, StreamTest }
+import org.apache.spark.sql.streaming.{ProcessingTime, StreamTest}
 import org.apache.spark.sql.test.SharedSQLContext
 import org.apache.spark.util.Utils
 import org.json4s.NoTypeHints
@@ -713,7 +702,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   test("setSlowPartitionAdjustment without any slow partition") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    testUtils.populateUniformly(eventHub.name, 500)
+    testUtils.populateUniformly(eventHub.name, 5000)
     val partitions: List[NameAndPartition] = List(NameAndPartition(eventHub.name, 0),
                                                   NameAndPartition(eventHub.name, 1),
                                                   NameAndPartition(eventHub.name, 2),
@@ -723,6 +712,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       getEventHubsConf(eventHub.name)
         .setMaxEventsPerTrigger(20)
         .setSlowPartitionAdjustment(true)
+        .setMaxAcceptableBatchReceiveTime(Duration.ofMillis(4))
         .setThrottlingStatusPlugin(new SimpleThrottlingStatusPlugin)
         .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
@@ -827,7 +817,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
   test("setSlowPartitionAdjustment with slow partitions") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
-    testUtils.populateUniformly(eventHub.name, 1000)
+    testUtils.populateUniformly(eventHub.name, 10000)
     val partitions: List[NameAndPartition] = List(NameAndPartition(eventHub.name, 0),
       NameAndPartition(eventHub.name, 1),
       NameAndPartition(eventHub.name, 2),
@@ -837,6 +827,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       getEventHubsConf(eventHub.name)
         .setMaxEventsPerTrigger(20)
         .setSlowPartitionAdjustment(true)
+        .setMaxAcceptableBatchReceiveTime(Duration.ofMillis(3))
         .setThrottlingStatusPlugin(new SimpleThrottlingStatusPlugin)
         .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
@@ -889,22 +880,23 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
               .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // we should get 6 events for partitions 0, 2, and 3, and just 1 event for partition 1
+      // we should get 4 events for partitions 0 and 3, 5 events for partition 2, and just 1 event for partition 1
+      // partitions 0 and 3 gets 4 eventsbecause of the fewer number of events in those partitions (this is not related to the adjusment logic)
       Assert(Set[Long](0, 1, 2).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
-      CheckLastBatch(10, 11, 12, 13, 14, 15, 10, 8, 9, 10, 11, 12, 13, 10, 11, 12, 13, 14, 15),
+      CheckLastBatch(10, 11, 12, 13, 10, 8, 9, 10, 11, 12, 10, 11, 12, 13),
       // for the next batch, let's only have 2 updates (one slow, on fast parttion)
       // since we don't have enough updated partitions, we should continue with the previous partition performance
-      PartitionsStatusTrackerUpdate(List( (partitions(0), 10L, 6, 20L), (partitions(3), 10L, 6, 252L))),
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 10L, 4, 13L), (partitions(3), 10L, 4, 168L))),
       Assert(Map(partitions(0) -> 1.0, partitions(1) -> 0.33, partitions(2) -> 1.0, partitions(3) -> 1.0)
               .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // we should get 6 events for partitions 0, 2, and 3, and just 1 event for partition 1
+      // we should get 4 events for partitions 0 and 3, 5 events for partition 2, and just 1 event for partition 1
       Assert(Set[Long](1, 2, 3).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
-      CheckLastBatch(16, 17, 18, 19, 20, 21, 11, 14, 15, 16, 17, 18, 19, 16, 17, 18, 19, 20, 21),
+      CheckLastBatch(14, 15, 16, 17, 11, 13, 14, 15, 16, 17, 14, 15, 16, 17),
       // let's get back to normal fro all partitions
-      PartitionsStatusTrackerUpdate(List( (partitions(0), 16L, 6, 18L), (partitions(1), 11L, 1, 3L),
-                                          (partitions(2), 14L, 6, 17L), (partitions(3), 16L, 6, 17L))),
+      PartitionsStatusTrackerUpdate(List( (partitions(0), 14L, 4, 12L), (partitions(1), 11L, 1, 3L),
+                                          (partitions(2), 13L, 5, 14L), (partitions(3), 14L, 4, 11L))),
       Assert( Map(partitions(0) -> 1.0, partitions(1) -> 1.0, partitions(2) -> 1.0, partitions(3) -> 1.0)
                 .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
@@ -913,10 +905,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       // Since partition 1 is behind, the prorate logic (irrelevent of slow partitions logics) tries to catch it up
       // therefore, partition 1 gets 5 events and other partitions are getting 4 each
       Assert(Set[Long](2, 3, 4).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
-      CheckLastBatch(22, 23, 24, 25, 12, 13, 14, 15, 16, 20, 21, 22, 23, 22, 23, 24, 25)
+      CheckLastBatch(18, 19, 20, 21, 12, 13, 14, 15, 16, 18, 19, 20, 21, 18, 19, 20, 21)
     )
   }
-
 
   test("setSlowPartitionAdjustment with more than one slow partitions") {
     val eventHub = testUtils.createEventHubs(newEventHubs(), 5)
@@ -931,6 +922,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       getEventHubsConf(eventHub.name)
         .setMaxEventsPerTrigger(50)
         .setSlowPartitionAdjustment(true)
+        .setMaxAcceptableBatchReceiveTime(Duration.ofMillis(4))
         .setThrottlingStatusPlugin(new SimpleThrottlingStatusPlugin)
         .setStartingPosition(EventPosition.fromSequenceNumber(0L))
         .toMap
@@ -974,10 +966,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
               .equals(SimulatedPartitionStatusTracker.getPerformancePercentages)),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
-      // we should get 11 events for partition 1, 2, 3 and 7 events for partitions 0, 4
+      // we should get 10 events for partition 1, 2, 3 and 6 events for partitions 0, 4
       Assert(Set[Long](0, 1).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
-      CheckLastBatch(10, 11, 12, 13, 14, 15, 16, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-          10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 10, 11, 12, 13, 14, 15, 16)
+      CheckLastBatch(10, 11, 12, 13, 14, 15, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+          10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 10, 11, 12, 13, 14, 15)
     )
   }
 

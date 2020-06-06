@@ -91,7 +91,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private lazy val throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = ehConf.throttlingStatusPlugin()
 
   PartitionsStatusTracker.setDefaultValuesInTracker(partitionCount, ehName,
-    ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout).toMillis, throttlingStatusPlugin)
+    ehConf.maxAcceptableBatchReceiveTime.getOrElse(DefaultMaxAcceptableBatchReceiveTime).toMillis, throttlingStatusPlugin)
 
   var partitionsThrottleFactor: mutable.Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
@@ -233,7 +233,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         }
     }
     val total = sizes.values.sum.toDouble
-    val averagePerforamnceFactor: Double = partitionsPerformancePercentage.values.sum.toDouble / partitionCount
+    //val averagePerforamnceFactor: Double = partitionsPerformancePercentage.values.sum.toDouble / partitionCount
     if (total < 1) {
       until
     } else {
@@ -245,12 +245,13 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
               val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
               // adjust performance performance pewrcentages to use as much as events possible in the batch
               val perforamnceFactor: Double = if(slowPartitionAdjustment) {
-                partitionsPerformancePercentage(nameAndPartition) / averagePerforamnceFactor
+                //partitionsPerformancePercentage(nameAndPartition) / averagePerforamnceFactor
+                partitionsPerformancePercentage(nameAndPartition)
               } else 1.0
 
               if(slowPartitionAdjustment) {
                 partitionsThrottleFactor(nameAndPartition) = perforamnceFactor
-                logDebug(s"Slow partition adjustment is on, so prorate amount for $nameAndPartition will be adjusted by" +
+                logInfo(s"Slow partition adjustment is on, so prorate amount for $nameAndPartition will be adjusted by" +
                   s" the perfromanceFactor = $perforamnceFactor")
               }
               val prorate = limit * (size / total) * perforamnceFactor

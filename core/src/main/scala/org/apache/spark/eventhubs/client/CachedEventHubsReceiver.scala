@@ -247,32 +247,6 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
     if(ehConf.slowPartitionAdjustment) {
-      // Navid TODO: inject delay for one partition for testing
-      // do nothing in the first 3 mins,
-      // then slowdown partition 0 for 1 minutes with a factor of 3
-      // then slowdown partition 0 for 40 seconds with a factor of 5
-      // then slowdown partition 0 for 20 seconds with a factor of 2
-      // then back to normal
-      var elapsedTimeForDelayInjection = elapsedTimeMs
-      var delayPhase: Int = 0
-      if(nAndP.partitionId == 0) {
-        val elapsedTimeSinceBeginingMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeSinceBeginingNs)
-        if((elapsedTimeSinceBeginingMs >= 60000) && (elapsedTimeSinceBeginingMs < 100000)) {
-          delayPhase = 1
-          logInfo("Injected Delay :: phase 1 :: seconds 60 to 100 :: added 1 ms per  event in batch")
-          elapsedTimeForDelayInjection = elapsedTimeForDelayInjection + batchCount
-        }
-        else if((elapsedTimeSinceBeginingMs >= 140000) && (elapsedTimeSinceBeginingMs < 200000)) {
-          delayPhase = 2
-          logInfo("Injected Delay :: phase 2 :: seconds 140 to 200 :: added 6 ms per  event in batch")
-          elapsedTimeForDelayInjection = elapsedTimeForDelayInjection + (batchCount * 6)
-        }
-        else if((elapsedTimeSinceBeginingMs >= 240000) && (elapsedTimeSinceBeginingMs < 300000)) {
-          delayPhase = 3
-          logInfo("Injected Delay :: phase 3 :: seconds 240 to 300 :: added 3 ms per  event in batch")
-          elapsedTimeForDelayInjection = elapsedTimeForDelayInjection + (batchCount * 3)
-        }
-      }
       sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, requestSeqNo, batchCount, elapsedTimeForDelayInjection, delayPhase))
     }
 

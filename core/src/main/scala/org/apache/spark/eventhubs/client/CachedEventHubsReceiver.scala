@@ -247,7 +247,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
     if(ehConf.slowPartitionAdjustment) {
-      sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, requestSeqNo, batchCount, elapsedTimeForDelayInjection, delayPhase))
+      sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, requestSeqNo, batchCount, elapsedTimeMs))
     }
 
     if (metricPlugin.isDefined) {

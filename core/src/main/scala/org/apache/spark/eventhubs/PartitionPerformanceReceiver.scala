@@ -49,11 +49,10 @@ case class PartitionPerformanceMetric(val nAndP: NameAndPartition,
                                       val taskId: Long,
                                       val requestSeqNo: SequenceNumber,
                                       val batchSize: Int,
-                                      val receiveTimeInMillis: Long,
-                                      val injectDelayPhase: Int) {
+                                      val receiveTimeInMillis: Long) {
 
   override def toString: String = {
-    s"Partition: $nAndP - ExecutorId: $executorId -  TaskId: $taskId - Request Seq. No. = $requestSeqNo - Batch Size = $batchSize - Elapsed Time(MS): $receiveTimeInMillis - DelayType: $injectDelayPhase"
+    s"Partition: $nAndP - ExecutorId: $executorId -  TaskId: $taskId - Request Seq. No. = $requestSeqNo - Batch Size = $batchSize - Elapsed Time(MS): $receiveTimeInMillis"
   }
 }
 

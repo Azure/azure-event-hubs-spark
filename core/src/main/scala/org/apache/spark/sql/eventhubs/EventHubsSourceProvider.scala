@@ -188,8 +188,12 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                   case d: DescribedType    => d.getDescribed
                   case default             => default
                 }
+                .mapValues {
+                  case s: String => UTF8String.fromString(s)
+                  case default   => UTF8String.fromString(Serialization.write(default))
+                }
                 .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  UTF8String.fromString(p._1) -> p._2
                 }),
             ArrayBasedMapData(
               // Don't duplicate offset, enqueued time, and seqNo

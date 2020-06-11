@@ -125,7 +125,7 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
       ))
 
     // The expected serializes to:
-    //     [Map(E -> true, N -> "1", J -> "x-opt-partition-key", F -> 1, A -> "Hello, world.",
+    //     [Map(E -> true, N -> "1", J -> "x-opt-partition-key", F -> 1, A -> Hello, world.,
     //     M -> 13, I -> [49], G -> 1, L -> 12, B -> {}, P -> "1", C -> [52,51,50], H -> "a",
     //     K -> [0,1,2,3,0,0,0,0,0,1,2,3,0,0,0,0], O -> "987654321", D -> null)]
     val expected = properties.get
@@ -147,8 +147,9 @@ class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQ
         case d: DescribedType    => d.getDescribed
         case default             => default
       }
-      .map { p =>
-        p._1 -> Serialization.write(p._2)
+      .mapValues {
+        case s: String => s
+        case default   => Serialization.write(default)
       }
 
     val eh = newEventHub()

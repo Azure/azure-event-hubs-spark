@@ -199,6 +199,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
     propertiesExpression.dataType match {
       case MapType(StringType, StringType, true) => // good
+      case MapType(StringType, StringType, false) => // good
       case t =>
         throw new IllegalStateException(
           s"${EventHubsWriter.PropertiesAttributeName} attribute unsupported type $t"

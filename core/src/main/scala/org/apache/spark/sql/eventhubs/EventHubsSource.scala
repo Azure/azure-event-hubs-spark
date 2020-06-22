@@ -26,9 +26,9 @@ import scala.collection.mutable
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
-import org.apache.spark.eventhubs.rdd.{EventHubsRDD, OffsetRange}
+import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.utils.ThrottlingStatusPlugin
-import org.apache.spark.eventhubs.{EventHubsConf, NameAndPartition, _}
+import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
@@ -86,7 +86,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   // set slow partition adjustment flag and static values in the tracker
   private val slowPartitionAdjustment: Boolean =
-    parameters.get(SlowPartitionAdjustmentKey).map(_.toBoolean).getOrElse(false)
+    parameters.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
 
   private lazy val throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = ehConf.throttlingStatusPlugin()
 
@@ -233,7 +233,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         }
     }
     val total = sizes.values.sum.toDouble
-    //val averagePerforamnceFactor: Double = partitionsPerformancePercentage.values.sum.toDouble / partitionCount
     if (total < 1) {
       until
     } else {
@@ -245,7 +244,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
               val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
               // adjust performance performance pewrcentages to use as much as events possible in the batch
               val perforamnceFactor: Double = if(slowPartitionAdjustment) {
-                //partitionsPerformancePercentage(nameAndPartition) / averagePerforamnceFactor
                 partitionsPerformancePercentage(nameAndPartition)
               } else 1.0
 
@@ -357,12 +355,12 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   }
 
   /**
-   * Add the newly generated batch to the status tracker. If there are TRACKING_BATCH_COUNT batches in the
+   * Add the newly generated batch to the status tracker. If there are TrackingBatchCount batches in the
    * tracker, remove the oldest one before adding the new batch.
    */
   private def addCurrentBatchToStatusTracker(offsetRanges: Array[OffsetRange]) = {
     localBatchId += 1
-    val batchIdToRemove = localBatchId - TRACKING_BATCH_COUNT
+    val batchIdToRemove = localBatchId - TrackingBatchCount
     logDebug(s"Slow partition adjustment is on, add the current batch $localBatchId to and remove the batch " +
       s"${if(batchIdToRemove >= 0) batchIdToRemove else None} from the tracker.")
     if(batchIdToRemove >= 0) {
@@ -406,7 +404,7 @@ private[eventhubs] object EventHubsSource {
   private[eventhubs] val VERSION = 1
 
   // RPC endpoint for partition performacne communciation in the driver
-  private val TRACKING_BATCH_COUNT = 3
+  private val TrackingBatchCount = 3
   private var localBatchId = -1
   val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
   val partitionPerformanceReceiver: PartitionPerformanceReceiver = new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)

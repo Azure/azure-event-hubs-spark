@@ -38,7 +38,7 @@ package object eventhubs {
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(300)
-  val DefaultMaxAcceptableBatchReceiveTime: Duration = Duration.ofMillis(500)
+  val DefaultMaxAcceptableBatchReceiveTime: Duration = Duration.ofSeconds(30)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
   val PrefetchCountMaximum: Int = PartitionReceiver.MAXIMUM_PREFETCH_COUNT

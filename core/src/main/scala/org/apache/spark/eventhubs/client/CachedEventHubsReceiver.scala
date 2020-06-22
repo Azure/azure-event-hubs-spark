@@ -219,7 +219,6 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val taskId = EventHubsUtils.getTaskId
     val startTimeNs = System.nanoTime()
     def elapsedTimeNs = System.nanoTime() - startTimeNs
-    def elapsedTimeSinceBeginingNs: Long = System.nanoTime() - CachedEventHubsReceiver.startRecieverTimeNs
 
     // Retrieve the events. First, we get the first event in the batch.
     // Then, if the succeeds, we collect the rest of the data.
@@ -247,7 +246,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
     if(ehConf.slowPartitionAdjustment) {
-      sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, SparkEnv.get.executorId, taskId, requestSeqNo, batchCount, elapsedTimeMs))
+      sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, EventHubsUtils.getTaskContextSlim, requestSeqNo, batchCount, elapsedTimeMs))
     }
 
     if (metricPlugin.isDefined) {
@@ -293,7 +292,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   // driver without waiting for any response.
   private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
     CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
-    logDebug(s"spark-${SparkEnv.get.executorId}-${EventHubsUtils.getTaskId} sent PartitionPerformanceMetric " +
+    logDebug(s"(Task: ${EventHubsUtils.getTaskContextSlim}) sent PartitionPerformanceMetric " +
       s"$PartitionPerformanceMetric to the driver.")
   }
 }

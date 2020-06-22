@@ -167,7 +167,7 @@ final class EventHubsConf private (private val connectionStr: String)
       MetricPluginKey,
       SlowPartitionAdjustmentKey,
       ThrottlingStatusPluginKey,
-      MaxAcceptableBatchReceiveTime
+      MaxAcceptableBatchReceiveTimeKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -470,15 +470,24 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
   }
 
+  /** Set the max time that is acceptable for a partition to receive events in a single batch.
+   *  This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
+   *  Only partitions that tale more than this time to receive thier portion of events in batch are considered
+   *  as potential slow partitrions.
+   *  Default: [[DefaultMaxAcceptableBatchReceiveTime]]
+   *
+   * @param d the new maximum acceptable time for a partition to receive events in a single batch
+   * @return the updated [[EventHubsConf]] instance
+   */
   def setMaxAcceptableBatchReceiveTime(d: Duration): EventHubsConf = {
-    set(MaxAcceptableBatchReceiveTime, d)
+    set(MaxAcceptableBatchReceiveTimeKey, d)
   }
 
-  /** The current receiver timeout.  */
+  /** The current max time that is acceptable for a partition to receive events in a single batch. */
   def maxAcceptableBatchReceiveTime: Option[Duration] = {
-    self.get(MaxAcceptableBatchReceiveTime) map (str => Duration.parse(str))
+    self.get(MaxAcceptableBatchReceiveTimeKey) map (str => Duration.parse(str))
   }
-
+  
   def setThrottlingStatusPlugin(throttlingStatusPlugin: ThrottlingStatusPlugin): EventHubsConf = {
     set(ThrottlingStatusPluginKey, throttlingStatusPlugin.getClass.getName)
   }
@@ -584,7 +593,7 @@ object EventHubsConf extends Logging {
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
   val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
-  val MaxAcceptableBatchReceiveTime = "eventhubs.maxAcceptableBatchReceiveTime"
+  val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

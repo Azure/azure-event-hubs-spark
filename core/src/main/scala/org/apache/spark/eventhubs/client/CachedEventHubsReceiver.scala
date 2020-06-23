@@ -291,9 +291,15 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   // send the partition perforamcne metric (elapsed time for receiving events in the batch) to the
   // driver without waiting for any response.
   private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
-    CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
-    logDebug(s"(Task: ${EventHubsUtils.getTaskContextSlim}) sent PartitionPerformanceMetric " +
+    logDebug(s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
       s"$PartitionPerformanceMetric to the driver.")
+    try {
+      CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
+    } catch {
+      case e: Exception =>
+        logError(s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
+          s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
+    }
   }
 }
 

@@ -487,7 +487,7 @@ final class EventHubsConf private (private val connectionStr: String)
   def maxAcceptableBatchReceiveTime: Option[Duration] = {
     self.get(MaxAcceptableBatchReceiveTimeKey) map (str => Duration.parse(str))
   }
-  
+
   def setThrottlingStatusPlugin(throttlingStatusPlugin: ThrottlingStatusPlugin): EventHubsConf = {
     set(ThrottlingStatusPluginKey, throttlingStatusPlugin.getClass.getName)
   }

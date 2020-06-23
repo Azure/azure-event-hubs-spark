@@ -213,9 +213,7 @@ class PartitionsStatusTracker extends Logging{
 object PartitionsStatusTracker {
   private val _partitionsStatusTrackerInstance = new PartitionsStatusTracker
   val BatchNotFound: Long = -1
-  val AcceptableReceiveTimePerEventInMs: Double = 1.0
-  val AcceptableDifferenceTimePerEventInMs: Double = 1.0
-  var DefaultMaxAcceptableBatchReceiveTimeInMs: Long = 30000
+  var acceptableBatchReceiveTimeInMs: Long = DefaultMaxAcceptableBatchReceiveTime.toMillis
   var partitionsCount: Int = 1
   var enoughUpdatesCount: Int = 1
   var throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = None
@@ -223,7 +221,7 @@ object PartitionsStatusTracker {
 
   def setDefaultValuesInTracker(numOfPartitions: Int, ehName: String, maxBatchReceiveTime: Long, throttlingSP: Option[ThrottlingStatusPlugin]) = {
     partitionsCount = numOfPartitions
-    DefaultMaxAcceptableBatchReceiveTimeInMs = maxBatchReceiveTime
+    acceptableBatchReceiveTimeInMs = maxBatchReceiveTime
     enoughUpdatesCount = (partitionsCount/2) + 1
     throttlingStatusPlugin = throttlingSP
     defaultPartitionsPerformancePercentage =
@@ -275,11 +273,9 @@ private[eventhubs] class BatchStatus(val batchId: Long,
             s"so return None ")
           None
         }
-        else if(performanceDifferenceIsNegligible) {
-          logInfo(s"All partitions are within the range of normal perforamnce because either " +
-            s"max_receive_time_per_event is less than ${PartitionsStatusTracker.AcceptableReceiveTimePerEventInMs} or " +
-            s"the difference between max and min receive time per event is less than " +
-            s"${PartitionsStatusTracker.AcceptableDifferenceTimePerEventInMs}")
+        else if(allPartitionsFinishedWithinAcceptableTime) {
+          logInfo(s"All partitions are within the range of normal perforamnce because " +
+            s"their receive time was less than ${PartitionsStatusTracker.acceptableBatchReceiveTimeInMs}.")
           PartitionsStatusTracker.defaultPartitionsPerformancePercentage
         }
         else {
@@ -303,31 +299,20 @@ private[eventhubs] class BatchStatus(val batchId: Long,
     }
   }
 
-/*
-  private def performanceDifferenceIsNegligible: Boolean = {
-    val updatedPartitionsTimePerEvent = paritionsStatus.filter(p =>
-      (p._2.hasBeenUpdated && !p._2.emptyBatch)).values.map(ps => ps.timePerEventInMillis)
-    if(updatedPartitionsTimePerEvent.isEmpty)
-      true
-    else {
-      val maxReceiveTime = updatedPartitionsTimePerEvent.max
-      val minReceiveTime = updatedPartitionsTimePerEvent.min
-      (maxReceiveTime < PartitionsStatusTracker.ACCEPTABLE_RECEIVE_TIME_PER_EVENT_MS) ||
-        ((maxReceiveTime - minReceiveTime) < PartitionsStatusTracker.ACCEPTABLE_DIFFERENCE_TIME_PER_EVENT_MS)
-    }
-  }
-*/
-  private def performanceDifferenceIsNegligible: Boolean = {
+  /**
+   * Check if any partition takes more than PartitionsStatusTracker.acceptableBatchReceiveTimeImMs to receive
+   * its portion of events. If all of partitions are within this time frame it means none of those is slow.
+   */
+  private def allPartitionsFinishedWithinAcceptableTime: Boolean = {
     val updatedPartitionsTime = paritionsStatusList.filter(p =>
       (p._2.hasBeenUpdated && !p._2.emptyBatch)).values.map(ps => ps.batchReceiveTimeInMillis)
     if(updatedPartitionsTime.isEmpty)
       true
     else {
       val maxReceiveTime = updatedPartitionsTime.max
-      (maxReceiveTime < PartitionsStatusTracker.DefaultMaxAcceptableBatchReceiveTimeInMs)
+      (maxReceiveTime < PartitionsStatusTracker.acceptableBatchReceiveTimeInMs)
     }
   }
-
 
   override def toString: String = {
     s"BatchStatus(localBatchId=$batchId, PartitionsStatus=${paritionsStatusList.values.toString()})"

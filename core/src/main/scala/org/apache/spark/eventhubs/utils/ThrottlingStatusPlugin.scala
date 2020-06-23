@@ -32,5 +32,4 @@ trait ThrottlingStatusPlugin extends Serializable {
                                            partitionsBatchSizes: Map[NameAndPartition, Int],
                                            partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
                                            partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit
-
 }

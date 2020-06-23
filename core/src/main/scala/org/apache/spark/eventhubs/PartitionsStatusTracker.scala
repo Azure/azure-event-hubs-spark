@@ -387,7 +387,7 @@ private[eventhubs] class PartitionStatus(val nAndP: NameAndPartition,
     if (batchSize != 0)
       this.timePerEventInMillis = this.batchReceiveTimeInMillis.toDouble / this.batchSize
     logDebug(
-      s"updatePerformanceMetrics for partition = $nAndP with request sequence number = $requestSeqNo contains" +
+      s"UpdatePerformanceMetrics for partition = $nAndP with request sequence number = $requestSeqNo contains" +
         s" batchSize = $batchSize and total receive time(ms) = $batchReceiveTimeInMillis")
   }
 

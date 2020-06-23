@@ -245,8 +245,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
 
     // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
-    if(ehConf.slowPartitionAdjustment) {
-      sendPartitionPerformanceToDriver(PartitionPerformanceMetric(nAndP, EventHubsUtils.getTaskContextSlim, requestSeqNo, batchCount, elapsedTimeMs))
+    if (ehConf.slowPartitionAdjustment) {
+      sendPartitionPerformanceToDriver(
+        PartitionPerformanceMetric(nAndP,
+                                   EventHubsUtils.getTaskContextSlim,
+                                   requestSeqNo,
+                                   batchCount,
+                                   elapsedTimeMs))
     }
 
     if (metricPlugin.isDefined) {
@@ -291,14 +296,16 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   // send the partition perforamcne metric (elapsed time for receiving events in the batch) to the
   // driver without waiting for any response.
   private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
-    logDebug(s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
-      s"$PartitionPerformanceMetric to the driver.")
+    logDebug(
+      s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
+        s"$PartitionPerformanceMetric to the driver.")
     try {
       CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
     } catch {
       case e: Exception =>
-        logError(s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
-          s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
+        logError(
+          s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
+            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
     }
   }
 }
@@ -318,7 +325,9 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   // RPC endpoint for partition performacne communciation in the executor
   val partitionPerformanceReceiverRef =
-    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME, SparkEnv.get.conf, SparkEnv.get.rpcEnv)
+    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
+                           SparkEnv.get.conf,
+                           SparkEnv.get.rpcEnv)
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase

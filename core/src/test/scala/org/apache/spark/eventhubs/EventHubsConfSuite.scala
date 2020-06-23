@@ -20,7 +20,11 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.NoSuchElementException
 
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, MetricPluginMock, ThrottlingStatusPluginMock }
+import org.apache.spark.eventhubs.utils.{
+  EventHubsTestUtils,
+  MetricPluginMock,
+  ThrottlingStatusPluginMock
+}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{ read => sread }

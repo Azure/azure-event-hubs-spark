@@ -203,7 +203,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                     val arr = new Array[Byte](buf.remaining)
                     buf.get(arr)
                     arr.asInstanceOf[AnyRef]
-                  case default             => default
+                  case default => default
                 }
                 .map { p =>
                   UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))

@@ -25,12 +25,14 @@ class ThrottlingStatusPluginMock extends ThrottlingStatusPlugin {
 
   val id = 1
 
-  override def onBatchCreation (nextBatchLocalId: Long,
-                                nextBatchOffsetRanges: Array[OffsetRange],
-                                partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit = {}
+  override def onBatchCreation(
+      nextBatchLocalId: Long,
+      nextBatchOffsetRanges: Array[OffsetRange],
+      partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit = {}
 
-  override def onPartitionsPerformanceStatusUpdate (latestUpdatedBatchLocalId: Long,
-                                                    partitionsBatchSizes: Map[NameAndPartition, Int],
-                                                    partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
-                                                    partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit = {}
+  override def onPartitionsPerformanceStatusUpdate(
+      latestUpdatedBatchLocalId: Long,
+      partitionsBatchSizes: Map[NameAndPartition, Int],
+      partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
+      partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit = {}
 }

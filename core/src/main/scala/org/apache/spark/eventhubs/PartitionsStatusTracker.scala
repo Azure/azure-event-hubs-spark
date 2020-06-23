@@ -25,13 +25,12 @@ import org.apache.spark.eventhubs.rdd.OffsetRange
 import org.apache.spark.eventhubs.utils.ThrottlingStatusPlugin
 import org.apache.spark.internal.Logging
 
-
-class PartitionsStatusTracker extends Logging{
+class PartitionsStatusTracker extends Logging {
 
   import PartitionsStatusTracker._
 
   // retrives the batchStatus object based on the local batchId
-  private val batchesStatus = mutable.Map[Long, BatchStatus]()
+  private val batchesStatusList = mutable.Map[Long, BatchStatus]()
 
   /**
    * retirives the local batchId for a pair of (NameAndPartition, SequenceNumber)
@@ -48,27 +47,40 @@ class PartitionsStatusTracker extends Logging{
    * Note that we ignore partitions with batchSize zero (startSeqNo == latestSeqNo) since we won't recieve
    * any performance metric message for such partitions.
    */
-  def addBatch(batchId: Long,
-               offsetRanges: Array[OffsetRange]): Unit = {
-    if(batchesStatus.contains(batchId)) {
-      throw new IllegalStateException(
-        s"Batch with local batch id: $batchId already exists in the partition status tracker. Can't be added again.")
+  def addorUpdateBatch(batchId: Long, offsetRanges: Array[OffsetRange]): Unit = {
+    if (batchesStatusList.contains(batchId)) {
+      // Batches are not supposed to be updated. Log an error if a batch is being updated
+      logError(
+        s"Batch with local batch id: $batchId already exists in the partition status tracker. Batches" +
+          s"are not supposed to be updated in the partition status tracker.")
+    } else {
+      // remove the oldest batch from the batchesStatusList to realse space for adding the new batch.
+      val batchIdToRemove = batchId - PartitionsStatusTracker.TrackingBatchCount
+      logDebug(
+        s"Remove the batch ${if (batchIdToRemove >= 0) batchIdToRemove else None} from the tracker.")
+      if (batchIdToRemove >= 0) {
+        removeBatch(batchIdToRemove)
+      }
     }
+
     // find partitions with a zero size batch.. No performance metric msg will be received for those partitions
     val isZeroSizeBatchPartition: Map[NameAndPartition, Boolean] =
-      offsetRanges.map(range  => (range.nameAndPartition, (range.fromSeqNo == range.untilSeqNo)))(breakOut)
+      offsetRanges.map(range => (range.nameAndPartition, (range.fromSeqNo == range.untilSeqNo)))(
+        breakOut)
 
     // create the batchStatus tracker and add it to the map
-    batchesStatus(batchId) = new BatchStatus(batchId, offsetRanges.map(range => {
+    batchesStatusList(batchId) = new BatchStatus(batchId, offsetRanges.map(range => {
       val np = range.nameAndPartition
       (np, new PartitionStatus(np, range.fromSeqNo, isZeroSizeBatchPartition(np)))
     })(breakOut))
 
     // add the mapping from partition-startSeqNo pair to the batchId ... ignore partitions with zero batch size
-    offsetRanges.filter(r => !isZeroSizeBatchPartition(r.nameAndPartition)).foreach(range => {
-      val key = partitionSeqNoKey(range.nameAndPartition, range.fromSeqNo)
-      addPartitionSeqNoToBatchIdMapping(key, batchId)
-    })
+    offsetRanges
+      .filter(r => !isZeroSizeBatchPartition(r.nameAndPartition))
+      .foreach(range => {
+        val key = partitionSeqNoKey(range.nameAndPartition, range.fromSeqNo)
+        addPartitionSeqNoToBatchIdMapping(key, batchId)
+      })
   }
 
   /**
@@ -78,31 +90,36 @@ class PartitionsStatusTracker extends Logging{
    * Not that we ignore partitions with batchSize zero (PartitionStatus.emptyBatch) since those haven't been
    * added to the mapping when we added the batch to the tracker. [See addBatch]
    */
-  def removeBatch(batchId: Long): Unit = {
-    if(!batchesStatus.contains(batchId)) {
-      logInfo(s"Batch with local batchId = $batchId doesn't exist in the batch status tracker,  so it can't be removed.")
+  private def removeBatch(batchId: Long): Unit = {
+    if (!batchesStatusList.contains(batchId)) {
+      logInfo(
+        s"Batch with local batchId = $batchId doesn't exist in the batch status tracker,  so it can't be removed.")
       return
     }
     // remove the mapping from partition-seqNo pair to the batchId (ignore partitions with empty batch size)
-    val batchStatus = batchesStatus(batchId)
-    batchStatus.paritionsStatusList.filter(p => !p._2.emptyBatch).values.foreach(ps => {
-      val key = partitionSeqNoKey(ps.nAndP, ps.requestSeqNo)
-      removePartitionSeqNoToBatchIdMapping(key)
-    })
+    val batchStatus = batchesStatusList(batchId)
+    batchStatus.paritionsStatusList
+      .filter(p => !p._2.emptyBatch)
+      .values
+      .foreach(ps => {
+        val key = partitionSeqNoKey(ps.nAndP, ps.requestSeqNo)
+        removePartitionSeqNoToBatchIdMapping(key)
+      })
     // remove the batchStatus tracker from the map
-    batchesStatus.remove(batchId)
+    batchesStatusList.remove(batchId)
   }
 
   private def addPartitionSeqNoToBatchIdMapping(key: String, batchId: Long): Unit = {
-    if(partitionSeqNoPairToBatchIdMap.contains(key)) {
-      throw new IllegalStateException(s"Partition-startSeqNo pair $key is already mapped to the batchId = " +
-        s"${partitionSeqNoPairToBatchIdMap.get(key)}, so cant be reassigned to batchId = $batchId")
+    if (partitionSeqNoPairToBatchIdMap.contains(key)) {
+      throw new IllegalStateException(
+        s"Partition-startSeqNo pair $key is already mapped to the batchId = " +
+          s"${partitionSeqNoPairToBatchIdMap.get(key)}, so cant be reassigned to batchId = $batchId")
     }
     partitionSeqNoPairToBatchIdMap(key) = batchId
   }
 
   private def removePartitionSeqNoToBatchIdMapping(key: String): Unit = {
-    if(!partitionSeqNoPairToBatchIdMap.contains(key)) {
+    if (!partitionSeqNoPairToBatchIdMap.contains(key)) {
       throw new IllegalStateException(
         s"Partition-startSeqNo pair $key doesn't exist in the partitionSeqNoPairToBatchIdMap, so it can't be removed.")
     }
@@ -113,7 +130,8 @@ class PartitionsStatusTracker extends Logging{
    * return the batch id for a given parition-RequestSeqNo pair.
    * if the batch doesn't exist in the tracker, return BATCH_NOT_FOUND
    */
-  private def getBatchIdForPartitionSeqNoPair(nAndP: NameAndPartition, seqNo: SequenceNumber): Long = {
+  private def getBatchIdForPartitionSeqNoPair(nAndP: NameAndPartition,
+                                              seqNo: SequenceNumber): Long = {
     val key = partitionSeqNoKey(nAndP, seqNo)
     partitionSeqNoPairToBatchIdMap.getOrElse(key, BatchNotFound)
   }
@@ -134,19 +152,20 @@ class PartitionsStatusTracker extends Logging{
                                  receiveTimeInMillis: Long): Unit = {
     // find the batchId based on partition-requestSeqNo pair in the partitionSeqNoPairToBatchIdMap ... ignore if it doesn't exist
     val batchId = getBatchIdForPartitionSeqNoPair(nAndP, requestSeqNo)
-    if(batchId == BatchNotFound) {
-      logInfo(s"Can't find the corresponding batchId for the partition-requestSeqNo pair ($nAndP, $requestSeqNo) " +
-        s"in the partition status tracker. Assume the message is for an old batch, so ignore it.")
+    if (batchId == BatchNotFound) {
+      logInfo(
+        s"Can't find the corresponding batchId for the partition-requestSeqNo pair ($nAndP, $requestSeqNo) " +
+          s"in the partition status tracker. Assume the message is for an old batch, so ignore it.")
       return
     }
-    // find the batch in batchesStatus and update the partition performacne in the batch
+    // find the batch in batchesStatusList and update the partition performacne in the batch
     // if it doesn't exist there should be an error adding/removing batches in the tracker
-    if(!batchesStatus.contains(batchId)) {
+    if (!batchesStatusList.contains(batchId)) {
       throw new IllegalStateException(
         s"Batch with local batch id = $batchId doesn't exist in the partition status tracker, while mapping " +
           s"from a partition-seqNo to this batchId exists in the partition status tracker.")
     }
-    val batchStatus = batchesStatus(batchId)
+    val batchStatus = batchesStatusList(batchId)
     batchStatus.updatePartitionPerformance(nAndP, batchSize, receiveTimeInMillis)
   }
 
@@ -157,35 +176,39 @@ class PartitionsStatusTracker extends Logging{
    */
   def partitionsPerformancePercentage(): Option[Map[NameAndPartition, Double]] = {
     // if there is no batch in the tracker, return None
-    if(batchesStatus.isEmpty) {
+    if (batchesStatusList.isEmpty) {
       logDebug(s"There is no batch in the tracker, so return None")
       None
-    }
-    else {
+    } else {
       // find the latest batch with enough updates
-      // In Scala 2.13 we can use: val latestUpdatedBatch = batchesStatus.maxByOption(b => b._2.receivedEnoughUpdates)
+      // In Scala 2.13 we can use: val latestUpdatedBatch = batchesStatusList.maxByOption(b => b._2.receivedEnoughUpdates)
       implicit val ordering = new Ordering[(Long, BatchStatus)] {
-        override def compare(x: (Long, BatchStatus), y: (Long, BatchStatus)): Int = (x._1 - y._1).toInt
+        override def compare(x: (Long, BatchStatus), y: (Long, BatchStatus)): Int =
+          (x._1 - y._1).toInt
       }
-      val batchesWithEnoughUpdates = batchesStatus.filter(b => b._2.receivedEnoughUpdates)
+      val batchesWithEnoughUpdates = batchesStatusList.filter(b => b._2.receivedEnoughUpdates)
       val latestUpdatedBatch: Option[BatchStatus] =
         if (batchesWithEnoughUpdates.isEmpty) None else Some(batchesWithEnoughUpdates.max._2)
 
-
       latestUpdatedBatch match {
         case None => {
-          logDebug(s"No batch has ${PartitionsStatusTracker.enoughUpdatesCount} partitions with updates (enough updates), " +
-            s"so return None")
+          logDebug(
+            s"No batch has ${PartitionsStatusTracker.enoughUpdatesCount} partitions with updates (enough updates), " +
+              s"so return None")
           None
         }
         case Some(batch) => {
-          logDebug(s"Batch ${batch.batchId} is the latest batch with enough updates. Caculate and return its perforamnce.")
+          logDebug(
+            s"Batch ${batch.batchId} is the latest batch with enough updates. Caculate and return its perforamnce.")
           val performancePercentages = batch.getPerformancePercentages
           PartitionsStatusTracker.throttlingStatusPlugin.foreach(
-            _.onPartitionsPerformanceStatusUpdate ( batch.batchId,
-                                                    batch.paritionsStatusList.map(par => (par._1, par._2.batchSize))(breakOut),
-                                                    batch.paritionsStatusList.map(par => (par._1, par._2.batchReceiveTimeInMillis))(breakOut),
-                                                    performancePercentages)
+            _.onPartitionsPerformanceStatusUpdate(
+              batch.batchId,
+              batch.paritionsStatusList.map(par => (par._1, par._2.batchSize))(breakOut),
+              batch.paritionsStatusList
+                .map(par => (par._1, par._2.batchReceiveTimeInMillis))(breakOut),
+              performancePercentages
+            )
           )
           performancePercentages
         }
@@ -197,8 +220,8 @@ class PartitionsStatusTracker extends Logging{
    * Clean up the tracker. This will be called when the source has been stopped
    */
   def cleanUp() = {
-    batchesStatus.map(b => b._2.paritionsStatusList.clear)
-    batchesStatus.clear
+    batchesStatusList.map(b => b._2.paritionsStatusList.clear)
+    batchesStatusList.clear
     partitionSeqNoPairToBatchIdMap.clear
   }
 
@@ -206,12 +229,13 @@ class PartitionsStatusTracker extends Logging{
    * This methods i being used for testing
    */
   def batchIdsInTracker: scala.collection.Set[Long] = {
-    this.batchesStatus.keySet
+    this.batchesStatusList.keySet
   }
 }
 
 object PartitionsStatusTracker {
   private val _partitionsStatusTrackerInstance = new PartitionsStatusTracker
+  private val TrackingBatchCount = 3
   val BatchNotFound: Long = -1
   var acceptableBatchReceiveTimeInMs: Long = DefaultMaxAcceptableBatchReceiveTime.toMillis
   var partitionsCount: Int = 1
@@ -219,13 +243,16 @@ object PartitionsStatusTracker {
   var throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = None
   var defaultPartitionsPerformancePercentage: Option[Map[NameAndPartition, Double]] = None
 
-  def setDefaultValuesInTracker(numOfPartitions: Int, ehName: String, maxBatchReceiveTime: Long, throttlingSP: Option[ThrottlingStatusPlugin]) = {
+  def setDefaultValuesInTracker(numOfPartitions: Int,
+                                ehName: String,
+                                maxBatchReceiveTime: Long,
+                                throttlingSP: Option[ThrottlingStatusPlugin]) = {
     partitionsCount = numOfPartitions
     acceptableBatchReceiveTimeInMs = maxBatchReceiveTime
-    enoughUpdatesCount = (partitionsCount/2) + 1
+    enoughUpdatesCount = (partitionsCount / 2) + 1
     throttlingStatusPlugin = throttlingSP
-    defaultPartitionsPerformancePercentage =
-      Some((for (pid <- 0 until partitionsCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut))
+    defaultPartitionsPerformancePercentage = Some(
+      (for (pid <- 0 until partitionsCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut))
   }
 
   private def partitionSeqNoKey(nAndP: NameAndPartition, seqNo: SequenceNumber): String =
@@ -234,79 +261,96 @@ object PartitionsStatusTracker {
   def getPartitionStatusTracker: PartitionsStatusTracker = _partitionsStatusTrackerInstance
 }
 
-
-private[eventhubs] class BatchStatus(val batchId: Long,
-                                     val paritionsStatusList: mutable.Map[NameAndPartition, PartitionStatus]) extends Logging{
+private[eventhubs] class BatchStatus(
+    val batchId: Long,
+    val paritionsStatusList: mutable.Map[NameAndPartition, PartitionStatus])
+    extends Logging {
 
   private var hasEnoughUpdates: Boolean = false
 
-  private var performancePercentages:Option[Map[NameAndPartition, Double]] = None
+  private var performancePercentages: Option[Map[NameAndPartition, Double]] = None
 
   def updatePartitionPerformance(nAndP: NameAndPartition,
                                  batchSize: Int,
                                  receiveTimeInMillis: Long): Unit = {
-    if(!paritionsStatusList.contains(nAndP)) {
+    if (!paritionsStatusList.contains(nAndP)) {
       throw new IllegalStateException(
         s"Partition $nAndP doesn't exist in the batch status for batchId $batchId. This is an illegal state that shouldn't happen.")
     }
     paritionsStatusList(nAndP).updatePerformanceMetrics(batchSize, receiveTimeInMillis)
   }
 
-  def receivedEnoughUpdates : Boolean = {
-    if(!hasEnoughUpdates) {
-      hasEnoughUpdates = paritionsStatusList.values.filter(par => par.hasBeenUpdated).size >= PartitionsStatusTracker.enoughUpdatesCount
+  def receivedEnoughUpdates: Boolean = {
+    if (!hasEnoughUpdates) {
+      hasEnoughUpdates = paritionsStatusList.values
+        .filter(par => par.hasBeenUpdated)
+        .size >= PartitionsStatusTracker.enoughUpdatesCount
     }
     hasEnoughUpdates
   }
 
-  def getPerformancePercentages: Option[Map[NameAndPartition, Double]] = performancePercentages match {
+  def getPerformancePercentages: Option[Map[NameAndPartition, Double]] =
+    performancePercentages match {
       case Some(completedPerformancePercentages) => performancePercentages
       case None => {
         // just use partitions which have batchSize > 0 and have been updated
-        logInfo(s"Calculate partition performacne percenatges for batch = $batchId with partitions status = $paritionsStatusList")
-        val partitionsTimePerEvent = paritionsStatusList.filter(p =>
-          (p._2.hasBeenUpdated && !p._2.emptyBatch)).values.map(ps => ps.timePerEventInMillis)
+        logInfo(
+          s"Calculate partition performacne percenatges for batch = $batchId with partitions status = $paritionsStatusList")
+        val partitionsTimePerEvent = paritionsStatusList
+          .filter(p => (p._2.hasBeenUpdated && !p._2.emptyBatch))
+          .values
+          .map(ps => ps.timePerEventInMillis)
 
         // check if there is no updated partition with batchSize > 0
-        if(partitionsTimePerEvent.isEmpty) {
-          logInfo(s"There is no updated partition with batchSize greater than 0 in batch $batchId, " +
-            s"so return None ")
+        if (partitionsTimePerEvent.isEmpty) {
+          logInfo(
+            s"There is no updated partition with batchSize greater than 0 in batch $batchId, " +
+              s"so return None ")
           None
-        }
-        else if(allPartitionsFinishedWithinAcceptableTime) {
+        } else if (allPartitionsFinishedWithinAcceptableTime) {
           logInfo(s"All partitions are within the range of normal perforamnce because " +
             s"their receive time was less than ${PartitionsStatusTracker.acceptableBatchReceiveTimeInMs}.")
           PartitionsStatusTracker.defaultPartitionsPerformancePercentage
-        }
-        else {
+        } else {
           // calculate the standard deviation
-          val avgTimePerEvent: Double = partitionsTimePerEvent.sum.toDouble / partitionsTimePerEvent.size
+          val avgTimePerEvent
+            : Double = partitionsTimePerEvent.sum.toDouble / partitionsTimePerEvent.size
           val stdDevTimePerEvent: Double = math.sqrt(
-            partitionsTimePerEvent.map(_.toDouble).map(time => math.pow(time - avgTimePerEvent, 2)).sum / partitionsTimePerEvent.size)
+            partitionsTimePerEvent
+              .map(_.toDouble)
+              .map(time => math.pow(time - avgTimePerEvent, 2))
+              .sum / partitionsTimePerEvent.size)
           // average + standard deviation can't go beyond the receiver timeout
-          logInfo(s"Calculated the average time per event = $avgTimePerEvent and the standard deviation = $stdDevTimePerEvent" +
-            s" for updated partitions in the batch $batchId.")
+          logInfo(
+            s"Calculated the average time per event = $avgTimePerEvent and the standard deviation = $stdDevTimePerEvent" +
+              s" for updated partitions in the batch $batchId.")
 
           // update performance metrics in each paritition and return that mapping
-          paritionsStatusList.foreach(par => par._2.updatePerformancePercentage(avgTimePerEvent, stdDevTimePerEvent))
-          val ppp: Map[NameAndPartition, Double] = paritionsStatusList.map(par => (par._1, par._2.performancePercentage))(breakOut)
+          paritionsStatusList.foreach(par =>
+            par._2.updatePerformancePercentage(avgTimePerEvent, stdDevTimePerEvent))
+          val ppp: Map[NameAndPartition, Double] =
+            paritionsStatusList.map(par => (par._1, par._2.performancePercentage))(breakOut)
           // if all partitions have been updated, save the result in performancePercentages
-          if(paritionsStatusList.values.filter(ps => ps.hasBeenUpdated).size == PartitionsStatusTracker.partitionsCount) {
+          if (paritionsStatusList.values
+                .filter(ps => ps.hasBeenUpdated)
+                .size == PartitionsStatusTracker.partitionsCount) {
             performancePercentages = Some(ppp)
           }
           Some(ppp)
+        }
       }
     }
-  }
 
   /**
    * Check if any partition takes more than PartitionsStatusTracker.acceptableBatchReceiveTimeImMs to receive
    * its portion of events. If all of partitions are within this time frame it means none of those is slow.
    */
   private def allPartitionsFinishedWithinAcceptableTime: Boolean = {
-    val updatedPartitionsTime = paritionsStatusList.filter(p =>
-      (p._2.hasBeenUpdated && !p._2.emptyBatch)).values.map(ps => ps.batchReceiveTimeInMillis)
-    if(updatedPartitionsTime.isEmpty)
+    val updatedPartitionsTime = paritionsStatusList
+      .filter(p => (p._2.hasBeenUpdated && !p._2.emptyBatch))
+      .values
+      .map(ps => ps.batchReceiveTimeInMillis)
+    if (updatedPartitionsTime.isEmpty)
       true
     else {
       val maxReceiveTime = updatedPartitionsTime.max
@@ -321,34 +365,36 @@ private[eventhubs] class BatchStatus(val batchId: Long,
 
 private[eventhubs] class PartitionStatus(val nAndP: NameAndPartition,
                                          val requestSeqNo: SequenceNumber,
-                                         val emptyBatch: Boolean)  extends Logging{
+                                         val emptyBatch: Boolean)
+    extends Logging {
 
   // a partition with an empty batch (batchSize = 0) doesn't receive any update message from the executor
-  var hasBeenUpdated: Boolean = if(emptyBatch) true else false
+  var hasBeenUpdated: Boolean = if (emptyBatch) true else false
 
   var performancePercentage: Double = 1
 
-  var batchSize: Int = if(emptyBatch) 0 else -1
+  var batchSize: Int = if (emptyBatch) 0 else -1
   // total receive time for the batch in milli seconds
-  var batchReceiveTimeInMillis: Long = if(emptyBatch) 0 else -1
+  var batchReceiveTimeInMillis: Long = if (emptyBatch) 0 else -1
 
-  var timePerEventInMillis: Double = if(emptyBatch) 0 else -1
+  var timePerEventInMillis: Double = if (emptyBatch) 0 else -1
 
   // Update the status of this partition with the received performance metrics
   def updatePerformanceMetrics(bSize: Int, receiveTimeInMillis: Long): Any = {
     this.batchSize = bSize
     this.batchReceiveTimeInMillis = receiveTimeInMillis
     this.hasBeenUpdated = true
-    if(batchSize != 0)
+    if (batchSize != 0)
       this.timePerEventInMillis = this.batchReceiveTimeInMillis.toDouble / this.batchSize
-    logDebug(s"updatePerformanceMetrics for partition = $nAndP with request sequence number = $requestSeqNo contains" +
-      s" batchSize = $batchSize and total receive time(ms) = $batchReceiveTimeInMillis")
+    logDebug(
+      s"updatePerformanceMetrics for partition = $nAndP with request sequence number = $requestSeqNo contains" +
+        s" batchSize = $batchSize and total receive time(ms) = $batchReceiveTimeInMillis")
   }
 
   def updatePerformancePercentage(averageTimePerEvent: Double, standardDeviation: Double): Unit = {
     val averagePlusStdDev: Double = averageTimePerEvent + standardDeviation
-    if(!emptyBatch && hasBeenUpdated){
-      if(timePerEventInMillis > averagePlusStdDev) {
+    if (!emptyBatch && hasBeenUpdated) {
+      if (timePerEventInMillis > averagePlusStdDev) {
         performancePercentage = averageTimePerEvent / timePerEventInMillis
       }
     }
@@ -356,7 +402,7 @@ private[eventhubs] class PartitionStatus(val nAndP: NameAndPartition,
 
   override def toString: String = {
     val partitionInfo: String = s"(${nAndP.ehName}/${nAndP.partitionId}/$requestSeqNo)"
-    if(hasBeenUpdated)
+    if (hasBeenUpdated)
       s"PartitionStatus[$partitionInfo -> (batchSize=$batchSize, time(ms)=$batchReceiveTimeInMillis, timePerEvent(ms)= $timePerEventInMillis)]"
     else
       s"PartitionStatus[$partitionInfo -> (No Update)]"

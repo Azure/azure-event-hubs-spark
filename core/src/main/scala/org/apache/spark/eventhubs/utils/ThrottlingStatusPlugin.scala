@@ -24,12 +24,13 @@ import scala.collection.mutable
 
 trait ThrottlingStatusPlugin extends Serializable {
 
-  def onBatchCreation (nextBatchLocalId: Long,
-                       nextBatchOffsetRanges: Array[OffsetRange],
-                       partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit
+  def onBatchCreation(nextBatchLocalId: Long,
+                      nextBatchOffsetRanges: Array[OffsetRange],
+                      partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit
 
-  def onPartitionsPerformanceStatusUpdate (latestUpdatedBatchLocalId: Long,
-                                           partitionsBatchSizes: Map[NameAndPartition, Int],
-                                           partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
-                                           partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit
+  def onPartitionsPerformanceStatusUpdate(
+      latestUpdatedBatchLocalId: Long,
+      partitionsBatchSizes: Map[NameAndPartition, Int],
+      partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
+      partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit
 }

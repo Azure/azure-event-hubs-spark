@@ -189,7 +189,10 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                   case default             => default
                 }
                 .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  p._2 match {
+                    case s: String  =>    UTF8String.fromString(p._1) -> UTF8String.fromString(s)
+                    case default    =>    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  }
                 }),
             ArrayBasedMapData(
               // Don't duplicate offset, enqueued time, and seqNo
@@ -205,7 +208,10 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                   case default             => default
                 }
                 .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  p._2 match {
+                    case s: String  =>    UTF8String.fromString(p._1) -> UTF8String.fromString(s)
+                    case default    =>    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  }
                 })
           )
         }

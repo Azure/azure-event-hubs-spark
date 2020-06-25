@@ -539,7 +539,10 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
         case default             => default
       }
       .map { p =>
-        p._1 -> Serialization.write(p._2)
+        p._2 match {
+          case s: String  =>    p._1 -> s
+          case default    =>    p._1 -> Serialization.write(p._2)
+        }
       }
 
     val eventHub = testUtils.createEventHubs(newEventHubs(), partitionCount = 1)

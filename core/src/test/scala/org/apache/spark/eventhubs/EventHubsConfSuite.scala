@@ -91,6 +91,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(map(MaxRatePerPartitionKey).toRate == DefaultMaxRate)
     intercept[Exception] { map(MaxRatesPerPartitionKey) }
     intercept[Exception] { map(ReceiverTimeoutKey) }
+    intercept[Exception] { map(MaxSilentTimeKey) }
     intercept[Exception] { map(OperationTimeoutKey) }
     intercept[Exception] { map(MaxEventsPerTriggerKey) }
     assert(map(UseSimulatedClientKey).toBoolean)
@@ -229,6 +230,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setMaxRatesPerPartition(Map(NameAndPartition("foo", 0) -> 12))
       .setMaxEventsPerTrigger(100)
       .setReceiverTimeout(Duration.ofSeconds(10))
+      .setMaxSilentTime(Duration.ofSeconds(60))
       .setOperationTimeout(Duration.ofSeconds(10))
       .setThreadPoolSize(16)
       .setPrefetchCount(100)
@@ -246,6 +248,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     originalConf("eventhubs.maxRatePerPartition")
     originalConf("eventhubs.maxRatesPerPartition")
     originalConf("eventhubs.receiverTimeout")
+    originalConf("eventhubs.maxSilentTime")
     originalConf("eventhubs.operationTimeout")
     originalConf("eventhubs.prefetchCount")
     originalConf("eventhubs.threadPoolSize")
@@ -263,6 +266,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[NoSuchElementException] { newConf("eventhubs.maxRatePerPartition") }
     intercept[NoSuchElementException] { newConf("eventhubs.maxRatesPerPartition") }
     newConf("eventhubs.receiverTimeout")
+    newConf("eventhubs.maxSilentTime")
     newConf("eventhubs.operationTimeout")
     newConf("eventhubs.prefetchCount")
     newConf("eventhubs.threadPoolSize")
@@ -322,5 +326,15 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     eventHubConfig.setOperationTimeout(Duration.ofMinutes(3))
     assert(eventHubConfig.operationTimeout.get.toMinutes == 3)
+  }
+
+  test("validate - max silent time") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+    intercept[IllegalArgumentException] {
+      eventHubConfig.setMaxSilentTime(Duration.ofSeconds(29))
+    }
+
+    eventHubConfig.setMaxSilentTime(Duration.ofMinutes(1))
+    assert(eventHubConfig.maxSilentTime.get.toMinutes == 1)
   }
 }

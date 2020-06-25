@@ -159,6 +159,7 @@ final class EventHubsConf private (private val connectionStr: String)
       ConnectionStringKey,
       ConsumerGroupKey,
       ReceiverTimeoutKey,
+      MaxSilentTimeKey,
       OperationTimeoutKey,
       PrefetchCountKey,
       ThreadPoolSizeKey,
@@ -364,6 +365,27 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
+   * Set the maximum silent time for a receiver. We will try to recreate the receiver
+   * if there is no activity for the length of this duration.
+   * Default: [[DefaultMaxSilentTime]]
+   *
+   * @param d the new maximum silent time
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setMaxSilentTime(d: Duration): EventHubsConf = {
+    if (d.toMillis < MinSilentTime.toMillis) {
+      throw new IllegalArgumentException("max silent time is less than " + MinSilentTime)
+    }
+
+    set(MaxSilentTimeKey, d)
+  }
+
+  /** The current maximum silent time.  */
+  def maxSilentTime: Option[Duration] = {
+    self.get(MaxSilentTimeKey) map (str => Duration.parse(str))
+  }
+
+  /**
    * Set the operation timeout. We will retryJava failures when contacting the
    * EventHubs service for the length of this timeout.
    * Default: [[DefaultOperationTimeout]]
@@ -536,6 +558,7 @@ object EventHubsConf extends Logging {
   val MaxRatePerPartitionKey = "eventhubs.maxRatePerPartition"
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
+  val MaxSilentTimeKey = "eventhubs.maxSilentTime"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
   val PrefetchCountKey = "eventhubs.prefetchCount"
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"

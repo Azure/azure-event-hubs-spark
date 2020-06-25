@@ -20,7 +20,7 @@ package org.apache.spark.eventhubs.client
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ ConcurrentLinkedQueue, Executors, ScheduledExecutorService }
 
-import com.microsoft.azure.eventhubs.EventHubClient
+import com.microsoft.azure.eventhubs.{ EventHubClient, RetryPolicy }
 import org.apache.spark.eventhubs._
 import org.apache.spark.internal.Logging
 
@@ -55,8 +55,12 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        client = EventHubClient.createFromConnectionStringSync(connStr.toString,
-                                                               ClientThreadPool.get(ehConf))
+        client = EventHubClient.createFromConnectionStringSync(
+          connStr.toString,
+          RetryPolicy.getDefault,
+          ClientThreadPool.get(ehConf),
+          null,
+          ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
       }
     } else {
       logInfo(

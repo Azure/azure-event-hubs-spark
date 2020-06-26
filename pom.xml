@@ -24,7 +24,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.microsoft.azure</groupId>
-    <artifactId>azure-eventhubs-spark-parent_2.11</artifactId>
+    <artifactId>azure-eventhubs-spark-parent_${scala.binary.version}</artifactId>
     <version>2.3.16</version>
     <packaging>pom</packaging>
 
@@ -50,7 +50,7 @@
     <properties>
         <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
         <scala.binary.version>2.11</scala.binary.version>
-        <spark.version>2.3.3</spark.version>
+        <spark.version>2.4.1</spark.version>
         <github.global.server>github</github.global.server>
     </properties>
 

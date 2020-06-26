@@ -50,7 +50,7 @@
     <properties>
         <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
         <scala.binary.version>2.11</scala.binary.version>
-        <spark.version>2.4.1</spark.version>
+        <spark.version>2.3.3</spark.version>
         <github.global.server>github</github.global.server>
     </properties>
 

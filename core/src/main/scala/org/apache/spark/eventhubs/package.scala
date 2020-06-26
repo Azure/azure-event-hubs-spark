@@ -19,7 +19,7 @@ package org.apache.spark
 
 import java.time.Duration
 
-import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubClientOptions, PartitionReceiver }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
@@ -37,6 +37,8 @@ package object eventhubs {
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
+  val DefaultMaxSilentTime: Duration = EventHubClientOptions.SILENT_OFF
+  val MinSilentTime: Duration = EventHubClientOptions.SILENT_MINIMUM
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(300)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
@@ -56,7 +58,7 @@ package object eventhubs {
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
   val SequenceNumberAnnotation = "x-opt-sequence-number"
 
-  val SparkConnectorVersion = "2.3.15"
+  val SparkConnectorVersion = "2.3.16"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int

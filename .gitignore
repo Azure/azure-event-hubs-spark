@@ -8,3 +8,4 @@ target/
 scalafmt-output.xml
 dependency-reduced-pom.xml
 metastore_db
+.DS_Store

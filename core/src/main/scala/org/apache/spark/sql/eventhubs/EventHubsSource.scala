@@ -80,7 +80,9 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger: Option[Long] =
-    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
+    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(
+      parameters.get(MaxEventsPerTriggerKeyAlias).map(_.toLong).getOrElse(
+        partitionCount * 1000)))
 
   private lazy val initialPartitionSeqNos = {
     val metadataLog =

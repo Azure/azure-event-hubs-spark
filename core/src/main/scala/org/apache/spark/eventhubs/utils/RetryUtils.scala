@@ -85,8 +85,9 @@ private[spark] object RetryUtils extends Logging {
   final def retryJava[T](fn: => CompletableFuture[T],
                          opName: String,
                          maxRetry: Int = RetryCount,
-                         delay: Int = 10): Future[T] = {
-    retryScala(toScala(fn), opName, maxRetry, delay)
+                         delay: Int = 10,
+                         replaceTransientErrors: Future[T] = null): Future[T] = {
+    retryScala(toScala(fn), opName, maxRetry, delay, replaceTransientErrors)
   }
 
   /**
@@ -106,7 +107,8 @@ private[spark] object RetryUtils extends Logging {
   final def retryScala[T](fn: => Future[T],
                           opName: String,
                           maxRetry: Int = RetryCount,
-                          delay: Int = 10): Future[T] = {
+                          delay: Int = 10,
+                          replaceTransientErrors: Future[T] = null): Future[T] = {
     def retryHelper(fn: => Future[T], retryCount: Int): Future[T] = {
       val taskId = EventHubsUtils.getTaskId
       fn.recoverWith {
@@ -115,8 +117,13 @@ private[spark] object RetryUtils extends Logging {
             logInfo(s"(TID $taskId) failure: $opName")
             throw eh
           }
-          logInfo(s"(TID $taskId) retrying $opName after $delay ms")
-          after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+          if (replaceTransientErrors != null) {
+            logInfo(s"(TID $taskId) ignoring transient failure in $opName")
+            replaceTransientErrors
+          } else {
+            logInfo(s"(TID $taskId) retrying $opName after $delay ms")
+            after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+          }
         case t: Throwable =>
           t.getCause match {
             case eh: EventHubException if eh.getIsTransient =>
@@ -124,8 +131,13 @@ private[spark] object RetryUtils extends Logging {
                 logInfo(s"(TID $taskId) failure: $opName")
                 throw eh
               }
-              logInfo(s"(TID $taskId) retrying $opName after $delay ms")
-              after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+              if (replaceTransientErrors != null) {
+                logInfo(s"(TID $taskId) ignoring transient failure in $opName")
+                replaceTransientErrors
+              } else {
+                logInfo(s"(TID $taskId) retrying $opName after $delay ms")
+                after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+              }
             case _ =>
               logInfo(s"(TID $taskId) failure: $opName")
               throw t

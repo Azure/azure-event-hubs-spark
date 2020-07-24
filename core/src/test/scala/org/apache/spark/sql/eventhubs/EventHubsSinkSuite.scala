@@ -452,7 +452,8 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     try {
       ex = intercept[StreamingQueryException] {
         writer = createEventHubsWriter(input.toDF(), ehConf, properties = Some(targetProperties))(
-          "properties", "body")
+          "properties",
+          "body")
         input.addData("1", "2", "3", "4", "5")
         writer.processAllAvailable()
       }

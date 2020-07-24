@@ -87,7 +87,9 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger: Option[Long] =
-    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(partitionCount * 1000))
+    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(
+      parameters.get(MaxEventsPerTriggerKeyAlias).map(_.toLong).getOrElse(
+        partitionCount * 1000)))
 
   // set slow partition adjustment flag and static values in the tracker
   private val slowPartitionAdjustment: Boolean =
@@ -128,7 +130,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
             val indexOfNewLine = content.indexOf("\n")
             if (indexOfNewLine > 0) {
               val version =
-                parseVersion(content.substring(0, indexOfNewLine), VERSION)
+                parseLogVersion(content.substring(0, indexOfNewLine), VERSION)
               EventHubsSourceOffset(SerializedOffset(content.substring(indexOfNewLine + 1)))
             } else {
               throw new IllegalStateException("Log file was malformed.")
@@ -136,6 +138,31 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
           } else {
             EventHubsSourceOffset(SerializedOffset(content)) // Spark 2.1 log file
           }
+        }
+
+        private def parseLogVersion(text: String, maxSupportedVersion: Int): Int = {
+          if (text.length > 0 && text(0) == 'v') {
+            val version =
+              try {
+                text.substring(1, text.length).toInt
+              } catch {
+                case _: NumberFormatException =>
+                  throw new IllegalStateException(s"Log file was malformed: failed to read correct log " +
+                    s"version from $text.")
+              }
+            if (version > 0) {
+              if (version > maxSupportedVersion) {
+                throw new IllegalStateException(s"UnsupportedLogVersion: maximum supported log version " +
+                  s"is v${maxSupportedVersion}, but encountered v$version. The log file was produced " +
+                  s"by a newer version of Spark and cannot be read by this version. Please upgrade.")
+              } else {
+                return version
+              }
+            }
+          }
+          // reaching here means we failed to read the correct log version
+          throw new IllegalStateException(s"Log file was malformed: failed to read correct log " +
+            s"version from $text.")
         }
       }
 

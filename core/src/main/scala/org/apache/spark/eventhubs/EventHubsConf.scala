@@ -611,6 +611,7 @@ object EventHubsConf extends Logging {
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"
   val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
+  val MaxEventsPerTriggerKeyAlias = "eventhubs.maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
   val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"

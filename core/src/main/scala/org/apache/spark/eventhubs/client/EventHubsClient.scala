@@ -35,7 +35,7 @@ import scala.util.{ Failure, Success }
 
 /**
  * A [[Client]] which connects to an event hub instance. All interaction
- * between Spark and Event Hubs will happen within this client.
+ * between Spark and Event Hubs will happen within this client. CHANGE IN COMMENT
  */
 @SerialVersionUID(1L)
 private[spark] class EventHubsClient(private val ehConf: EventHubsConf)

@@ -79,6 +79,7 @@ private[spark] object RetryUtils extends Logging {
    * @param opName the name of the operation. This is to assist with logging.
    * @param maxRetry The number of times the operation will be retried.
    * @param delay The delay (in milliseconds) before the Future is run again.
+   * @param replaceTransientErrors If not null a transient error returns this Future instead.
    * @tparam T the result type from the [[CompletableFuture]]
    * @return the [[Future]] returned by the async operation
    */
@@ -101,6 +102,7 @@ private[spark] object RetryUtils extends Logging {
    * @param opName the name of the operation. This is to assist with logging.
    * @param maxRetry The number of times the operation will be retried.
    * @param delay The delay (in milliseconds) before the Future is run again.
+   * @param replaceTransientErrors If not null a transient error returns this Future instead.
    * @tparam T the result type from the [[Future]]
    * @return the [[Future]] returned by the async operation
    */

@@ -38,7 +38,7 @@ import org.apache.spark.util.RpcUtils
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Awaitable, Future }
+import scala.concurrent.{ Await, Awaitable, Future, Promise }
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
@@ -130,7 +130,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def closeReceiver(): Future[Void] = {
-    retryJava(receiver.close(), "closing a receiver")
+    // Closing a PartitionReceiver is not a retryable operation: after the first call, it always
+    // returns the same CompletableFuture. Therefore, if it fails with a transient
+    // error, log and continue.
+    // val dummyResult = Future[Void](null)
+    val dummyResult = Promise[Void]()
+    dummyResult success null
+    retryJava(receiver.close(), "closing a receiver", replaceTransientErrors = dummyResult.future)
   }
 
   private def recreateReceiver(seqNo: SequenceNumber): Unit = {

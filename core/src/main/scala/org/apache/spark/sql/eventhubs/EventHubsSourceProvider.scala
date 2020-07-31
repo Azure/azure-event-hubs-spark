@@ -140,6 +140,7 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
+
   def eventHubsSchema: StructType = {
     StructType(
       Seq(
@@ -205,7 +206,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                     val arr = new Array[Byte](buf.remaining)
                     buf.get(arr)
                     arr.asInstanceOf[AnyRef]
-                  case default             => default
+                  case default => default
                 }
                 .map { p =>
                   p._2 match {

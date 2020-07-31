@@ -20,7 +20,11 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.NoSuchElementException
 
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, MetricPluginMock }
+import org.apache.spark.eventhubs.utils.{
+  EventHubsTestUtils,
+  MetricPluginMock,
+  ThrottlingStatusPluginMock
+}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{ read => sread }
@@ -219,6 +223,15 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(idField.getInt(actualListener) == expectedListener.id)
   }
 
+  test("throttlingStatusPlugin set/get") {
+    val expectedListener = new ThrottlingStatusPluginMock
+    val conf = testUtils.getEventHubsConf().setThrottlingStatusPlugin(expectedListener)
+    val actualListener = conf.throttlingStatusPlugin.get
+    val idField = actualListener.getClass.getDeclaredField("id")
+    idField.setAccessible(true)
+    assert(idField.getInt(actualListener) == expectedListener.id)
+  }
+
   test("trimmedConfig") {
     val originalConf = testUtils
       .getEventHubsConf()
@@ -336,5 +349,27 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     eventHubConfig.setMaxSilentTime(Duration.ofMinutes(1))
     assert(eventHubConfig.maxSilentTime.get.toMinutes == 1)
+  }
+
+  test("validate - slow partition adjustment config") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+
+    // check the default value. It should be DefaultSlowPartitionAdjustment = false
+    assert(
+      eventHubConfig.slowPartitionAdjustment ==
+        DefaultSlowPartitionAdjustment.toBoolean)
+
+    val expectedSlowPartionAdjustment = true
+    eventHubConfig.setSlowPartitionAdjustment(expectedSlowPartionAdjustment)
+    val actualSlowPartionAdjustment = eventHubConfig.slowPartitionAdjustment
+    assert(expectedSlowPartionAdjustment == actualSlowPartionAdjustment)
+  }
+
+  test("validate - max acceptable batch receive time config") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+    val expectedTime = Duration.ofSeconds(20)
+    eventHubConfig.setMaxAcceptableBatchReceiveTime(expectedTime)
+    val actualTime = eventHubConfig.maxAcceptableBatchReceiveTime.get
+    assert(expectedTime == actualTime)
   }
 }

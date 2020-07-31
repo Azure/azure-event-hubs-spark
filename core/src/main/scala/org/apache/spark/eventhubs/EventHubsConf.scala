@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.eventhubs.utils.{ MetricPlugin, ThrottlingStatusPlugin }
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -165,7 +165,10 @@ final class EventHubsConf private (private val connectionStr: String)
       ThreadPoolSizeKey,
       UseExclusiveReceiverKey,
       UseSimulatedClientKey,
-      MetricPluginKey
+      MetricPluginKey,
+      SlowPartitionAdjustmentKey,
+      ThrottlingStatusPluginKey,
+      MaxAcceptableBatchReceiveTimeKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -474,6 +477,50 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
+   * Set the flag for slow parition adjustment. The default value is false.
+   * Default: [[DefaultSlowPartitionAdjustment]]
+   *
+   * @param b the flag which specifies whether the connector uses slow partition adjustment logic
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setSlowPartitionAdjustment(b: Boolean): EventHubsConf = {
+    set(SlowPartitionAdjustmentKey, b)
+  }
+
+  /** The slow partition adjustment flag  */
+  def slowPartitionAdjustment: Boolean = {
+    self.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
+  }
+
+  /** Set the max time that is acceptable for a partition to receive events in a single batch.
+   *  This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
+   *  Only partitions that tale more than this time to receive thier portion of events in batch are considered
+   *  as potential slow partitrions.
+   *  Default: [[DefaultMaxAcceptableBatchReceiveTime]]
+   *
+   * @param d the new maximum acceptable time for a partition to receive events in a single batch
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setMaxAcceptableBatchReceiveTime(d: Duration): EventHubsConf = {
+    set(MaxAcceptableBatchReceiveTimeKey, d)
+  }
+
+  /** The current max time that is acceptable for a partition to receive events in a single batch. */
+  def maxAcceptableBatchReceiveTime: Option[Duration] = {
+    self.get(MaxAcceptableBatchReceiveTimeKey) map (str => Duration.parse(str))
+  }
+
+  def setThrottlingStatusPlugin(throttlingStatusPlugin: ThrottlingStatusPlugin): EventHubsConf = {
+    set(ThrottlingStatusPluginKey, throttlingStatusPlugin.getClass.getName)
+  }
+
+  def throttlingStatusPlugin(): Option[ThrottlingStatusPlugin] = {
+    self.get(ThrottlingStatusPluginKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[ThrottlingStatusPlugin]
+    })
+  }
+
+  /**
    * Set the size of thread pool.
    * Default: [[DefaultUseExclusiveReceiver]]
    *
@@ -564,9 +611,13 @@ object EventHubsConf extends Logging {
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"
   val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
+  val MaxEventsPerTriggerKeyAlias = "eventhubs.maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
   val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
+  val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
+  val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
+  val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

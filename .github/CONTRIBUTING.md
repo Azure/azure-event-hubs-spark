@@ -18,7 +18,7 @@ run all unit/integration tests and build a JAR.
  
 ### SBT Dependency
 
-    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.16"
+    libraryDependencies += "com.microsoft.azure" %% "azure-eventhubs-spark" %% "2.3.17"
  
 ## Filing Issues
 

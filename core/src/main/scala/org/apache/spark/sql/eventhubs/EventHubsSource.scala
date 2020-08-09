@@ -72,7 +72,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   import EventHubsSource._
 
   private lazy val ehClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
-  private def partitionCount: Int = ehClient.partitionCount
+  private lazy val partitionCount: Int = ehClient.partitionCount
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private val ehName = ehConf.name

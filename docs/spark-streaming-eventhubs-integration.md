@@ -23,13 +23,13 @@ For Scala/Java applications using SBT/Maven project definitions, link your appli
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.15
+  version = 2.3.17
 
 or
 
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.12
-  version = 2.3.15
+  version = 2.3.17
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.

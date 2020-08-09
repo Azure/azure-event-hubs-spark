@@ -29,14 +29,16 @@ import org.apache.spark.eventhubs.{
   EventHubsConf,
   EventHubsUtils,
   NameAndPartition,
-  SequenceNumber
+  SequenceNumber,
+  PartitionPerformanceReceiver
 }
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.RpcUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Awaitable, Future }
+import scala.concurrent.{ Await, Awaitable, Future, Promise }
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
@@ -128,7 +130,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def closeReceiver(): Future[Void] = {
-    retryJava(receiver.close(), "closing a receiver")
+    // Closing a PartitionReceiver is not a retryable operation: after the first call, it always
+    // returns the same CompletableFuture. Therefore, if it fails with a transient
+    // error, log and continue.
+    // val dummyResult = Future[Void](null)
+    val dummyResult = Promise[Void]()
+    dummyResult success null
+    retryJava(receiver.close(), "closing a receiver", replaceTransientErrors = dummyResult.future)
   }
 
   private def recreateReceiver(seqNo: SequenceNumber): Unit = {
@@ -241,6 +249,17 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     val (result, validate) = sorted.duplicate
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
+
+    // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
+    if (ehConf.slowPartitionAdjustment) {
+      sendPartitionPerformanceToDriver(
+        PartitionPerformanceMetric(nAndP,
+                                   EventHubsUtils.getTaskContextSlim,
+                                   requestSeqNo,
+                                   batchCount,
+                                   elapsedTimeMs))
+    }
+
     if (metricPlugin.isDefined) {
       val (validateSize, batchSizeInBytes) =
         validate
@@ -279,6 +298,22 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
         throw e
     }
   }
+
+  // send the partition perforamcne metric (elapsed time for receiving events in the batch) to the
+  // driver without waiting for any response.
+  private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
+    logDebug(
+      s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
+        s"$PartitionPerformanceMetric to the driver.")
+    try {
+      CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
+    } catch {
+      case e: Exception =>
+        logError(
+          s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
+            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
+    }
+  }
 }
 
 /**
@@ -288,9 +323,17 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
  */
 private[spark] object CachedEventHubsReceiver extends CachedReceiver with Logging {
 
+  private val startRecieverTimeNs = System.nanoTime()
+
   type MutableMap[A, B] = scala.collection.mutable.HashMap[A, B]
 
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
+
+  // RPC endpoint for partition performacne communciation in the executor
+  val partitionPerformanceReceiverRef =
+    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
+                           SparkEnv.get.conf,
+                           SparkEnv.get.rpcEnv)
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase

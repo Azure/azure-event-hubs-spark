@@ -140,6 +140,7 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
+
   def eventHubsSchema: StructType = {
     StructType(
       Seq(
@@ -189,7 +190,10 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                   case default             => default
                 }
                 .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  p._2 match {
+                    case s: String  =>    UTF8String.fromString(p._1) -> UTF8String.fromString(s)
+                    case default    =>    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  }
                 }),
             ArrayBasedMapData(
               // Don't duplicate offset, enqueued time, and seqNo
@@ -202,10 +206,13 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                     val arr = new Array[Byte](buf.remaining)
                     buf.get(arr)
                     arr.asInstanceOf[AnyRef]
-                  case default             => default
+                  case default => default
                 }
                 .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  p._2 match {
+                    case s: String  =>    UTF8String.fromString(p._1) -> UTF8String.fromString(s)
+                    case default    =>    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  }
                 })
           )
         }

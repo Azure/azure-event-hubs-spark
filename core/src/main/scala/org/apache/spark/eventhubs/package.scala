@@ -33,6 +33,7 @@ package object eventhubs {
 
   val StartOfStream: String = "-1"
   val EndOfStream: String = "@latest"
+  val DefaultEmptyString: String = ""
   val DefaultEventPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
@@ -55,12 +56,16 @@ package object eventhubs {
   val DefaultEpoch = 0L
   val RetryCount = 10
   val WaitInterval = 5000
+  val DefaultAadAuthTenantId = "72f988bf-86f1-41af-91ab-2d7cd011db47" //Microsoft tenant
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
   val SequenceNumberAnnotation = "x-opt-sequence-number"
 
-  val SparkConnectorVersion = "2.3.16"
+  val SparkConnectorVersion = "2.3.17"
+
+  val AadAuthByCertificate = "certificate"
+  val AadAuthBySecret = "secret"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int
@@ -94,4 +99,5 @@ package object eventhubs {
 
     def toSequenceNumber: SequenceNumber = str.toLong
   }
+
 }

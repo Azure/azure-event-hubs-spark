@@ -53,6 +53,7 @@ final class EventHubsConf private (private val connectionStr: String)
   self =>
 
   import EventHubsConf._
+
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionStr)
 
@@ -168,7 +169,13 @@ final class EventHubsConf private (private val connectionStr: String)
       MetricPluginKey,
       SlowPartitionAdjustmentKey,
       ThrottlingStatusPluginKey,
-      MaxAcceptableBatchReceiveTimeKey
+      MaxAcceptableBatchReceiveTimeKey,
+      AadAuthKey,
+      AadAuthTenantIdKey,
+      AadAuthClientIdKey,
+      AadAuthClientSecretKey,
+      AadAuthClientCertificateByteBufferKey,
+      AadAuthClientCertificatePasswordKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -493,10 +500,10 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /** Set the max time that is acceptable for a partition to receive events in a single batch.
-   *  This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
-   *  Only partitions that tale more than this time to receive thier portion of events in batch are considered
-   *  as potential slow partitrions.
-   *  Default: [[DefaultMaxAcceptableBatchReceiveTime]]
+   * This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
+   * Only partitions that tale more than this time to receive thier portion of events in batch are considered
+   * as potential slow partitrions.
+   * Default: [[DefaultMaxAcceptableBatchReceiveTime]]
    *
    * @param d the new maximum acceptable time for a partition to receive events in a single batch
    * @return the updated [[EventHubsConf]] instance
@@ -561,6 +568,98 @@ final class EventHubsConf private (private val connectionStr: String)
             s"${PartitionPreferredLocationStrategy.values.mkString(",")}"))
   }
 
+  /**
+   * Set whether to use AAD auth to connect eventhubs.
+   * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+   * There're 2 options for AadAuth: 1) Certificate; 2) Secret, you'll also need to set
+   * 1) eventhubs.aadAuthTenantId 2) eventhubs.aadAuthClientId
+   * If "Certificate", you'll also need to set
+   * 1) eventhubs.aadAuthCertByteBuffer 2) eventhubs.aadAuthCertPassowrd
+   * If "Secret", you need to set
+   * 1) eventhubs.aadAuthSecret
+   * Default: [[DefaultEmptyString]]
+   *
+   * @param aadAuth whether to use aad auth by eventhubs client
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuth(aadAuth: String): EventHubsConf = {
+    set(AadAuthKey, aadAuth)
+  }
+
+  def aadAuth: String = {
+    self.get(AadAuthKey).getOrElse(DefaultEmptyString)
+  }
+
+  /**
+   * Set the tenant id if [[AadAuthKey]] is Certificate or Password
+   * Default: [[DefaultAadAuthTenantId]]: Microsoft tenant
+   *
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthTenantId(tenantId: String): EventHubsConf = {
+    set(AadAuthTenantIdKey, tenantId)
+  }
+
+  def aadAuthTenantId: String = {
+    self.get(AadAuthTenantIdKey).getOrElse(DefaultAadAuthTenantId)
+  }
+
+  /**
+   * Set the certficate byte buffer if [[AadAuthKey]] is Certificate or Password
+   *
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthClientCertificateByteBuffer(certificateByteBuffer: Array[Byte]): EventHubsConf = {
+    set(AadAuthClientCertificateByteBufferKey, new String(certificateByteBuffer.map(_.toChar))) // we want to keep it as it is, no string encoding
+  }
+
+  def aadAuthClientCertificateByteBuffer: Array[Byte] = {
+    self
+      .get(AadAuthClientCertificateByteBufferKey)
+      .getOrElse(DefaultEmptyString)
+      .toCharArray
+      .map(_.toByte)
+  }
+
+  /**
+   * Set the client id if [[AadAuthKey]] is Certificate or Password
+   *
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthClientCertificatePassword(certificatePassword: String): EventHubsConf = {
+    set(AadAuthClientCertificatePasswordKey, certificatePassword)
+  }
+
+  def aadAuthClientCertificatePassword: String = {
+    self.get(AadAuthClientCertificatePasswordKey).getOrElse(DefaultEmptyString)
+  }
+
+  /**
+   * Set the client id if [[AadAuthKey]] is Certificate or Password
+   *
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthClientId(clientId: String): EventHubsConf = {
+    set(AadAuthClientIdKey, clientId)
+  }
+
+  def aadAuthClientId: String = {
+    self.get(AadAuthClientIdKey).getOrElse(DefaultEmptyString)
+  }
+
+  /**
+   * Set the client Secret if [[AadAuthKey]] is Certificate or Password
+   *
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthClientSecret(clientId: String): EventHubsConf = {
+    set(AadAuthClientSecretKey, clientId)
+  }
+
+  def aadAuthClientSecret: String = {
+    self.get(AadAuthClientSecretKey).getOrElse(DefaultEmptyString)
+  }
+
   // The simulated client (and simulated eventhubs) will be used. These
   // can be found in EventHubsTestUtils.
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
@@ -618,6 +717,12 @@ object EventHubsConf extends Logging {
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
   val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
+  val AadAuthKey = "eventhubs.aadAuth"
+  val AadAuthTenantIdKey = "eventhubs.aadAuthTenantId"
+  val AadAuthClientIdKey = "eventhubs.aadAuthClientId"
+  val AadAuthClientCertificateByteBufferKey = "eventhubs.aadAuthCertByteBuffer"
+  val AadAuthClientCertificatePasswordKey = "eventhubs.aadAuthCertPassword"
+  val AadAuthClientSecretKey = "eventhubs.aadAuthClientSecret"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

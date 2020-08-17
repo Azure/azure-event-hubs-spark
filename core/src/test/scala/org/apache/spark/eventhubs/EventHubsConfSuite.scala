@@ -99,6 +99,13 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[Exception] { map(OperationTimeoutKey) }
     intercept[Exception] { map(MaxEventsPerTriggerKey) }
     assert(map(UseSimulatedClientKey).toBoolean)
+    assert(map(AadAuthKey) == AadAuthByCertificate)
+    assert(map(AadAuthClientIdKey) == "ClientGuid")
+    intercept[Exception] { map(AadAuthTenantIdKey) }
+    intercept[Exception] { map(AadAuthClientSecretKey) }
+    intercept[Exception] { map(AadAuthClientCertificatePasswordKey) }
+    intercept[Exception] { map(AadAuthClientCertificateByteBufferKey) }
+    intercept[Exception] { map(AadAuthClientCertificatePasswordKey) }
   }
 
   test("toConf") {
@@ -118,7 +125,11 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         StartingPositionsKey -> Serialization.write(expectedPositions.map {
           case (k, v) => k.toString -> v
         }),
-        MaxEventsPerTriggerKey -> 4.toString
+        MaxEventsPerTriggerKey -> 4.toString,
+        AadAuthKey -> AadAuthBySecret,
+        AadAuthClientIdKey -> "client_guid",
+        AadAuthTenantIdKey -> "tenant_guid",
+        AadAuthClientSecretKey -> "client_secret"
       ))
 
     val expectedConf = EventHubsConf(expectedConnStr)
@@ -126,6 +137,10 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setStartingPosition(expectedPosition)
       .setStartingPositions(expectedPositions)
       .setMaxEventsPerTrigger(4L)
+      .setAadAuth(AadAuthBySecret)
+      .setAadAuthClientId("client_guid")
+      .setAadAuthTenantId("tenant_guid")
+      .setAadAuthClientSecret("client_secret")
 
     assert(expectedConf.equals(actualConf))
   }
@@ -248,6 +263,11 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setThreadPoolSize(16)
       .setPrefetchCount(100)
       .setUseExclusiveReceiver(true)
+      .setAadAuth(AadAuthByCertificate)
+      .setAadAuthTenantId("tenant_id")
+      .setAadAuthClientId("client_id")
+      .setAadAuthClientCertificateByteBuffer(Array(231.toByte, 127.toByte))
+      .setAadAuthClientCertificatePassword("certificate_password")
 
     val newConf = originalConf.trimmed
 
@@ -268,6 +288,11 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     originalConf("eventhubs.useExclusiveReceiver")
     originalConf("maxEventsPerTrigger")
     originalConf("useSimulatedClient")
+    originalConf("eventhubs.aadAuth")
+    originalConf("eventhubs.aadAuthTenantId")
+    originalConf("eventhubs.aadAuthClientId")
+    originalConf("eventhubs.aadAuthCertByteBuffer")
+    originalConf("eventhubs.aadAuthCertPassword")
 
     // newConf should be trimmed
     newConf("eventhubs.connectionString")
@@ -286,6 +311,12 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     newConf("eventhubs.useExclusiveReceiver")
     intercept[NoSuchElementException] { newConf("maxEventsPerTrigger") }
     newConf("useSimulatedClient")
+    newConf("eventhubs.aadAuth")
+    newConf("eventhubs.aadAuthTenantId")
+    newConf("eventhubs.aadAuthClientId")
+    newConf("eventhubs.aadAuthCertByteBuffer")
+    newConf("eventhubs.aadAuthCertPassword")
+    intercept[NoSuchElementException] { newConf("eventhubs.aadAuthClientSecret") }
   }
 
   test("validate - with EntityPath") {
@@ -371,5 +402,14 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     eventHubConfig.setMaxAcceptableBatchReceiveTime(expectedTime)
     val actualTime = eventHubConfig.maxAcceptableBatchReceiveTime.get
     assert(expectedTime == actualTime)
+  }
+
+  test("validate - certificate byte array") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+        .setAadAuthClientCertificateByteBuffer(Array(0x34, 0xFF.toByte))
+    val expectedCertBuffer = Array(0x34, 0xFF.toByte)
+    val actualCertBuffer = eventHubConfig.aadAuthClientCertificateByteBuffer
+    assert(expectedCertBuffer.size == actualCertBuffer.size)
+    assert(expectedCertBuffer === actualCertBuffer)
   }
 }

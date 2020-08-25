@@ -254,6 +254,66 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
+  test("Partitions number increased") {
+    var eventHub = testUtils.createEventHubs(newEventHubs(), DefaultPartitionCount)
+    testUtils.populateUniformly(eventHub.name, 5000)
+
+    val parameters = testUtils
+        .getEventHubsConfWithoutStartingPositions(eventHub.name)
+        .setMaxEventsPerTrigger(4)
+        .setStartingPosition(EventPosition.fromStartOfStream)
+        .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // we'll get one event per partition per trigger
+      CheckAnswer(0, 0, 0, 0),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1),
+      StopStream
+    )
+    eventHub = testUtils.createEventHubs(eventHub.name, DefaultPartitionCount * 2)
+    testUtils.populateUniformly(eventHub.name, 3)
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0 ,0, 0, 0, 0, 0, 0, 0),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0 ,0, 0, 0, 0, 0, 0, 0, 1 ,1, 1, 1, 1, 1, 1, 1)
+    )
+  }
+
   test("maxOffsetsPerTrigger with non-uniform partitions") {
     val name = newEventHubs()
     val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)

@@ -224,7 +224,6 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(StartingPositionKey) map EventHubsConf.read[EventPosition]
   }
 
-
   /**
    * Sets starting positions on a per partition basis. This takes precedent over all
    * other configurations. If nothing is set here, then we will defer to what has been set

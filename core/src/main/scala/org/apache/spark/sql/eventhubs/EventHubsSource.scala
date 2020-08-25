@@ -166,10 +166,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         }
       }
     val defaultSeqNos = ehClient
-      .translate(
-        ehConf.clone.setStartingPosition(
-          ehConf.startingPositionForNewPartitions.getOrElse(DefaultEventPositionForNewPartitions)),
-        partitionCount)
+      .translate(ehConf, partitionCount)
       .map {
         case (pId, seqNo) =>
           (NameAndPartition(ehName, pId), seqNo)
@@ -214,26 +211,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     val latest = earliestAndLatest.map {
       case (p, (_, l)) => NameAndPartition(ehName, p) -> l
-    }
-
-    val fromSeqNumbers = currentSeqNos match {
-      case Some(currentSeqNumbers) =>
-        if (earliestAndLatest.size > currentSeqNumbers.size) {
-          val defaultSeqNos = ehClient
-            .translate(ehConf.clone.setStartingPosition(
-                         ehConf.startingPositionForNewPartitions.getOrElse(
-                           DefaultEventPositionForNewPartitions)),
-                       partitionCount)
-            .map {
-              case (pId, seqNo) =>
-                (NameAndPartition(ehName, pId), seqNo)
-            }
-          defaultSeqNos ++ currentSeqNumbers
-        } else {
-          currentSeqNumbers
-        }
-      case None =>
-        initialPartitionSeqNos
     }
 
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
@@ -364,10 +341,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         val prevOffsets = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
         val startingSeqNos = if (prevOffsets.size < untilSeqNos.size) {
           val defaultSeqNos = ehClient
-            .translate(ehConf.clone.setStartingPosition(
-                         ehConf.startingPositionForNewPartitions.getOrElse(
-                           DefaultEventPositionForNewPartitions)),
-                       partitionCount)
+            .translate(ehConf, partitionCount)
             .map {
               case (pId, seqNo) =>
                 (NameAndPartition(ehName, pId), seqNo)

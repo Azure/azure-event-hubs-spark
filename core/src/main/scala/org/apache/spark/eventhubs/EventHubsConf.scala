@@ -224,13 +224,6 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(StartingPositionKey) map EventHubsConf.read[EventPosition]
   }
 
-  def setStartingPositionForNewPartitions(eventPosition: EventPosition): EventHubsConf = {
-    set(StartingPositionForNewPartitionsKey, EventHubsConf.write(eventPosition))
-  }
-
-  def startingPositionForNewPartitions: Option[EventPosition] = {
-    self.get(StartingPositionForNewPartitionsKey) map EventHubsConf.read[EventPosition]
-  }
 
   /**
    * Sets starting positions on a per partition basis. This takes precedent over all
@@ -623,7 +616,6 @@ object EventHubsConf extends Logging {
   val UseSimulatedClientKey = "useSimulatedClient"
   val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
-  val StartingPositionForNewPartitionsKey = "eventhubs.StartingPositionForNewPartitionsKey"
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
   val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"

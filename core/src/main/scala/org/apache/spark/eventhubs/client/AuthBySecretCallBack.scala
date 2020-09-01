@@ -12,7 +12,7 @@ case class AuthBySecretCallBack(clientId: String, clientSecret: String) extends 
   override def acquireToken(audience: String, authority: String, state: Any): CompletableFuture[String] = try {
     var app = ConfidentialClientApplication
       .builder(clientId, new ClientSecret(this.clientSecret))
-      .authority(authority)
+      .authority("https://login.microsoftonline.com/" + authority)
       .build
 
     val parameters = ClientCredentialParameters.builder(Collections.singleton(audience + ".default")).build

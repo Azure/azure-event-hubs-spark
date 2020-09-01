@@ -652,8 +652,8 @@ final class EventHubsConf private (private val connectionStr: String)
    *
    * @return the updated [[EventHubsConf]] instance
    */
-  def setAadAuthClientSecret(clientId: String): EventHubsConf = {
-    set(AadAuthClientSecretKey, clientId)
+  def setAadAuthClientSecret(clientSecret: String): EventHubsConf = {
+    set(AadAuthClientSecretKey, clientSecret)
   }
 
   def aadAuthClientSecret: String = {

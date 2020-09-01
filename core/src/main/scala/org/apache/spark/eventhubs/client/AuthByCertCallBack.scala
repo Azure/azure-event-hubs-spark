@@ -21,7 +21,7 @@ case class AuthByCertCallBack(clientId: String, cert: Array[Byte], certPassword:
       val app = ConfidentialClientApplication
         .builder(clientId,
                  ClientCredentialFactory.create(new ByteArrayInputStream(cert), certPassword))
-        .authority(authority)
+        .authority("https://login.microsoftonline.com/" + authority)
         .build
 
       val parameters =

@@ -56,12 +56,13 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        if (ehConf.aadAuth.toLowerCase.equals(AadAuthByCertificate)) {
-          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
-            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
-            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-            .setRetryPolicy(RetryPolicy.getDefault)
+        val aadAuthMethod = ehConf.aadAuth.toLowerCase
+        val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
+          .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+          .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+          .setRetryPolicy(RetryPolicy.getDefault)
 
+        if (aadAuthMethod.equals(AadAuthByCertificate)) {
           client = EventHubClient.createWithAzureActiveDirectory(
             connStr.getEndpoint,
             ehConf.name,
@@ -74,12 +75,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
             ClientThreadPool.get(ehConf),
             ehClientOption
           ).get()
-        } else if (ehConf.aadAuth.toLowerCase.equals(AadAuthBySecret)) {
-          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
-            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
-            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-            .setRetryPolicy(RetryPolicy.getDefault)
-
+        } else if (aadAuthMethod.equals(AadAuthBySecret)) {
           client = EventHubClient.createWithAzureActiveDirectory(
             connStr.getEndpoint,
             ehConf.name,
@@ -87,6 +83,15 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
               ehConf.aadAuthClientId,
               ehConf.aadAuthClientSecret
             ),
+            ehConf.aadAuthTenantId,
+            ClientThreadPool.get(ehConf),
+            ehClientOption
+          ).get()
+        } else if (aadAuthMethod.equals(AadAuthByCallback)) {
+          client = EventHubClient.createWithAzureActiveDirectory(
+            connStr.getEndpoint,
+            ehConf.name,
+            ehConf.aadAuthCallback().get,
             ehConf.aadAuthTenantId,
             ClientThreadPool.get(ehConf),
             ehClientOption

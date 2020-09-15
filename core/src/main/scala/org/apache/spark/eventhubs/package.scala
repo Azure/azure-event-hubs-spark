@@ -66,6 +66,7 @@ package object eventhubs {
 
   val AadAuthByCertificate = "certificate"
   val AadAuthBySecret = "secret"
+  val AadAuthByCallback = "callback"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int

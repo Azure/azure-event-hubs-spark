@@ -20,9 +20,10 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
+import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider.AuthenticationCallback
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.{ MetricPlugin, ThrottlingStatusPlugin }
+import org.apache.spark.eventhubs.utils.{AadAuthenticationCallback, MetricPlugin, ThrottlingStatusPlugin}
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -175,7 +176,8 @@ final class EventHubsConf private (private val connectionStr: String)
       AadAuthClientIdKey,
       AadAuthClientSecretKey,
       AadAuthClientCertificateByteBufferKey,
-      AadAuthClientCertificatePasswordKey
+      AadAuthClientCertificatePasswordKey,
+      AadAuthCallbackKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -571,7 +573,7 @@ final class EventHubsConf private (private val connectionStr: String)
   /**
    * Set whether to use AAD auth to connect eventhubs.
    * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
-   * There're 2 options for AadAuth: 1) Certificate; 2) Secret, you'll also need to set
+   * There're 3 options for AadAuth: 1) Certificate; 2) Secret; 3) Callback. You'll also need to set
    * 1) eventhubs.aadAuthTenantId 2) eventhubs.aadAuthClientId
    * If "Certificate", you'll also need to set
    * 1) eventhubs.aadAuthCertByteBuffer 2) eventhubs.aadAuthCertPassowrd
@@ -660,6 +662,16 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(AadAuthClientSecretKey).getOrElse(DefaultEmptyString)
   }
 
+  def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
+    set(AadAuthCallbackKey, callback.getClass.getName)
+  }
+
+  def aadAuthCallback(): Option[AadAuthenticationCallback] = {
+    self.get(AadAuthCallbackKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
+    })
+  }
+
   // The simulated client (and simulated eventhubs) will be used. These
   // can be found in EventHubsTestUtils.
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
@@ -723,6 +735,7 @@ object EventHubsConf extends Logging {
   val AadAuthClientCertificateByteBufferKey = "eventhubs.aadAuthCertByteBuffer"
   val AadAuthClientCertificatePasswordKey = "eventhubs.aadAuthCertPassword"
   val AadAuthClientSecretKey = "eventhubs.aadAuthClientSecret"
+  val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

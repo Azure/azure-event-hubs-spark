@@ -20,16 +20,12 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.NoSuchElementException
 
-import org.apache.spark.eventhubs.utils.{
-  EventHubsTestUtils,
-  MetricPluginMock,
-  ThrottlingStatusPluginMock
-}
+import org.apache.spark.eventhubs.utils.{AadAuthenticationCallbackMock, EventHubsTestUtils, MetricPluginMock, ThrottlingStatusPluginMock}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.{ read => sread }
-import org.json4s.jackson.Serialization.{ write => swrite }
-import org.scalatest.{ BeforeAndAfterAll, FunSuite }
+import org.json4s.jackson.Serialization.{read => sread}
+import org.json4s.jackson.Serialization.{write => swrite}
+import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 /**
  * Tests [[EventHubsConf]] for correctness.
@@ -317,6 +313,8 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     newConf("eventhubs.aadAuthCertByteBuffer")
     newConf("eventhubs.aadAuthCertPassword")
     intercept[NoSuchElementException] { newConf("eventhubs.aadAuthClientSecret") }
+    intercept[NoSuchElementException] { newConf("eventhubs.aadAuthCallback") }
+
   }
 
   test("validate - with EntityPath") {
@@ -411,5 +409,17 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val actualCertBuffer = eventHubConfig.aadAuthClientCertificateByteBuffer
     assert(expectedCertBuffer.size == actualCertBuffer.size)
     assert(expectedCertBuffer === actualCertBuffer)
+  }
+
+  test("validate - AadAuthenticationCallback") {
+    val aadAuthCallback = new AadAuthenticationCallbackMock()
+    val eventHubConfig = testUtils.getEventHubsConf()
+      .setAadAuth("callback")
+      .setAadAuthCallback(aadAuthCallback)
+
+    val actualAuthMethod = eventHubConfig.aadAuth
+    val actualCallback = eventHubConfig.aadAuthCallback()
+    assert(actualAuthMethod == "callback")
+    assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMock])
   }
 }

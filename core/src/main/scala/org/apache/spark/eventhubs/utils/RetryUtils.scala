@@ -79,14 +79,16 @@ private[spark] object RetryUtils extends Logging {
    * @param opName the name of the operation. This is to assist with logging.
    * @param maxRetry The number of times the operation will be retried.
    * @param delay The delay (in milliseconds) before the Future is run again.
+   * @param replaceTransientErrors If not null a transient error returns this Future instead.
    * @tparam T the result type from the [[CompletableFuture]]
    * @return the [[Future]] returned by the async operation
    */
   final def retryJava[T](fn: => CompletableFuture[T],
                          opName: String,
                          maxRetry: Int = RetryCount,
-                         delay: Int = 10): Future[T] = {
-    retryScala(toScala(fn), opName, maxRetry, delay)
+                         delay: Int = 10,
+                         replaceTransientErrors: Future[T] = null): Future[T] = {
+    retryScala(toScala(fn), opName, maxRetry, delay, replaceTransientErrors)
   }
 
   /**
@@ -100,13 +102,15 @@ private[spark] object RetryUtils extends Logging {
    * @param opName the name of the operation. This is to assist with logging.
    * @param maxRetry The number of times the operation will be retried.
    * @param delay The delay (in milliseconds) before the Future is run again.
+   * @param replaceTransientErrors If not null a transient error returns this Future instead.
    * @tparam T the result type from the [[Future]]
    * @return the [[Future]] returned by the async operation
    */
   final def retryScala[T](fn: => Future[T],
                           opName: String,
                           maxRetry: Int = RetryCount,
-                          delay: Int = 10): Future[T] = {
+                          delay: Int = 10,
+                          replaceTransientErrors: Future[T] = null): Future[T] = {
     def retryHelper(fn: => Future[T], retryCount: Int): Future[T] = {
       val taskId = EventHubsUtils.getTaskId
       fn.recoverWith {
@@ -115,8 +119,13 @@ private[spark] object RetryUtils extends Logging {
             logInfo(s"(TID $taskId) failure: $opName")
             throw eh
           }
-          logInfo(s"(TID $taskId) retrying $opName after $delay ms")
-          after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+          if (replaceTransientErrors != null) {
+            logInfo(s"(TID $taskId) ignoring transient failure in $opName")
+            replaceTransientErrors
+          } else {
+            logInfo(s"(TID $taskId) retrying $opName after $delay ms")
+            after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+          }
         case t: Throwable =>
           t.getCause match {
             case eh: EventHubException if eh.getIsTransient =>
@@ -124,8 +133,13 @@ private[spark] object RetryUtils extends Logging {
                 logInfo(s"(TID $taskId) failure: $opName")
                 throw eh
               }
-              logInfo(s"(TID $taskId) retrying $opName after $delay ms")
-              after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+              if (replaceTransientErrors != null) {
+                logInfo(s"(TID $taskId) ignoring transient failure in $opName")
+                replaceTransientErrors
+              } else {
+                logInfo(s"(TID $taskId) retrying $opName after $delay ms")
+                after(delay.milliseconds)(retryHelper(fn, retryCount + 1))
+              }
             case _ =>
               logInfo(s"(TID $taskId) failure: $opName")
               throw t

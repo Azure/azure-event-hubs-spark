@@ -64,9 +64,7 @@ package object eventhubs {
 
   val SparkConnectorVersion = "2.3.17"
 
-  val AadAuthByCertificate = "certificate"
-  val AadAuthBySecret = "secret"
-  val AadAuthByCallback = "callback"
+  val DefaultUseAadAuth = "false"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int

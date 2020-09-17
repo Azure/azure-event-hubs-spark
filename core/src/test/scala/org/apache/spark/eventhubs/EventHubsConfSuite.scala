@@ -95,13 +95,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[Exception] { map(OperationTimeoutKey) }
     intercept[Exception] { map(MaxEventsPerTriggerKey) }
     assert(map(UseSimulatedClientKey).toBoolean)
-    assert(map(AadAuthKey) == AadAuthByCertificate)
-    assert(map(AadAuthClientIdKey) == "ClientGuid")
+    intercept[Exception] { map(UseAadAuthKey) }
     intercept[Exception] { map(AadAuthTenantIdKey) }
-    intercept[Exception] { map(AadAuthClientSecretKey) }
-    intercept[Exception] { map(AadAuthClientCertificatePasswordKey) }
-    intercept[Exception] { map(AadAuthClientCertificateByteBufferKey) }
-    intercept[Exception] { map(AadAuthClientCertificatePasswordKey) }
+    intercept[Exception] { map(AadAuthCallbackKey) }
   }
 
   test("toConf") {
@@ -122,10 +118,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
           case (k, v) => k.toString -> v
         }),
         MaxEventsPerTriggerKey -> 4.toString,
-        AadAuthKey -> AadAuthBySecret,
-        AadAuthClientIdKey -> "client_guid",
+        UseAadAuthKey -> "true",
         AadAuthTenantIdKey -> "tenant_guid",
-        AadAuthClientSecretKey -> "client_secret"
+        AadAuthCallbackKey -> classOf[AadAuthenticationCallbackMock].getName
       ))
 
     val expectedConf = EventHubsConf(expectedConnStr)
@@ -133,10 +128,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setStartingPosition(expectedPosition)
       .setStartingPositions(expectedPositions)
       .setMaxEventsPerTrigger(4L)
-      .setAadAuth(AadAuthBySecret)
-      .setAadAuthClientId("client_guid")
+      .setUseAadAuth(true)
       .setAadAuthTenantId("tenant_guid")
-      .setAadAuthClientSecret("client_secret")
+      .setAadAuthCallback(new AadAuthenticationCallbackMock())
 
     assert(expectedConf.equals(actualConf))
   }
@@ -258,12 +252,10 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setOperationTimeout(Duration.ofSeconds(10))
       .setThreadPoolSize(16)
       .setPrefetchCount(100)
-      .setUseExclusiveReceiver(true)
-      .setAadAuth(AadAuthByCertificate)
+      .setUseAadAuth(true)
       .setAadAuthTenantId("tenant_id")
-      .setAadAuthClientId("client_id")
-      .setAadAuthClientCertificateByteBuffer(Array(231.toByte, 127.toByte))
-      .setAadAuthClientCertificatePassword("certificate_password")
+      .setAadAuthCallback(new AadAuthenticationCallbackMock())
+      .setUseExclusiveReceiver(true)
 
     val newConf = originalConf.trimmed
 
@@ -284,11 +276,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     originalConf("eventhubs.useExclusiveReceiver")
     originalConf("maxEventsPerTrigger")
     originalConf("useSimulatedClient")
-    originalConf("eventhubs.aadAuth")
+    originalConf("eventhubs.useAadAuth")
     originalConf("eventhubs.aadAuthTenantId")
-    originalConf("eventhubs.aadAuthClientId")
-    originalConf("eventhubs.aadAuthCertByteBuffer")
-    originalConf("eventhubs.aadAuthCertPassword")
+    originalConf("eventhubs.aadAuthCallback")
 
     // newConf should be trimmed
     newConf("eventhubs.connectionString")
@@ -307,14 +297,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     newConf("eventhubs.useExclusiveReceiver")
     intercept[NoSuchElementException] { newConf("maxEventsPerTrigger") }
     newConf("useSimulatedClient")
-    newConf("eventhubs.aadAuth")
-    newConf("eventhubs.aadAuthTenantId")
-    newConf("eventhubs.aadAuthClientId")
-    newConf("eventhubs.aadAuthCertByteBuffer")
-    newConf("eventhubs.aadAuthCertPassword")
-    intercept[NoSuchElementException] { newConf("eventhubs.aadAuthClientSecret") }
-    intercept[NoSuchElementException] { newConf("eventhubs.aadAuthCallback") }
-
   }
 
   test("validate - with EntityPath") {
@@ -402,24 +384,15 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(expectedTime == actualTime)
   }
 
-  test("validate - certificate byte array") {
-    val eventHubConfig = testUtils.getEventHubsConf()
-        .setAadAuthClientCertificateByteBuffer(Array(0x34, 0xFF.toByte))
-    val expectedCertBuffer = Array(0x34, 0xFF.toByte)
-    val actualCertBuffer = eventHubConfig.aadAuthClientCertificateByteBuffer
-    assert(expectedCertBuffer.size == actualCertBuffer.size)
-    assert(expectedCertBuffer === actualCertBuffer)
-  }
 
   test("validate - AadAuthenticationCallback") {
     val aadAuthCallback = new AadAuthenticationCallbackMock()
     val eventHubConfig = testUtils.getEventHubsConf()
-      .setAadAuth("callback")
+      .setUseAadAuth(true)
       .setAadAuthCallback(aadAuthCallback)
 
-    val actualAuthMethod = eventHubConfig.aadAuth
     val actualCallback = eventHubConfig.aadAuthCallback()
-    assert(actualAuthMethod == "callback")
+    assert(eventHubConfig.useAadAuth)
     assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMock])
   }
 }

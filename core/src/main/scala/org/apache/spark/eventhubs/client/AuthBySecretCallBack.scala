@@ -1,13 +1,12 @@
 package org.apache.spark.eventhubs.client
 
-import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
 
 import com.microsoft.aad.msal4j.{IAuthenticationResult, _}
-import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider
+import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
-case class AuthBySecretCallBack(clientId: String, clientSecret: String) extends AzureActiveDirectoryTokenProvider.AuthenticationCallback {
+case class AuthBySecretCallBack(clientId: String, clientSecret: String) extends AadAuthenticationCallback{
 
   override def acquireToken(audience: String, authority: String, state: Any): CompletableFuture[String] = try {
     var app = ConfidentialClientApplication

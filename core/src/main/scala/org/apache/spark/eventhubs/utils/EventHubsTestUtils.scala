@@ -149,8 +149,6 @@ private[spark] class EventHubsTestUtils {
       .setConsumerGroup("consumerGroup")
       .setStartingPositions(positions)
       .setMaxRatePerPartition(DefaultMaxRate)
-      .setAadAuth("certificate")
-      .setAadAuthClientId("ClientGuid")
       .setUseSimulatedClient(true)
   }
 

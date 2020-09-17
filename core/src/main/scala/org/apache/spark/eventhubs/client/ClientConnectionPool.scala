@@ -56,38 +56,13 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        val aadAuthMethod = ehConf.aadAuth.toLowerCase
-        val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
-          .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
-          .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-          .setRetryPolicy(RetryPolicy.getDefault)
 
-        if (aadAuthMethod.equals(AadAuthByCertificate)) {
-          client = EventHubClient.createWithAzureActiveDirectory(
-            connStr.getEndpoint,
-            ehConf.name,
-            AuthByCertCallBack(
-              ehConf.aadAuthClientId,
-              ehConf.aadAuthClientCertificateByteBuffer,
-              ehConf.aadAuthClientCertificatePassword
-            ),
-            ehConf.aadAuthTenantId,
-            ClientThreadPool.get(ehConf),
-            ehClientOption
-          ).get()
-        } else if (aadAuthMethod.equals(AadAuthBySecret)) {
-          client = EventHubClient.createWithAzureActiveDirectory(
-            connStr.getEndpoint,
-            ehConf.name,
-            AuthBySecretCallBack(
-              ehConf.aadAuthClientId,
-              ehConf.aadAuthClientSecret
-            ),
-            ehConf.aadAuthTenantId,
-            ClientThreadPool.get(ehConf),
-            ehClientOption
-          ).get()
-        } else if (aadAuthMethod.equals(AadAuthByCallback)) {
+
+        if (ehConf.useAadAuth) {
+          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
+            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+            .setRetryPolicy(RetryPolicy.getDefault)
           client = EventHubClient.createWithAzureActiveDirectory(
             connStr.getEndpoint,
             ehConf.name,

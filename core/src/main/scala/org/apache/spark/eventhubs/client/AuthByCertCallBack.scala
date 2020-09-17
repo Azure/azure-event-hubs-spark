@@ -4,16 +4,11 @@ import java.io.ByteArrayInputStream
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
 
-import com.microsoft.aad.msal4j.{
-  ClientCredentialFactory,
-  ClientCredentialParameters,
-  ConfidentialClientApplication,
-  IAuthenticationResult
-}
-import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider
+import com.microsoft.aad.msal4j.{ClientCredentialFactory, ClientCredentialParameters, ConfidentialClientApplication, IAuthenticationResult}
+import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
 case class AuthByCertCallBack(clientId: String, cert: Array[Byte], certPassword: String)
-    extends AzureActiveDirectoryTokenProvider.AuthenticationCallback {
+    extends AadAuthenticationCallback {
   override def acquireToken(audience: String,
                             authority: String,
                             state: Any): CompletableFuture[String] =

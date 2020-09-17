@@ -171,12 +171,8 @@ final class EventHubsConf private (private val connectionStr: String)
       SlowPartitionAdjustmentKey,
       ThrottlingStatusPluginKey,
       MaxAcceptableBatchReceiveTimeKey,
-      AadAuthKey,
+      UseAadAuthKey,
       AadAuthTenantIdKey,
-      AadAuthClientIdKey,
-      AadAuthClientSecretKey,
-      AadAuthClientCertificateByteBufferKey,
-      AadAuthClientCertificatePasswordKey,
       AadAuthCallbackKey
     ).map(_.toLowerCase).toSet
 
@@ -571,25 +567,27 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set whether to use AAD auth to connect eventhubs.
+   * Use AAD auth to connect eventhubs instead of connection string.
    * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
-   * There're 3 options for AadAuth: 1) Certificate; 2) Secret; 3) Callback. You'll also need to set
-   * 1) eventhubs.aadAuthTenantId 2) eventhubs.aadAuthClientId
-   * If "Certificate", you'll also need to set
-   * 1) eventhubs.aadAuthCertByteBuffer 2) eventhubs.aadAuthCertPassowrd
-   * If "Secret", you need to set
-   * 1) eventhubs.aadAuthSecret
-   * Default: [[DefaultEmptyString]]
-   *
-   * @param aadAuth whether to use aad auth by eventhubs client
+   * Default: [[false]]
    * @return the updated [[EventHubsConf]] instance
    */
-  def setAadAuth(aadAuth: String): EventHubsConf = {
-    set(AadAuthKey, aadAuth)
+  def setUseAadAuth(b: Boolean): EventHubsConf = {
+    set(UseAadAuthKey, b)
   }
 
-  def aadAuth: String = {
-    self.get(AadAuthKey).getOrElse(DefaultEmptyString)
+  def useAadAuth: Boolean = {
+    self.get(UseAadAuthKey).getOrElse(DefaultUseAadAuth).toBoolean
+  }
+
+  def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
+    set(AadAuthCallbackKey, callback.getClass.getName)
+  }
+
+  def aadAuthCallback(): Option[AadAuthenticationCallback] = {
+    self.get(AadAuthCallbackKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
+    })
   }
 
   /**
@@ -604,72 +602,6 @@ final class EventHubsConf private (private val connectionStr: String)
 
   def aadAuthTenantId: String = {
     self.get(AadAuthTenantIdKey).getOrElse(DefaultAadAuthTenantId)
-  }
-
-  /**
-   * Set the certficate byte buffer if [[AadAuthKey]] is Certificate or Password
-   *
-   * @return the updated [[EventHubsConf]] instance
-   */
-  def setAadAuthClientCertificateByteBuffer(certificateByteBuffer: Array[Byte]): EventHubsConf = {
-    set(AadAuthClientCertificateByteBufferKey, new String(certificateByteBuffer.map(_.toChar))) // we want to keep it as it is, no string encoding
-  }
-
-  def aadAuthClientCertificateByteBuffer: Array[Byte] = {
-    self
-      .get(AadAuthClientCertificateByteBufferKey)
-      .getOrElse(DefaultEmptyString)
-      .toCharArray
-      .map(_.toByte)
-  }
-
-  /**
-   * Set the client id if [[AadAuthKey]] is Certificate or Password
-   *
-   * @return the updated [[EventHubsConf]] instance
-   */
-  def setAadAuthClientCertificatePassword(certificatePassword: String): EventHubsConf = {
-    set(AadAuthClientCertificatePasswordKey, certificatePassword)
-  }
-
-  def aadAuthClientCertificatePassword: String = {
-    self.get(AadAuthClientCertificatePasswordKey).getOrElse(DefaultEmptyString)
-  }
-
-  /**
-   * Set the client id if [[AadAuthKey]] is Certificate or Password
-   *
-   * @return the updated [[EventHubsConf]] instance
-   */
-  def setAadAuthClientId(clientId: String): EventHubsConf = {
-    set(AadAuthClientIdKey, clientId)
-  }
-
-  def aadAuthClientId: String = {
-    self.get(AadAuthClientIdKey).getOrElse(DefaultEmptyString)
-  }
-
-  /**
-   * Set the client Secret if [[AadAuthKey]] is Certificate or Password
-   *
-   * @return the updated [[EventHubsConf]] instance
-   */
-  def setAadAuthClientSecret(clientSecret: String): EventHubsConf = {
-    set(AadAuthClientSecretKey, clientSecret)
-  }
-
-  def aadAuthClientSecret: String = {
-    self.get(AadAuthClientSecretKey).getOrElse(DefaultEmptyString)
-  }
-
-  def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
-    set(AadAuthCallbackKey, callback.getClass.getName)
-  }
-
-  def aadAuthCallback(): Option[AadAuthenticationCallback] = {
-    self.get(AadAuthCallbackKey) map (className => {
-      Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
-    })
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -729,13 +661,9 @@ object EventHubsConf extends Logging {
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
   val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
-  val AadAuthKey = "eventhubs.aadAuth"
-  val AadAuthTenantIdKey = "eventhubs.aadAuthTenantId"
-  val AadAuthClientIdKey = "eventhubs.aadAuthClientId"
-  val AadAuthClientCertificateByteBufferKey = "eventhubs.aadAuthCertByteBuffer"
-  val AadAuthClientCertificatePasswordKey = "eventhubs.aadAuthCertPassword"
-  val AadAuthClientSecretKey = "eventhubs.aadAuthClientSecret"
+  val UseAadAuthKey = "eventhubs.useAadAuth"
   val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
+  val AadAuthTenantIdKey =  "eventhubs.aadAuthTenantId"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

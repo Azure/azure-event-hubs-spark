@@ -33,6 +33,8 @@ import org.apache.spark.eventhubs.{
   PartitionPerformanceReceiver
 }
 import org.apache.spark.internal.Logging
+import org.apache.spark.rpc.RpcEndpointRef
+import org.apache.spark.SparkException
 import org.apache.spark.util.RpcUtils
 
 import scala.collection.JavaConverters._
@@ -66,7 +68,7 @@ private[spark] trait CachedReceiver {
 private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                                        nAndP: NameAndPartition,
                                                        startSeqNo: SequenceNumber)
-    extends Logging {
+  extends Logging {
 
   type AwaitTimeoutException = java.util.concurrent.TimeoutException
 
@@ -89,11 +91,11 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiverOptions.setIdentifier(s"spark-${SparkEnv.get.executorId}-$taskId")
     val consumer = retryJava(
       EventHubsUtils.createReceiverInner(client,
-                                         ehConf.useExclusiveReceiver,
-                                         consumerGroup,
-                                         nAndP.partitionId.toString,
-                                         EventPosition.fromSequenceNumber(seqNo).convert,
-                                         receiverOptions),
+        ehConf.useExclusiveReceiver,
+        consumerGroup,
+        nAndP.partitionId.toString,
+        EventPosition.fromSequenceNumber(seqNo).convert,
+        receiverOptions),
       "CachedReceiver creation."
     )
     Await.result(consumer, ehConf.internalOperationTimeout)
@@ -162,7 +164,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       Await.result(lastReceivedOffset(), ehConf.internalOperationTimeout)
 
     if ((lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) ||
-        !receiver.getIsOpen) {
+      !receiver.getIsOpen) {
       logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
         DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
 
@@ -193,11 +195,11 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
         // The event still isn't present. It must be (2).
         val info = Await.result(
           retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
-                    "partitionRuntime"),
+            "partitionRuntime"),
           ehConf.internalOperationTimeout)
 
         if (requestSeqNo < info.getBeginSequenceNumber &&
-            movedSeqNo == info.getBeginSequenceNumber) {
+          movedSeqNo == info.getBeginSequenceNumber) {
           Future {
             movedEvent
           }
@@ -238,8 +240,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     val theRest = for { i <- 1 until batchCount } yield
       awaitReceiveMessage(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
-                                     s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
-                          requestSeqNo)
+        s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
+        requestSeqNo)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten
     val sorted = combined.toSeq
@@ -254,10 +256,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     if (ehConf.slowPartitionAdjustment) {
       sendPartitionPerformanceToDriver(
         PartitionPerformanceMetric(nAndP,
-                                   EventHubsUtils.getTaskContextSlim,
-                                   requestSeqNo,
-                                   batchCount,
-                                   elapsedTimeMs))
+          EventHubsUtils.getTaskContextSlim,
+          requestSeqNo,
+          batchCount,
+          elapsedTimeMs))
     }
 
     if (metricPlugin.isDefined) {
@@ -270,10 +272,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
           .getOrElse((0, 0L))
       metricPlugin.foreach(
         _.onReceiveMetric(EventHubsUtils.getTaskContextSlim,
-                          nAndP,
-                          batchCount,
-                          batchSizeInBytes,
-                          elapsedTimeMs))
+          nAndP,
+          batchCount,
+          batchSizeInBytes,
+          elapsedTimeMs))
       assert(validateSize == batchCount)
     } else {
       assert(validate.size == batchCount)
@@ -305,13 +307,21 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     logDebug(
       s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
         s"$PartitionPerformanceMetric to the driver.")
-    try {
-      CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
-    } catch {
-      case e: Exception =>
-        logError(
+    CachedEventHubsReceiver.partitionPerformanceReceiverRef match {
+      case Some(receiverRef) =>
+        try {
+          receiverRef.send(partitionPerformance)
+        } catch {
+          case e: Exception =>
+            logError(
+              s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
+                s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
+        }
+      case None =>
+        throw new NullPointerException(
           s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
-            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
+            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver because the " +
+            s"RPC endpoint is not open.")
     }
   }
 }
@@ -330,10 +340,18 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
 
   // RPC endpoint for partition performacne communciation in the executor
-  val partitionPerformanceReceiverRef =
-    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
-                           SparkEnv.get.conf,
-                           SparkEnv.get.rpcEnv)
+  val partitionPerformanceReceiverRef : Option[RpcEndpointRef] =
+    try {
+      Some(RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
+        SparkEnv.get.conf,
+        SparkEnv.get.rpcEnv))
+    } catch {
+      case (e: SparkException) => {
+        logWarning(s"RPC endpoint for partition performacne communciation has not been opened on the driver. " +
+          s"If you are using the SlowPartitionAdjustment feature, this will cause an error. " +
+          s"Note that SlowPartitionAdjustment feature is only being supported for streaming applications.")
+        None
+      }}
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase

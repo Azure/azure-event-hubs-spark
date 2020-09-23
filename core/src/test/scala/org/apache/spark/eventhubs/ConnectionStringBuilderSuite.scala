@@ -60,6 +60,13 @@ class ConnectionStringBuilderSuite extends FunSuite {
     validateConnStrForAadAuthBuilder(connStrBuilder)
   }
 
+  test("setAadAuthConnectionString") {
+    val connStrBuilder = ConnectionStringBuilder(correctConnectionStringForAadAuth)
+    val secondConnStrBuilder = ConnectionStringBuilder()
+    secondConnStrBuilder.setAadAuthConnectionString(connStrBuilder.getEndpoint, connStrBuilder.getEventHubName)
+    validateConnStrForAadAuthBuilder(ConnectionStringBuilder(secondConnStrBuilder.build))
+  }
+
   test("exchange connection string across constructors") {
     val connStrBuilder = ConnectionStringBuilder(correctConnectionString)
     val secondConnStr = ConnectionStringBuilder()

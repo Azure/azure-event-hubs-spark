@@ -55,7 +55,6 @@ package object eventhubs {
   val DefaultEpoch = 0L
   val RetryCount = 10
   val WaitInterval = 5000
-  val DefaultAadAuthTenantId = "72f988bf-86f1-41af-91ab-2d7cd011db47" //Microsoft tenant
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"

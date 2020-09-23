@@ -172,7 +172,6 @@ final class EventHubsConf private (private val connectionStr: String)
       ThrottlingStatusPluginKey,
       MaxAcceptableBatchReceiveTimeKey,
       UseAadAuthKey,
-      AadAuthTenantIdKey,
       AadAuthCallbackKey
     ).map(_.toLowerCase).toSet
 
@@ -572,7 +571,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * Default: [[false]]
    * @return the updated [[EventHubsConf]] instance
    */
-  def setUseAadAuth(b: Boolean): EventHubsConf = {
+  private def setUseAadAuth(b: Boolean): EventHubsConf = {
     set(UseAadAuthKey, b)
   }
 
@@ -581,6 +580,7 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
+    setUseAadAuth(true)
     set(AadAuthCallbackKey, callback.getClass.getName)
   }
 
@@ -588,20 +588,6 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(AadAuthCallbackKey) map (className => {
       Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
     })
-  }
-
-  /**
-   * Set the tenant id if [[AadAuthKey]] is Certificate or Password
-   * Default: [[DefaultAadAuthTenantId]]: Microsoft tenant
-   *
-   * @return the updated [[EventHubsConf]] instance
-   */
-  def setAadAuthTenantId(tenantId: String): EventHubsConf = {
-    set(AadAuthTenantIdKey, tenantId)
-  }
-
-  def aadAuthTenantId: String = {
-    self.get(AadAuthTenantIdKey).getOrElse(DefaultAadAuthTenantId)
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -663,7 +649,6 @@ object EventHubsConf extends Logging {
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
   val UseAadAuthKey = "eventhubs.useAadAuth"
   val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
-  val AadAuthTenantIdKey =  "eventhubs.aadAuthTenantId"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

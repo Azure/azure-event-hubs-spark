@@ -96,7 +96,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[Exception] { map(MaxEventsPerTriggerKey) }
     assert(map(UseSimulatedClientKey).toBoolean)
     intercept[Exception] { map(UseAadAuthKey) }
-    intercept[Exception] { map(AadAuthTenantIdKey) }
     intercept[Exception] { map(AadAuthCallbackKey) }
   }
 
@@ -119,7 +118,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         }),
         MaxEventsPerTriggerKey -> 4.toString,
         UseAadAuthKey -> "true",
-        AadAuthTenantIdKey -> "tenant_guid",
         AadAuthCallbackKey -> classOf[AadAuthenticationCallbackMock].getName
       ))
 
@@ -128,8 +126,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setStartingPosition(expectedPosition)
       .setStartingPositions(expectedPositions)
       .setMaxEventsPerTrigger(4L)
-      .setUseAadAuth(true)
-      .setAadAuthTenantId("tenant_guid")
       .setAadAuthCallback(new AadAuthenticationCallbackMock())
 
     assert(expectedConf.equals(actualConf))
@@ -252,8 +248,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setOperationTimeout(Duration.ofSeconds(10))
       .setThreadPoolSize(16)
       .setPrefetchCount(100)
-      .setUseAadAuth(true)
-      .setAadAuthTenantId("tenant_id")
       .setAadAuthCallback(new AadAuthenticationCallbackMock())
       .setUseExclusiveReceiver(true)
 
@@ -277,7 +271,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     originalConf("maxEventsPerTrigger")
     originalConf("useSimulatedClient")
     originalConf("eventhubs.useAadAuth")
-    originalConf("eventhubs.aadAuthTenantId")
     originalConf("eventhubs.aadAuthCallback")
 
     // newConf should be trimmed
@@ -388,7 +381,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   test("validate - AadAuthenticationCallback") {
     val aadAuthCallback = new AadAuthenticationCallbackMock()
     val eventHubConfig = testUtils.getEventHubsConf()
-      .setUseAadAuth(true)
       .setAadAuthCallback(aadAuthCallback)
 
     val actualCallback = eventHubConfig.aadAuthCallback()

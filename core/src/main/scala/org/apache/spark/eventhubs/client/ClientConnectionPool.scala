@@ -66,7 +66,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
               connStr.getEndpoint,
               ehConf.name,
               ehConf.aadAuthCallback().get,
-              ehConf.aadAuthTenantId,
+              ehConf.aadAuthCallback().get.authority,
               ClientThreadPool.get(ehConf),
               ehClientOption
             )

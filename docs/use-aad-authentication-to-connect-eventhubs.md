@@ -16,6 +16,7 @@ import com.microsoft.aad.msal4j.{IAuthenticationResult, _}
 import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
 case class AuthBySecretCallBack(clientId: String, clientSecret: String) extends AadAuthenticationCallback{
+  override def authority: String = "your-tenant-id"
 
   override def acquireToken(audience: String, authority: String, state: Any): CompletableFuture[String] = try {
     var app = ConfidentialClientApplication
@@ -36,11 +37,11 @@ case class AuthBySecretCallBack(clientId: String, clientSecret: String) extends 
 ```
 and then set the authentication to use AAD auth.
 ```scala
-val connectionString = "Endpoint=sb://SAMPLE;EntityPath=EVENTHUBS_NAME"
+val connectionString = ConnectionStringBuilder()
+  .setAadAuthConnectionString(new URI("your-ehs-endpoint"), "your-ehs-name")
+  .build
 val ehConf = EventHubsConf(connectionString)
   .setConsumerGroup("consumerGroup")
-  .setUseAadAuth(true)
-  .setAadAuthTenantId("tenant_guid")
   .setAadAuthCallback(AuthBySecretCallBack())
 ```
 
@@ -58,14 +59,16 @@ import com.microsoft.aad.msal4j.{ClientCredentialFactory, ClientCredentialParame
 import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
 case class AuthByCertCallBack(clientId: String, cert: Array[Byte], certPassword: String)
-    extends AadAuthenticationCallback {
+  extends AadAuthenticationCallback {
+  override def authority: String = "your-tenant-id"
+
   override def acquireToken(audience: String,
                             authority: String,
                             state: Any): CompletableFuture[String] =
     try {
       val app = ConfidentialClientApplication
         .builder(clientId,
-                 ClientCredentialFactory.create(new ByteArrayInputStream(cert), certPassword))
+          ClientCredentialFactory.create(new ByteArrayInputStream(cert), certPassword))
         .authority("https://login.microsoftonline.com/" + authority)
         .build
 
@@ -85,10 +88,10 @@ case class AuthByCertCallBack(clientId: String, cert: Array[Byte], certPassword:
 ```
 and then set the authentication to use AAD auth.
 ```scala
-val connectionString = "Endpoint=sb://SAMPLE;EntityPath=EVENTHUBS_NAME"
+val connectionString = ConnectionStringBuilder()
+  .setAadAuthConnectionString(new URI("your-ehs-endpoint"), "your-ehs-name")
+  .build
 val ehConf = EventHubsConf(connectionString)
   .setConsumerGroup("consumerGroup")
-  .setUseAadAuth(true)
-  .setAadAuthTenantId("tenant_guid")
   .setAadAuthCallback(AuthByCertCallBack())
 ```

@@ -566,8 +566,8 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Use AAD auth to connect eventhubs instead of connection string.
-   * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+   * Use AAD auth to connect eventhubs instead of connection string. It's internal.
+   *
    * Default: [[false]]
    * @return the updated [[EventHubsConf]] instance
    */
@@ -579,6 +579,14 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(UseAadAuthKey).getOrElse(DefaultUseAadAuth).toBoolean
   }
 
+  /**
+  * set a callback class for aad auth. The class should be Serializable and derived from
+  * org.apache.spark.eventhubs.utils.AadAuthenticationCallback.
+  * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+  *
+  * @param callback The callback class which implements org.apache.spark.eventhubs.utils.AadAuthenticationCallback
+  * @return the updated [[EventHubsConf]] instance
+  */
   def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
     setUseAadAuth(true)
     set(AadAuthCallbackKey, callback.getClass.getName)

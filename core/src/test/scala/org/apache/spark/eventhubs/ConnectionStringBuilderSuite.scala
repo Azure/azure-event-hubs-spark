@@ -33,6 +33,11 @@ class ConnectionStringBuilderSuite extends FunSuite {
     assert(connStrBuilder.getOperationTimeout == CorrectOperationTimeout)
   }
 
+  private val validateConnStrForAadAuthBuilder = (connStrBuilder: ConnectionStringBuilder) => {
+    assert(connStrBuilder.getEventHubName == CorrectEntityPath)
+    assert(connStrBuilder.getEndpoint.getHost == CorrectEndpoint)
+  }
+
   test("parse invalid connection string") {
     intercept[Exception] {
       ConnectionStringBuilder("something")
@@ -48,6 +53,18 @@ class ConnectionStringBuilderSuite extends FunSuite {
   test("parse valid connection string") {
     val connStrBuilder = ConnectionStringBuilder(correctConnectionString)
     validateConnStrBuilder(connStrBuilder)
+  }
+
+  test("parse valid connection string for AAD auth") {
+    val connStrBuilder = ConnectionStringBuilder(correctConnectionStringForAadAuth)
+    validateConnStrForAadAuthBuilder(connStrBuilder)
+  }
+
+  test("setAadAuthConnectionString") {
+    val connStrBuilder = ConnectionStringBuilder(correctConnectionStringForAadAuth)
+    val secondConnStrBuilder = ConnectionStringBuilder()
+    secondConnStrBuilder.setAadAuthConnectionString(connStrBuilder.getEndpoint, connStrBuilder.getEventHubName)
+    validateConnStrForAadAuthBuilder(ConnectionStringBuilder(secondConnStrBuilder.build))
   }
 
   test("exchange connection string across constructors") {
@@ -81,4 +98,7 @@ object ConnectionStringBuilderSuite {
   private val correctConnectionString =
     s"Endpoint=sb://$CorrectEndpoint;EntityPath=$CorrectEntityPath;SharedAccessKeyName=$CorrectKeyName;" +
       s"SharedAccessKey=$CorrectKey;OperationTimeout=$CorrectOperationTimeout;"
+
+  private val correctConnectionStringForAadAuth =
+    s"Endpoint=sb://$CorrectEndpoint;EntityPath=$CorrectEntityPath;"
 }

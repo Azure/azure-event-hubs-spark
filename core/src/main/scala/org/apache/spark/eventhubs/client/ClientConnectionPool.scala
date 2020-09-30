@@ -17,10 +17,11 @@
 
 package org.apache.spark.eventhubs.client
 
+import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ ConcurrentLinkedQueue, Executors, ScheduledExecutorService }
 
-import com.microsoft.azure.eventhubs.{ EventHubClient, RetryPolicy }
+import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubClientOptions, RetryPolicy }
 import org.apache.spark.eventhubs._
 import org.apache.spark.internal.Logging
 
@@ -55,12 +56,29 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        client = EventHubClient.createFromConnectionStringSync(
-          connStr.toString,
-          RetryPolicy.getDefault,
-          ClientThreadPool.get(ehConf),
-          null,
-          ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+        if (ehConf.useAadAuth) {
+          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
+            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+            .setRetryPolicy(RetryPolicy.getDefault)
+          client = EventHubClient
+            .createWithAzureActiveDirectory(
+              connStr.getEndpoint,
+              ehConf.name,
+              ehConf.aadAuthCallback().get,
+              ehConf.aadAuthCallback().get.authority,
+              ClientThreadPool.get(ehConf),
+              ehClientOption
+            )
+            .get()
+        } else {
+          client = EventHubClient.createFromConnectionStringSync(
+            connStr.toString,
+            RetryPolicy.getDefault,
+            ClientThreadPool.get(ehConf),
+            null,
+            ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+        }
       }
     } else {
       logInfo(

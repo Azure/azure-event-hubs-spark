@@ -20,9 +20,10 @@ package org.apache.spark.eventhubs
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
+import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider.AuthenticationCallback
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.{ MetricPlugin, ThrottlingStatusPlugin }
+import org.apache.spark.eventhubs.utils.{AadAuthenticationCallback, MetricPlugin, ThrottlingStatusPlugin}
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -53,6 +54,7 @@ final class EventHubsConf private (private val connectionStr: String)
   self =>
 
   import EventHubsConf._
+
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionStr)
 
@@ -168,7 +170,9 @@ final class EventHubsConf private (private val connectionStr: String)
       MetricPluginKey,
       SlowPartitionAdjustmentKey,
       ThrottlingStatusPluginKey,
-      MaxAcceptableBatchReceiveTimeKey
+      MaxAcceptableBatchReceiveTimeKey,
+      UseAadAuthKey,
+      AadAuthCallbackKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -493,10 +497,10 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /** Set the max time that is acceptable for a partition to receive events in a single batch.
-   *  This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
-   *  Only partitions that tale more than this time to receive thier portion of events in batch are considered
-   *  as potential slow partitrions.
-   *  Default: [[DefaultMaxAcceptableBatchReceiveTime]]
+   * This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
+   * Only partitions that tale more than this time to receive thier portion of events in batch are considered
+   * as potential slow partitrions.
+   * Default: [[DefaultMaxAcceptableBatchReceiveTime]]
    *
    * @param d the new maximum acceptable time for a partition to receive events in a single batch
    * @return the updated [[EventHubsConf]] instance
@@ -561,6 +565,39 @@ final class EventHubsConf private (private val connectionStr: String)
             s"${PartitionPreferredLocationStrategy.values.mkString(",")}"))
   }
 
+  /**
+   * Use AAD auth to connect eventhubs instead of connection string. It's internal.
+   *
+   * Default: [[false]]
+   * @return the updated [[EventHubsConf]] instance
+   */
+  private def setUseAadAuth(b: Boolean): EventHubsConf = {
+    set(UseAadAuthKey, b)
+  }
+
+  def useAadAuth: Boolean = {
+    self.get(UseAadAuthKey).getOrElse(DefaultUseAadAuth).toBoolean
+  }
+
+  /**
+  * set a callback class for aad auth. The class should be Serializable and derived from
+  * org.apache.spark.eventhubs.utils.AadAuthenticationCallback.
+  * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+  *
+  * @param callback The callback class which implements org.apache.spark.eventhubs.utils.AadAuthenticationCallback
+  * @return the updated [[EventHubsConf]] instance
+  */
+  def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
+    setUseAadAuth(true)
+    set(AadAuthCallbackKey, callback.getClass.getName)
+  }
+
+  def aadAuthCallback(): Option[AadAuthenticationCallback] = {
+    self.get(AadAuthCallbackKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
+    })
+  }
+
   // The simulated client (and simulated eventhubs) will be used. These
   // can be found in EventHubsTestUtils.
   private[spark] def setUseSimulatedClient(b: Boolean): EventHubsConf = {
@@ -618,6 +655,8 @@ object EventHubsConf extends Logging {
   val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
   val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
+  val UseAadAuthKey = "eventhubs.useAadAuth"
+  val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

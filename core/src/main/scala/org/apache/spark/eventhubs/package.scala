@@ -62,6 +62,8 @@ package object eventhubs {
 
   val SparkConnectorVersion = "2.3.17"
 
+  val DefaultUseAadAuth = "false"
+
   type PartitionId = Int
   val PartitionId: Int.type = Int
 
@@ -94,4 +96,5 @@ package object eventhubs {
 
     def toSequenceNumber: SequenceNumber = str.toLong
   }
+
 }

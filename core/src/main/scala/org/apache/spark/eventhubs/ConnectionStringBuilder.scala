@@ -241,6 +241,20 @@ class ConnectionStringBuilder private () {
   }
 
   /**
+   * Set a connection string for AAD authentication
+   *
+   * @param endpoint the eventhubs instance endpoint
+   * @param eventHubName the eventhubs name
+   *
+   * @return the { @link ConnectionStringBuilder} being set.
+   */
+  def setAadAuthConnectionString(endpoint: URI, eventHubName: String): ConnectionStringBuilder = {
+    this
+      .setEndpoint(endpoint)
+      .setEventHubName(eventHubName)
+  }
+
+  /**
    * Identical to [[build]].
    */
   override def toString: String = build

@@ -33,8 +33,6 @@ import org.apache.spark.eventhubs.{
   PartitionPerformanceReceiver
 }
 import org.apache.spark.internal.Logging
-import org.apache.spark.rpc.RpcEndpointRef
-import org.apache.spark.SparkException
 import org.apache.spark.util.RpcUtils
 
 import scala.collection.JavaConverters._
@@ -307,21 +305,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     logDebug(
       s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
         s"$PartitionPerformanceMetric to the driver.")
-    CachedEventHubsReceiver.partitionPerformanceReceiverRef match {
-      case Some(receiverRef) =>
-        try {
-          receiverRef.send(partitionPerformance)
-        } catch {
-          case e: Exception =>
-            logError(
-              s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
-                s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
-        }
-      case None =>
-        throw new NullPointerException(
+    try {
+      CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
+    } catch {
+      case e: Exception =>
+        logError(
           s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
-            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver because the " +
-            s"RPC endpoint is not open.")
+            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
     }
   }
 }
@@ -340,18 +330,10 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
 
   // RPC endpoint for partition performacne communciation in the executor
-  val partitionPerformanceReceiverRef : Option[RpcEndpointRef] =
-    try {
-      Some(RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
-        SparkEnv.get.conf,
-        SparkEnv.get.rpcEnv))
-    } catch {
-      case (e: SparkException) => {
-        logWarning(s"RPC endpoint for partition performacne communciation has not been opened on the driver. " +
-          s"If you are using the SlowPartitionAdjustment feature, this will cause an error. " +
-          s"Note that SlowPartitionAdjustment feature is only being supported for streaming applications.")
-        None
-      }}
+  val partitionPerformanceReceiverRef =
+    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
+      SparkEnv.get.conf,
+      SparkEnv.get.rpcEnv)
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase

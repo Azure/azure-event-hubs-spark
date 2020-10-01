@@ -45,6 +45,8 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ AnalysisException, DataFrame, SQLContext, SaveMode }
 import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.jackson.Serialization
+import org.apache.spark.rpc.RpcEndpointRef
+import org.apache.spark.SparkEnv
 
 import collection.JavaConverters._
 
@@ -140,6 +142,12 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
+  // RPC endpoint for partition performacne communciation in the driver
+  val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
+  val partitionPerformanceReceiver: PartitionPerformanceReceiver =
+    new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
+  val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv
+    .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
 
   def eventHubsSchema: StructType = {
     StructType(

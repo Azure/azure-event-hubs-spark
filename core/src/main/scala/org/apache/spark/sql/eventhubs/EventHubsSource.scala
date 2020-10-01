@@ -77,6 +77,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   import EventHubsConf._
   import EventHubsSource._
+  import EventHubsSourceProvider._
 
   private lazy val ehClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
   private lazy val partitionCount: Int = ehClient.partitionCount
@@ -438,14 +439,7 @@ private[eventhubs] object EventHubsSource {
     """.stripMargin
 
   private[eventhubs] val VERSION = 1
-
-  // RPC endpoint for partition performacne communciation in the driver
   private var localBatchId = -1
-  val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
-  val partitionPerformanceReceiver: PartitionPerformanceReceiver =
-    new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
-  val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv
-    .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
 
   def getSortedExecutorList(sc: SparkContext): Array[String] = {
     val bm = sc.env.blockManager

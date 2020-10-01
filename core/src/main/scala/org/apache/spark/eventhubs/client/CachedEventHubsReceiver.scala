@@ -66,7 +66,7 @@ private[spark] trait CachedReceiver {
 private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                                                        nAndP: NameAndPartition,
                                                        startSeqNo: SequenceNumber)
-  extends Logging {
+    extends Logging {
 
   type AwaitTimeoutException = java.util.concurrent.TimeoutException
 
@@ -89,11 +89,11 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiverOptions.setIdentifier(s"spark-${SparkEnv.get.executorId}-$taskId")
     val consumer = retryJava(
       EventHubsUtils.createReceiverInner(client,
-        ehConf.useExclusiveReceiver,
-        consumerGroup,
-        nAndP.partitionId.toString,
-        EventPosition.fromSequenceNumber(seqNo).convert,
-        receiverOptions),
+                                         ehConf.useExclusiveReceiver,
+                                         consumerGroup,
+                                         nAndP.partitionId.toString,
+                                         EventPosition.fromSequenceNumber(seqNo).convert,
+                                         receiverOptions),
       "CachedReceiver creation."
     )
     Await.result(consumer, ehConf.internalOperationTimeout)
@@ -162,7 +162,7 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       Await.result(lastReceivedOffset(), ehConf.internalOperationTimeout)
 
     if ((lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) ||
-      !receiver.getIsOpen) {
+        !receiver.getIsOpen) {
       logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
         DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
 
@@ -193,11 +193,11 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
         // The event still isn't present. It must be (2).
         val info = Await.result(
           retryJava(client.getPartitionRuntimeInformation(nAndP.partitionId.toString),
-            "partitionRuntime"),
+                    "partitionRuntime"),
           ehConf.internalOperationTimeout)
 
         if (requestSeqNo < info.getBeginSequenceNumber &&
-          movedSeqNo == info.getBeginSequenceNumber) {
+            movedSeqNo == info.getBeginSequenceNumber) {
           Future {
             movedEvent
           }
@@ -238,8 +238,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     val theRest = for { i <- 1 until batchCount } yield
       awaitReceiveMessage(receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout),
-        s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
-        requestSeqNo)
+                                     s"receive; $nAndP; seqNo: ${requestSeqNo + i}"),
+                          requestSeqNo)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten
     val sorted = combined.toSeq
@@ -254,10 +254,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     if (ehConf.slowPartitionAdjustment) {
       sendPartitionPerformanceToDriver(
         PartitionPerformanceMetric(nAndP,
-          EventHubsUtils.getTaskContextSlim,
-          requestSeqNo,
-          batchCount,
-          elapsedTimeMs))
+                                   EventHubsUtils.getTaskContextSlim,
+                                   requestSeqNo,
+                                   batchCount,
+                                   elapsedTimeMs))
     }
 
     if (metricPlugin.isDefined) {
@@ -270,10 +270,10 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
           .getOrElse((0, 0L))
       metricPlugin.foreach(
         _.onReceiveMetric(EventHubsUtils.getTaskContextSlim,
-          nAndP,
-          batchCount,
-          batchSizeInBytes,
-          elapsedTimeMs))
+                          nAndP,
+                          batchCount,
+                          batchSizeInBytes,
+                          elapsedTimeMs))
       assert(validateSize == batchCount)
     } else {
       assert(validate.size == batchCount)
@@ -329,11 +329,11 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
 
-  // RPC endpoint for partition performacne communciation in the executor
+  // RPC endpoint for partition performance communication in the executor
   val partitionPerformanceReceiverRef =
     RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
-      SparkEnv.get.conf,
-      SparkEnv.get.rpcEnv)
+                           SparkEnv.get.conf,
+                           SparkEnv.get.rpcEnv)
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase

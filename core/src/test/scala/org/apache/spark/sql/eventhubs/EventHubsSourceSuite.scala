@@ -288,9 +288,11 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       }
       true
     }
-
+    val defaultCheckpointLocation =
+      Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath
+    println(defaultCheckpointLocation)
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
       waitUntilBatchProcessed,
       // we'll get one event per partition per trigger
       CheckAnswer(0, 0, 0, 0),
@@ -303,15 +305,16 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     eventHub = testUtils.createEventHubs(eventHub.name, DefaultPartitionCount * 2)
     testUtils.populateUniformly(eventHub.name, 3)
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
       waitUntilBatchProcessed,
       // four additional events
-      CheckAnswer(0 ,0, 0, 0, 0, 0, 0, 0),
+      CheckAnswer(0 ,0, 0, 0, 2, 2, 2, 2),
       AdvanceManualClock(100),
       waitUntilBatchProcessed,
       // four additional events
-      CheckAnswer(0 ,0, 0, 0, 0, 0, 0, 0, 1 ,1, 1, 1, 1, 1, 1, 1)
+      CheckAnswer(0 ,0, 0, 0, 1, 1, 1, 1, 2 ,2, 2, 2)
     )
+
   }
 
   test("maxOffsetsPerTrigger with non-uniform partitions") {

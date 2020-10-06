@@ -169,21 +169,24 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
               s"version from $text.")
         }
       }
-
-    metadataLog
-      .get(0)
-      .getOrElse {
-        // translate starting points within ehConf to sequence numbers
-        val seqNos = ehClient.translate(ehConf, partitionCount).map {
-          case (pId, seqNo) =>
-            (NameAndPartition(ehName, pId), seqNo)
-        }
-        val offset = EventHubsSourceOffset(seqNos)
-        metadataLog.add(0, offset)
-        logInfo(s"Initial sequence numbers: $seqNos")
-        offset
+    val defaultSeqNos = ehClient
+      .translate(ehConf, partitionCount)
+      .map {
+        case (pId, seqNo) =>
+          (NameAndPartition(ehName, pId), seqNo)
       }
-      .partitionToSeqNos
+
+    val seqNos = metadataLog.get(0) match {
+      case Some(checkpoint) =>
+        defaultSeqNos ++ checkpoint.partitionToSeqNos
+      case None =>
+        defaultSeqNos
+    }
+    val offset = EventHubsSourceOffset(seqNos)
+    metadataLog.add(0, offset)
+    logInfo(s"Initial sequence numbers: $seqNos")
+    offset.partitionToSeqNos
+
   }
 
   private var currentSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
@@ -208,11 +211,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // If not, we'll report possible data loss.
     earliestSeqNos = Some(earliestAndLatest.map {
       case (p, (e, _)) => NameAndPartition(ehName, p) -> e
-    }.toMap)
+    })
 
     val latest = earliestAndLatest.map {
       case (p, (_, l)) => NameAndPartition(ehName, p) -> l
-    }.toMap
+    }
 
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>
@@ -229,7 +232,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     currentSeqNos = Some(seqNos)
     logInfo(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
-
     Some(EventHubsSourceOffset(seqNos))
   }
 
@@ -330,7 +332,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                 schema,
                                                 isStreaming = true)
     }
-
     if (earliestSeqNos.isEmpty) {
       val earliestAndLatest = ehClient.allBoundedSeqNos
       earliestSeqNos = Some(earliestAndLatest.map {
@@ -341,7 +342,18 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val fromSeqNos = start match {
       // recovery mode ..
       case Some(prevBatchEndOffset) =>
-        val startingSeqNos = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+        val prevOffsets = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+        val startingSeqNos = if (prevOffsets.size < untilSeqNos.size) {
+          val defaultSeqNos = ehClient
+            .translate(ehConf, partitionCount)
+            .map {
+              case (pId, seqNo) =>
+                (NameAndPartition(ehName, pId), seqNo)
+            }
+          defaultSeqNos ++ prevOffsets
+        } else {
+          prevOffsets
+        }
         adjustStartingOffset(startingSeqNos)
 
       case None => adjustStartingOffset(initialPartitionSeqNos)
@@ -383,7 +395,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         true
       }
     }.toArray
-
     // if slowPartitionAdjustment is on, add the current batch to the perforamnce tracker
     if (slowPartitionAdjustment) {
       addCurrentBatchToStatusTracker(offsetRanges)

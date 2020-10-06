@@ -56,9 +56,9 @@ private[spark] class EventHubsTestUtils {
   /**
    * Sends events to the specified simulated event hub.
    *
-   * @param ehName the event hub to send to
-   * @param partition the partition id that will receive the data
-   * @param data the data being sent
+   * @param ehName     the event hub to send to
+   * @param partition  the partition id that will receive the data
+   * @param data       the data being sent
    * @param properties additional application properties
    * @return
    */
@@ -98,7 +98,7 @@ private[spark] class EventHubsTestUtils {
   /**
    * Creates a [[SimulatedEventHubs]].
    *
-   * @param ehName the name of the simulated event hub
+   * @param ehName         the name of the simulated event hub
    * @param partitionCount the number of partitions in the simulated event hub
    * @return the newly created [[SimulatedEventHubs]]
    */
@@ -109,6 +109,7 @@ private[spark] class EventHubsTestUtils {
 
   /**
    * Destroys the the event hub if it is present.
+   *
    * @param ehName the name of the simulated event hub to be destroyed.
    */
   def destroyEventHubs(ehName: String): Unit = {
@@ -161,9 +162,9 @@ private[spark] class EventHubsTestUtils {
    * counter. In this example, the payloads would be 0, 1, 2, 3,
    * 4, 5, 6, 7, 8, 9.
    *
-   * @param ehName the simulated event hub to receive the events
-   * @param count the number of events to be generated for each
-   *              partition
+   * @param ehName     the simulated event hub to receive the events
+   * @param count      the number of events to be generated for each
+   *                   partition
    * @param properties the [[ApplicationProperties]] to be inserted
    *                   to each event
    */

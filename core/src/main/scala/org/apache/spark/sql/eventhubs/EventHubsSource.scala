@@ -30,9 +30,7 @@ import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.utils.ThrottlingStatusPlugin
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
-import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
-import org.apache.spark.SparkEnv
 import org.apache.spark.sql.execution.streaming.{
   HDFSMetadataLog,
   Offset,
@@ -77,6 +75,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   import EventHubsConf._
   import EventHubsSource._
+  import EventHubsSourceProvider._
 
   private lazy val ehClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
   private lazy val partitionCount: Int = ehClient.partitionCount
@@ -87,9 +86,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger: Option[Long] =
-    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(
-      parameters.get(MaxEventsPerTriggerKeyAlias).map(_.toLong).getOrElse(
-        partitionCount * 1000)))
+    Option(parameters
+      .get(MaxEventsPerTriggerKey)
+      .map(_.toLong)
+      .getOrElse(
+        parameters.get(MaxEventsPerTriggerKeyAlias).map(_.toLong).getOrElse(partitionCount * 1000)))
 
   // set slow partition adjustment flag and static values in the tracker
   private val slowPartitionAdjustment: Boolean =
@@ -147,22 +148,25 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                 text.substring(1, text.length).toInt
               } catch {
                 case _: NumberFormatException =>
-                  throw new IllegalStateException(s"Log file was malformed: failed to read correct log " +
-                    s"version from $text.")
+                  throw new IllegalStateException(
+                    s"Log file was malformed: failed to read correct log " +
+                      s"version from $text.")
               }
             if (version > 0) {
               if (version > maxSupportedVersion) {
-                throw new IllegalStateException(s"UnsupportedLogVersion: maximum supported log version " +
-                  s"is v${maxSupportedVersion}, but encountered v$version. The log file was produced " +
-                  s"by a newer version of Spark and cannot be read by this version. Please upgrade.")
+                throw new IllegalStateException(
+                  s"UnsupportedLogVersion: maximum supported log version " +
+                    s"is v${maxSupportedVersion}, but encountered v$version. The log file was produced " +
+                    s"by a newer version of Spark and cannot be read by this version. Please upgrade.")
               } else {
                 return version
               }
             }
           }
           // reaching here means we failed to read the correct log version
-          throw new IllegalStateException(s"Log file was malformed: failed to read correct log " +
-            s"version from $text.")
+          throw new IllegalStateException(
+            s"Log file was malformed: failed to read correct log " +
+              s"version from $text.")
         }
       }
     val defaultSeqNos = ehClient
@@ -449,14 +453,7 @@ private[eventhubs] object EventHubsSource {
     """.stripMargin
 
   private[eventhubs] val VERSION = 1
-
-  // RPC endpoint for partition performacne communciation in the driver
   private var localBatchId = -1
-  val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
-  val partitionPerformanceReceiver: PartitionPerformanceReceiver =
-    new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
-  val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv
-    .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
 
   def getSortedExecutorList(sc: SparkContext): Array[String] = {
     val bm = sc.env.blockManager

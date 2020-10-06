@@ -133,7 +133,13 @@ private[spark] class EventHubsTestUtils {
    */
   def getEventHubsConf(ehName: String = "name"): EventHubsConf = {
     val partitionCount = getEventHubs(ehName).partitionCount
+    val positions: Map[NameAndPartition, EventPosition] = (for {
+      partition <- 0 until partitionCount
+    } yield NameAndPartition(ehName, partition) -> EventPosition.fromSequenceNumber(0L)).toMap
+    getEventHubsConfWithoutStartingPositions(ehName).setStartingPositions(positions)
+  }
 
+  def getEventHubsConfWithoutStartingPositions(ehName: String = "name"): EventHubsConf = {
     val connectionString = ConnectionStringBuilder()
       .setNamespaceName("namespace")
       .setEventHubName(ehName)
@@ -141,13 +147,8 @@ private[spark] class EventHubsTestUtils {
       .setSasKey("key")
       .build
 
-    val positions: Map[NameAndPartition, EventPosition] = (for {
-      partition <- 0 until partitionCount
-    } yield NameAndPartition(ehName, partition) -> EventPosition.fromSequenceNumber(0L)).toMap
-
     EventHubsConf(connectionString)
       .setConsumerGroup("consumerGroup")
-      .setStartingPositions(positions)
       .setMaxRatePerPartition(DefaultMaxRate)
       .setUseSimulatedClient(true)
   }

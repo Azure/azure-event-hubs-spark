@@ -329,7 +329,7 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
 
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
 
-  // RPC endpoint for partition performacne communciation in the executor
+  // RPC endpoint for partition performance communication in the executor
   val partitionPerformanceReceiverRef =
     RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
                            SparkEnv.get.conf,

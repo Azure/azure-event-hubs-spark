@@ -254,6 +254,80 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     )
   }
 
+  test("Partitions number increased") {
+    val name = newEventHubs()
+    var eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)
+    testUtils.send(name, partition = Some(0), data = 0 to 9)
+    testUtils.send(name, partition = Some(1), data = 10 to 19)
+    testUtils.send(name, partition = Some(2), data = 20 to 29)
+    testUtils.send(name, partition = Some(3), data = 30 to 39)
+
+    val parameters = testUtils
+      .getEventHubsConfWithoutStartingPositions(eventHub.name)
+      .setMaxEventsPerTrigger(8)
+      .setStartingPosition(EventPosition.fromStartOfStream)
+      .toMap
+
+    val reader = spark.readStream
+      .format("eventhubs")
+      .options(parameters)
+
+    val eventhubs = reader
+      .load()
+      .select("body")
+      .as[String]
+
+    val mapped: org.apache.spark.sql.Dataset[_] = eventhubs.map(_.toInt)
+
+    val clock = new StreamManualClock
+
+    val waitUntilBatchProcessed = AssertOnQuery { q =>
+      eventually(Timeout(streamingTimeout)) {
+        if (q.exception.isEmpty) {
+          assert(clock.isStreamWaitingAt(clock.getTimeMillis()))
+        }
+      }
+      if (q.exception.isDefined) {
+        throw q.exception.get
+      }
+      true
+    }
+    val defaultCheckpointLocation =
+      Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath
+
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
+      waitUntilBatchProcessed,
+      // we'll get one event per partition per trigger
+      CheckAnswer(0, 1, 10, 11, 20, 21, 30, 31),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(0, 1, 10, 11, 20, 21, 30, 31, 2, 3, 12, 13, 22, 23, 32, 33),
+      StopStream
+    )
+    // Add partitions to eventhub
+    eventHub = testUtils.createEventHubs(name, DefaultPartitionCount * 2)
+    testUtils.send(name, partition = Some(0), data = 0 to 9)
+    testUtils.send(name, partition = Some(1), data = 10 to 19)
+    testUtils.send(name, partition = Some(2), data = 20 to 29)
+    testUtils.send(name, partition = Some(3), data = 30 to 39)
+    testUtils.send(name, partition = Some(4), data = 40 to 49)
+    testUtils.send(name, partition = Some(5), data = 50 to 59)
+    testUtils.send(name, partition = Some(6), data = 60 to 69)
+    testUtils.send(name, partition = Some(7), data = 70 to 79)
+    testStream(mapped)(
+      StartStream(ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(4, 14, 24, 34, 40, 50, 60, 70),
+      AdvanceManualClock(100),
+      waitUntilBatchProcessed,
+      // four additional events
+      CheckAnswer(4, 14, 24, 34, 40, 50, 60, 70, 5, 15, 25, 35, 41, 51, 61, 71)
+    )
+  }
+
   test("maxOffsetsPerTrigger with non-uniform partitions") {
     val name = newEventHubs()
     val eventHub = testUtils.createEventHubs(name, DefaultPartitionCount)

@@ -30,9 +30,7 @@ import org.apache.spark.eventhubs.rdd.{ EventHubsRDD, OffsetRange }
 import org.apache.spark.eventhubs.utils.ThrottlingStatusPlugin
 import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition, _ }
 import org.apache.spark.internal.Logging
-import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.scheduler.ExecutorCacheTaskLocation
-import org.apache.spark.SparkEnv
 import org.apache.spark.sql.execution.streaming.{
   HDFSMetadataLog,
   Offset,
@@ -77,6 +75,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   import EventHubsConf._
   import EventHubsSource._
+  import EventHubsSourceProvider._
 
   private lazy val ehClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
   private lazy val partitionCount: Int = ehClient.partitionCount
@@ -87,9 +86,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private val sc = sqlContext.sparkContext
 
   private val maxOffsetsPerTrigger: Option[Long] =
-    Option(parameters.get(MaxEventsPerTriggerKey).map(_.toLong).getOrElse(
-      parameters.get(MaxEventsPerTriggerKeyAlias).map(_.toLong).getOrElse(
-        partitionCount * 1000)))
+    Option(parameters
+      .get(MaxEventsPerTriggerKey)
+      .map(_.toLong)
+      .getOrElse(
+        parameters.get(MaxEventsPerTriggerKeyAlias).map(_.toLong).getOrElse(partitionCount * 1000)))
 
   // set slow partition adjustment flag and static values in the tracker
   private val slowPartitionAdjustment: Boolean =
@@ -147,39 +148,45 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                 text.substring(1, text.length).toInt
               } catch {
                 case _: NumberFormatException =>
-                  throw new IllegalStateException(s"Log file was malformed: failed to read correct log " +
-                    s"version from $text.")
+                  throw new IllegalStateException(
+                    s"Log file was malformed: failed to read correct log " +
+                      s"version from $text.")
               }
             if (version > 0) {
               if (version > maxSupportedVersion) {
-                throw new IllegalStateException(s"UnsupportedLogVersion: maximum supported log version " +
-                  s"is v${maxSupportedVersion}, but encountered v$version. The log file was produced " +
-                  s"by a newer version of Spark and cannot be read by this version. Please upgrade.")
+                throw new IllegalStateException(
+                  s"UnsupportedLogVersion: maximum supported log version " +
+                    s"is v${maxSupportedVersion}, but encountered v$version. The log file was produced " +
+                    s"by a newer version of Spark and cannot be read by this version. Please upgrade.")
               } else {
                 return version
               }
             }
           }
           // reaching here means we failed to read the correct log version
-          throw new IllegalStateException(s"Log file was malformed: failed to read correct log " +
-            s"version from $text.")
+          throw new IllegalStateException(
+            s"Log file was malformed: failed to read correct log " +
+              s"version from $text.")
         }
+      }
+    val defaultSeqNos = ehClient
+      .translate(ehConf, partitionCount)
+      .map {
+        case (pId, seqNo) =>
+          (NameAndPartition(ehName, pId), seqNo)
       }
 
-    metadataLog
-      .get(0)
-      .getOrElse {
-        // translate starting points within ehConf to sequence numbers
-        val seqNos = ehClient.translate(ehConf, partitionCount).map {
-          case (pId, seqNo) =>
-            (NameAndPartition(ehName, pId), seqNo)
-        }
-        val offset = EventHubsSourceOffset(seqNos)
-        metadataLog.add(0, offset)
-        logInfo(s"Initial sequence numbers: $seqNos")
-        offset
-      }
-      .partitionToSeqNos
+    val seqNos = metadataLog.get(0) match {
+      case Some(checkpoint) =>
+        defaultSeqNos ++ checkpoint.partitionToSeqNos
+      case None =>
+        defaultSeqNos
+    }
+    val offset = EventHubsSourceOffset(seqNos)
+    metadataLog.add(0, offset)
+    logInfo(s"Initial sequence numbers: $seqNos")
+    offset.partitionToSeqNos
+
   }
 
   private var currentSeqNos: Option[Map[NameAndPartition, SequenceNumber]] = None
@@ -204,11 +211,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     // If not, we'll report possible data loss.
     earliestSeqNos = Some(earliestAndLatest.map {
       case (p, (e, _)) => NameAndPartition(ehName, p) -> e
-    }.toMap)
+    })
 
     val latest = earliestAndLatest.map {
       case (p, (_, l)) => NameAndPartition(ehName, p) -> l
-    }.toMap
+    }
 
     val seqNos: Map[NameAndPartition, SequenceNumber] = maxOffsetsPerTrigger match {
       case None =>
@@ -225,7 +232,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     currentSeqNos = Some(seqNos)
     logInfo(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
-
     Some(EventHubsSourceOffset(seqNos))
   }
 
@@ -326,7 +332,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
                                                 schema,
                                                 isStreaming = true)
     }
-
     if (earliestSeqNos.isEmpty) {
       val earliestAndLatest = ehClient.allBoundedSeqNos
       earliestSeqNos = Some(earliestAndLatest.map {
@@ -337,7 +342,18 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val fromSeqNos = start match {
       // recovery mode ..
       case Some(prevBatchEndOffset) =>
-        val startingSeqNos = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+        val prevOffsets = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
+        val startingSeqNos = if (prevOffsets.size < untilSeqNos.size) {
+          val defaultSeqNos = ehClient
+            .translate(ehConf, partitionCount)
+            .map {
+              case (pId, seqNo) =>
+                (NameAndPartition(ehName, pId), seqNo)
+            }
+          defaultSeqNos ++ prevOffsets
+        } else {
+          prevOffsets
+        }
         adjustStartingOffset(startingSeqNos)
 
       case None => adjustStartingOffset(initialPartitionSeqNos)
@@ -379,7 +395,6 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         true
       }
     }.toArray
-
     // if slowPartitionAdjustment is on, add the current batch to the perforamnce tracker
     if (slowPartitionAdjustment) {
       addCurrentBatchToStatusTracker(offsetRanges)
@@ -438,14 +453,7 @@ private[eventhubs] object EventHubsSource {
     """.stripMargin
 
   private[eventhubs] val VERSION = 1
-
-  // RPC endpoint for partition performacne communciation in the driver
   private var localBatchId = -1
-  val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
-  val partitionPerformanceReceiver: PartitionPerformanceReceiver =
-    new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
-  val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv
-    .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
 
   def getSortedExecutorList(sc: SparkContext): Array[String] = {
     val bm = sc.env.blockManager

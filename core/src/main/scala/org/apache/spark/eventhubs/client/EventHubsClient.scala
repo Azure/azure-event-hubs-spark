@@ -44,6 +44,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     with Logging {
 
   import org.apache.spark.eventhubs._
+  import EventHubsClient._
 
   ehConf.validate
 
@@ -164,10 +165,17 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    *
    * @return partition count
    */
-  override lazy val partitionCount: Int = {
+  override def partitionCount: Int = {
     try {
-      val runtimeInfo = client.getRuntimeInformation.get
-      runtimeInfo.getPartitionCount
+      val currentTimeStamp = System.currentTimeMillis()
+      if ((currentTimeStamp - partitionCountCacheUpdateTimestamp > UpdatePartitionCountIntervalMS) || (partitionCountCache == 0)) {
+        val runtimeInfo = client.getRuntimeInformation.get
+        partitionCountCache = runtimeInfo.getPartitionCount
+        partitionCountCacheUpdateTimestamp = currentTimeStamp
+        logDebug(
+          s"Get ParitionCount = ${partitionCountCache} from runTimeInfo at timestamp ${partitionCountCacheUpdateTimestamp}")
+      }
+      partitionCountCache
     } catch {
       case e: Exception => throw e
     }
@@ -318,6 +326,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 }
 
 private[spark] object EventHubsClient {
+  private var partitionCountCache: Int = 0
+  private var partitionCountCacheUpdateTimestamp: Long = 0
 
   private[spark] def apply(ehConf: EventHubsConf): EventHubsClient =
     new EventHubsClient(ehConf)

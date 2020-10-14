@@ -55,6 +55,7 @@ package object eventhubs {
   val DefaultEpoch = 0L
   val RetryCount = 10
   val WaitInterval = 5000
+  val UpdatePartitionCountIntervalMS = 5000
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"

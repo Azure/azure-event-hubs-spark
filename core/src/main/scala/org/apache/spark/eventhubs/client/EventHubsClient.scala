@@ -166,6 +166,25 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return partition count
    */
   override def partitionCount: Int = {
+    if (ehConf.dynamicPartitionDiscovery) {
+      partitionCountDynamic
+    } else {
+      partitionCountLazyVal
+    }
+  }
+
+  lazy val partitionCountLazyVal: Int = {
+    try {
+      logDebug(
+        s"partitionCountLazyVal makes a call to runTimeInfo to read the number of partitions.")
+      val runtimeInfo = client.getRuntimeInformation.get
+      runtimeInfo.getPartitionCount
+    } catch {
+      case e: Exception => throw e
+    }
+  }
+
+  def partitionCountDynamic: Int = {
     try {
       val currentTimeStamp = System.currentTimeMillis()
       if ((currentTimeStamp - partitionCountCacheUpdateTimestamp > UpdatePartitionCountIntervalMS) || (partitionCountCache == 0)) {
@@ -173,7 +192,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         partitionCountCache = runtimeInfo.getPartitionCount
         partitionCountCacheUpdateTimestamp = currentTimeStamp
         logDebug(
-          s"Get ParitionCount = ${partitionCountCache} from runTimeInfo at timestamp ${partitionCountCacheUpdateTimestamp}")
+          s"partitionCountDynamic made a call to runTimeInfo to read the number of partitions = ${partitionCountCache} at timestamp = ${partitionCountCacheUpdateTimestamp}")
       }
       partitionCountCache
     } catch {

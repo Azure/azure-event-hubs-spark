@@ -166,10 +166,14 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * @return partition count
    */
   override def partitionCount: Int = {
-    if (ehConf.dynamicPartitionDiscovery) {
-      partitionCountDynamic
-    } else {
-      partitionCountLazyVal
+    try {
+      if (ehConf.dynamicPartitionDiscovery) {
+        partitionCountDynamic
+      } else {
+        partitionCountLazyVal
+      }
+    } catch {
+      case e: Exception => throw e
     }
   }
 

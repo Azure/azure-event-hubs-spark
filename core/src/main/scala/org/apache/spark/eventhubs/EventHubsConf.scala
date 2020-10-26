@@ -502,10 +502,12 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set the flag for dynamic partition discovery. If dynamic partition discovery is disabled
-   * the number of partitions is being read and set at the beginning of the execution. Otherwise the number
-   * of partitions is being read and updated every [[UpdatePartitionCountIntervalMS]] milliseconds.
-   * The default value is false.
+   * Set the flag for dynamic partition discovery. This option is useful only if partitions are being dynamically
+   * added to an existing event hub. For more information on how to dynamically add partitions to an event hub
+   * please refer to [[https://docs.microsoft.com/en-us/azure/event-hubs/dynamically-add-partitions]].
+   * If dynamic partition discovery is disabled the number of partitions is being read and set at the
+   * beginning of the execution. Otherwise the number of partitions is being read and updated every
+   * [[UpdatePartitionCountIntervalMS]] milliseconds. The default value is false.
    * Default: [[DefaultDynamicPartitionDiscovery]]
    *
    * @param b the flag which specifies whether the connector uses dynamic partition discovery

@@ -55,7 +55,7 @@ private[spark] class EventHubsDirectDStream private[spark] (_ssc: StreamingConte
 
   import EventHubsDirectDStream._
 
-  private lazy val partitionCount: Int = ehClient.partitionCount
+  private def partitionCount: Int = ehClient.partitionCount
   private lazy val ehName = ehConf.name
 
   @transient private var _client: Client = _

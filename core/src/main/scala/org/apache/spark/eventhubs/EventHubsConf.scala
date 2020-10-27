@@ -23,7 +23,11 @@ import java.util.concurrent.ConcurrentHashMap
 import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider.AuthenticationCallback
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.{AadAuthenticationCallback, MetricPlugin, ThrottlingStatusPlugin}
+import org.apache.spark.eventhubs.utils.{
+  AadAuthenticationCallback,
+  MetricPlugin,
+  ThrottlingStatusPlugin
+}
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -172,7 +176,8 @@ final class EventHubsConf private (private val connectionStr: String)
       ThrottlingStatusPluginKey,
       MaxAcceptableBatchReceiveTimeKey,
       UseAadAuthKey,
-      AadAuthCallbackKey
+      AadAuthCallbackKey,
+      DynamicPartitionDiscoveryKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -496,10 +501,31 @@ final class EventHubsConf private (private val connectionStr: String)
     self.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
   }
 
+  /**
+   * Set the flag for dynamic partition discovery. This option is useful only if partitions are being dynamically
+   * added to an existing event hub. For more information on how to dynamically add partitions to an event hub
+   * please refer to [[https://docs.microsoft.com/en-us/azure/event-hubs/dynamically-add-partitions]].
+   * If dynamic partition discovery is disabled the number of partitions is being read and set at the
+   * beginning of the execution. Otherwise the number of partitions is being read and updated every
+   * [[UpdatePartitionCountIntervalMS]] milliseconds. The default value is false.
+   * Default: [[DefaultDynamicPartitionDiscovery]]
+   *
+   * @param b the flag which specifies whether the connector uses dynamic partition discovery
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setDynamicPartitionDiscovery(b: Boolean): EventHubsConf = {
+    set(DynamicPartitionDiscoveryKey, b)
+  }
+
+  /** The dynamic partition discovery flag  */
+  def dynamicPartitionDiscovery: Boolean = {
+    self.get(DynamicPartitionDiscoveryKey).getOrElse(DefaultDynamicPartitionDiscovery).toBoolean
+  }
+
   /** Set the max time that is acceptable for a partition to receive events in a single batch.
    * This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
-   * Only partitions that tale more than this time to receive thier portion of events in batch are considered
-   * as potential slow partitrions.
+   * Only partitions that tale more than this time to receive their portion of events in batch are considered
+   * as potential slow partitions.
    * Default: [[DefaultMaxAcceptableBatchReceiveTime]]
    *
    * @param d the new maximum acceptable time for a partition to receive events in a single batch
@@ -580,13 +606,13 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-  * set a callback class for aad auth. The class should be Serializable and derived from
-  * org.apache.spark.eventhubs.utils.AadAuthenticationCallback.
-  * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
-  *
-  * @param callback The callback class which implements org.apache.spark.eventhubs.utils.AadAuthenticationCallback
-  * @return the updated [[EventHubsConf]] instance
-  */
+   * set a callback class for aad auth. The class should be Serializable and derived from
+   * org.apache.spark.eventhubs.utils.AadAuthenticationCallback.
+   * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+   *
+   * @param callback The callback class which implements org.apache.spark.eventhubs.utils.AadAuthenticationCallback
+   * @return the updated [[EventHubsConf]] instance
+   */
   def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
     setUseAadAuth(true)
     set(AadAuthCallbackKey, callback.getClass.getName)
@@ -657,6 +683,7 @@ object EventHubsConf extends Logging {
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
   val UseAadAuthKey = "eventhubs.useAadAuth"
   val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
+  val DynamicPartitionDiscoveryKey = "eventhubs.DynamicPartitionDiscovery"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

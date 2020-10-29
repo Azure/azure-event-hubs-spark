@@ -24,6 +24,7 @@ import java.util.concurrent.{ ConcurrentLinkedQueue, Executors, ScheduledExecuto
 import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubClientOptions, RetryPolicy }
 import org.apache.spark.eventhubs._
 import org.apache.spark.internal.Logging
+import com.microsoft.azure.eventhubs.EventHubException
 
 /**
  * A connection pool for EventHubClients. A connection pool is created per connection string.
@@ -56,28 +57,46 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        if (ehConf.useAadAuth) {
-          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
-            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
-            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-            .setRetryPolicy(RetryPolicy.getDefault)
-          client = EventHubClient
-            .createWithAzureActiveDirectory(
-              connStr.getEndpoint,
-              ehConf.name,
-              ehConf.aadAuthCallback().get,
-              ehConf.aadAuthCallback().get.authority,
+        try {
+          if (ehConf.useAadAuth) {
+            val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
+              .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+              .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+              .setRetryPolicy(RetryPolicy.getDefault)
+            client = EventHubClient
+              .createWithAzureActiveDirectory(
+                connStr.getEndpoint,
+                ehConf.name,
+                ehConf.aadAuthCallback().get,
+                ehConf.aadAuthCallback().get.authority,
+                ClientThreadPool.get(ehConf),
+                ehClientOption
+              )
+              .get()
+          } else {
+            client = EventHubClient.createFromConnectionStringSync(
+              connStr.toString,
+              RetryPolicy.getDefault,
               ClientThreadPool.get(ehConf),
-              ehClientOption
-            )
-            .get()
-        } else {
-          client = EventHubClient.createFromConnectionStringSync(
-            connStr.toString,
-            RetryPolicy.getDefault,
-            ClientThreadPool.get(ehConf),
-            null,
-            ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+              null,
+              ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+          }
+        } catch {
+          case ehException: EventHubException if ehException.getIsTransient =>
+            logInfo(
+              s"Ignoring transient failure ${ehException} from EventHubClient.createFromConnectionStringSync for EventHub name: ${ehConf.name}")
+            client = null
+          case t: Throwable =>
+            t.getCause match {
+              case ehException: EventHubException if ehException.getIsTransient =>
+                logInfo(
+                  s"Ignoring transient failure ${ehException} from EventHubClient.createFromConnectionStringSync for EventHub name: ${ehConf.name}")
+                client = null
+              case _ =>
+                logInfo(
+                  s"Fail because of a failure from EventHubClient.createFromConnectionStringSync for EventHub name: ${ehConf.name}")
+                throw t
+            }
         }
       }
     } else {

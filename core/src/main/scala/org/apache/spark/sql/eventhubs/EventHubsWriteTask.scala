@@ -181,14 +181,15 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
 
     val partitionIdExpression =
       inputSchema
-        .find(_.name == EventHubsWriter.PartitionIdAttributeName)
+        .find(attr =>
+          (attr.name == EventHubsWriter.PartitionIdAttributeNameAlias) || (attr.name == EventHubsWriter.PartitionIdAttributeName))
         .getOrElse(Literal(null, StringType))
 
     partitionIdExpression.dataType match {
       case StringType => // good
       case t =>
         throw new IllegalStateException(
-          s"${EventHubsWriter.PartitionIdAttributeName} attribute unsupported type $t"
+          s"${EventHubsWriter.PartitionIdAttributeNameAlias} attribute unsupported type $t"
         )
     }
 
@@ -198,7 +199,7 @@ private[eventhubs] abstract class EventHubsRowWriter(inputSchema: Seq[Attribute]
         .getOrElse(Literal(null, MapType(StringType, StringType)))
 
     propertiesExpression.dataType match {
-      case MapType(StringType, StringType, true) => // good
+      case MapType(StringType, StringType, true)  => // good
       case MapType(StringType, StringType, false) => // good
       case t =>
         throw new IllegalStateException(

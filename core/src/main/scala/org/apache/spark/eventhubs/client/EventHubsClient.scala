@@ -88,7 +88,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
 
     val sendTask = if (partition.isDefined) {
-      if (partitionSender.getPartitionId.toInt != partition.get) {
+      if ((partitionSender == null) || (partitionSender.getPartitionId.toInt != partition.get)) {
         logInfo("Recreating partition sender.")
         createPartitionSender(partition.get)
       }

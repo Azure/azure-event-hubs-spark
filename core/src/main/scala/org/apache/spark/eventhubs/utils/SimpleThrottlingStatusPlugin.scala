@@ -17,6 +17,8 @@
 
 package org.apache.spark.eventhubs.utils
 
+import java.net.URI
+
 import org.apache.spark.eventhubs.NameAndPartition
 import org.apache.spark.eventhubs.rdd.OffsetRange
 import scala.collection.mutable
@@ -25,15 +27,20 @@ import org.apache.spark.internal.Logging
 class SimpleThrottlingStatusPlugin extends ThrottlingStatusPlugin with Logging {
 
   override def onBatchCreation(
+      namespaceEndpoint: URI,
+      eventHubName: String,
       nextBatchLocalId: Long,
       nextBatchOffsetRanges: Array[OffsetRange],
       partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit = {
     log.info(
-      s"New Batch with localId = $nextBatchLocalId has been created with start and end offsets:" +
-        s"${nextBatchOffsetRanges} and partitions throttle factors: ${partitionsThrottleFactor}")
+      s"New Batch with localId = $nextBatchLocalId has been created with start and end offsets: " +
+        s"${nextBatchOffsetRanges} and partitions throttle factors: ${partitionsThrottleFactor} for " +
+        s"namespaceEndpoint: ${namespaceEndpoint}, eventHubName: ${eventHubName}")
   }
 
   override def onPartitionsPerformanceStatusUpdate(
+      namespaceEndpoint: URI,
+      eventHubName: String,
       latestUpdatedBatchLocalId: Long,
       partitionsBatchSizes: Map[NameAndPartition, Int],
       partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
@@ -41,6 +48,7 @@ class SimpleThrottlingStatusPlugin extends ThrottlingStatusPlugin with Logging {
     log.info(
       s"Latest updated batch with localId = $latestUpdatedBatchLocalId received these information:" +
         s"Batch size: ${partitionsBatchSizes}, batch receive times in ms: ${partitionsBatchReceiveTimeMS}, " +
-        s"performance percentages: ${partitionsPerformancePercentages}")
+        s"performance percentages: ${partitionsPerformancePercentages}, namespaceEndpoint: ${namespaceEndpoint}, " +
+        s"eventHubName: ${eventHubName}")
   }
 }

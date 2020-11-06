@@ -17,6 +17,7 @@
 
 package org.apache.spark.eventhubs
 
+import java.net.URI
 import java.util.logging.Logger
 
 import scala.collection.mutable
@@ -203,6 +204,8 @@ class PartitionsStatusTracker extends Logging {
           val performancePercentages = batch.getPerformancePercentages
           PartitionsStatusTracker.throttlingStatusPlugin.foreach(
             _.onPartitionsPerformanceStatusUpdate(
+              namespaceEndpoint,
+              eventhubName,
               batch.batchId,
               batch.paritionsStatusList.map(par => (par._1, par._2.batchSize))(breakOut),
               batch.paritionsStatusList
@@ -242,11 +245,16 @@ object PartitionsStatusTracker {
   var enoughUpdatesCount: Int = 1
   var throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = None
   var defaultPartitionsPerformancePercentage: Option[Map[NameAndPartition, Double]] = None
+  var namespaceEndpoint: URI = null
+  var eventhubName: String = ""
 
   def setDefaultValuesInTracker(numOfPartitions: Int,
+                                endpoint: URI,
                                 ehName: String,
                                 maxBatchReceiveTime: Long,
                                 throttlingSP: Option[ThrottlingStatusPlugin]) = {
+    namespaceEndpoint = endpoint
+    eventhubName = ehName
     partitionsCount = numOfPartitions
     acceptableBatchReceiveTimeInMs = maxBatchReceiveTime
     enoughUpdatesCount = (partitionsCount / 2) + 1

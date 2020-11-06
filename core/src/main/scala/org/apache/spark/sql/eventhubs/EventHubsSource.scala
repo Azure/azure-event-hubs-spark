@@ -101,9 +101,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   PartitionsStatusTracker.setDefaultValuesInTracker(
     partitionCount,
+    ConnectionStringBuilder(ehConf.connectionString).getEndpoint,
     ehName,
     ehConf.maxAcceptableBatchReceiveTime.getOrElse(DefaultMaxAcceptableBatchReceiveTime).toMillis,
-    throttlingStatusPlugin)
+    throttlingStatusPlugin
+  )
 
   var partitionsThrottleFactor: mutable.Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
@@ -399,7 +401,11 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     if (slowPartitionAdjustment) {
       addCurrentBatchToStatusTracker(offsetRanges)
       throttlingStatusPlugin.foreach(
-        _.onBatchCreation(localBatchId, offsetRanges, partitionsThrottleFactor))
+        _.onBatchCreation(ConnectionStringBuilder(ehConf.connectionString).getEndpoint,
+                          ehName,
+                          localBatchId,
+                          offsetRanges,
+                          partitionsThrottleFactor))
     }
     val rdd =
       EventHubsSourceProvider.toInternalRow(new EventHubsRDD(sc, ehConf.trimmed, offsetRanges))

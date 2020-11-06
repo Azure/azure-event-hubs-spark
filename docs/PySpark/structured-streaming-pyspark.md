@@ -56,7 +56,7 @@ connectionString = "YOUR.CONNECTION.STRING"
 ehConf = {}
 ehConf['eventhubs.connectionString'] = connectionString
 
-For 2.3.15 version and above, the configuration dictionary requires that connection string be encrypted.
+# For 2.3.15 version and above, the configuration dictionary requires that connection string be encrypted.
 ehConf['eventhubs.connectionString'] = sc._jvm.org.apache.spark.eventhubs.EventHubsUtils.encrypt(connectionString)
 
 ```
@@ -239,7 +239,7 @@ ehConf = {
 }
 
 # Simple batch query
-val df = spark \
+df = spark \
   .read \
   .format("eventhubs") \
   .options(**ehConf) \
@@ -329,16 +329,14 @@ ds = df \
   .write \
   .format("eventhubs") \
   .options(**ehWriteConf) \
-  .option("checkpointLocation", YOUR.OUTPUT.PATH.STRING) \
   .save()
 
 # Write body data from a DataFrame to EventHubs with a partitionKey
 ds = df \
   .selectExpr("partitionKey", "body") \
-  .writeStream \
+  .write \
   .format("eventhubs") \
   .options(**ehWriteConf) \
-  .option("checkpointLocation", "///output.txt") \
   .save()
 ```
 

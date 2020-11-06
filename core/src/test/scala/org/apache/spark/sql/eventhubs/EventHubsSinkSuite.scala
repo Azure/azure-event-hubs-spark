@@ -411,7 +411,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     assert(
       ex.getMessage
         .toLowerCase(Locale.ROOT)
-        .contains(s"partition attribute unsupported type"))
+        .contains(s"partitionid attribute unsupported type"))
   }
 
   test("streaming - write data with valid schema but wrong type - bad partitionKey type") {

@@ -23,7 +23,11 @@ import java.util.concurrent.{ ConcurrentLinkedQueue, Executors, ScheduledExecuto
 
 import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubClientOptions, RetryPolicy }
 import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.utils.RetryUtils.retryJava
 import org.apache.spark.internal.Logging
+
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * A connection pool for EventHubClients. A connection pool is created per connection string.
@@ -61,23 +65,32 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
             .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
             .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
             .setRetryPolicy(RetryPolicy.getDefault)
-          client = EventHubClient
-            .createWithAzureActiveDirectory(
-              connStr.getEndpoint,
-              ehConf.name,
-              ehConf.aadAuthCallback().get,
-              ehConf.aadAuthCallback().get.authority,
-              ClientThreadPool.get(ehConf),
-              ehClientOption
-            )
-            .get()
+          client = Await.result(
+            retryJava(
+              EventHubClient
+                .createWithAzureActiveDirectory(connStr.getEndpoint,
+                                                ehConf.name,
+                                                ehConf.aadAuthCallback().get,
+                                                ehConf.aadAuthCallback().get.authority,
+                                                ClientThreadPool.get(ehConf),
+                                                ehClientOption),
+              "createWithAzureActiveDirectory"
+            ),
+            ehConf.internalOperationTimeout
+          )
         } else {
-          client = EventHubClient.createFromConnectionStringSync(
-            connStr.toString,
-            RetryPolicy.getDefault,
-            ClientThreadPool.get(ehConf),
-            null,
-            ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+          client = Await.result(
+            retryJava(
+              EventHubClient.createFromConnectionString(
+                connStr.toString,
+                RetryPolicy.getDefault,
+                ClientThreadPool.get(ehConf),
+                null,
+                ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime)),
+              "createFromConnectionString"
+            ),
+            ehConf.internalOperationTimeout
+          )
         }
       }
     } else {

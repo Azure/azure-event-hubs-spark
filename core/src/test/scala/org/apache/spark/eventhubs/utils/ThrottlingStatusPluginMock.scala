@@ -19,9 +19,8 @@ package org.apache.spark.eventhubs.utils
 
 import java.net.URI
 
-import org.apache.spark.eventhubs.NameAndPartition
+import org.apache.spark.eventhubs.{ NameAndPartition, PartitionContext }
 import org.apache.spark.eventhubs.rdd.OffsetRange
-
 import scala.collection.mutable
 
 class ThrottlingStatusPluginMock extends ThrottlingStatusPlugin {
@@ -29,15 +28,13 @@ class ThrottlingStatusPluginMock extends ThrottlingStatusPlugin {
   val id = 1
 
   override def onBatchCreation(
-      namespaceEndpoint: URI,
-      eventHubName: String,
+      partitionContext: PartitionContext,
       nextBatchLocalId: Long,
       nextBatchOffsetRanges: Array[OffsetRange],
       partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit = {}
 
   override def onPartitionsPerformanceStatusUpdate(
-      namespaceEndpoint: URI,
-      eventHubName: String,
+      partitionContext: PartitionContext,
       latestUpdatedBatchLocalId: Long,
       partitionsBatchSizes: Map[NameAndPartition, Int],
       partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],

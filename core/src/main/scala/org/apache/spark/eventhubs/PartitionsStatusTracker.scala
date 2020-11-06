@@ -204,8 +204,7 @@ class PartitionsStatusTracker extends Logging {
           val performancePercentages = batch.getPerformancePercentages
           PartitionsStatusTracker.throttlingStatusPlugin.foreach(
             _.onPartitionsPerformanceStatusUpdate(
-              namespaceEndpoint,
-              eventhubName,
+              partitionContext,
               batch.batchId,
               batch.paritionsStatusList.map(par => (par._1, par._2.batchSize))(breakOut),
               batch.paritionsStatusList
@@ -245,22 +244,20 @@ object PartitionsStatusTracker {
   var enoughUpdatesCount: Int = 1
   var throttlingStatusPlugin: Option[ThrottlingStatusPlugin] = None
   var defaultPartitionsPerformancePercentage: Option[Map[NameAndPartition, Double]] = None
-  var namespaceEndpoint: URI = null
-  var eventhubName: String = ""
+  var partitionContext: PartitionContext = null
 
   def setDefaultValuesInTracker(numOfPartitions: Int,
-                                endpoint: URI,
-                                ehName: String,
+                                pContext: PartitionContext,
                                 maxBatchReceiveTime: Long,
                                 throttlingSP: Option[ThrottlingStatusPlugin]) = {
-    namespaceEndpoint = endpoint
-    eventhubName = ehName
+    partitionContext = pContext
     partitionsCount = numOfPartitions
     acceptableBatchReceiveTimeInMs = maxBatchReceiveTime
     enoughUpdatesCount = (partitionsCount / 2) + 1
     throttlingStatusPlugin = throttlingSP
     defaultPartitionsPerformancePercentage = Some(
-      (for (pid <- 0 until partitionsCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut))
+      (for (pid <- 0 until partitionsCount)
+        yield (NameAndPartition(pContext.eventHubName, pid), 1.0))(breakOut))
   }
 
   private def partitionSeqNoKey(nAndP: NameAndPartition, seqNo: SequenceNumber): String =

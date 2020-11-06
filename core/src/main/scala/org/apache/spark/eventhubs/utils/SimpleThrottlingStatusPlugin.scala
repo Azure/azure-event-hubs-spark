@@ -17,30 +17,34 @@
 
 package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.NameAndPartition
+import java.net.URI
+
+import org.apache.spark.eventhubs.{ NameAndPartition, PartitionContext }
 import org.apache.spark.eventhubs.rdd.OffsetRange
-import scala.collection.mutable
 import org.apache.spark.internal.Logging
+import scala.collection.mutable
 
 class SimpleThrottlingStatusPlugin extends ThrottlingStatusPlugin with Logging {
 
   override def onBatchCreation(
+      partitionContext: PartitionContext,
       nextBatchLocalId: Long,
       nextBatchOffsetRanges: Array[OffsetRange],
       partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit = {
-    log.info(
-      s"New Batch with localId = $nextBatchLocalId has been created with start and end offsets:" +
-        s"${nextBatchOffsetRanges} and partitions throttle factors: ${partitionsThrottleFactor}")
+    log.info(s"New Batch with localId = ${nextBatchLocalId} has been created for " +
+      s"partitionContext: ${partitionContext} with start and end offsets: ${nextBatchOffsetRanges} " +
+      s"and partitions throttle factors: ${partitionsThrottleFactor}")
   }
 
   override def onPartitionsPerformanceStatusUpdate(
+      partitionContext: PartitionContext,
       latestUpdatedBatchLocalId: Long,
       partitionsBatchSizes: Map[NameAndPartition, Int],
       partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
       partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit = {
     log.info(
-      s"Latest updated batch with localId = $latestUpdatedBatchLocalId received these information:" +
-        s"Batch size: ${partitionsBatchSizes}, batch receive times in ms: ${partitionsBatchReceiveTimeMS}, " +
-        s"performance percentages: ${partitionsPerformancePercentages}")
+      s"Latest updated batch with localId = ${latestUpdatedBatchLocalId}  for partitionContext: ${partitionContext} " +
+        s"received these information: Batch size: ${partitionsBatchSizes}, batch receive times in ms: " +
+        s"${partitionsBatchReceiveTimeMS}, performance percentages: ${partitionsPerformancePercentages}.")
   }
 }

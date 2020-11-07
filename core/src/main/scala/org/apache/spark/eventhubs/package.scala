@@ -50,11 +50,13 @@ package object eventhubs {
   val DefaultPartitionPreferredLocationStrategy = "Hash"
   val DefaultUseExclusiveReceiver = "true"
   val DefaultSlowPartitionAdjustment = "false"
+  val DefaultDynamicPartitionDiscovery = "false"
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
   val RetryCount = 10
   val WaitInterval = 5000
+  val UpdatePartitionCountIntervalMS = 300000
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"

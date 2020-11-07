@@ -78,10 +78,12 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   import EventHubsSourceProvider._
 
   private lazy val ehClient = EventHubsSourceProvider.clientFactory(parameters)(ehConf)
-  private lazy val partitionCount: Int = ehClient.partitionCount
+  private def partitionCount: Int = ehClient.partitionCount
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private val ehName = ehConf.name
+  private val partitionContext =
+    new PartitionContext(ConnectionStringBuilder(ehConf.connectionString).getEndpoint, ehName)
 
   private val sc = sqlContext.sparkContext
 
@@ -101,9 +103,10 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   PartitionsStatusTracker.setDefaultValuesInTracker(
     partitionCount,
-    ehName,
+    partitionContext,
     ehConf.maxAcceptableBatchReceiveTime.getOrElse(DefaultMaxAcceptableBatchReceiveTime).toMillis,
-    throttlingStatusPlugin)
+    throttlingStatusPlugin
+  )
 
   var partitionsThrottleFactor: mutable.Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
@@ -178,6 +181,10 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
     val seqNos = metadataLog.get(0) match {
       case Some(checkpoint) =>
+        if (defaultSeqNos.size > checkpoint.partitionToSeqNos.size) {
+          logInfo(
+            s"Number of partitions has increased from ${checkpoint.partitionToSeqNos.size} in the latest checkpoint to ${defaultSeqNos.size}.")
+        }
         defaultSeqNos ++ checkpoint.partitionToSeqNos
       case None =>
         defaultSeqNos
@@ -344,6 +351,8 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       case Some(prevBatchEndOffset) =>
         val prevOffsets = EventHubsSourceOffset.getPartitionSeqNos(prevBatchEndOffset)
         val startingSeqNos = if (prevOffsets.size < untilSeqNos.size) {
+          logInfo(
+            s"Number of partitions has increased from ${prevOffsets.size} to ${untilSeqNos.size}")
           val defaultSeqNos = ehClient
             .translate(ehConf, partitionCount)
             .map {
@@ -399,7 +408,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     if (slowPartitionAdjustment) {
       addCurrentBatchToStatusTracker(offsetRanges)
       throttlingStatusPlugin.foreach(
-        _.onBatchCreation(localBatchId, offsetRanges, partitionsThrottleFactor))
+        _.onBatchCreation(partitionContext, localBatchId, offsetRanges, partitionsThrottleFactor))
     }
     val rdd =
       EventHubsSourceProvider.toInternalRow(new EventHubsRDD(sc, ehConf.trimmed, offsetRanges))

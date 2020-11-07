@@ -17,18 +17,21 @@
 
 package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.NameAndPartition
-import org.apache.spark.eventhubs.rdd.OffsetRange
+import java.net.URI
 
+import org.apache.spark.eventhubs.{ NameAndPartition, PartitionContext }
+import org.apache.spark.eventhubs.rdd.OffsetRange
 import scala.collection.mutable
 
 trait ThrottlingStatusPlugin extends Serializable {
 
-  def onBatchCreation(nextBatchLocalId: Long,
+  def onBatchCreation(partitionContext: PartitionContext,
+                      nextBatchLocalId: Long,
                       nextBatchOffsetRanges: Array[OffsetRange],
                       partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit
 
   def onPartitionsPerformanceStatusUpdate(
+      partitionContext: PartitionContext,
       latestUpdatedBatchLocalId: Long,
       partitionsBatchSizes: Map[NameAndPartition, Int],
       partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],

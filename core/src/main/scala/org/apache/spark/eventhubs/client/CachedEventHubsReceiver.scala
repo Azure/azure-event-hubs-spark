@@ -309,9 +309,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
     } catch {
       case e: Exception =>
-        logError(
-          s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
-            s"PartitionPerformanceMetric: $PartitionPerformanceMetric to the driver.")
+        logError(s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
+          s"PartitionPerformanceMetric: ${PartitionPerformanceMetric} to the driver with error: ${e}.")
     }
   }
 }

@@ -22,6 +22,7 @@ import java.time.Duration
 import org.apache.spark.internal.Logging
 import org.apache.spark.rpc.{ RpcEndpoint, RpcEnv }
 import org.apache.spark.SparkContext
+import org.json4s.jackson.Serialization
 
 private[spark] class PartitionPerformanceReceiver(override val rpcEnv: RpcEnv,
                                                   val statusTracker: PartitionsStatusTracker)
@@ -56,7 +57,8 @@ case class PartitionPerformanceMetric(val nAndP: NameAndPartition,
                                       //val taskId: Long,
                                       val requestSeqNo: SequenceNumber,
                                       val batchSize: Int,
-                                      val receiveTimeInMillis: Long) {
+                                      val receiveTimeInMillis: Long)
+    extends Serializable {
 
   override def toString: String = {
     s"PartitionPerformanceMetric received from task: $taskContextSlim for partition: $nAndP, requestSeqNo: $requestSeqNo. " +

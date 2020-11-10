@@ -17,6 +17,8 @@
 
 package org.apache.spark.eventhubs
 
+import org.json4s.jackson.Serialization
+
 /**
  * Task context which provides Spark's task information
  *
@@ -24,7 +26,8 @@ package org.apache.spark.eventhubs
  * @param taskId Spark's current task Id.
  * @param sparkPartitionId Spark's current partition Id.
  */
-class TaskContextSlim(val stageId: Int, val taskId: Long, val sparkPartitionId: Int) {
+class TaskContextSlim(val stageId: Int, val taskId: Long, val sparkPartitionId: Int)
+    extends Serializable {
   override def toString: String = {
     s"Spark stage $stageId (TID $taskId) spark partitionId $sparkPartitionId"
   }

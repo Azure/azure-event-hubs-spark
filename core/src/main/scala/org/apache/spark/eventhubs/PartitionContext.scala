@@ -18,6 +18,7 @@
 package org.apache.spark.eventhubs
 
 import java.net.URI
+import org.json4s.jackson.Serialization
 
 /**
  * Partition context which provides EventHub's information for partitions
@@ -26,7 +27,7 @@ import java.net.URI
  * @param namespaceEndpoint Namespace endpoint.
  * @param eventHubName EventHub name.
  */
-class PartitionContext(val namespaceEndpoint: URI, val eventHubName: String) {
+class PartitionContext(val namespaceEndpoint: URI, val eventHubName: String) extends Serializable {
   override def toString: String = {
     s"NamespaceEndpoint: $namespaceEndpoint, eventHubName: $eventHubName"
   }

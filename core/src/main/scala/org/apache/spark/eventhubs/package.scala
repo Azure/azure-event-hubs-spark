@@ -62,7 +62,7 @@ package object eventhubs {
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
   val SequenceNumberAnnotation = "x-opt-sequence-number"
 
-  val SparkConnectorVersion = "2.3.17"
+  val SparkConnectorVersion = "2.3.18"
 
   val DefaultUseAadAuth = "false"
 

@@ -210,7 +210,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * Sets the default starting position for all partitions.
    *
    * If you would like to start from a different position for a specific partition,
-   * please see [[setStartingPositions()]]. If a position is set for particiular partition,
+   * please see [[setStartingPositions()]]. If a position is set for particular partition,
    * we will use that position instead of the one set by this method.
    *
    * If no starting position is set, then [[DefaultEventPosition]] is used
@@ -239,7 +239,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * in [[setStartingPosition()]]. If nothing is set in [[setStartingPosition()]], then
    * we will start consuming from the start of the EventHub partition.
    *
-   * @param eventPositions a map of parition ids (ints) to [[EventPosition]]s
+   * @param eventPositions a map of partition ids (ints) to [[EventPosition]]s
    * @return the updated [[EventHubsConf]] instance
    * @see [[EventPosition]]
    */
@@ -486,7 +486,7 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set the flag for slow parition adjustment. The default value is false.
+   * Set the flag for slow partition adjustment. The default value is false.
    * Default: [[DefaultSlowPartitionAdjustment]]
    *
    * @param b the flag which specifies whether the connector uses slow partition adjustment logic

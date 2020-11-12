@@ -41,11 +41,26 @@ import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
 import org.apache.spark.{ SparkContext, TaskContext }
+import org.apache.spark.rpc.RpcEndpointRef
+import org.apache.spark.SparkEnv
 
 /**
  * Helper to create Direct DStreams which consume events from Event Hubs.
  */
 object EventHubsUtils extends Logging {
+
+  var partitionPerformanceReceiverRef: RpcEndpointRef = null
+
+  private def createRpcEndpoint() = {
+    if (partitionPerformanceReceiverRef == null) {
+      // RPC endpoint for partition performance communication in the driver
+      val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
+      val partitionPerformanceReceiver: PartitionPerformanceReceiver =
+        new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
+      partitionPerformanceReceiverRef = SparkEnv.get.rpcEnv
+        .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
+    }
+  }
 
   /**
    * Creates a Direct DStream which consumes from  the Event Hubs instance
@@ -56,6 +71,7 @@ object EventHubsUtils extends Logging {
    * @return An [[EventHubsDirectDStream]]
    */
   def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf): EventHubsDirectDStream = {
+    createRpcEndpoint()
     new EventHubsDirectDStream(ssc, ehConf, EventHubsClient.apply)
   }
 
@@ -69,6 +85,7 @@ object EventHubsUtils extends Logging {
    */
   def createDirectStream(jssc: JavaStreamingContext,
                          ehConf: EventHubsConf): JavaInputDStream[EventData] = {
+    createRpcEndpoint()
     new JavaInputDStream(createDirectStream(jssc.ssc, ehConf))
   }
 
@@ -85,6 +102,7 @@ object EventHubsUtils extends Logging {
   def createRDD(sc: SparkContext,
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): EventHubsRDD = {
+    createRpcEndpoint()
     new EventHubsRDD(sc, ehConf.trimmed, offsetRanges)
   }
 
@@ -101,6 +119,7 @@ object EventHubsUtils extends Logging {
   def createRDD(jsc: JavaSparkContext,
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): JavaRDD[EventData] = {
+    createRpcEndpoint()
     new JavaRDD(createRDD(jsc.sc, ehConf, offsetRanges))
   }
 

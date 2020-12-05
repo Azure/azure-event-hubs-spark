@@ -18,10 +18,7 @@
 package com.microsoft.azure.schemaregistry.spark.avro
 
 import com.azure.data.schemaregistry.avro.{SchemaRegistryAvroSerializer}
-
-
 import scala.collection.JavaConverters._
-
 import org.apache.spark.sql.Column
 
 /***
@@ -52,6 +49,12 @@ object functions {
     new Column(AvroDataToCatalyst(data.expr, schemaId, clientOptions.asScala.toMap, requireExactSchemaMatch))
   }
 
+  /***
+   * Incoming
+   * @param data
+   * @param props
+   * @return
+   */
   def to_avro(data: Column, props : Map[String, AnyRef]): Column = {
     data
   }

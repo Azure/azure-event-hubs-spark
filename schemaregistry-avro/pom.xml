@@ -1,50 +1,49 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.microsoft.azure</groupId>
-  <artifactId>azure-schemaregistry-spark-avro</artifactId>
+  <artifactId>azure-schemaregistry-spark-avro_${scala.binary.version}</artifactId>
   <version>1.0.0-beta.4</version>
   <name>${project.artifactId}</name>
+
+  <parent>
+    <groupId>com.microsoft.azure</groupId>
+    <artifactId>azure-eventhubs-spark-parent_${scala.binary.version}</artifactId>
+    <version>2.3.18</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+  <packaging>jar</packaging>
 
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <encoding>UTF-8</encoding>
-    <scala.version>2.12.6</scala.version>
-    <scala.binary.version>2.11</scala.binary.version>
-    <spark.project.version>2.3.3</spark.project.version>
-    <scala.compat.version>2.11</scala.compat.version>
   </properties>
 
   <dependencies>
     <dependency>
-      <groupId>org.scala-lang</groupId>
-      <artifactId>scala-library</artifactId>
-      <version>${scala.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.binary.version}</artifactId>
-      <version>${spark.project.version}</version>
+      <version>${spark.version}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
-      <version>${spark.project.version}</version>
+      <version>${spark.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
-      <version>${spark.project.version}</version>
+      <version>${spark.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-sql_${scala.binary.version}</artifactId>
-      <version>${spark.project.version}</version>
+      <version>${spark.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

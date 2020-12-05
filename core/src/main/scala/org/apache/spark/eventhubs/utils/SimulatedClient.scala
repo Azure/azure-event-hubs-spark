@@ -74,7 +74,7 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
    */
   override def allBoundedSeqNos: Map[PartitionId, (SequenceNumber, SequenceNumber)] =
     (0 until partitionCount)
-      .map(i => i -> (eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)))
+      .map(i => i -> ((eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)): (SequenceNumber, SequenceNumber)))
       .toMap
 
   /**

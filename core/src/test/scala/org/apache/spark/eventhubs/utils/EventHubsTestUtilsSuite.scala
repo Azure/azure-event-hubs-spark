@@ -20,9 +20,9 @@ package org.apache.spark.eventhubs.utils
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.microsoft.azure.eventhubs.EventData
-import org.apache.spark.eventhubs.{ EventHubsConf, NameAndPartition }
+import org.apache.spark.eventhubs.{EventHubsConf, NameAndPartition, SequenceNumber}
 import org.apache.spark.internal.Logging
-import org.scalatest.{ BeforeAndAfter, BeforeAndAfterAll, FunSuite }
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
 
 import collection.JavaConverters._
 
@@ -143,10 +143,10 @@ class EventHubsTestUtilsSuite
     val conf = testUtils.getEventHubsConf(eventHub.name)
     val client = SimulatedClient(conf)
     val results = client.allBoundedSeqNos.toMap
-    assert(results(0) == (0, 1))
-    assert(results(1) == (0, 2))
-    assert(results(2) == (0, 3))
-    assert(results(3) == (0, 1))
+    assert(results(0) == ((0, 1): (SequenceNumber, SequenceNumber)))
+    assert(results(1) == ((0, 2): (SequenceNumber, SequenceNumber)))
+    assert(results(2) == ((0, 3): (SequenceNumber, SequenceNumber)))
+    assert(results(3) == ((0, 1): (SequenceNumber, SequenceNumber)))
   }
 
   test("partitionSize") {

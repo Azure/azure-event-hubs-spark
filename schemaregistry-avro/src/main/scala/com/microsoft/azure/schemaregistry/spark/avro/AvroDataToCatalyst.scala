@@ -105,7 +105,7 @@ case class AvroDataToCatalyst(
         }
       }
 
-      avroConverter.deserialize(genericRecord).get
+      avroConverter.deserialize(genericRecord)
     } catch {
       case NonFatal(e) => parseMode match {
         case PermissiveMode => nullResultRow
@@ -123,17 +123,7 @@ case class AvroDataToCatalyst(
 
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val expr = ctx.addReferenceObj("this", this)
-    nullSafeCodeGen(ctx, ev, eval => {
-      val result = ctx.freshName("result")
-      val dt = CodeGenerator.boxedType(dataType)
-      s"""
-        $dt $result = ($dt) $expr.nullSafeEval($eval);
-        if ($result == null) {
-          ${ev.isNull} = true;
-        } else {
-          ${ev.value} = $result;
-        }
-      """
-    })
+    defineCodeGen(ctx, ev, input =>
+      s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
   }
 }

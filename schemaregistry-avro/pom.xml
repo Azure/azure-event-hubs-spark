@@ -16,8 +16,6 @@
   <properties>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
-    <scala.binary.version>2.12</scala.binary.version>
-    <spark.version>3.0.1</spark.version>
     <encoding>UTF-8</encoding>
   </properties>
 

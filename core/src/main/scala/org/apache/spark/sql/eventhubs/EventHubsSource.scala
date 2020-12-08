@@ -111,8 +111,15 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   var partitionsThrottleFactor: mutable.Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
 
-  val defaultPartitionsPerformancePercentage: Map[NameAndPartition, Double] =
+  var defaultPartitionsPerformancePercentage: Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
+
+  private def updatePartitionCountInPartitionsStatusTracker(numberOfPartitions: Int) = {
+    logInfo(s"Update the partitionCount to ${numberOfPartitions} in the PartitionsStatusTracker.")
+    PartitionsStatusTracker.updateDefaultValuesInTracker(numberOfPartitions)
+    defaultPartitionsPerformancePercentage =
+      (for (pid <- 0 until numberOfPartitions) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
+  }
 
   private lazy val initialPartitionSeqNos = {
     val metadataLog =
@@ -293,18 +300,18 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
             .get(nameAndPartition)
             .map { size =>
               val begin = from.getOrElse(nameAndPartition, fromNew(nameAndPartition))
-              // adjust performance performance pewrcentages to use as much as events possible in the batch
-              val perforamnceFactor: Double = if (slowPartitionAdjustment) {
-                partitionsPerformancePercentage(nameAndPartition)
+              // adjust performance percentages to use as much as events possible in the batch
+              val performanceFactor: Double = if (slowPartitionAdjustment) {
+                partitionsPerformancePercentage.getOrElse(nameAndPartition, 1.0)
               } else 1.0
 
               if (slowPartitionAdjustment) {
-                partitionsThrottleFactor(nameAndPartition) = perforamnceFactor
+                partitionsThrottleFactor(nameAndPartition) = performanceFactor
                 logInfo(
                   s"Slow partition adjustment is on, so prorate amount for $nameAndPartition will be adjusted by" +
-                    s" the perfromanceFactor = $perforamnceFactor")
+                    s" the performanceFactor = $performanceFactor")
               }
-              val prorate = limit * (size / total) * perforamnceFactor
+              val prorate = limit * (size / total) * performanceFactor
               logDebug(s"rateLimit $nameAndPartition prorated amount is $prorate")
               // Don't completely starve small partitions
               val off = begin + (if (prorate < 1) Math.ceil(prorate) else Math.floor(prorate)).toLong
@@ -353,6 +360,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
         val startingSeqNos = if (prevOffsets.size < untilSeqNos.size) {
           logInfo(
             s"Number of partitions has increased from ${prevOffsets.size} to ${untilSeqNos.size}")
+          updatePartitionCountInPartitionsStatusTracker(partitionCount)
           val defaultSeqNos = ehClient
             .translate(ehConf, partitionCount)
             .map {
@@ -425,7 +433,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     localBatchId += 1
     logDebug(
       s"Slow partition adjustment is on, add the current batch $localBatchId to the tracker.")
-    partitionsStatusTracker.addorUpdateBatch(localBatchId, offsetRanges)
+    partitionsStatusTracker.addOrUpdateBatch(localBatchId, offsetRanges)
   }
 
   /**

@@ -101,12 +101,17 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   private lazy val throttlingStatusPlugin: Option[ThrottlingStatusPlugin] =
     ehConf.throttlingStatusPlugin()
 
-  PartitionsStatusTracker.setDefaultValuesInTracker(
+  private var localBatchId = -1
+
+  // Create a partition status tracker for this source and add it to the partitionPerformanceReceiver
+  // this is being used only if slow partition adjustment is on
+  val partitionsStatusTracker = new PartitionsStatusTracker(
     partitionCount,
     partitionContext,
     ehConf.maxAcceptableBatchReceiveTime.getOrElse(DefaultMaxAcceptableBatchReceiveTime).toMillis,
     throttlingStatusPlugin
   )
+  partitionPerformanceReceiver.addStatusTracker(ehName, partitionsStatusTracker)
 
   var partitionsThrottleFactor: mutable.Map[NameAndPartition, Double] =
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
@@ -116,7 +121,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private def updatePartitionCountInPartitionsStatusTracker(numberOfPartitions: Int) = {
     logInfo(s"Update the partitionCount to ${numberOfPartitions} in the PartitionsStatusTracker.")
-    PartitionsStatusTracker.updateDefaultValuesInTracker(numberOfPartitions)
+    partitionsStatusTracker.updateNumberofPartitionsInTracker(numberOfPartitions)
     defaultPartitionsPerformancePercentage =
       (for (pid <- 0 until numberOfPartitions) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
   }
@@ -470,7 +475,6 @@ private[eventhubs] object EventHubsSource {
     """.stripMargin
 
   private[eventhubs] val VERSION = 1
-  private var localBatchId = -1
 
   def getSortedExecutorList(sc: SparkContext): Array[String] = {
     val bm = sc.env.blockManager

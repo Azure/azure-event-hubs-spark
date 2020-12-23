@@ -54,6 +54,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
   private var _client: EventHubClient = _
 
+  private var partitionCountCache: Int = 0
+  private var partitionCountCacheUpdateTimestamp: Long = 0
+
   private def client = synchronized {
     if (_client == null) {
       _client = ClientConnectionPool.borrowClient(ehConf)
@@ -180,7 +183,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   lazy val partitionCountLazyVal: Int = {
     try {
       logDebug(
-        s"partitionCountLazyVal makes a call to runTimeInfo to read the number of partitions.")
+        s"partitionCountLazyVal makes a call to runTimeInfo to read the number of partitions for EventHub ${client.getEventHubName}.")
       val runtimeInfo = client.getRuntimeInformation.get
       runtimeInfo.getPartitionCount
     } catch {
@@ -196,7 +199,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         partitionCountCache = runtimeInfo.getPartitionCount
         partitionCountCacheUpdateTimestamp = currentTimeStamp
         logDebug(
-          s"partitionCountDynamic made a call to runTimeInfo to read the number of partitions = ${partitionCountCache} at timestamp = ${partitionCountCacheUpdateTimestamp}")
+          s"partitionCountDynamic made a call to runTimeInfo to read the number of partitions = ${partitionCountCache}" +
+            s" at timestamp = ${partitionCountCacheUpdateTimestamp} for EventHub ${client.getEventHubName}")
       }
       partitionCountCache
     } catch {
@@ -349,8 +353,6 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 }
 
 private[spark] object EventHubsClient {
-  private var partitionCountCache: Int = 0
-  private var partitionCountCacheUpdateTimestamp: Long = 0
 
   private[spark] def apply(ehConf: EventHubsConf): EventHubsClient =
     new EventHubsClient(ehConf)

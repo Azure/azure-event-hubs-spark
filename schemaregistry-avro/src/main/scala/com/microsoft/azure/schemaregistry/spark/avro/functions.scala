@@ -48,14 +48,4 @@ object functions {
        requireExactSchemaMatch: Boolean = true): Column = {
     new Column(AvroDataToCatalyst(data.expr, schemaId, clientOptions.asScala.toMap, requireExactSchemaMatch))
   }
-
-  /***
-   * Incoming
-   * @param data
-   * @param props
-   * @return
-   */
-  def to_avro(data: Column, props : Map[String, AnyRef]): Column = {
-    data
-  }
 }

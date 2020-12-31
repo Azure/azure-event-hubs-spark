@@ -25,7 +25,6 @@ import com.azure.data.schemaregistry.avro.{SchemaRegistryAvroSerializer, SchemaR
 import com.azure.identity.ClientSecretCredentialBuilder
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
-import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, SpecificInternalRow, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.util.{FailFastMode, ParseMode, PermissiveMode}
@@ -45,7 +44,6 @@ case class AvroDataToCatalyst(
   override lazy val dataType: DataType = {
     val dt = SchemaConverters.toSqlType(new Schema.Parser().parse(expectedSchemaString)).dataType;
     dt
-    // todo: compare stream compat to group compat and verify equal
   }
 
   override def nullable: Boolean = true

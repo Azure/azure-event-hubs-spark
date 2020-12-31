@@ -72,14 +72,14 @@ However, there are two edge cases that will be common in streaming scenarios in 
 To handle the more dangerous second case, Spark functions will throw if incoming data contains fields that cannot be captured by the existing schema.  This behavior is based on the assumption that perceived data loss is prohibited.
 
 To handle the first first case, a parameter will be introduced called `requireExactSchemaMatch`:
-- If true, if the schema in the payload is not an exact match to the Spark-specified schema, then the job will throw.  This allows users to specify that their pipeline contain one schema only.  (q: add list of permitted guids?)
+- If true, if the schema in the payload is not an exact match to the Spark-specified schema, then the job will throw.  This allows users to specify that their pipeline contain one schema only.
 - If false, the job will attempt to read the data incoming in the stream.  In the case of upgraded consumers reading backwards compatible schemas, the job will be able to properly read the schemas (nullable deleted fields, adding new optional fields).
 
 ## Failure Modes
 
 Two modes will be supported as dictated by Spark SQL - 
 - `FailFastMode` - fail on catching any exception
-- `PermissiveMode` - continue processing if parsing exceptions are caught
+- `PermissiveMode` - continue processing if parsing exceptions are caught (currently unsupported)
 
 Customers will be able to configure the stream with specific failure models, but the default failure model will be `FailFastMode` to prevent perceived data loss with `PermissiveMode`.
 

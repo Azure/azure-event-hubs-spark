@@ -17,8 +17,48 @@
 
 package com.microsoft.azure.schemaregistry.spark.avro
 
-import org.scalatest.FunSuite
+import java.util
 
-class AvroDeserializerSuite extends FunSuite {
+import org.apache.spark.SparkException
+import org.apache.spark.sql.{Column, QueryTest, Row}
+import org.apache.spark.sql.execution.LocalTableScanExec
+import org.apache.spark.sql.functions.{col, lit, struct}
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.test.SharedSparkSession
 
+class AvroFunctionsSuite extends QueryTest with SharedSparkSession {
+  import testImplicits._
+
+  test("do not handle null column") {
+
+    try {
+      functions.from_avro(null, "schema_id", null)
+      fail()
+    }
+    catch {
+      case _: NullPointerException =>
+    }
+  }
+
+  test("do not handle null schema ID") {
+    try {
+      functions.from_avro(new Column("empty"), null, new util.HashMap())
+      fail()
+    }
+    catch {
+      case _: NullPointerException =>
+    }
+  }
+
+  test("invalid client options") {
+    val configMap = new util.HashMap[String, String]()
+    configMap.put("schema.registry.url", "https://namespace.servicebus.windows.net")
+    try {
+      functions.from_avro(new Column("empty"), "schema_id", configMap)
+      fail()
+    }
+    catch {
+      case _: IllegalArgumentException =>
+    }
+  }
 }

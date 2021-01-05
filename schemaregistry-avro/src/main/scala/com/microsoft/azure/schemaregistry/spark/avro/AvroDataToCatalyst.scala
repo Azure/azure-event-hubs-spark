@@ -21,7 +21,7 @@ import java.io.ByteArrayInputStream
 
 import com.azure.core.util.serializer.TypeReference
 import com.azure.data.schemaregistry.SchemaRegistryClientBuilder
-import com.azure.data.schemaregistry.avro.{SchemaRegistryAvroSerializer, SchemaRegistryAvroSerializerBuilder}
+import com.azure.data.schemaregistry.avro.{SchemaRegistryAvroSerializerBuilder}
 import com.azure.identity.ClientSecretCredentialBuilder
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord

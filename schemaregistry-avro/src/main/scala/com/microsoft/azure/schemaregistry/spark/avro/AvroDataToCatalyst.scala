@@ -76,7 +76,11 @@ case class AvroDataToCatalyst(
   @transient private lazy val expectedSchema = new Schema.Parser().parse(expectedSchemaString)
 
   @transient private lazy val parseMode: ParseMode = {
-    FailFastMode // permissive mode
+    val mode = options.get("mode").map(ParseMode.fromString).getOrElse(FailFastMode)
+    if (mode != PermissiveMode && mode != FailFastMode) {
+      throw new IllegalArgumentException(mode + "parse mode not supported.")
+    }
+    mode
   }
 
   @transient private lazy val nullResultRow: Any = dataType match {

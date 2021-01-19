@@ -98,7 +98,7 @@ The position can be an enqueued time, offset, sequence number, the start of the 
 
 
 ```python
-import datetime from datetime as dt
+from datetime import datetime as dt
 
 # Start from beginning of stream
 startOffset = "-1"

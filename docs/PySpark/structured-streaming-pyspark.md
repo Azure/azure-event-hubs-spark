@@ -99,6 +99,7 @@ The position can be an enqueued time, offset, sequence number, the start of the 
 
 ```python
 from datetime import datetime as dt
+import json
 
 # Start from beginning of stream
 startOffset = "-1"

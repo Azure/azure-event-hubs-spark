@@ -83,7 +83,8 @@ because they move between different executor nodes. Note that the receiver recre
 the receiving task for a specific eventhubs partition is moving from one executor to another. 
 
 In this case, increasing the spark locality can help to reduce/avoid recreating receivers. The spark locality can be 
-increased by assigning a higher value than the default 3s to the "spark.locality.wait" property.
+increased by assigning a higher value to the "spark.locality.wait" property (for instance, increase the value to 15s 
+instead of the default value 3s).
  
 **What else? If you have suggestions for this FAQ please share them on the 
 [gitter chat](https://gitter.im/azure-event-hubs-spark/Lobby) or open an issue!**

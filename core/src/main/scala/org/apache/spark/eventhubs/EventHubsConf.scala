@@ -617,7 +617,7 @@ final class EventHubsConf private (private val connectionStr: String)
   def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
     setUseAadAuth(true)
     set(AadAuthCallbackKey, callback.getClass.getName)
-    set(AadAuthCallbackParams, callback.args.mkString(","))
+    set(AadAuthCallbackParams, callback.params.mkString(","))
   }
 
   def aadAuthCallback(): Option[AadAuthenticationCallback] = {

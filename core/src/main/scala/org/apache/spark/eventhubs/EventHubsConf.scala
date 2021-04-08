@@ -177,6 +177,7 @@ final class EventHubsConf private (private val connectionStr: String)
       MaxAcceptableBatchReceiveTimeKey,
       UseAadAuthKey,
       AadAuthCallbackKey,
+      AadAuthCallbackParams,
       DynamicPartitionDiscoveryKey
     ).map(_.toLowerCase).toSet
 
@@ -616,12 +617,15 @@ final class EventHubsConf private (private val connectionStr: String)
   def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
     setUseAadAuth(true)
     set(AadAuthCallbackKey, callback.getClass.getName)
+    set(AadAuthCallbackParams, callback.args.mkString(","))
   }
 
   def aadAuthCallback(): Option[AadAuthenticationCallback] = {
-    self.get(AadAuthCallbackKey) map (className => {
-      Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
-    })
+    for {
+      callbackClassName <- self.get(AadAuthCallbackKey)
+      callbackParams <- self.get(AadAuthCallbackParams).map(_.split(","))
+    } yield Class.forName(callbackClassName).getConstructor(classOf[Seq[String]])
+      .newInstance(callbackParams.toSeq).asInstanceOf[AadAuthenticationCallback]
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -683,6 +687,7 @@ object EventHubsConf extends Logging {
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
   val UseAadAuthKey = "eventhubs.useAadAuth"
   val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
+  val AadAuthCallbackParams = "eventhubs.aadAuthCallbackParams"
   val DynamicPartitionDiscoveryKey = "eventhubs.DynamicPartitionDiscovery"
 
   /** Creates an EventHubsConf */

@@ -118,7 +118,8 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         }),
         MaxEventsPerTriggerKey -> 4.toString,
         UseAadAuthKey -> "true",
-        AadAuthCallbackKey -> classOf[AadAuthenticationCallbackMock].getName
+        AadAuthCallbackKey -> classOf[AadAuthenticationCallbackMock].getName,
+        AadAuthCallbackParams -> ""
       ))
 
     val expectedConf = EventHubsConf(expectedConnStr)

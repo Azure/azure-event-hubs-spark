@@ -119,7 +119,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         MaxEventsPerTriggerKey -> 4.toString,
         UseAadAuthKey -> "true",
         AadAuthCallbackKey -> classOf[AadAuthenticationCallbackMock].getName,
-        AadAuthCallbackParams -> ""
+        AadAuthCallbackParams -> "param1,param2"
       ))
 
     val expectedConf = EventHubsConf(expectedConnStr)
@@ -127,7 +127,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setStartingPosition(expectedPosition)
       .setStartingPositions(expectedPositions)
       .setMaxEventsPerTrigger(4L)
-      .setAadAuthCallback(new AadAuthenticationCallbackMock())
+      .setAadAuthCallback(new AadAuthenticationCallbackMock("param1", "param2"))
 
     assert(expectedConf.equals(actualConf))
   }

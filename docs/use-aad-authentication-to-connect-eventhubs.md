@@ -15,15 +15,15 @@ import java.util.concurrent.CompletableFuture
 import com.microsoft.aad.msal4j.{IAuthenticationResult, _}
 import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
-case class AuthBySecretCallBack() extends AadAuthenticationCallback{
+class AuthBySecretCallBack(params: String*) extends AadAuthenticationCallback(params) {
 
   implicit def toJavaFunction[A, B](f: Function1[A, B]) = new java.util.function.Function[A, B] {
     override def apply(a: A): B = f(a)
   }
-  override def authority: String = "your-tenant-id"
+  override def authority: String = "your-tenant-id" //or taken from "params"
 
-  val clientId: String = "your-client-id"
-  val clientSecret: String = "your-client-secret"
+  val clientId: String = "your-client-id" //or taken from "params"
+  val clientSecret: String = "your-client-secret" //or taken from "params"
 
   override def acquireToken(audience: String, authority: String, state: Any): CompletableFuture[String] = try {
     var app = ConfidentialClientApplication
@@ -49,7 +49,7 @@ val connectionString = ConnectionStringBuilder()
   .build
 val ehConf = EventHubsConf(connectionString)
   .setConsumerGroup("consumerGroup")
-  .setAadAuthCallback(AuthBySecretCallBack())
+  .setAadAuthCallback(new AuthBySecretCallBack(/* optional "params" can be passed here */))
 ```
 
 
@@ -65,15 +65,15 @@ import java.util.concurrent.CompletableFuture
 import com.microsoft.aad.msal4j.{ClientCredentialFactory, ClientCredentialParameters, ConfidentialClientApplication, IAuthenticationResult}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
-case class AuthByCertCallBack() extends AadAuthenticationCallback {
+class AuthByCertCallBack(params: String*) extends AadAuthenticationCallback(params) {
   implicit def toJavaFunction[A, B](f: Function1[A, B]) = new java.util.function.Function[A, B] {
     override def apply(a: A): B = f(a)
   }
-  val clientId: String = "your-client-id"
-  val cert: Array[Byte] = FileUtils.readFileToByteArray(new File("your-cert-local-path"))
-  val certPassword: String = "password-of-your-cert"
+  val clientId: String = "your-client-id" //or taken from "params"
+  val cert: Array[Byte] = FileUtils.readFileToByteArray(new File("your-cert-local-path")) //or taken from "params"
+  val certPassword: String = "password-of-your-cert" //or taken from "params"
 
-  override def authority: String = "your-tenant-id"
+  override def authority: String = "your-tenant-id" //or taken from "params"
   override def acquireToken(audience: String,
                             authority: String,
                             state: Any): CompletableFuture[String] =
@@ -103,5 +103,5 @@ val connectionString = ConnectionStringBuilder()
   .build
 val ehConf = EventHubsConf(connectionString)
   .setConsumerGroup("consumerGroup")
-  .setAadAuthCallback(AuthByCertCallBack())
+  .setAadAuthCallback(new AuthByCertCallBack(/* optional "params" can be passed here */))
 ```

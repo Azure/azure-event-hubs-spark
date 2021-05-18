@@ -52,6 +52,11 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 
 There is an open issue for each planned feature/enhancement. 
 
+## FAQ
+
+We maintain an [FAQ](FAQ.md) - reach out to us via [gitter](https://gitter.im/azure-event-hubs-spark/Lobby) 
+if you think anything needs to be added or clarified!
+
 ## Usage
 
 ### Linking 
@@ -77,11 +82,6 @@ Documentation for our connector can be found [here](docs/). The integration guid
 documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming 
 [here](https://spark.apache.org/docs/latest/streaming-programming-guide.html), and, the last but not least, Structured Streaming 
 [here](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html). 
-
-### FAQ
-
-We maintain an [FAQ](FAQ.md) - reach out to us via [gitter](https://gitter.im/azure-event-hubs-spark/Lobby) 
-if you think anything needs to be added or clarified!
 
 ### Further Assistance 
 

@@ -177,6 +177,7 @@ final class EventHubsConf private (private val connectionStr: String)
       MaxAcceptableBatchReceiveTimeKey,
       UseAadAuthKey,
       AadAuthCallbackKey,
+      AadAuthCallbackParamsKey,
       DynamicPartitionDiscoveryKey
     ).map(_.toLowerCase).toSet
 
@@ -619,9 +620,39 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   def aadAuthCallback(): Option[AadAuthenticationCallback] = {
-    self.get(AadAuthCallbackKey) map (className => {
-      Class.forName(className).newInstance().asInstanceOf[AadAuthenticationCallback]
-    })
+    val params: Seq[String] = self.get(AadAuthCallbackParamsKey) map EventHubsConf
+      .read[Seq[String]] getOrElse Seq.empty
+    if (params.isEmpty) {
+      self.get(AadAuthCallbackKey) map (className => {
+        Class
+          .forName(className)
+          .getConstructor()
+          .newInstance()
+          .asInstanceOf[AadAuthenticationCallback]
+      })
+    } else {
+      self.get(AadAuthCallbackKey) map (className => {
+        Class
+          .forName(className)
+          .getConstructor(classOf[Seq[String]])
+          .newInstance(params)
+          .asInstanceOf[AadAuthenticationCallback]
+      })
+    }
+  }
+
+  /**
+   * set the parameter passed to the aad auth callback class in case it accepts parameters. The aad auth class should
+   * either accepts no parameters or accepts a sequence of strings. This optional parameter can be used to pass
+   * authentication secrets to the aad auth callback class securely.
+   * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+   *
+   * @param params The parameters passed to the aad authentication callback class. The parameters should be passed as a
+   *               sequence of Strings.
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthCallbackParams(params: Seq[String]): EventHubsConf = {
+    set(AadAuthCallbackParamsKey, EventHubsConf.write[Seq[String]](params))
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -683,6 +714,7 @@ object EventHubsConf extends Logging {
   val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
   val UseAadAuthKey = "eventhubs.useAadAuth"
   val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
+  val AadAuthCallbackParamsKey = "eventhubs.AadAuthCallbackParams"
   val DynamicPartitionDiscoveryKey = "eventhubs.DynamicPartitionDiscovery"
 
   /** Creates an EventHubsConf */

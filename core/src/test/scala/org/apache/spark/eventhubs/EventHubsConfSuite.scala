@@ -17,15 +17,19 @@
 
 package org.apache.spark.eventhubs
 
+import org.apache.spark.eventhubs.utils.{
+  AadAuthenticationCallbackMock,
+  AadAuthenticationCallbackMockWithParams,
+  EventHubsTestUtils,
+  MetricPluginMock,
+  ThrottlingStatusPluginMock
+}
 import java.time.Duration
-import java.util.NoSuchElementException
-
-import org.apache.spark.eventhubs.utils.{AadAuthenticationCallbackMock, EventHubsTestUtils, MetricPluginMock, ThrottlingStatusPluginMock}
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.{read => sread}
-import org.json4s.jackson.Serialization.{write => swrite}
-import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.json4s.jackson.Serialization.{ read => sread }
+import org.json4s.jackson.Serialization.{ write => swrite }
+import org.scalatest.{ BeforeAndAfterAll, FunSuite }
 
 /**
  * Tests [[EventHubsConf]] for correctness.
@@ -377,14 +381,27 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(expectedTime == actualTime)
   }
 
-
   test("validate - AadAuthenticationCallback") {
     val aadAuthCallback = new AadAuthenticationCallbackMock()
-    val eventHubConfig = testUtils.getEventHubsConf()
+    val eventHubConfig = testUtils
+      .getEventHubsConf()
       .setAadAuthCallback(aadAuthCallback)
 
     val actualCallback = eventHubConfig.aadAuthCallback()
     assert(eventHubConfig.useAadAuth)
     assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMock])
+  }
+
+  test("validate - AadAuthenticationCallbackWithParams") {
+    val params: Seq[String] = Seq("passed-tenant-id")
+    val aadAuthCallbackWithParams = new AadAuthenticationCallbackMockWithParams(params)
+    val eventHubConfig = testUtils
+      .getEventHubsConf()
+      .setAadAuthCallback(aadAuthCallbackWithParams)
+      .setAadAuthCallbackParams(params)
+
+    val actualCallback = eventHubConfig.aadAuthCallback()
+    assert(eventHubConfig.useAadAuth)
+    assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMockWithParams])
   }
 }

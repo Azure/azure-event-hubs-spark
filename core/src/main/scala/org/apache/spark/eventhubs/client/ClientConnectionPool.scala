@@ -62,7 +62,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       while (client == null) {
         if (ehConf.useAadAuth) {
           val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
-            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(MinSilentTime))
             .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
             .setRetryPolicy(RetryPolicy.getDefault)
           client = Await.result(

@@ -393,7 +393,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
   }
 
   test("validate - AadAuthenticationCallbackWithParams") {
-    val params: Seq[String] = Seq("passed-tenant-id")
+    val params: Map[String, String] = Map("authority" -> "passed-tenant-id")
     val aadAuthCallbackWithParams = new AadAuthenticationCallbackMockWithParams(params)
     val eventHubConfig = testUtils
       .getEventHubsConf()
@@ -403,5 +403,6 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     val actualCallback = eventHubConfig.aadAuthCallback()
     assert(eventHubConfig.useAadAuth)
     assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMockWithParams])
+    assert(actualCallback.get.authority == "passed-tenant-id")
   }
 }

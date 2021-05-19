@@ -9,7 +9,8 @@ This guide will show you how you can
 
 
 ## Use Service Principal with Secret to Authorize
-First, you need to create a callback class extends from `org.apache.spark.eventhubs.utils.AadAuthenticationCallback`. There are two options on how the callback class can access the secrets. Either set the secrets directly in the class definition, or pass teh secrets as a sequence of strings parameter to the callback class.
+First, you need to create a callback class extends from `org.apache.spark.eventhubs.utils.AadAuthenticationCallback`. There are two options on how the callback class can access the secrets. Either set the secrets directly in the class definition, or pass the secrets in a properties bag of type `Map[String, Object]` to the callback class.
+Please note that since the connector is using reflection to instantiate the callback class on each executor node, the callback class definition should be packaged in a jar file and be added to your cluster.
 
 ### Write Secret in Callback Class
 In this case, you set the required secrets in the callback class as shown in the below example:
@@ -62,23 +63,24 @@ val ehConf = EventHubsConf(connectionString)
 
 
 ### Pass Secrets to Callback Class
-Another option is to pass the secrets as a sequence of strings to the callback class. For instance, if you want to read the secrets from a [secret scope](https://docs.microsoft.com/en-us/azure/databricks/security/secrets/secret-scopes), you can use `dbutils` API to get the secrets on the driver and pass those to the callback class. 
+Another option is to pass the secrets in a properties bag to the callback class. For instance, if you want to read the secrets from a [secret scope](https://docs.microsoft.com/en-us/azure/databricks/security/secrets/secret-scopes), you can use `dbutils` API to get the secrets on the driver and pass those to the callback class. Note that the callback class only accepts one parameter of type `Map[String, Object]`.
 Here is an example showing how you can do so:
+
 ```scala
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
 import com.microsoft.aad.msal4j.{IAuthenticationResult, _}
 import org.apache.spark.eventhubs.utils.AadAuthenticationCallback
 
-class AuthBySecretCallBackWithParams(params: Seq[String]) extends AadAuthenticationCallback{
+class AuthBySecretCallBackWithParams(params: Map[String, Object]) extends AadAuthenticationCallback{
 
   implicit def toJavaFunction[A, B](f: Function1[A, B]) = new java.util.function.Function[A, B] {
     override def apply(a: A): B = f(a)
   }
   
-  override def authority: String = params(0)
-  val clientId: String = params(1)
-  val clientSecret: String = params(2)
+  override def authority: String = params("authority").asInstanceOf[String]
+  val clientId: String = params("clientId").asInstanceOf[String]
+  val clientSecret: String = params("clientSecret").asInstanceOf[String]
 
   override def acquireToken(audience: String, authority: String, state: Any): CompletableFuture[String] = try {
     var app = ConfidentialClientApplication
@@ -101,9 +103,9 @@ class AuthBySecretCallBackWithParams(params: Seq[String]) extends AadAuthenticat
 In this case you should use both `setAadAuthCallback` and `setAadAuthCallbackParams` options in `EventHubsConf` to us AAD authentication to connect to your EventHub instance.
 
 ```scala
-val params: Seq[String] = Seq(dbutils.secrets.get(scope = "your_secret_scope", key = "your_tenantid_key"),
-                              dbutils.secrets.get(scope = "your_secret_scope", key = "your_clientid_key"),
-                              dbutils.secrets.get(scope = "your_secret_scope", key = "your_clientsecret_key"))
+val params: Map[String, String] = Map("authority" -> dbutils.secrets.get(scope = "nykvsecrets", key = "ehaadtesttenantid"),
+									  "clientId" -> dbutils.secrets.get(scope = "nykvsecrets", key = "ehaadtestclientid"),
+									  "clientSecret" -> dbutils.secrets.get(scope = "nykvsecrets", key = "ehaadtestclientsecret"))
 
 val connectionString = ConnectionStringBuilder()
   .setAadAuthConnectionString(new URI("your-ehs-endpoint"), "your-ehs-name")

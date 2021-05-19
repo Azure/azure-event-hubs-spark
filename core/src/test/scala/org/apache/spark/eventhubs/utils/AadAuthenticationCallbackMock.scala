@@ -9,11 +9,11 @@ class AadAuthenticationCallbackMock extends AadAuthenticationCallback {
   override def authority: String = "Fake-tenant-id"
 }
 
-class AadAuthenticationCallbackMockWithParams(params: Seq[String])
+class AadAuthenticationCallbackMockWithParams(params: Map[String, Object])
     extends AadAuthenticationCallback {
   override def acquireToken(s: String, s1: String, o: Any): CompletableFuture[String] = {
     new CompletableFuture[String]()
   }
 
-  override def authority: String = params(0)
+  override def authority: String = params("authority").asInstanceOf[String]
 }

@@ -620,8 +620,8 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   def aadAuthCallback(): Option[AadAuthenticationCallback] = {
-    val params: Seq[String] = self.get(AadAuthCallbackParamsKey) map EventHubsConf
-      .read[Seq[String]] getOrElse Seq.empty
+    val params: Map[String, Object] = self.get(AadAuthCallbackParamsKey) map EventHubsConf
+      .read[Map[String, Object]] getOrElse Map.empty
     if (params.isEmpty) {
       self.get(AadAuthCallbackKey) map (className => {
         Class
@@ -634,7 +634,7 @@ final class EventHubsConf private (private val connectionStr: String)
       self.get(AadAuthCallbackKey) map (className => {
         Class
           .forName(className)
-          .getConstructor(classOf[Seq[String]])
+          .getConstructor(classOf[Map[String, Object]])
           .newInstance(params)
           .asInstanceOf[AadAuthenticationCallback]
       })
@@ -643,16 +643,16 @@ final class EventHubsConf private (private val connectionStr: String)
 
   /**
    * set the parameter passed to the aad auth callback class in case it accepts parameters. The aad auth class should
-   * either accepts no parameters or accepts a sequence of strings. This optional parameter can be used to pass
-   * authentication secrets to the aad auth callback class securely.
+   * either accepts no parameters or accepts a properties bag(Map[String, Object]). This optional parameter can be used
+   * to pass authentication secrets to the aad auth callback class securely.
    * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
    *
    * @param params The parameters passed to the aad authentication callback class. The parameters should be passed as a
    *               sequence of Strings.
    * @return the updated [[EventHubsConf]] instance
    */
-  def setAadAuthCallbackParams(params: Seq[String]): EventHubsConf = {
-    set(AadAuthCallbackParamsKey, EventHubsConf.write[Seq[String]](params))
+  def setAadAuthCallbackParams(params: Map[String, Object]): EventHubsConf = {
+    set(AadAuthCallbackParamsKey, EventHubsConf.write[Map[String, Object]](params))
   }
 
   // The simulated client (and simulated eventhubs) will be used. These

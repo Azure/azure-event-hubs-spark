@@ -267,8 +267,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
     val completed = mutable.Map[PartitionId, SequenceNumber]()
     val needsTranslation = ArrayBuffer[(NameAndPartition, EventPosition)]()
+    val NamespaceAndEhName: String = ehConf.namespaceUri + ":" + ehConf.name
 
-    logInfo(s"translate: useStart is set to $useStart.")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName useStart is set to $useStart.")
     val positions = if (useStart) {
       ehConf.startingPositions.getOrElse(Map.empty).par
     } else {
@@ -279,8 +280,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     } else {
       ehConf.endingPosition.getOrElse(DefaultEndingPosition)
     }
-    logInfo(s"translate: PerPartitionPositions = $positions")
-    logInfo(s"translate: Default position = $defaultPos")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName PerPartitionPositions = $positions")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName Default position = $defaultPos")
 
     (0 until partitionCount).par.foreach { id =>
       val nAndP = NameAndPartition(ehConf.name, id)
@@ -294,7 +295,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         synchronized(needsTranslation += tuple)
       }
     }
-    logInfo(s"translate: needsTranslation = $needsTranslation")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName needsTranslation = $needsTranslation")
 
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val futures = for ((nAndP, pos) <- needsTranslation)

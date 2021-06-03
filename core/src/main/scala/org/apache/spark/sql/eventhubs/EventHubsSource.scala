@@ -82,6 +82,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
 
   private val ehConf = EventHubsConf.toConf(parameters)
   private val ehName = ehConf.name
+  private val namespaceUri = ehConf.namespaceUri
   private val partitionContext =
     new PartitionContext(ConnectionStringBuilder(ehConf.connectionString).getEndpoint, ehName)
 
@@ -191,7 +192,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     }
     val offset = EventHubsSourceOffset(seqNos)
     metadataLog.add(0, offset)
-    logInfo(s"Initial sequence numbers: $seqNos")
+    logInfo(s"Initial sequence numbers for namespace $namespaceUri: $seqNos")
     offset.partitionToSeqNos
 
   }
@@ -238,7 +239,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     }
 
     currentSeqNos = Some(seqNos)
-    logInfo(s"GetOffset: ${seqNos.toSeq.map(_.toString).sorted}")
+    logInfo(s"GetOffset for namespace $namespaceUri: ${seqNos.toSeq.map(_.toString).sorted}")
     Some(EventHubsSourceOffset(seqNos))
   }
 
@@ -328,7 +329,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
   override def getBatch(start: Option[Offset], end: Offset): DataFrame = {
     initialPartitionSeqNos
 
-    logInfo(s"getBatch called with start = $start and end = $end")
+    logInfo(s"getBatch for namespace $namespaceUri, Evenhub $ehName called with start = $start and end = $end")
     val untilSeqNos = EventHubsSourceOffset.getPartitionSeqNos(end)
     // On recovery, getBatch wil be called before getOffset
     if (currentSeqNos.isEmpty) {
@@ -413,7 +414,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     val rdd =
       EventHubsSourceProvider.toInternalRow(new EventHubsRDD(sc, ehConf.trimmed, offsetRanges))
     logInfo(
-      "GetBatch generating RDD of offset range: " +
+      s"GetBatch for namespace $namespaceUri, Evenhub $ehName generating RDD of offset range: " +
         offsetRanges.sortBy(_.nameAndPartition.toString).mkString(", "))
     sqlContext.internalCreateDataFrame(rdd, schema, isStreaming = true)
   }

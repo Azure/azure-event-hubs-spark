@@ -395,14 +395,14 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
       preferredLoc = if (numExecutors > 0) {
         Some(sortedExecutors(Math.floorMod(preferredPartitionLocation, numExecutors)))
       } else None
-    } yield OffsetRange(np, fromSeqNo, untilSeqNo, preferredLoc)).filter { range =>
+    } yield OffsetRange(np, fromSeqNo, untilSeqNo, preferredLoc)).map { range =>
       if (range.untilSeqNo < range.fromSeqNo) {
         reportDataLoss(
           s"Partition ${range.nameAndPartition}'s sequence number was changed from " +
             s"${range.fromSeqNo} to ${range.untilSeqNo}, some data may have been missed")
-        false
+        OffsetRange(range.nameAndPartition, range.fromSeqNo, range.fromSeqNo, range.preferredLoc)
       } else {
-        true
+        range
       }
     }.toArray
     // if slowPartitionAdjustment is on, add the current batch to the perforamnce tracker

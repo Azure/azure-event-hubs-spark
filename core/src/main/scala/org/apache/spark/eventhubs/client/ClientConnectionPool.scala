@@ -53,7 +53,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (client == null) {
       logInfo(
-        s"No clients left to borrow. EventHub name: ${ehConf.name}, " +
+        s"No clients left to borrow. NamespaceUri: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, " +
           s"ConsumerGroup name: $consumerGroup. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
       connStr.setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
@@ -95,7 +95,8 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
       }
     } else {
       logInfo(
-        s"Borrowing client. EventHub name: ${ehConf.name}, ConsumerGroup name: $consumerGroup")
+        s"Borrowing client. Namespace: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, ConsumerGroup name: " +
+          s"$consumerGroup")
     }
     logInfo(s"Available clients: {${pool.size}}. Total clients: ${count.get}")
     client
@@ -109,7 +110,8 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   private def returnClient(client: EventHubClient): Unit = {
     pool.offer(client)
     logInfo(
-      s"Client returned. EventHub name: ${ehConf.name}. Total clients: ${count.get}. Available clients: ${pool.size}")
+      s"Client returned. Namespace: ${ehConf.namespaceUri},EventHub name: ${ehConf.name}. Total clients: ${count.get}. " +
+        s"Available clients: ${pool.size}")
   }
 }
 

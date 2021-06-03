@@ -19,6 +19,7 @@ package org.apache.spark.eventhubs
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.net.URI
 
 import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider.AuthenticationCallback
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
@@ -191,6 +192,9 @@ final class EventHubsConf private (private val connectionStr: String)
 
   /** The currently set EventHub name */
   def name: String = ConnectionStringBuilder(connectionString).getEventHubName
+
+  /** The namespace uri in String*/
+  def namespaceUri: String = ConnectionStringBuilder(connectionString).getEndpoint.toString
 
   /** Set the consumer group for your EventHubs instance. If no consumer
    * group is provided, then [[DefaultConsumerGroup]] will be used.

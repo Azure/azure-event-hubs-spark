@@ -39,7 +39,10 @@ Note that this error could happen if the same structured stream is accessed by m
 Spark will read from the input source and process the dataframe separately for each defined sink. 
 This results in having multiple readers on the same consumer group-partition combo.
 In order to prevent this, you can create a separate reader for each writer using a separate consumer group or
-use an intermediate delta table if you are using Databricks.
+use an intermediate delta table if you are using Databricks. 
+
+Please refer to the [How to Avoid the `ReceiverDisconnectedException`](https://github.com/Azure/azure-event-hubs-spark/blob/master/examples/multiple-readers-example.md) 
+document for more information.
       
 
 **Why am I getting events from the `EndofStream`, despite using `setStartingPositions`?**
@@ -72,6 +75,22 @@ The send operation uses the **`receiverTimeout`** value as the amount of time it
 Since a single batch is being transferred by a single send operation, if the batch contains a large number events you 
 have to adjust the `receiverTimeout` to give enough time to the send operation to complete its entire transfer.
 
+
+**Why am I seeing: `"java.util.concurrent.TimeoutException: Futures timed out after [5 minutes]"?`**
+
+The connector uses blocking calls on Futures in several places and uses a default 5 minutes timeout to ensure the progress
+is not blocked indefinitely. Therefore, generally speaking, the Future time-out exception could happen due to different reasons.
+
+However, a known situation that may result in seeing this error is when the connector keeps recreating the cached receivers 
+because they move between different executor nodes. Note that the receiver recreation is expected behavior when 
+the receiving task for a specific eventhubs partition is moving from one executor to another. 
+
+In this case, increasing the spark locality can help to reduce/avoid recreating receivers. The spark locality can be 
+increased by assigning a higher value to the "spark.locality.wait" property (for instance, increase the value to 15s 
+instead of the default value 3s).
+
+Please refer to the [How to Avoid the `ReceiverDisconnectedException`](https://github.com/Azure/azure-event-hubs-spark/blob/master/examples/multiple-readers-example.md) 
+document for more information.
  
 **What else? If you have suggestions for this FAQ please share them on the 
 [gitter chat](https://gitter.im/azure-event-hubs-spark/Lobby) or open an issue!**

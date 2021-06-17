@@ -167,9 +167,10 @@ object EventHubsUtils extends Logging {
     if (taskContext != null) {
       new TaskContextSlim(taskContext.stageId(),
                           taskContext.taskAttemptId(),
-                          taskContext.partitionId())
+                          taskContext.partitionId(),
+                          SparkEnv.get.executorId)
     } else {
-      new TaskContextSlim(-1, -1, -1)
+      new TaskContextSlim(-1, -1, -1, "")
     }
   }
 

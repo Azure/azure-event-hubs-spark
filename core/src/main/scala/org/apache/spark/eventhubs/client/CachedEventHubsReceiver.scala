@@ -72,6 +72,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
   import org.apache.spark.eventhubs._
 
+  private lazy val namespaceUri: String = ehConf.namespaceUri
+  private lazy val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+
   private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
@@ -81,8 +84,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private def createReceiver(seqNo: SequenceNumber): PartitionReceiver = {
     val taskId = EventHubsUtils.getTaskId
     logInfo(
-      s"(TID $taskId) creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. seqNo: $seqNo")
-    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+      s"(TID $taskId) creating receiver for namespaceUri: $namespaceUri EventHubNameAndPartition: $nAndP " +
+        s"consumer group: $consumerGroup. seqNo: $seqNo")
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(true)
     receiverOptions.setPrefetchCount(ehConf.prefetchCount.getOrElse(DefaultPrefetchCount))
@@ -114,8 +117,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       if (!receiver.getIsOpen && retryCount < RetryCount) {
         val taskId = EventHubsUtils.getTaskId
         logInfo(
-          s"(TID $taskId) receiver is not opened yet. Will retry {$retryCount} $nAndP, consumer group: ${ehConf.consumerGroup
-            .getOrElse(DefaultConsumerGroup)}")
+          s"(TID $taskId) receiver is not opened yet. Will retry {$retryCount} for namespaceUri: $namespaceUri " +
+            s"EventHubNameAndPartition: $nAndP consumer group: $consumerGroup")
 
         val retry = retryCount + 1
         after(WaitInterval.milliseconds)(receiveOneWithRetry(timeout, msg, retry))
@@ -151,8 +154,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiver = createReceiver(seqNo)
 
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
-    logInfo(s"(TID $taskId) Finished recreating a receiver for $nAndP, ${ehConf.consumerGroup
-      .getOrElse(DefaultConsumerGroup)}: $elapsedTimeMs ms")
+    logInfo(s"(TID $taskId) Finished recreating a receiver for namespaceUri: $namespaceUri EventHubNameAndPartition: " +
+      s"$nAndP consumer group: $consumerGroup: $elapsedTimeMs ms")
   }
 
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
@@ -163,8 +166,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     if ((lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) ||
         !receiver.getIsOpen) {
-      logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
-        DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
+      logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for namespaceUri: $namespaceUri " +
+        s"EventHubNameAndPartition: $nAndP consumer group: $consumerGroup. requestSeqNo: $requestSeqNo, " +
+        s"lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
 
       recreateReceiver(requestSeqNo)
     }
@@ -182,8 +186,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       // First, we'll check for case (1).
 
       logInfo(
-        s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
-          DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, receivedSeqNo: $receivedSeqNo")
+        s"(TID $taskId) checkCursor. Recreating a receiver for namespaceUri: $namespaceUri EventHubNameAndPartition:" +
+          s" $nAndP consumer group: $consumerGroup. requestSeqNo: $requestSeqNo, receivedSeqNo: $receivedSeqNo")
       recreateReceiver(requestSeqNo)
       val movedEvent = awaitReceiveMessage(
         receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor move"),
@@ -202,7 +206,6 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
             movedEvent
           }
         } else {
-          val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
           throw new IllegalStateException(
             s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
               s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
@@ -278,8 +281,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     } else {
       assert(validate.size == batchCount)
     }
-    logInfo(s"(TID $taskId) Finished receiving for $nAndP, consumer group: ${ehConf.consumerGroup
-      .getOrElse(DefaultConsumerGroup)}, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
+    logInfo(s"(TID $taskId) Finished receiving for namespaceUri: $namespaceUri EventHubNameAndPartition: $nAndP " +
+      s"consumer group: $consumerGroup, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
     result
   }
 
@@ -291,8 +294,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     } catch {
       case e: AwaitTimeoutException =>
         logError(
-          s"(TID $taskId) awaitReceiveMessage call failed with timeout. Event Hub $nAndP, ConsumerGroup ${ehConf.consumerGroup
-            .getOrElse(DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo")
+          s"(TID $taskId) awaitReceiveMessage call failed with timeout. NamespaceUri: $namespaceUri " +
+            s"EventHubNameAndPartition: $nAndP consumer group: $consumerGroup. requestSeqNo: $requestSeqNo")
 
         recreateReceiver(requestSeqNo)
         throw e
@@ -345,8 +348,9 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           batchSize: Int): Iterator[EventData] = {
     val taskId = EventHubsUtils.getTaskId
 
-    logInfo(s"(TID $taskId) EventHubsCachedReceiver look up. For $nAndP, ${ehConf.consumerGroup
-      .getOrElse(DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, batchSize: $batchSize")
+    logInfo(s"(TID $taskId) EventHubsCachedReceiver look up. For namespaceUri ${ehConf.namespaceUri} " +
+      s"EventHubNameAndPartition $nAndP consumer group ${ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)}. " +
+      s"requestSeqNo: $requestSeqNo, batchSize: $batchSize")
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
       receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {

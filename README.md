@@ -40,13 +40,10 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 #### Databricks
 |Databricks Runtime Version|Artifact Id|Package Version|
 |-------------|------------|----------------|
+|Databricks Runtime 8.X|azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.20%7Cjar)|
 |Databricks Runtime 7.X|azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.20%7Cjar)|
 |Databricks Runtime 6.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.20%7Cjar)|
-|Databricks Runtime 6.X|azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.20%7Cjar)|
 |Databricks Runtime 5.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.20%7Cjar)|
-|Databricks Runtime 5.X|azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.20%7Cjar)|
-|Databricks Runtime 4.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.20%7Cjar)|
-|Databricks Runtime 3.5|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.20-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.20%7Cjar)|
 
 #### Roadmap
 

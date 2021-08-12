@@ -40,6 +40,22 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{ Await, Awaitable, Future, Promise }
 
+private[client] class CachedReceivedData (startSeqNo: SequenceNumber,
+                                          batchSize: Int,
+                                          cachedData: Seq[EventData]) {
+
+    def matchSeqNoAndBatchSize(reqStartSeqNo: SequenceNumber, reqBatchSize: Int): Boolean = {
+      if ((startSeqNo == reqStartSeqNo) && (batchSize == reqBatchSize)) {
+        return true
+      }
+        false
+    }
+
+    def getCachedDataIterator(): Iterator[EventData] = {
+      cachedData.iterator
+    }
+}
+
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
                                  nAndP: NameAndPartition,
@@ -80,6 +96,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
   private var receiver: PartitionReceiver = createReceiver(startSeqNo)
+
+  private var cachedData: CachedReceivedData = new CachedReceivedData(-1, -1, null)
 
   private def createReceiver(seqNo: SequenceNumber): PartitionReceiver = {
     val taskId = EventHubsUtils.getTaskId
@@ -229,6 +247,15 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val startTimeNs = System.nanoTime()
     def elapsedTimeNs = System.nanoTime() - startTimeNs
 
+    // first check if this call re-executes a stream that has already been received.
+    // This situation could happen if multiple actions or writers are using the
+    // same stream. In this case, we return the cached data.
+    if (cachedData.matchSeqNoAndBatchSize(requestSeqNo, batchSize)) {
+      logInfo(s"(TID $taskId) Returned data from cache for namespaceUri: $namespaceUri EventHubNameAndPartition: $nAndP " +
+        s"consumer group: $consumerGroup, requestSeqNo: $requestSeqNo, batchSize: $batchSize")
+      return cachedData.getCachedDataIterator()
+    }
+
     // Retrieve the events. First, we get the first event in the batch.
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
@@ -245,11 +272,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                           requestSeqNo)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten
-    val sorted = combined.toSeq
+    val sortedSeq = combined.toSeq
       .sortWith((e1, e2) =>
         e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
-      .iterator
 
+    cachedData = new CachedReceivedData(requestSeqNo, batchSize, sortedSeq)
+
+    val sorted = sortedSeq.iterator
     val (result, validate) = sorted.duplicate
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
 

@@ -39,7 +39,8 @@ object functions {
   val SCHEMA_GROUP_KEY: String = "schema.group"
   val SCHEMA_NAME_KEY: String = "schema.name"
   val SCHEMA_AUTO_REGISTER_FLAG_KEY: String = "schema.auto.register.flag"
-  val SCHEMA_PARSE_MODE: String = "mode"
+  val SCHEMA_PARSE_MODE: String = "failure.mode"
+  val SCHEMA_EXACT_MATCH_REQUIRED: String = "schema.exact.match.required"
 
   /***
    * Converts Spark SQL Column containing SR payloads into a into its corresponding catalyst value.
@@ -49,15 +50,13 @@ object functions {
    *
    * @param data column with SR payloads
    * @param schemaString The avro schema in JSON string format.
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast)
-   * @param requireExactSchemaMatch boolean if call should throw if data contents do not exactly match expected schema
+   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast) and schema exact match flag
    */
   def from_avro(
        data: Column,
        schemaString: String,
-       clientOptions: java.util.Map[String, String],
-       requireExactSchemaMatch: Boolean = false): Column = {
-    new Column(AvroDataToCatalyst(data.expr, SchemaReader.VALUE_NOT_PROVIDED, schemaString, clientOptions.asScala.toMap, requireExactSchemaMatch))
+       clientOptions: java.util.Map[String, String]): Column = {
+    new Column(AvroDataToCatalyst(data.expr, SchemaReader.VALUE_NOT_PROVIDED, schemaString, clientOptions.asScala.toMap))
   }
 
   /***
@@ -68,25 +67,16 @@ object functions {
    *
    * @param data column with SR payloads
    * @param schemaId The GUID of the expected schema.
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast)
-   * @param requireExactSchemaMatch boolean if call should throw if data contents do not exactly match expected schema
+   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast) and schema exact match flag
    */
   def from_avro(
        data: Column,
        schemaId: SchemaGUID,
-       clientOptions: java.util.Map[String, String],
-       requireExactSchemaMatch: Boolean): Column = {
+       clientOptions: java.util.Map[String, String]): Column = {
     if(schemaId == null) {
       throw new NullPointerException("Schema Id cannot be null.")
     }
-    new Column(AvroDataToCatalyst(data.expr, schemaId.schemaIdStringValue, SchemaReader.VALUE_NOT_PROVIDED, clientOptions.asScala.toMap, requireExactSchemaMatch))
-  }
-
-  def from_avro(
-       data: Column,
-       schemaId: SchemaGUID,
-       clientOptions: java.util.Map[String, String]): Column = {
-    from_avro(data, schemaId, clientOptions, false)
+    new Column(AvroDataToCatalyst(data.expr, schemaId.schemaIdStringValue, SchemaReader.VALUE_NOT_PROVIDED, clientOptions.asScala.toMap))
   }
 
   /**

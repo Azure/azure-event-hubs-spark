@@ -7,21 +7,21 @@ First, we need to create a schema group with a schema in a schema registry hoste
 In this example, we use the following schema. Please follow the steps in the link above and create the below schema in your schema group. Please note down the *Schema GUID* to use in the producer/consumer code later.
 ```json
 {
+    "namespace": "Microsoft.Azure.Data.SchemaRegistry.example",
     "type": "record",
-    "name": "testSchema",
-	"namespace": "myNamespace", 
+    "name": "Order",
     "fields": [
         {
             "name": "id",
             "type": "string"
         },
         {
-            "name": "name",
-            "type": "string"
+            "name": "amount",
+            "type": "double"
         },
         {
-            "name": "favoriteNumber",
-            "type": "int"
+            "name": "description",
+            "type": "string"
         }
     ]
 }
@@ -75,20 +75,20 @@ import com.microsoft.azure.schemaregistry.spark.avro.SchemaGUID
 import org.apache.spark.sql.functions.{col, udf}
 import spark.sqlContext.implicits._
 
-  val data = Seq(("id1", "name1", 1), ("id2", "name2", 2), ("id3", "name3", 3)) 
-  val df = data.toDF("id", "name", "favoriteNumber")
+case class Order(id: String, amount: Double, description: String)
+val makeOrderRecord = udf((id: String, amount: Double, description: String) => Order(id, amount, description))
 
-  case class MyRecord(id: String, name: String, favoriteNumber: Int)
-  val makeMyRecord = udf((id: String, name: String, favoriteNumber: Int) => MyRecord(id, name, favoriteNumber))
+val data = Seq(("id1", 11.11, "order1"), ("id2", 22.22, "order2"), ("id3", 33.33, "order3")) 
+val df = data.toDF("id", "amount", "description")
 
-  val dfRecord = df.
-    withColumn("record", makeMyRecord(col("id"), col("name"), col("favoriteNumber"))).
+val dfRecord = df.
+    withColumn("orders", makeOrderRecord(col("id"), col("amount"), col("description"))).
     drop("id").
-    drop("name").
-    drop("favoriteNumber")
+    drop("amount").
+    drop("description")
 
-  val schemaGUIDString: String = "<YOUR_SCHEMA_GUID>"
-  val dfAvro = dfRecord.select(to_avro($"record", SchemaGUID(schemaGUIDString), props) as "body")
+val schemaGUIDString: String = "<YOUR_SCHEMA_GUID>"
+val dfAvro = dfRecord.select(to_avro($"record", SchemaGUID(schemaGUIDString), props) as "body")
 ```
 
 #### Send Data to Your Eventhub Instance
@@ -115,7 +115,7 @@ In order to serialize payloads using the schema definition, the property object 
  
 Both schema group and schema name are needed to retrieve the unique schema GUID. Note that the schema GUID is being added to every payload so that all consumers know exactly which schema has been used to serialize the payload.
 
-If you want to use a new schema which has not been registered in your schema group, you need to enable the schema auto registry option by setting the "schema.auto.register.flag" to "true" in your property object.
+If you want to use a new schema which has not been registered in your schema group, you need to enable the schema auto registry option by setting the `schema.auto.register.flag` to `true` in your property object.
 The schema auto registry option simply registers a new schema under the schema group and name provided in the properties object if it cannot find the schema in the given schema group. 
 Using a new schema with disabled auto registry option results in an exception. Note that the schema auto registry option is off by default.
 
@@ -150,41 +150,41 @@ import com.microsoft.azure.schemaregistry.spark.avro.functions._
 import org.apache.spark.sql.functions.{col, udf}
 import spark.sqlContext.implicits._
 
-  val data = Seq(("id1", "name1", 1), ("id2", "name2", 2), ("id3", "name3", 3)) 
-  val df = data.toDF("id", "name", "favoriteNumber")
+case class Order(id: String, amount: Double, description: String)
+val makeOrderRecord = udf((id: String, amount: Double, description: String) => Order(id, amount, description))
 
-  case class MyRecord(id: String, name: String, favoriteNumber: Int)
-  val makeMyRecord = udf((id: String, name: String, favoriteNumber: Int) => MyRecord(id, name, favoriteNumber))
+val data = Seq(("id1", 11.11, "order1"), ("id2", 22.22, "order2"), ("id3", 33.33, "order3")) 
+val df = data.toDF("id", "amount", "description")
 
-  val dfRecord = df.
-    withColumn("record", makeMyRecord(col("id"), col("name"), col("favoriteNumber"))).
+val dfRecord = df.
+    withColumn("orders", makeOrderRecord(col("id"), col("amount"), col("description"))).
     drop("id").
-    drop("name").
-    drop("favoriteNumber")
+    drop("amount").
+    drop("description")
 
-    val schemaString = """
-    {
-        "type": "record",
-        "name": "testSchema",
-    	"namespace": "myNamespace", 
-        "fields": [
-            {
-                "name": "id",
-                "type": "string"
-            },
-            {
-                "name": "name",
-                "type": "string"
-            },
-            {
-                "name": "favoriteNumber",
-                "type": "int"
-            }
-        ]
-    }
+val schemaString = """
+{
+    "namespace": "Microsoft.Azure.Data.SchemaRegistry.example",
+    "type": "record",
+    "name": "Order",
+    "fields": [
+        {
+            "name": "id",
+            "type": "string"
+        },
+        {
+            "name": "amount",
+            "type": "double"
+        },
+        {
+            "name": "description",
+            "type": "string"
+        }
+    ]
+}
   """  
-  	
-   val dfAvro = dfRecord.select(to_avro($"record", schemaString, props) as "body")
+ 	
+val dfAvro = dfRecord.select(to_avro($"record", schemaString, props) as "body")
 ```
 
 Finally, you can send the payloads in the `dfAvro` to your Eventhub instance using the sample code provided in the [Send Data to Your Eventhub Instance](#send-data-to-your-eventhub-instance) subsection under the producer example 1.
@@ -195,7 +195,7 @@ Finally, you can send the payloads in the `dfAvro` to your Eventhub instance usi
 We can perform the following steps to pull data from an Eventhub instance and parse it with respect to a schema from the schema registry:
    * Pull data from the Eventhub instance using azure-event-hubs-spark connector.
    * Use a property object which contains required information to connect to your schema registry.
-   * Deserialize the data using 'from_avro' function defined in azure-schemaregistry-spark-avro.
+   * Deserialize the data using `from_avro` function defined in azure-schemaregistry-spark-avro.
    
 Please refer to the [Producer Examples](#producer-examples) section for the required information in the property map.
     
@@ -219,6 +219,10 @@ val df = spark.
 ```
 
 #### Create a Schema Registry Object
+
+In case you want to set either `schema.exact.match.required` or `failure.mode` options, you should set their corresponding values in the property map. 
+For more information about these options please refer to the [schema registry README](../README.md) file.
+
 ```scala
 import com.microsoft.azure.schemaregistry.spark.avro.functions._
 import java.util._
@@ -233,6 +237,8 @@ val props: HashMap[String, String] = new HashMap()
   props.put(SCHEMA_REGISTRY_TENANT_ID_KEY, schemaRegistryTenantID)
   props.put(SCHEMA_REGISTRY_CLIENT_ID_KEY, schemaRegistryClientID)
   props.put(SCHEMA_REGISTRY_CLIENT_SECRET_KEY, schemaRegistryClientSecret)
+  // optional: in case you want to enable the exact schema match option, you should set the "schema.exact.match.required" to "true" in the property map
+  // props.put(SCHEMA_EXACT_MATCH_REQUIRED, "true")
 ```
 
 #### Deserialize Data
@@ -244,7 +250,7 @@ val schemaGUIDString = "<YOUR_SCHEMA_GUID>"
 val parsed_df = df.select(from_avro($"body", SchemaGUID(schemaGUIDString), props) as "jsondata")
 
 val query = parsed_df.
-    select($"jsondata.id", $"jsondata.name", $"jsondata.favoriteNumber").
+    select($"jsondata.id", $"jsondata.amount", $"jsondata.description").
     writeStream.
     format("console").
     start()
@@ -261,31 +267,31 @@ The only difference is when you use `from_avro` to deserialize the data where yo
 import com.microsoft.azure.schemaregistry.spark.avro.functions._;
 
 val schemaString = """
-    {
-        "type": "record",
-        "name": "testSchema",
-    	"namespace": "myNamespace", 
-        "fields": [
-            {
-                "name": "id",
-                "type": "string"
-            },
-            {
-                "name": "name",
-                "type": "string"
-            },
-            {
-                "name": "favoriteNumber",
-                "type": "int"
-            }
-        ]
-    }
-  """  
+{
+    "namespace": "Microsoft.Azure.Data.SchemaRegistry.example",
+    "type": "record",
+    "name": "Order",
+    "fields": [
+        {
+            "name": "id",
+            "type": "string"
+        },
+        {
+            "name": "amount",
+            "type": "double"
+        },
+        {
+            "name": "description",
+            "type": "string"
+        }
+    ]
+}
+ """  
 
 val parsed_df = df.select(from_avro($"body", schemaString, props) as "jsondata")
 
 val query = parsed_df.
-    select($"jsondata.id", $"jsondata.name", $"jsondata.favoriteNumber").
+    select($"jsondata.id", $"jsondata.amount", $"jsondata.description").
     writeStream.
     format("console").
     start()

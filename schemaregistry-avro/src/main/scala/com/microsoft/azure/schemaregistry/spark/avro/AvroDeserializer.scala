@@ -294,8 +294,9 @@ class AvroDeserializer(rootAvroType: Schema, rootCatalystType: DataType) {
                                avroType: Schema,
                                sqlType: StructType,
                                path: List[String]): (CatalystDataUpdater, GenericRecord) => Unit = {
-    val validFieldIndexes = ArrayBuffer.empty[Int]
-    val fieldWriters = ArrayBuffer.empty[(CatalystDataUpdater, Any) => Unit]
+    val validFieldNames = ArrayBuffer.empty[String]
+    val fieldWritersMap = scala.collection.mutable.Map[String, (CatalystDataUpdater, Any) => Unit]()
+    val defaultValues = scala.collection.mutable.Map[String, Object]()
 
     val length = sqlType.length
     var i = 0
@@ -303,7 +304,10 @@ class AvroDeserializer(rootAvroType: Schema, rootCatalystType: DataType) {
       val sqlField = sqlType.fields(i)
       val avroField = avroType.getField(sqlField.name)
       if (avroField != null) {
-        validFieldIndexes += avroField.pos()
+        validFieldNames += sqlField.name
+        if(avroField.defaultVal != null) {
+          defaultValues(sqlField.name) = avroField.defaultVal
+        }
 
         val baseWriter = newWriter(avroField.schema(), sqlField.dataType, path :+ sqlField.name)
         val ordinal = i
@@ -314,7 +318,7 @@ class AvroDeserializer(rootAvroType: Schema, rootCatalystType: DataType) {
             baseWriter(fieldUpdater, ordinal, value)
           }
         }
-        fieldWriters += fieldWriter
+        fieldWritersMap(sqlField.name) = fieldWriter
       } else if (!sqlField.nullable) {
         throw new IncompatibleSchemaException(
           s"""
@@ -328,8 +332,20 @@ class AvroDeserializer(rootAvroType: Schema, rootCatalystType: DataType) {
 
     (fieldUpdater, record) => {
       var i = 0
-      while (i < validFieldIndexes.length) {
-        fieldWriters(i)(fieldUpdater, record.get(validFieldIndexes(i)))
+      while (i < validFieldNames.length) {
+        var valueObj : Object = record.get(validFieldNames(i))
+
+        if(valueObj == null) {
+          if(defaultValues.contains(validFieldNames(i))) {
+            valueObj = defaultValues(validFieldNames(i))
+          }
+          else {
+             throw new IncompatibleSchemaException(s"The schema = $rootAvroType contains non-optional field " +
+               s"${validFieldNames(i)} (i.e without a deafult value) that does not exist in the record producer schema.")
+          }
+        }
+
+        fieldWritersMap(validFieldNames(i))(fieldUpdater, valueObj)
         i += 1
       }
     }

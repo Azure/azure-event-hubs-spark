@@ -32,32 +32,18 @@ Below you can find more info about available APIs:
   /**
    * @param data column with SR payloads
    * @param schemaString The avro schema in JSON string format.
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast)
-   * @param requireExactSchemaMatch boolean if call should throw if data contents do not exactly match expected schema
+   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast) and schema exact match flag
    */
   def from_avro(
        data: Column,
        schemaString: String,
-       clientOptions: java.util.Map[String, String],
-       requireExactSchemaMatch: Boolean = false): Column
+       clientOptions: java.util.Map[String, String]): Column
 
   /**
    * @param data column with SR payloads
    * @param schemaId The GUID of the expected schema.
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast)
-   * @param requireExactSchemaMatch boolean if call should throw if data contents do not exactly match expected schema
+   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast) and schema exact match flag
    */
-  def from_avro(
-       data: Column,
-       schemaId: SchemaGUID,
-       clientOptions: java.util.Map[String, String],
-       requireExactSchemaMatch: Boolean): Column
-  
-  /**
-   * @param data column with SR payloads
-   * @param schemaId The GUID of the expected schema.
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast)
-  */
   def from_avro(
        data: Column,
        schemaId: SchemaGUID,
@@ -90,23 +76,27 @@ You can find examples of how to use the above APIs in
 
 In the context of stream processing, the primary use case is where the schema GUID references a schema matching in the stream.
 
-However, there are two edge cases that will be common in streaming scenarios in which we are concerned with schema evolution -
-- Stream jobs reading old data with new schemas - only backwards compatible data will be readable, meaning that fields may be null.
-- Stream jobs reading new data with old schemas - even if the Spark job schema is forwards compatible with the new schema, projecting data written with the new schema to the old one will result in data loss in the case of additional fields being added.
+However, there are two edge cases that will be common in streaming scenarios in which we are concerned with schema evolution:
+    * Backward compatibility: stream jobs reading old data with new schemas.
+    * Forward compatibility: stream jobs reading new data with old schemas.
+    
+To handle these scenarios, we have introduced the `schema.exact.match.required` flag which can be set in the properties map: 
+    * If true, the schema in the payload must exactly match the specified schema, otherwise the job throws an `IncompatibleSchemaException`.
+    * If false, the job will attempt to read the data incoming in the stream even if the payload schema is different from the specified schema. In this case:
+        * if the payload contains a field not present in the specified schema, the value for that field in the payload is ignored.
+        * if the specified schema contains a field not present in the payload, and the field has a default value, then the default value is added to the stream.
+        * if the specified schema contains a field not present in the payload, and the field does not have a default value, the job throws an `IncompatibleSchemaException`.
+        
+Please note that the default value for the `schema.exact.match.required` flag is `false`. However, we suggest setting this flag to `true` in production jobs.
 
-To handle the more dangerous second case, Spark functions will throw if incoming data contains fields that cannot be captured by the existing schema.  This behavior is based on the assumption that perceived data loss is prohibited.
-
-To handle the first case, a parameter will be introduced called `requireExactSchemaMatch`:
-- If true, if the schema in the payload is not an exact match to the Spark-specified schema, then the job will throw.  This allows users to specify that their pipeline contain one schema only.
-- If false, the job will attempt to read the data incoming in the stream.  In the case of upgraded consumers reading backwards compatible schemas, the job will be able to properly read the schemas (nullable deleted fields, adding new optional fields).
 
 ## Failure Modes
 
 Two modes will be supported as dictated by Spark SQL - 
 - `FailFastMode` - fail on catching any exception
-- `PermissiveMode` - continue processing if parsing exceptions are caught (currently unsupported)
+- `PermissiveMode` - continue processing if parsing exceptions are caught
 
-Customers will be able to configure the stream with specific failure models, but the default failure model will be `FailFastMode` to prevent perceived data loss with `PermissiveMode`.
+You can configure the stream with specific failure mode using the `failure.mode` key in the properties map. The default failure mode is `FailFastMode` to prevent perceived data loss with `PermissiveMode`.
 
 See also:
 - aka.ms/schemaregistry

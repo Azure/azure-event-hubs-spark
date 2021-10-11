@@ -153,17 +153,3 @@ object SchemaReader {
     }
   }
 }
-
-
-final case class MissingPropertyException(
-      private val message: String,
-      private val cause: Throwable)
-  extends Exception(message, cause) {
-
-  def this(message: String) =
-    this(message = message, cause = null)
-}
-
-final case class SchemaNotFoundException(
-     private val message: String)
-  extends Exception(message) {}

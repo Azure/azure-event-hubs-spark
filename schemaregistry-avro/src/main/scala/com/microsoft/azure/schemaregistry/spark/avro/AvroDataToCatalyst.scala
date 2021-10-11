@@ -33,14 +33,14 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 
 import scala.util.control.NonFatal
+import scala.util.Try
 import org.apache.spark.internal.Logging
 
 case class AvroDataToCatalyst(
      child: Expression,
      schemaId: String,
      schemaDefinition: String,
-     options: Map[java.lang.String, java.lang.String],
-     requireExactSchemaMatch: Boolean)
+     options: Map[java.lang.String, java.lang.String])
   extends UnaryExpression with ExpectsInputTypes with Logging {
 
   override def inputTypes: Seq[BinaryType] = Seq(BinaryType)
@@ -58,13 +58,16 @@ case class AvroDataToCatalyst(
     new AvroDeserializer(schemaReader.expectedSchema, dataType)
   }
 
-  //@transient private lazy val expectedSchema = new Schema.Parser().parse(schemaReader.expectedSchemaString)
+  @transient private lazy val requireExactSchemaMatch: Boolean = {
+    val requiredExactMatchStr: String = options.getOrElse(functions.SCHEMA_EXACT_MATCH_REQUIRED, "false")
+    Try(requiredExactMatchStr.toLowerCase.toBoolean).getOrElse(false)
+  }
 
   @transient private lazy val parseMode: ParseMode = {
-    val modeStr = schemaReader.options.getOrElse(functions.SCHEMA_PARSE_MODE, "FailFastMode")
+    val modeStr = schemaReader.options.getOrElse(functions.SCHEMA_PARSE_MODE, FailFastMode.name)
     val mode = ParseMode.fromString(modeStr)
     if (mode != PermissiveMode && mode != FailFastMode) {
-      throw new IllegalArgumentException(mode + "parse mode not supported.")
+      throw new IllegalArgumentException(mode + " parse mode not supported.")
     }
     mode
   }
@@ -82,7 +85,7 @@ case class AvroDataToCatalyst(
   }
 
   override def nullSafeEval(input: Any): Any = {
-    try {
+  //  try {
       val binary = new ByteArrayInputStream(input.asInstanceOf[Array[Byte]])
       // compare schema version and datatype version
       val genericRecord = schemaReader.serializer.deserialize(binary, TypeReference.createInstance(classOf[GenericRecord]))
@@ -93,10 +96,12 @@ case class AvroDataToCatalyst(
         }
       }
 
+    try {
       avroConverter.deserialize(genericRecord)
-    } catch {
+  } catch {
       case NonFatal(e) => parseMode match {
-        case PermissiveMode => nullResultRow
+        case PermissiveMode => //nullResultRow
+          throw new Exception(s"nave Permissive --> error message is $e")
         case FailFastMode =>
           throw new Exception("Malformed records are detected in record parsing. " +
             s"Current parse Mode: ${FailFastMode.name}. To process malformed records as null " +

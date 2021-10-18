@@ -2,7 +2,7 @@
 
 ## Register a Schema
 
-First, we need to create a schema group with a schema in a schema registry hosted by Azure Event Hubs. Please refer to [Create an Event Hubs schema registry using the Azure portal](https://docs.microsoft.com/en-us/azure/event-hubs/create-schema-registry) for detailed instructions. 
+First, you need to create a schema group with a schema in a schema registry hosted by Azure Event Hubs. Please refer to [Create an Event Hubs schema registry using the Azure portal](https://docs.microsoft.com/en-us/azure/event-hubs/create-schema-registry) for detailed instructions. 
 
 In this example, we use the following schema. Please follow the steps in the link above and create the below schema in your schema group. Please note down the *Schema GUID* to use in the producer/consumer code later.
 ```json
@@ -29,7 +29,8 @@ In this example, we use the following schema. Please follow the steps in the lin
 
 ### Azure Role-Based Access Control
 
-In order to be able to access the schema registry programmatically, you need to register an application in Azure Active Directory (Azure AD) and add the security principal of the application to one of the Azure role-based access control (Azure RBAC) roles mentioned in [Azure role-based access control](https://docs.microsoft.com/en-us/azure/event-hubs/schema-registry-overview#azure-role-based-access-control) section in the schema registery overview page. Also, you can refer to [Register an app with Azure AD](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app) for instructions on registering an application using the Azure portal.
+In order to be able to access the schema registry programmatically, you need to register an application in Azure Active Directory (Azure AD) and add the security principal of the application to one of the Azure role-based access control (Azure RBAC) roles mentioned in [Azure role-based access control](https://docs.microsoft.com/en-us/azure/event-hubs/schema-registry-overview#azure-role-based-access-control) section in the schema registery overview page. 
+Also, you can refer to [Register an app with Azure AD](https://docs.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app) for instructions on registering an application using the Azure portal.
 
 Please make sure to note down the client ID (application ID), tenant ID, and the secret to use in the code.
 
@@ -37,7 +38,7 @@ Please make sure to note down the client ID (application ID), tenant ID, and the
 
 In order to send data to an eventhub using the schema registry you need to:
 	* Use a property object which contains required information to connect to your schema registry.
-	* Create records matching the schema and serialize those using 'to_avro' function defined in azure-schemaregistry-spark-avro.
+	* Create records matching the schema and serialize those using `to_avro` function defined in azure-schemaregistry-spark-avro.
 	* Send serialized bytes to the Eventhub instance.
 
 Please note that for accessing the schema registry the below information must be provided in the property map:

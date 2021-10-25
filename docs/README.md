@@ -9,6 +9,7 @@ Also, you can read more about other features of this connector in below document
 
 - [Receive Key-Value Pairs from Events Sent using Event Hubs Kafka Endpoint](receive-events-sent-using-kafka-protocol.md)
 - [Spark Structured Streaming Adjustment for Slow Partitions](slow-partition-adjustment-feature.md)
+- [Use AAD Authentication to Connect Event Hubs](use-aad-authentication-to-connect-eventhubs.md)
 
 Additionally, here are some links to documentation on Event Hubs, Spark, and Databricks:
 

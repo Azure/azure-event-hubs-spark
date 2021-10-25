@@ -441,7 +441,8 @@ final class EventHubsConf private (private val connectionStr: String)
    */
   def setPrefetchCount(count: Int): EventHubsConf = {
     if (count > PrefetchCountMaximum || count < PrefetchCountMinimum) {
-      throw new IllegalArgumentException("setPrefetchCount: count value is out of range.")
+      throw new IllegalArgumentException(s"setPrefetchCount: count value is out of range. PrefetchCount should be " +
+        s"within the range [$PrefetchCountMinimum, $PrefetchCountMaximum].")
     }
 
     set(PrefetchCountKey, count)
@@ -556,7 +557,7 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set the size of thread pool.
+   * Set whether the connector uses an epoch receiver
    * Default: [[DefaultUseExclusiveReceiver]]
    *
    * @param b the flag which specifies whether the connector uses an epoch receiver

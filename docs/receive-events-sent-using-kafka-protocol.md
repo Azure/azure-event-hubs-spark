@@ -7,7 +7,7 @@ This guide will show you how you can properly extract a Kafka key from an event 
 Azure Event Hubs supports three protocols for consumers and producers: AMQP, Kafka, and HTTPS. 
 Since each one of these protocols has its own way of representing a message, it is important to ensure that the values 
 within an event are correctly interpreted by the consuming application when it uses a different protocol than the producer application.
-This topic has been discussedin great details <a href="https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-exchange-events-different-protocols" target="_blank">here</a>.
+This topic has been discussed in great details <a href="https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-exchange-events-different-protocols" target="_blank">here</a>.
 
 Since Event Hubs Spark connector uses AMPQ protocol to send and receive events, this article shows how you can properly 
 extract the Kafka key-value pair from an event that has been produced by an Event Hubs Kafka endpoint.

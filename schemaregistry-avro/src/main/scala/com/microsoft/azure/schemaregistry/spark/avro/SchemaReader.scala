@@ -61,26 +61,31 @@ class SchemaReader(
     try {
       schemaId = schemaRegistryAsyncClient.getSchemaId(schemaGroup, schemaName, expectedSchemaString, SerializationType.AVRO).block()
     } catch {
-      case _: ServiceErrorResponseException => {
-        val autoRegistryStr: String = options.getOrElse(SCHEMA_AUTO_REGISTER_FLAG_KEY, "false")
-        val autoRegistryFlag: Boolean = Try(autoRegistryStr.toLowerCase.toBoolean).getOrElse(false)
-        if(autoRegistryFlag) {
-          val schemaProperties = schemaRegistryAsyncClient
-            .registerSchema(schemaGroup, schemaName, expectedSchemaString, SerializationType.AVRO)
-            .block()
-          schemaId = schemaProperties.getSchemaId
-        } else {
-          throw new SchemaNotFoundException(s"Schema with name=$schemaName and content=$expectedSchemaString does not" +
-            s"exist in schemaGroup=$schemaGroup and $SCHEMA_AUTO_REGISTER_FLAG_KEY is set to false. If you want to" +
-            s"auto register a new schema make sure to set $SCHEMA_AUTO_REGISTER_FLAG_KEY to true in the properties.")
+      case e: ServiceErrorResponseException => {
+        val errorStatusCode = e.getResponse.getStatusCode
+        errorStatusCode match {
+          case 404 => { // schema not found
+            val autoRegistryStr: String = options.getOrElse(SCHEMA_AUTO_REGISTER_FLAG_KEY, "false")
+            val autoRegistryFlag: Boolean = Try(autoRegistryStr.toLowerCase.toBoolean).getOrElse(false)
+            if(autoRegistryFlag) {
+              val schemaProperties = schemaRegistryAsyncClient
+                .registerSchema(schemaGroup, schemaName, expectedSchemaString, SerializationType.AVRO)
+                .block()
+              schemaId = schemaProperties.getSchemaId
+            } else {
+              throw new SchemaNotFoundException(s"Schema with name=$schemaName and content=$expectedSchemaString does not" +
+                s"exist in schemaGroup=$schemaGroup and $SCHEMA_AUTO_REGISTER_FLAG_KEY is set to false. If you want to" +
+                s"auto register a new schema make sure to set $SCHEMA_AUTO_REGISTER_FLAG_KEY to true in the properties.")
+            }
+          }
+          case _ => throw e
         }
       }
+      case e: Throwable => throw e
     }
-
   }
 
   @transient lazy val expectedSchema = new Schema.Parser().parse(expectedSchemaString)
-
 }
 
 object SchemaReader {

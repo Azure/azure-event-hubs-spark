@@ -42,13 +42,6 @@ case class CatalystDataToAvro(
 
   @transient private lazy val schemaReader = SchemaReader.createSchemaReader(schemaId, schemaDefinition, options, true)
 
-  // TODO: if schema is not present, use SchemaConverters.toAvroType(child.dataType, child.nullable)
-  //@transient private lazy val avroType = new Schema.Parser().parse(expectedSchemaString)
-
-/*
-  @transient private lazy val schemaReader = SchemaReader(schemaId, options)
-  @transient private lazy val avroType = schemaReader.expectedSchema
-*/
   @transient private lazy val avroConverter =
     new AvroSerializer(child.dataType, schemaReader.expectedSchema, child.nullable)
 
@@ -63,13 +56,12 @@ case class CatalystDataToAvro(
     out.reset()
     encoder = EncoderFactory.get().directBinaryEncoder(out, encoder)
     val avroData = avroConverter.serialize(input)
-    //val payloadOut = new ByteArrayOutputStream()
     val prefixBytes = Array[Byte](0, 0, 0, 0)
     val payloadPrefixBytes = prefixBytes ++ schemaReader.schemaId.getBytes()
-    //schemaReader.serializer.serialize(out, avroData)
+
     writer.write(avroData, encoder)
     encoder.flush()
-    //out.toByteArray
+
     val payloadOut = payloadPrefixBytes ++ out.toByteArray
     payloadOut
   }

@@ -85,7 +85,6 @@ case class AvroDataToCatalyst(
   }
 
   override def nullSafeEval(input: Any): Any = {
-  //  try {
       val binary = new ByteArrayInputStream(input.asInstanceOf[Array[Byte]])
       // compare schema version and datatype version
       val genericRecord = schemaReader.serializer.deserialize(binary, TypeReference.createInstance(classOf[GenericRecord]))
@@ -119,15 +118,5 @@ case class AvroDataToCatalyst(
     defineCodeGen(ctx, ev, input =>
       s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
   }
-
-  /*
-  private def getSchemaIdFromPayload(input: Any): String = {
-    logInfo(s" nave in getSchemaIdFromPayload input = $input.")
-    val inputBytes = input.asInstanceOf[Array[Byte]]
-    val schemaIdBytes = inputBytes.slice(4,36)
-    val schemaId = new String(schemaIdBytes, StandardCharsets.UTF_8)
-    schemaId
-  }
-*/
 
 }

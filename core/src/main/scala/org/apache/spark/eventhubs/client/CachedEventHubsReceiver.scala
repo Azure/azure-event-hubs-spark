@@ -391,11 +391,11 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
     } catch {
       case completionExecution: CompletionException =>
         val exceptionCause = completionExecution.getCause
-        if (exceptionCause != null &&  exceptionCause.isInstanceOf[RejectedExecutionException] && exceptionCause.getMessage.contains("ReactorDispatcher")) {
+        if (exceptionCause != null &&  exceptionCause.isInstanceOf[RejectedExecutionException] && exceptionCause.getMessage.contains("ReactorDispatcher instance is closed")) {
           // reactor dispatcher closed case
           logInfo(s"(TID $taskId) EventHubsCachedReceiver receive execution for namespaceUri ${ehConf.namespaceUri} " +
             s"EventHubNameAndPartition $nAndP consumer group ${ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)} " +
-            s"failed with $completionExecution. Try to recerate the entire CachedEventHubsReceiver instance in order to " +
+            s"failed with $completionExecution. Try to recreate the entire CachedEventHubsReceiver instance in order to " +
             s"use a fresh EventHubClient from the underlying java SDK, then try receiving events again.")
           receiver.client.close();
           receiver = CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo)
@@ -406,8 +406,8 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
         } else if (exceptionCause != null &&  exceptionCause.isInstanceOf[ReceiverDisconnectedException]) {
           logInfo(s"(TID $taskId) EventHubsCachedReceiver receive execution for namespaceUri ${ehConf.namespaceUri} " +
             s"EventHubNameAndPartition $nAndP consumer group ${ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)} " +
-            s"failed becuase another receiver for the same <NS-EH-CG-Part> combo has been created and cause this one " +
-            s"to get discnnected. The full error is: $completionExecution. Throw the exception so that the driver can " +
+            s"failed because another receiver for the same <NS-EH-CG-Part> combo has been created and caused this one " +
+            s"to get disconnected. The full error is: $completionExecution. Throw the exception so that the driver can " +
             s"retry the task.")
           throw completionExecution
         } else {

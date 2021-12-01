@@ -21,13 +21,13 @@ import java.io.IOException
 import java.util.concurrent.CompletableFuture
 
 import com.microsoft.azure.eventhubs.EventHubException
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class RetryUtilsSuite extends FunSuite with ScalaFutures {
+class RetryUtilsSuite extends AnyFunSuite with ScalaFutures {
 
   import RetryUtilsSuite._
 

@@ -29,15 +29,16 @@ import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{count, window}
 import org.apache.spark.sql.streaming.util.StreamManualClock
-import org.apache.spark.sql.streaming.{ProcessingTime, StreamTest}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.streaming.StreamTest
+import org.apache.spark.sql.streaming.Trigger.ProcessingTime
+import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.util.Utils
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
-abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
+abstract class EventHubsSourceTest extends StreamTest with SharedSparkSession {
 
   protected var testUtils: EventHubsTestUtils = _
 

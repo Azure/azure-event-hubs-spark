@@ -22,7 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.microsoft.azure.eventhubs.EventData
 import org.apache.spark.eventhubs.{EventHubsConf, NameAndPartition, SequenceNumber}
 import org.apache.spark.internal.Logging
-import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FunSuite}
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll}
+import org.scalatest.funsuite.AnyFunSuite
 
 import collection.JavaConverters._
 
@@ -30,7 +31,7 @@ import collection.JavaConverters._
  * Tests the functionality of the simulated EventHubs instance used for testing.
  */
 class EventHubsTestUtilsSuite
-    extends FunSuite
+    extends AnyFunSuite
     with BeforeAndAfter
     with BeforeAndAfterAll
     with Logging {

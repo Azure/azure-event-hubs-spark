@@ -19,9 +19,9 @@ package org.apache.spark.eventhubs
 
 import java.time.Instant
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class EventPositionSuite extends FunSuite {
+class EventPositionSuite extends AnyFunSuite {
 
   test("convert - offset") {
     val actual = EventPosition.fromOffset("123456789").convert

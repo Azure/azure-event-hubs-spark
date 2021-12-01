@@ -27,11 +27,11 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.execution.streaming.MemoryStream
 import org.apache.spark.sql.streaming._
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.SharedSparkSession
 import org.scalatest.time.Span
 import collection.JavaConverters._
 
-class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
+class EventHubsSinkSuite extends StreamTest with SharedSparkSession {
   import testImplicits._
   import EventHubsTestUtils._
 

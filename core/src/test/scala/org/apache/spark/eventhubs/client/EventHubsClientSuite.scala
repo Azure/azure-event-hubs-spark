@@ -21,13 +21,14 @@
 
 package org.apache.spark.eventhubs.client
 
-import org.scalatest.mock.MockitoSugar
-import org.scalatest.{ BeforeAndAfter, FunSuite }
+import org.scalatestplus.mockito.MockitoSugar
+import org.scalatest.BeforeAndAfter
+import org.scalatest.funsuite.AnyFunSuite
 
 /**
  * Test suite for EventHubsClient
  */
-class EventHubsClientSuite extends FunSuite with BeforeAndAfter with MockitoSugar {
+class EventHubsClientSuite extends AnyFunSuite with BeforeAndAfter with MockitoSugar {
   // TODO: add tests for driver-side translation
   // Seems we can implement "translate" in our EventHubsTestUtils. I'll do that soon!
 

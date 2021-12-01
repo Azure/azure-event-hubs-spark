@@ -19,9 +19,9 @@ package org.apache.spark.sql.eventhubs
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.eventhubs.NameAndPartition
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.SharedSparkSession
 
-class JsonUtilsSuite extends SparkFunSuite with SharedSQLContext {
+class JsonUtilsSuite extends SparkFunSuite with SharedSparkSession {
 
   test("parsing partitions") {
     val parsed = JsonUtils.partitions("""{"nameA":[0,1],"nameB":[4,6]}""")

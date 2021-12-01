@@ -49,8 +49,8 @@
 
     <properties>
         <sbt.project.name>azure-eventhubs-spark-parent</sbt.project.name>
-        <scala.binary.version>2.11</scala.binary.version>
-        <spark.version>2.3.3</spark.version>
+        <scala.binary.version>2.12</scala.binary.version>
+        <spark.version>3.2.0</spark.version>
         <github.global.server>github</github.global.server>
         <java.version>1.8</java.version>
         <CodeCacheSize>1g</CodeCacheSize>
@@ -163,20 +163,32 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>1.10.8</version>
+            <version>4.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatestplus</groupId>
+            <artifactId>mockito-3-4_2.12</artifactId>
+            <version>3.2.10.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.binary.version}</artifactId>
             <scope>test</scope>
-            <version>3.0.3</version>
+            <version>3.2.9</version>
         </dependency>
         <dependency>
             <groupId>com.microsoft.azure</groupId>
             <artifactId>msal4j</artifactId>
             <version>1.7.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.12.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>

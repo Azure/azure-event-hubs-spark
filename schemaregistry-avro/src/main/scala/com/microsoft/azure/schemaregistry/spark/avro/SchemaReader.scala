@@ -17,8 +17,8 @@
 
 package com.microsoft.azure.schemaregistry.spark.avro
 
-import com.azure.data.schemaregistry.implementation.models.ServiceErrorResponseException
-import com.azure.data.schemaregistry.models.{SerializationType, SchemaProperties}
+import com.azure.data.schemaregistry.implementation.models.ErrorException
+import com.azure.data.schemaregistry.models.{SchemaFormat, SchemaProperties, SchemaRegistrySchema}
 import com.azure.data.schemaregistry.SchemaRegistryClientBuilder
 import com.azure.data.schemaregistry.avro.{SchemaRegistryAvroSerializerBuilder}
 import com.azure.identity.ClientSecretCredentialBuilder
@@ -41,7 +41,7 @@ class SchemaReader(
         .build()
 
   @transient private lazy val schemaRegistryAsyncClient = new SchemaRegistryClientBuilder()
-        .endpoint(options.getOrElse(SCHEMA_REGISTRY_URL, null))
+        .fullyQualifiedNamespace(options.getOrElse(SCHEMA_REGISTRY_URL, null))
         .credential(schemaRegistryCredential)
         .buildAsyncClient()
 
@@ -52,16 +52,18 @@ class SchemaReader(
     .buildSerializer()
 
   def setSchemaString  = {
-    expectedSchemaString = new String(schemaRegistryAsyncClient.getSchema(schemaId).block().getSchema)
+    val schemaRegistrySchema = schemaRegistryAsyncClient.getSchema(schemaId).block()
+    expectedSchemaString = schemaRegistrySchema.getDefinition
   }
 
   def setSchemaId = {
     val schemaGroup: String = options.getOrElse(SCHEMA_GROUP_KEY, null)
     val schemaName: String = options.getOrElse(SCHEMA_NAME_KEY, null)
     try {
-      schemaId = schemaRegistryAsyncClient.getSchemaId(schemaGroup, schemaName, expectedSchemaString, SerializationType.AVRO).block()
+      val schemaProperties = schemaRegistryAsyncClient.getSchemaProperties(schemaGroup, schemaName, expectedSchemaString, SchemaFormat.AVRO).block()
+      schemaId = schemaProperties.getId
     } catch {
-      case e: ServiceErrorResponseException => {
+      case e: ErrorException => {
         val errorStatusCode = e.getResponse.getStatusCode
         errorStatusCode match {
           case 404 => { // schema not found
@@ -69,9 +71,9 @@ class SchemaReader(
             val autoRegistryFlag: Boolean = Try(autoRegistryStr.toLowerCase.toBoolean).getOrElse(false)
             if(autoRegistryFlag) {
               val schemaProperties = schemaRegistryAsyncClient
-                .registerSchema(schemaGroup, schemaName, expectedSchemaString, SerializationType.AVRO)
+                .registerSchema(schemaGroup, schemaName, expectedSchemaString, SchemaFormat.AVRO)
                 .block()
-              schemaId = schemaProperties.getSchemaId
+              schemaId = schemaProperties.getId
             } else {
               throw new SchemaNotFoundException(s"Schema with name=$schemaName and content=$expectedSchemaString does not" +
                 s"exist in schemaGroup=$schemaGroup and $SCHEMA_AUTO_REGISTER_FLAG_KEY is set to false. If you want to" +

@@ -23,6 +23,16 @@ mvn clean compile assembly:assembly
 
 The JAR can then be uploaded without additional required dependencies in your environment.  If using `spark-submit`, use the `--jars` option to submit the path of the custom JAR.
 
+## Environment Support
+
+|Environment|Package Version|
+|-------------|----------------|
+|Databricks Runtime 10.X|azure-schemaregistry-spark-avro-1.0.0|
+|Databricks Runtime 9.X|azure-schemaregistry-spark-avro-1.0.0|
+|Databricks Runtime 8.X|azure-schemaregistry-spark-avro-1.0.0|
+|Synapse Spark pool 3.1|azure-schemaregistry-spark-avro-1.0.0|
+
+
 ## Available API
 
 Both `from_avro` and `to_avro` functions can be used by either providing the schema GUID or the schema itself. Note that if you are providing the schema GUID it should be wrapped in a SchemaGUID object. 

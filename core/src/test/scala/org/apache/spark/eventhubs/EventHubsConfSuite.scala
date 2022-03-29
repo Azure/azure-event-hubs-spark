@@ -29,12 +29,13 @@ import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{ read => sread }
 import org.json4s.jackson.Serialization.{ write => swrite }
-import org.scalatest.{ BeforeAndAfterAll, FunSuite }
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.funsuite.AnyFunSuite
 
 /**
  * Tests [[EventHubsConf]] for correctness.
  */
-class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
+class EventHubsConfSuite extends AnyFunSuite with BeforeAndAfterAll {
 
   import EventHubsConf._
   import EventHubsTestUtils._

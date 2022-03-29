@@ -29,15 +29,16 @@ import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.functions.{count, window}
 import org.apache.spark.sql.streaming.util.StreamManualClock
-import org.apache.spark.sql.streaming.{ProcessingTime, StreamTest}
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.streaming.{Trigger, StreamTest}
+import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.util.Utils
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
+import org.scalatest.Assertions._
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.time.SpanSugar._
 
-abstract class EventHubsSourceTest extends StreamTest with SharedSQLContext {
+abstract class EventHubsSourceTest extends StreamTest with SharedSparkSession {
 
   protected var testUtils: EventHubsTestUtils = _
 
@@ -234,7 +235,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
 
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // we'll get one event per partition per trigger
       CheckAnswer(0, 0, 0, 0),
@@ -243,7 +244,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       // four additional events
       CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1),
       StopStream,
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // four additional events
       CheckAnswer(0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2),
@@ -296,7 +297,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       Utils.createTempDir(namePrefix = "streaming.metadata").getCanonicalPath
 
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
+      StartStream(Trigger.ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
       waitUntilBatchProcessed,
       // we'll get one event per partition per trigger
       CheckAnswer(0, 1, 10, 11, 20, 21, 30, 31),
@@ -317,7 +318,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     testUtils.send(name, partition = Some(6), data = 60 to 69)
     testUtils.send(name, partition = Some(7), data = 70 to 79)
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
+      StartStream(Trigger.ProcessingTime(100), clock, checkpointLocation = defaultCheckpointLocation),
       waitUntilBatchProcessed,
       // four additional events
       CheckAnswer(4, 14, 24, 34, 40, 50, 60, 70),
@@ -368,7 +369,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
 
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // 1 from smallest, 1 from middle, 8 from biggest
       CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107),
@@ -378,7 +379,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
         114, 115, 116),
       StopStream,
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // smallest now empty, 1 more from middle, 9 more from biggest
       CheckAnswer(1, 10, 100, 101, 102, 103, 104, 105, 106, 107, 11, 108, 109, 110, 111, 112, 113,
@@ -647,7 +648,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
 
     testStream(eventhubs)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // we'll get one event per partition per trigger
       CheckAnswer(expected)
@@ -681,7 +682,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     val mapped = eventhubs.map(e => e.toInt + 1)
 
     testStream(mapped)(
-      StartStream(trigger = ProcessingTime(1)),
+      StartStream(trigger = Trigger.ProcessingTime(1)),
       makeSureGetOffsetCalled,
       AddEventHubsData(conf, 1, 2, 3),
       CheckAnswer(2, 3, 4),
@@ -754,9 +755,9 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
 
     val windowedAggregation = eventhubs
       .withWatermark("enqueuedTime", "10 seconds")
-      .groupBy(window($"enqueuedTime", "5 seconds") as 'window)
-      .agg(count("*") as 'count)
-      .select($"window".getField("start") as 'window, $"count")
+      .groupBy(window($"enqueuedTime", "5 seconds") as ("window"))
+      .agg(count("*") as ("count"))
+      .select($"window".getField("start") as ("window"), $"count")
 
     val query = windowedAggregation.writeStream
       .format("memory")
@@ -823,7 +824,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       Map(partitions(0) -> 1.0, partitions(1) -> 1.0, partitions(2) -> 1.0, partitions(3) -> 1.0)
 
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // we'll get 5 events per partition per trigger
       Assert(Set[Long](0).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
@@ -868,7 +869,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
       Assert(Set[Long](2, 3, 4).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
       CheckLastBatch(20, 21, 22, 23, 24, 20, 21, 22, 23, 24, 20, 21, 22, 23, 24, 20, 21, 22, 23, 24),
       StopStream,
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       // get update for the last batch before stopping the stream. It should be ignored because the tracker
       // state should be clean at the start of the stream
       PartitionsStatusTrackerUpdate(List( (partitions(0), 20L, 5, 100L), (partitions(1), 20L, 5, 13L),
@@ -935,7 +936,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
 
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // we'll get 5 events per partition per trigger
       Assert(Set[Long](0).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),
@@ -1030,7 +1031,7 @@ class EventHubsSourceSuite extends EventHubsSourceTest {
     }
 
     testStream(mapped)(
-      StartStream(ProcessingTime(100), clock),
+      StartStream(Trigger.ProcessingTime(100), clock),
       waitUntilBatchProcessed,
       // we'll get 10 events per partition per trigger
       Assert(Set[Long](0).equals(SimulatedPartitionStatusTracker.currentBatchIdsInTracker)),

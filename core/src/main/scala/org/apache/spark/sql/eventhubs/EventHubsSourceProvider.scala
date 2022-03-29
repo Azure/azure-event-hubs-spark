@@ -48,7 +48,7 @@ import org.json4s.jackson.Serialization
 import org.apache.spark.rpc.RpcEndpointRef
 import org.apache.spark.SparkEnv
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 
 /**
  * The provider class for the [[EventHubsSource]].
@@ -195,7 +195,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                 case c: Character        => c.toString.asInstanceOf[AnyRef]
                 case d: DescribedType    => d.getDescribed
                 case default             => default
-              }
+              }.toMap
               .map { p =>
                 p._2 match {
                   case s: String => UTF8String.fromString(p._1) -> UTF8String.fromString(s)
@@ -215,7 +215,7 @@ private[sql] object EventHubsSourceProvider extends Serializable {
                     buf.get(arr)
                     arr.asInstanceOf[AnyRef]
                   case default => default
-                }
+                }.toMap
                 .map { p =>
                   p._2 match {
                     case s: String => UTF8String.fromString(p._1) -> UTF8String.fromString(s)

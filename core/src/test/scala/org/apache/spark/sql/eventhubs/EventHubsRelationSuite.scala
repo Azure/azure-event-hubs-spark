@@ -23,12 +23,12 @@ import org.apache.qpid.proton.amqp._
 import org.apache.spark.eventhubs.{ EventHubsConf, EventPosition, NameAndPartition }
 import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.apache.spark.sql.{ DataFrame, QueryTest }
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.SharedSparkSession
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.scalatest.BeforeAndAfter
 
-class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSQLContext {
+class EventHubsRelationSuite extends QueryTest with BeforeAndAfter with SharedSparkSession {
 
   import testImplicits._
 

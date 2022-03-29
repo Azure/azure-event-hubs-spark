@@ -32,7 +32,7 @@ class EventHubsRDDSuite extends SparkFunSuite with BeforeAndAfterAll {
     new SparkConf().setMaster("local[4]").setAppName(this.getClass.getSimpleName)
   private var sc: SparkContext = _
 
-  override def beforeAll {
+  override def beforeAll : Unit = {
     super.beforeAll()
     testUtils = new EventHubsTestUtils
     val eventHub = testUtils.createEventHubs(DefaultName, DefaultPartitionCount)

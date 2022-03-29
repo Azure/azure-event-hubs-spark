@@ -67,7 +67,7 @@ class ConnectionStringBuilder private () {
    * @param connectionString EventHubs ConnectionString
    * @throws IllegalConnectionStringFormatException when the format of the ConnectionString is not valid
    */
-  private def this(connectionString: String) {
+  private def this(connectionString: String) = {
     this()
     parseConnectionString(connectionString)
   }

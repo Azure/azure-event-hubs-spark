@@ -27,11 +27,12 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.execution.streaming.MemoryStream
 import org.apache.spark.sql.streaming._
-import org.apache.spark.sql.test.SharedSQLContext
+import org.apache.spark.sql.test.SharedSparkSession
+import org.scalatest.Assertions._
 import org.scalatest.time.Span
 import collection.JavaConverters._
 
-class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
+class EventHubsSinkSuite extends StreamTest with SharedSparkSession {
   import testImplicits._
   import EventHubsTestUtils._
 
@@ -159,7 +160,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     val inputEvents =
       spark
         .range(1, 1000)
-        .select(to_json(struct("*")) as 'body)
+        .select(to_json(struct("*")) as ("body"))
 
     val eh = newEventHub()
     testUtils.createEventHubs(eh, DefaultPartitionCount)

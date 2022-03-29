@@ -17,9 +17,9 @@
 
 package org.apache.spark.eventhubs.rdd
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class OffsetRangeSuite extends FunSuite {
+class OffsetRangeSuite extends AnyFunSuite {
   test("offset range - toString") {
     val ehName = "eh-0"
     val fromSeqNo = 0

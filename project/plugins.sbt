@@ -1,3 +1,2 @@
-scalaVersion := "2.11.8"
-
-addSbtPlugin("org.lucidchart" %% "sbt-scalafmt" % "1.12")
+scalaVersion := "2.12.15"
+addSbtPlugin("com.lucidchart" %% "sbt-scalafmt" % "1.12")

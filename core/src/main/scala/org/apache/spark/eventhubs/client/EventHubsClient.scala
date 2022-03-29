@@ -372,7 +372,7 @@ private[spark] object EventHubsClient {
    *
    * @param user_agent the user agent
    */
-  def userAgent_=(user_agent: String) {
+  def userAgent_=(user_agent: String): Unit = {
     EventHubClientImpl.USER_AGENT = user_agent
   }
 }

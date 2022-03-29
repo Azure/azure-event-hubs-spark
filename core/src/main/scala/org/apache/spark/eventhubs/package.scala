@@ -87,7 +87,7 @@ package object eventhubs {
   }
 
   // Allow Strings to be converted to types defined in this library.
-  implicit class EventHubsString(val str: String) extends AnyVal {
+  implicit class EventHubsString(private val str: String) extends AnyVal {
     def toPartitionId: PartitionId = str.toInt
 
     def toRate: Rate = str.toInt

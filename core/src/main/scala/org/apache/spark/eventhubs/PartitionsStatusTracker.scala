@@ -66,8 +66,7 @@ class PartitionsStatusTracker extends Logging {
 
     // find partitions with a zero size batch.. No performance metric msg will be received for those partitions
     val isZeroSizeBatchPartition: Map[NameAndPartition, Boolean] =
-      offsetRanges.map(range => (range.nameAndPartition, (range.fromSeqNo == range.untilSeqNo)))(
-        breakOut)
+      offsetRanges.map(range => (range.nameAndPartition, (range.fromSeqNo == range.untilSeqNo))).toMap
 
     // create the batchStatus tracker and add it to the map
     batchesStatusList(batchId) = new BatchStatus(batchId, offsetRanges.map(range => {
@@ -206,9 +205,9 @@ class PartitionsStatusTracker extends Logging {
             _.onPartitionsPerformanceStatusUpdate(
               partitionContext,
               batch.batchId,
-              batch.paritionsStatusList.map(par => (par._1, par._2.batchSize))(breakOut),
+              batch.paritionsStatusList.map(par => (par._1, par._2.batchSize)).toMap,
               batch.paritionsStatusList
-                .map(par => (par._1, par._2.batchReceiveTimeInMillis))(breakOut),
+                .map(par => (par._1, par._2.batchReceiveTimeInMillis)).toMap,
               performancePercentages
             )
           )
@@ -257,7 +256,7 @@ object PartitionsStatusTracker {
     throttlingStatusPlugin = throttlingSP
     defaultPartitionsPerformancePercentage = Some(
       (for (pid <- 0 until partitionsCount)
-        yield (NameAndPartition(pContext.eventHubName, pid), 1.0))(breakOut))
+        yield (NameAndPartition(pContext.eventHubName, pid), 1.0)).toMap)
   }
 
   private def partitionSeqNoKey(nAndP: NameAndPartition, seqNo: SequenceNumber): String =
@@ -334,7 +333,7 @@ private[eventhubs] class BatchStatus(
           paritionsStatusList.foreach(par =>
             par._2.updatePerformancePercentage(avgTimePerEvent, stdDevTimePerEvent))
           val ppp: Map[NameAndPartition, Double] =
-            paritionsStatusList.map(par => (par._1, par._2.performancePercentage))(breakOut)
+            paritionsStatusList.map(par => (par._1, par._2.performancePercentage)).toMap
           // if all partitions have been updated, save the result in performancePercentages
           if (paritionsStatusList.values
                 .filter(ps => ps.hasBeenUpdated)

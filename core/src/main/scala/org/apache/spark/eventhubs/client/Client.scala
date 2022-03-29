@@ -35,7 +35,7 @@ private[spark] trait Client extends Serializable {
    * @param partition the partition that will receive all events sent
    *                    from this partition sender.
    */
-  def createPartitionSender(partition: Int)
+  def createPartitionSender(partition: Int): Unit
 
   /**
    * Sends an [[EventData]] to your Event Hub. If a partition is provided,

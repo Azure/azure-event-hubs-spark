@@ -83,7 +83,7 @@ private[spark] class EventHubsRDD(sc: SparkContext,
       .runJob(
         this,
         (tc: TaskContext, it: Iterator[EventData]) => it.take(parts(tc.partitionId)).toArray,
-        parts.keys.toArray
+        parts.keys.toIndexedSeq
       )
       .flatten
   }

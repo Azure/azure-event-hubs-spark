@@ -354,7 +354,7 @@ val query =
     .writeStream
     .foreach(writer)
     .outputMode("update")
-    .trigger(ProcessingTime("25 seconds"))
+    .trigger(Trigger.ProcessingTime("25 seconds"))
     .start()
 ```
 

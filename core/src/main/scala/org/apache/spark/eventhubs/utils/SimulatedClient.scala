@@ -108,7 +108,7 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
       positions.get.map { case (k, v) => k.partitionId -> v }.mapValues(_.seqNo).mapValues {
         seqNo =>
           { if (seqNo == -1L) 0L else seqNo }
-      }
+      }.toMap
     }
   }
 

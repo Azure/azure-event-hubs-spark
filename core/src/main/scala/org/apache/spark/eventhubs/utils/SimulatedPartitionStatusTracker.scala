@@ -18,7 +18,6 @@
 package org.apache.spark.eventhubs.utils
 
 import org.apache.spark.eventhubs.{ NameAndPartition, PartitionsStatusTracker, SequenceNumber }
-import scala.collection.breakOut
 
 private[spark] object SimulatedPartitionStatusTracker {
   val sourceTracker = PartitionsStatusTracker.getPartitionStatusTracker
@@ -33,7 +32,7 @@ private[spark] object SimulatedPartitionStatusTracker {
   def getPerformancePercentages: Map[NameAndPartition, Double] = {
 
     sourceTracker.partitionsPerformancePercentage match {
-      case Some(percentages) => (percentages.map(par => (par._1, roundDouble(par._2, 2))))(breakOut)
+      case Some(percentages) => (percentages.map(par => (par._1, roundDouble(par._2, 2)))).toMap
       case None              => Map[NameAndPartition, Double]()
     }
   }

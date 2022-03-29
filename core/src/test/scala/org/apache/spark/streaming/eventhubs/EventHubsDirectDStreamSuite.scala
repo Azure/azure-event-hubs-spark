@@ -39,8 +39,10 @@ import org.apache.spark.streaming.scheduler.{
 }
 import org.apache.spark.streaming.{ Milliseconds, Seconds, StreamingContext, Time }
 import org.apache.spark.util.Utils
+import org.scalatest.Assertions._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.BeforeAndAfter
+
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._

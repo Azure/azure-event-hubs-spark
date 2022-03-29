@@ -21,8 +21,8 @@ import java.io._
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 
-import scala.collection.breakOut
 import scala.collection.mutable
+import scala.collection.breakOut
 
 import org.apache.commons.io.IOUtils
 import org.apache.spark.SparkContext
@@ -113,7 +113,7 @@ private[spark] class EventHubsSource private[eventhubs] (sqlContext: SQLContext,
     (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
 
   val defaultPartitionsPerformancePercentage: Map[NameAndPartition, Double] =
-    (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0))(breakOut)
+    (for (pid <- 0 until partitionCount) yield (NameAndPartition(ehName, pid), 1.0)).toMap
 
   private lazy val initialPartitionSeqNos = {
     val metadataLog =

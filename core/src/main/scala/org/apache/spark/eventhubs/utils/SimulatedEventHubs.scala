@@ -207,7 +207,7 @@ private[spark] class SimulatedEventHubs(val name: String, val partitionCount: In
     private[utils] def send(event: EventData, properties: Option[Map[String, Object]]): Unit = {
       // Need to add a Seq No to the EventData to properly simulate the service.
       val e = EventHubsTestUtils.createEventData(event.getBytes, data.size.toLong, properties)
-      synchronized(data = data :+ e)
+      synchronized{data = data :+ e}
     }
 
     /**

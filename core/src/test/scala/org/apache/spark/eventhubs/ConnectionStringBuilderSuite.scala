@@ -19,9 +19,9 @@ package org.apache.spark.eventhubs
 
 import java.time.Duration
 
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ConnectionStringBuilderSuite extends FunSuite {
+class ConnectionStringBuilderSuite extends AnyFunSuite {
 
   import ConnectionStringBuilderSuite._
 

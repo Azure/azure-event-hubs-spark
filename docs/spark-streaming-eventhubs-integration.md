@@ -29,7 +29,7 @@ or
 
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.12
-  version = 2.3.21
+  version = 2.4.0
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -326,8 +326,8 @@ then your `batchInterval` must be greater than 4 seconds because `consumptionTim
 ## Deploying 
 As with any Spark applications, `spark-submit` is used to launch your application.
 
-For Scala and Java applications, if you are using SBT or Maven for project management, then package azure-eventhubs-spark_2.11
-and its dependencies into the application JAR. Make sure spark-core_2.11 and spark-streaming_2.11 are marked as provided 
+For Scala and Java applications, if you are using SBT or Maven for project management, then package azure-eventhubs-spark_2.12
+and its dependencies into the application JAR. Make sure spark-core_2.12 and spark-streaming_2.12 are marked as provided
 dependencies as those are already present in a Spark installation. Then use `spark-submit` to launch your application 
 (see [Deploying](https://spark.apache.org/docs/latest/streaming-programming-guide.html#deploying-applications) section 
 in the main programming guide).

@@ -1,10 +1,10 @@
-# Use AAD Authentication to Connect Eventhubs
+# Use AAD Authentication to Connect Event Hubs
 This guide will show you how you can 
-<a href="https://docs.microsoft.com/en-us/azure/event-hubs/authenticate-application" target="_blank">use AAD authentication to access Eventhubs</a>.
+<a href="https://docs.microsoft.com/en-us/azure/event-hubs/authenticate-application" target="_blank">use AAD authentication to access Event Hubs</a>.
 
 * [Use Service Principal with Secret to Authorize](#use-service-principal-with-secret-to-authorize)
-  * [Write Secrets in Callback Class](#write-secret-in-callback-class)
-  * [Pass Secrets to Callback Class](#pass-secret-to-callback-class)
+  * [Write Secrets in Callback Class](#write-secrets-in-callback-class)
+  * [Pass Secrets to Callback Class](#pass-secrets-to-callback-class)
 * [Use Service Principal with Certificate to Authorize](#use-service-principal-with-certificate-to-authorize)
 
 
@@ -12,7 +12,7 @@ This guide will show you how you can
 First, you need to create a callback class extends from `org.apache.spark.eventhubs.utils.AadAuthenticationCallback`. There are two options on how the callback class can access the secrets. Either set the secrets directly in the class definition, or pass the secrets in a properties bag of type `Map[String, Object]` to the callback class.
 Please note that since the connector is using reflection to instantiate the callback class on each executor node, the callback class definition should be packaged in a jar file and be added to your cluster.
 
-### Write Secret in Callback Class
+### Write Secrets in Callback Class
 In this case, you set the required secrets in the callback class as shown in the below example:
 
 ```scala

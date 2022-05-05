@@ -24,13 +24,13 @@ For Scala/Java applications using SBT/Maven project definitions, link your appli
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.21
+  version = 2.3.22
 
 or
 
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.12
-  version = 2.3.21
+  version = 2.3.22
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -425,11 +425,11 @@ AMQP types need to be handled explicitly by the connector. Below we list the AMQ
 As with any Spark applications, `spark-submit` is used to launch your application. `azure-eventhubs-spark_2.11`
 and its dependencies can be directly added to `spark-submit` using `--packages`, such as,
 
-    ./bin/spark-submit --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.21 ...
+    ./bin/spark-submit --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.22 ...
 
 For experimenting on `spark-shell`, you can also use `--packages` to add `azure-eventhubs-spark_2.11` and its dependencies directly,
 
-    ./bin/spark-shell --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.21 ...
+    ./bin/spark-shell --packages com.microsoft.azure:azure-eventhubs-spark_2.11:2.3.22 ...
 
 See [Application Submission Guide](https://spark.apache.org/docs/latest/submitting-applications.html) for more details about submitting
 applications with external dependencies.

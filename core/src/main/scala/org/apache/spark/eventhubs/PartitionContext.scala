@@ -15,22 +15,20 @@
  * limitations under the License.
  */
 
-package org.apache.spark.eventhubs.utils
+package org.apache.spark.eventhubs
 
-import org.apache.spark.eventhubs.{ NameAndPartition, TaskContextSlim }
+import java.net.URI
+import org.json4s.jackson.Serialization
 
-trait MetricPlugin extends Serializable {
-
-  def onReceiveMetric(taskContextSlim: TaskContextSlim,
-                      partitionInfo: NameAndPartition,
-                      batchCount: Int,
-                      batchSizeInBytes: Long,
-                      elapsedTimeInMillis: Long): Unit
-
-  def onSendMetric(taskContextSlim: TaskContextSlim,
-                   eventHubName: String,
-                   batchCount: Int,
-                   batchSizeInBytes: Long,
-                   elapsedTimeInMillis: Long,
-                   isSuccess: Boolean): Unit
+/**
+ * Partition context which provides EventHub's information for partitions
+ * to be used in Throttling Status Plugin
+ *
+ * @param namespaceEndpoint Namespace endpoint.
+ * @param eventHubName EventHub name.
+ */
+class PartitionContext(val namespaceEndpoint: URI, val eventHubName: String) extends Serializable {
+  override def toString: String = {
+    s"NamespaceEndpoint: $namespaceEndpoint, eventHubName: $eventHubName"
+  }
 }

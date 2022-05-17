@@ -411,7 +411,7 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     assert(
       ex.getMessage
         .toLowerCase(Locale.ROOT)
-        .contains(s"partition attribute unsupported type"))
+        .contains(s"partitionid attribute unsupported type"))
   }
 
   test("streaming - write data with valid schema but wrong type - bad partitionKey type") {
@@ -452,7 +452,8 @@ class EventHubsSinkSuite extends StreamTest with SharedSQLContext {
     try {
       ex = intercept[StreamingQueryException] {
         writer = createEventHubsWriter(input.toDF(), ehConf, properties = Some(targetProperties))(
-          "properties", "body")
+          "properties",
+          "body")
         input.addData("1", "2", "3", "4", "5")
         writer.processAllAvailable()
       }

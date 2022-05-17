@@ -18,12 +18,18 @@ partitions and Spark partitions, and access to sequence numbers and metadata.
 * [Deploying](#deploying)
 
 ## Linking
-For Scala/Java applications using SBT/Maven project defnitions, link your application with the following artifact:
+For Scala/Java applications using SBT/Maven project definitions, link your application with the following artifact:
 
 ```
   groupId = com.microsoft.azure
   artifactId = azure-eventhubs-spark_2.11
-  version = 2.3.13
+  version = 2.3.22
+
+or
+
+  groupId = com.microsoft.azure
+  artifactId = azure-eventhubs-spark_2.12
+  version = 2.3.22
 ```
 
 For Python applications, you need to add this above library and its dependencies when deploying your application.
@@ -46,7 +52,7 @@ When you get the connection string from the Azure Portal, it may or may not have
 val without = "Endpoint=ENDPOINT;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY"
     
 // With an entity path 
-val with = "Endpoint=sb://SAMPLE;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY;EntityPath=EVENTHUB_NAME"
+val withEntity = "Endpoint=sb://SAMPLE;SharedAccessKeyName=KEY_NAME;SharedAccessKey=KEY;EntityPath=EVENTHUB_NAME"
 ```
 
 To connect to your EventHubs, an `EntityPath` must be present. If your connection string doesn't have one, don't worry!
@@ -93,12 +99,14 @@ Additionally, the following configurations are optional:
 | Option | value | default | query type | meaning |
 | ------ | ----- | ------- | ---------- | ------- |
 | consumerGroup | `String` | "$Default" | RDD and DStream | A consumer group is a view of an entire event hub. Consumer groups enable multiple consuming applications to each have a separate view of the event stream, and to read the stream independently at their own pace and with their own offsets. More info is available [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-features#event-consumers) | 
-| startingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | RDD and DStream | Starting positions for specific partitions. If any positions are set in this option, they take priority when starting the Structured Streaming job. If nothing is configured for a specific partition, then the `EventPosition` set in startingPosition is used. If no position set there, we will start consuming from the end of the partition. |
-| startingPosition | `EventPosition` | end of stream | DStream only | The starting position for your Structured Streaming job. If a specific EventPosition is *not* set for a partition using startingPositions, then we use the `EventPosition` set in startingPosition. If nothing is set in either option, we will begin consuming from the end of the partition. |
+| startingPositions | `Map[NameAndPartition, EventPosition]` | end of stream | RDD and DStream | Sets starting positions for specific partitions. If any positions are set in this option, they take priority over any other option. If nothing is configured within this option, then the setting in `startingPosition` is used. If no position has been set in either option, we will start consuming from the end of the partition. |
+| startingPosition | `EventPosition` | end of stream | DStream only | The starting position for your Spark Streaming job. If a specific EventPosition is *not* set for a partition using `startingPositions`, then we use the `EventPosition` set in `startingPosition`. If nothing is set in either option, we will begin consuming from the end of the partition. |
 | maxRatesPerPartition | `Map[NameAndPartition, Int]` | None | DStream only | Rate limits on a per partition basis. Specify the maximum number of events to be processed on a certain partition within a batch interval. If nothing is set here, `maxRatePerPartition` is used. If nothing is set in there, the default value (1000) is used. | 
 | maxRatePerPartition | `Int` | 1000 | DStream only | Rate limit on maximum number of events processed per partition per batch interval. | 
 | receiverTimeout | `java.time.Duration` | 60 seconds | RDD and DStream | The amount of time Event Hub receive calls will be retried before throwing an exception. | 
 | operationTimeout | `java.time.Duration` | 60 seconds | RDD and DStream | The amount of time Event Hub API calls will be retried before throwing an exception. |
+| aadAuthCallback | `org.apache.spark.eventhubs.utils.AadAuthenticationCallback` | None | RDD and DStream | Sets a callback class extending the `AadAuthenticationCallback` trait to use AAD authentication instead of the connection string to access Event Hubs. More info is available [here](use-aad-authentication-to-connect-eventhubs.md). |
+| aadAuthCallbackParams | `Map[String, Object]` | `Map.empty` | RDD and DStream | Sets the parameters passed to the AAD authentication callback class. More info is available [here](use-aad-authentication-to-connect-eventhubs.md). |
 
 For each option, there exists a corresponding setter in the EventHubsConf. For example:
 
@@ -234,7 +242,7 @@ are [at-least-once](https://spark.apache.org/docs/latest/streaming-programming-g
 So if you want the equivalent of exactly-once semantics, you must either store offsets after an idempotent output, or store 
 offsets in an atomic transaction alongside output. With this integration, you have 2 options, in order of increasing 
 reliability (and code complexity), for how to store offsets. Note: Event Hubs doesn't support idempotent sends. That feature
-is currently under developement. 
+is currently under development. 
 
 ### Checkpoints 
 

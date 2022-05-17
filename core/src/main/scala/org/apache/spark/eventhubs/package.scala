@@ -19,7 +19,7 @@ package org.apache.spark
 
 import java.time.Duration
 
-import com.microsoft.azure.eventhubs.{ EventHubClient, PartitionReceiver }
+import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubClientOptions, PartitionReceiver }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
@@ -37,7 +37,10 @@ package object eventhubs {
   val DefaultEndingPosition: EventPosition = EventPosition.fromEndOfStream
   val DefaultMaxRatePerPartition: Rate = 1000
   val DefaultReceiverTimeout: Duration = Duration.ofSeconds(60)
+  val DefaultMaxSilentTime: Duration = EventHubClientOptions.SILENT_OFF
+  val MinSilentTime: Duration = EventHubClientOptions.SILENT_MINIMUM
   val DefaultOperationTimeout: Duration = Duration.ofSeconds(300)
+  val DefaultMaxAcceptableBatchReceiveTime: Duration = Duration.ofSeconds(30)
   val DefaultConsumerGroup: String = EventHubClient.DEFAULT_CONSUMER_GROUP_NAME
   val PrefetchCountMinimum: Int = PartitionReceiver.MINIMUM_PREFETCH_COUNT
   val PrefetchCountMaximum: Int = PartitionReceiver.MAXIMUM_PREFETCH_COUNT
@@ -46,17 +49,22 @@ package object eventhubs {
   val DefaultUseSimulatedClient = "false"
   val DefaultPartitionPreferredLocationStrategy = "Hash"
   val DefaultUseExclusiveReceiver = "true"
+  val DefaultSlowPartitionAdjustment = "false"
+  val DefaultDynamicPartitionDiscovery = "false"
   val StartingSequenceNumber = 0L
   val DefaultThreadPoolSize = 16
   val DefaultEpoch = 0L
   val RetryCount = 10
   val WaitInterval = 5000
+  val UpdatePartitionCountIntervalMS = 300000
 
   val OffsetAnnotation = "x-opt-offset"
   val EnqueuedTimeAnnotation = "x-opt-enqueued-time"
   val SequenceNumberAnnotation = "x-opt-sequence-number"
 
-  val SparkConnectorVersion = "2.3.15"
+  val SparkConnectorVersion = "2.3.22"
+
+  val DefaultUseAadAuth = "false"
 
   type PartitionId = Int
   val PartitionId: Int.type = Int
@@ -90,4 +98,5 @@ package object eventhubs {
 
     def toSequenceNumber: SequenceNumber = str.toLong
   }
+
 }

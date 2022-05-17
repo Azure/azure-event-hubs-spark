@@ -17,12 +17,17 @@
 
 package org.apache.spark.eventhubs.client
 
+import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ ConcurrentLinkedQueue, Executors, ScheduledExecutorService }
 
-import com.microsoft.azure.eventhubs.EventHubClient
+import com.microsoft.azure.eventhubs.{ EventHubClient, EventHubClientOptions, RetryPolicy }
 import org.apache.spark.eventhubs._
+import org.apache.spark.eventhubs.utils.RetryUtils.retryJava
 import org.apache.spark.internal.Logging
+
+import scala.concurrent.{ Await, Future }
+import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * A connection pool for EventHubClients. A connection pool is created per connection string.
@@ -48,19 +53,50 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (client == null) {
       logInfo(
-        s"No clients left to borrow. EventHub name: ${ehConf.name}, " +
+        s"No clients left to borrow. NamespaceUri: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, " +
           s"ConsumerGroup name: $consumerGroup. Creating client ${count.incrementAndGet()}")
       val connStr = ConnectionStringBuilder(ehConf.connectionString)
       connStr.setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
       EventHubsClient.userAgent =
         s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
       while (client == null) {
-        client = EventHubClient.createFromConnectionStringSync(connStr.toString,
-                                                               ClientThreadPool.get(ehConf))
+        if (ehConf.useAadAuth) {
+          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
+            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+            .setRetryPolicy(RetryPolicy.getDefault)
+          client = Await.result(
+            retryJava(
+              EventHubClient
+                .createWithAzureActiveDirectory(connStr.getEndpoint,
+                                                ehConf.name,
+                                                ehConf.aadAuthCallback().get,
+                                                ehConf.aadAuthCallback().get.authority,
+                                                ClientThreadPool.get(ehConf),
+                                                ehClientOption),
+              "createWithAzureActiveDirectory"
+            ),
+            ehConf.internalOperationTimeout
+          )
+        } else {
+          client = Await.result(
+            retryJava(
+              EventHubClient.createFromConnectionString(
+                connStr.toString,
+                RetryPolicy.getDefault,
+                ClientThreadPool.get(ehConf),
+                null,
+                ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime)),
+              "createFromConnectionString"
+            ),
+            ehConf.internalOperationTimeout
+          )
+        }
       }
     } else {
       logInfo(
-        s"Borrowing client. EventHub name: ${ehConf.name}, ConsumerGroup name: $consumerGroup")
+        s"Borrowing client. Namespace: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, ConsumerGroup name: " +
+          s"$consumerGroup")
     }
     logInfo(s"Available clients: {${pool.size}}. Total clients: ${count.get}")
     client
@@ -74,7 +110,8 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   private def returnClient(client: EventHubClient): Unit = {
     pool.offer(client)
     logInfo(
-      s"Client returned. EventHub name: ${ehConf.name}. Total clients: ${count.get}. Available clients: ${pool.size}")
+      s"Client returned. Namespace: ${ehConf.namespaceUri},EventHub name: ${ehConf.name}. Total clients: ${count.get}. " +
+        s"Available clients: ${pool.size}")
   }
 }
 

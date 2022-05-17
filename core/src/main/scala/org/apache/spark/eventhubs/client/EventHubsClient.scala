@@ -29,7 +29,6 @@ import org.json4s.jackson.Serialization
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.{ ArrayBuffer, ListBuffer }
-import scala.compat.java8.FutureConverters
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ Await, Future }
 import scala.util.{ Failure, Success }
@@ -45,6 +44,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     with Logging {
 
   import org.apache.spark.eventhubs._
+  import EventHubsClient._
 
   ehConf.validate
 
@@ -53,6 +53,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
   private var pendingWorks = new ListBuffer[Future[Any]]
 
   private var _client: EventHubClient = _
+
+  private var partitionCountCache: Int = 0
+  private var partitionCountCacheUpdateTimestamp: Long = 0
 
   private def client = synchronized {
     if (_client == null) {
@@ -88,7 +91,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
 
     val sendTask = if (partition.isDefined) {
-      if (partitionSender.getPartitionId.toInt != partition.get) {
+      if ((partitionSender == null) || (partitionSender.getPartitionId.toInt != partition.get)) {
         logInfo("Recreating partition sender.")
         createPartitionSender(partition.get)
       }
@@ -99,7 +102,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
       client.send(event)
     }
 
-    pendingWorks += FutureConverters.toScala(sendTask)
+    pendingWorks += retryJava(sendTask, "send", 1)
   }
 
   /**
@@ -128,7 +131,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
               if (r.getIsEmpty) r.getLastEnqueuedSequenceNumber + 1 else r.getBeginSequenceNumber
             }
           val latest = r.getLastEnqueuedSequenceNumber + 1
-          i -> (earliest, latest)
+          i -> ((earliest, latest): (Long, Long))
         }
     Await
       .result(Future.sequence(futures), ehConf.internalOperationTimeout)
@@ -165,10 +168,41 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    *
    * @return partition count
    */
-  override lazy val partitionCount: Int = {
+  override def partitionCount: Int = {
     try {
+      if (ehConf.dynamicPartitionDiscovery) {
+        partitionCountDynamic
+      } else {
+        partitionCountLazyVal
+      }
+    } catch {
+      case e: Exception => throw e
+    }
+  }
+
+  lazy val partitionCountLazyVal: Int = {
+    try {
+      logDebug(
+        s"partitionCountLazyVal makes a call to runTimeInfo to read the number of partitions for EventHub ${client.getEventHubName}.")
       val runtimeInfo = client.getRuntimeInformation.get
       runtimeInfo.getPartitionCount
+    } catch {
+      case e: Exception => throw e
+    }
+  }
+
+  def partitionCountDynamic: Int = {
+    try {
+      val currentTimeStamp = System.currentTimeMillis()
+      if ((currentTimeStamp - partitionCountCacheUpdateTimestamp > UpdatePartitionCountIntervalMS) || (partitionCountCache == 0)) {
+        val runtimeInfo = client.getRuntimeInformation.get
+        partitionCountCache = runtimeInfo.getPartitionCount
+        partitionCountCacheUpdateTimestamp = currentTimeStamp
+        logDebug(
+          s"partitionCountDynamic made a call to runTimeInfo to read the number of partitions = ${partitionCountCache}" +
+            s" at timestamp = ${partitionCountCacheUpdateTimestamp} for EventHub ${client.getEventHubName}")
+      }
+      partitionCountCache
     } catch {
       case e: Exception => throw e
     }
@@ -182,16 +216,21 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
    * [[PartitionSender]] is closed.
    */
   override def close(): Unit = {
-    logInfo("close: Closing EventHubsClient.")
+    logInfo(s"close is called. ${EventHubsUtils.getTaskContextSlim}")
 
-    Future.sequence(pendingWorks).onComplete {
+    val future = Future.sequence(pendingWorks)
+    future.onComplete {
       case Success(_) => cleanup()
       case Failure(e) =>
-        logError(s"failed to complete pending tasks. $ehConf: ", e)
+        logError(
+          s"failed to complete pending tasks. event hubs: ${ehConf.name}, ${EventHubsUtils.getTaskContextSlim}",
+          e)
         cleanup()
 
         throw e
     }
+
+    Await.result(future, ehConf.internalOperationTimeout)
   }
 
   private def cleanup(): Unit = {
@@ -228,8 +267,9 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
 
     val completed = mutable.Map[PartitionId, SequenceNumber]()
     val needsTranslation = ArrayBuffer[(NameAndPartition, EventPosition)]()
+    val NamespaceAndEhName: String = ehConf.namespaceUri + ":" + ehConf.name
 
-    logInfo(s"translate: useStart is set to $useStart.")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName useStart is set to $useStart.")
     val positions = if (useStart) {
       ehConf.startingPositions.getOrElse(Map.empty).par
     } else {
@@ -240,8 +280,8 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     } else {
       ehConf.endingPosition.getOrElse(DefaultEndingPosition)
     }
-    logInfo(s"translate: PerPartitionPositions = $positions")
-    logInfo(s"translate: Default position = $defaultPos")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName PerPartitionPositions = $positions")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName Default position = $defaultPos")
 
     (0 until partitionCount).par.foreach { id =>
       val nAndP = NameAndPartition(ehConf.name, id)
@@ -255,7 +295,7 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         synchronized(needsTranslation += tuple)
       }
     }
-    logInfo(s"translate: needsTranslation = $needsTranslation")
+    logInfo(s"translate: NsAndEhName: $NamespaceAndEhName needsTranslation = $needsTranslation")
 
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     val futures = for ((nAndP, pos) <- needsTranslation)

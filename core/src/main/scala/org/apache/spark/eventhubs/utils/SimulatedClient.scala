@@ -74,7 +74,7 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
    */
   override def allBoundedSeqNos: Map[PartitionId, (SequenceNumber, SequenceNumber)] =
     (0 until partitionCount)
-      .map(i => i -> (eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)))
+      .map(i => i -> ((eventHub.earliestSeqNo(i), eventHub.latestSeqNo(i)): (SequenceNumber, SequenceNumber)))
       .toMap
 
   /**
@@ -97,8 +97,11 @@ private[spark] class SimulatedClient(private val ehConf: EventHubsConf) extends 
     if (positions.isEmpty && position.isEmpty) {
       (for { id <- 0 until eventHub.partitionCount } yield id -> apiCall(id)).toMap
     } else if (positions.isEmpty) {
-      require(position.get.seqNo >= 0L)
-      (for { id <- 0 until partitionCount } yield id -> position.get.seqNo).toMap
+      if (position.get.seqNo < 0L) {
+        (for { id <- 0 until partitionCount } yield id -> apiCall(id)).toMap
+      } else {
+        (for { id <- 0 until partitionCount } yield id -> position.get.seqNo).toMap
+      }
     } else {
       require(positions.get.forall(x => x._2.seqNo >= 0L))
       require(positions.get.size == partitionCount)

@@ -19,10 +19,16 @@ package org.apache.spark.eventhubs
 
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.net.URI
 
+import com.microsoft.azure.eventhubs.AzureActiveDirectoryTokenProvider.AuthenticationCallback
 import org.apache.spark.eventhubs.PartitionPreferredLocationStrategy.PartitionPreferredLocationStrategy
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.spark.eventhubs.utils.MetricPlugin
+import org.apache.spark.eventhubs.utils.{
+  AadAuthenticationCallback,
+  MetricPlugin,
+  ThrottlingStatusPlugin
+}
 import org.apache.spark.internal.Logging
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
@@ -53,6 +59,7 @@ final class EventHubsConf private (private val connectionStr: String)
   self =>
 
   import EventHubsConf._
+
   private val settings = new ConcurrentHashMap[String, String]()
   this.setConnectionString(connectionStr)
 
@@ -159,12 +166,20 @@ final class EventHubsConf private (private val connectionStr: String)
       ConnectionStringKey,
       ConsumerGroupKey,
       ReceiverTimeoutKey,
+      MaxSilentTimeKey,
       OperationTimeoutKey,
       PrefetchCountKey,
       ThreadPoolSizeKey,
       UseExclusiveReceiverKey,
       UseSimulatedClientKey,
-      MetricPluginKey
+      MetricPluginKey,
+      SlowPartitionAdjustmentKey,
+      ThrottlingStatusPluginKey,
+      MaxAcceptableBatchReceiveTimeKey,
+      UseAadAuthKey,
+      AadAuthCallbackKey,
+      AadAuthCallbackParamsKey,
+      DynamicPartitionDiscoveryKey
     ).map(_.toLowerCase).toSet
 
     val trimmedConfig = EventHubsConf(connectionString)
@@ -177,6 +192,9 @@ final class EventHubsConf private (private val connectionStr: String)
 
   /** The currently set EventHub name */
   def name: String = ConnectionStringBuilder(connectionString).getEventHubName
+
+  /** The namespace uri in String*/
+  def namespaceUri: String = ConnectionStringBuilder(connectionString).getEndpoint.toString
 
   /** Set the consumer group for your EventHubs instance. If no consumer
    * group is provided, then [[DefaultConsumerGroup]] will be used.
@@ -197,7 +215,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * Sets the default starting position for all partitions.
    *
    * If you would like to start from a different position for a specific partition,
-   * please see [[setStartingPositions()]]. If a position is set for particiular partition,
+   * please see [[setStartingPositions()]]. If a position is set for particular partition,
    * we will use that position instead of the one set by this method.
    *
    * If no starting position is set, then [[DefaultEventPosition]] is used
@@ -226,7 +244,7 @@ final class EventHubsConf private (private val connectionStr: String)
    * in [[setStartingPosition()]]. If nothing is set in [[setStartingPosition()]], then
    * we will start consuming from the start of the EventHub partition.
    *
-   * @param eventPositions a map of parition ids (ints) to [[EventPosition]]s
+   * @param eventPositions a map of partition ids (ints) to [[EventPosition]]s
    * @return the updated [[EventHubsConf]] instance
    * @see [[EventPosition]]
    */
@@ -364,6 +382,27 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
+   * Set the maximum silent time for a receiver. We will try to recreate the receiver
+   * if there is no activity for the length of this duration.
+   * Default: [[DefaultMaxSilentTime]]
+   *
+   * @param d the new maximum silent time
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setMaxSilentTime(d: Duration): EventHubsConf = {
+    if (d.toMillis < MinSilentTime.toMillis) {
+      throw new IllegalArgumentException("max silent time is less than " + MinSilentTime)
+    }
+
+    set(MaxSilentTimeKey, d)
+  }
+
+  /** The current maximum silent time.  */
+  def maxSilentTime: Option[Duration] = {
+    self.get(MaxSilentTimeKey) map (str => Duration.parse(str))
+  }
+
+  /**
    * Set the operation timeout. We will retryJava failures when contacting the
    * EventHubs service for the length of this timeout.
    * Default: [[DefaultOperationTimeout]]
@@ -402,7 +441,8 @@ final class EventHubsConf private (private val connectionStr: String)
    */
   def setPrefetchCount(count: Int): EventHubsConf = {
     if (count > PrefetchCountMaximum || count < PrefetchCountMinimum) {
-      throw new IllegalArgumentException("setPrefetchCount: count value is out of range.")
+      throw new IllegalArgumentException(s"setPrefetchCount: count value is out of range. PrefetchCount should be " +
+        s"within the range [$PrefetchCountMinimum, $PrefetchCountMaximum].")
     }
 
     set(PrefetchCountKey, count)
@@ -452,7 +492,72 @@ final class EventHubsConf private (private val connectionStr: String)
   }
 
   /**
-   * Set the size of thread pool.
+   * Set the flag for slow partition adjustment. The default value is false.
+   * Default: [[DefaultSlowPartitionAdjustment]]
+   *
+   * @param b the flag which specifies whether the connector uses slow partition adjustment logic
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setSlowPartitionAdjustment(b: Boolean): EventHubsConf = {
+    set(SlowPartitionAdjustmentKey, b)
+  }
+
+  /** The slow partition adjustment flag  */
+  def slowPartitionAdjustment: Boolean = {
+    self.get(SlowPartitionAdjustmentKey).getOrElse(DefaultSlowPartitionAdjustment).toBoolean
+  }
+
+  /**
+   * Set the flag for dynamic partition discovery. This option is useful only if partitions are being dynamically
+   * added to an existing event hub. For more information on how to dynamically add partitions to an event hub
+   * please refer to [[https://docs.microsoft.com/en-us/azure/event-hubs/dynamically-add-partitions]].
+   * If dynamic partition discovery is disabled the number of partitions is being read and set at the
+   * beginning of the execution. Otherwise the number of partitions is being read and updated every
+   * [[UpdatePartitionCountIntervalMS]] milliseconds. The default value is false.
+   * Default: [[DefaultDynamicPartitionDiscovery]]
+   *
+   * @param b the flag which specifies whether the connector uses dynamic partition discovery
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setDynamicPartitionDiscovery(b: Boolean): EventHubsConf = {
+    set(DynamicPartitionDiscoveryKey, b)
+  }
+
+  /** The dynamic partition discovery flag  */
+  def dynamicPartitionDiscovery: Boolean = {
+    self.get(DynamicPartitionDiscoveryKey).getOrElse(DefaultDynamicPartitionDiscovery).toBoolean
+  }
+
+  /** Set the max time that is acceptable for a partition to receive events in a single batch.
+   * This value is being used to identify slow partitions when the slowPartitionAdjustment is on.
+   * Only partitions that tale more than this time to receive their portion of events in batch are considered
+   * as potential slow partitions.
+   * Default: [[DefaultMaxAcceptableBatchReceiveTime]]
+   *
+   * @param d the new maximum acceptable time for a partition to receive events in a single batch
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setMaxAcceptableBatchReceiveTime(d: Duration): EventHubsConf = {
+    set(MaxAcceptableBatchReceiveTimeKey, d)
+  }
+
+  /** The current max time that is acceptable for a partition to receive events in a single batch. */
+  def maxAcceptableBatchReceiveTime: Option[Duration] = {
+    self.get(MaxAcceptableBatchReceiveTimeKey) map (str => Duration.parse(str))
+  }
+
+  def setThrottlingStatusPlugin(throttlingStatusPlugin: ThrottlingStatusPlugin): EventHubsConf = {
+    set(ThrottlingStatusPluginKey, throttlingStatusPlugin.getClass.getName)
+  }
+
+  def throttlingStatusPlugin(): Option[ThrottlingStatusPlugin] = {
+    self.get(ThrottlingStatusPluginKey) map (className => {
+      Class.forName(className).newInstance().asInstanceOf[ThrottlingStatusPlugin]
+    })
+  }
+
+  /**
+   * Set whether the connector uses an epoch receiver
    * Default: [[DefaultUseExclusiveReceiver]]
    *
    * @param b the flag which specifies whether the connector uses an epoch receiver
@@ -490,6 +595,69 @@ final class EventHubsConf private (private val connectionStr: String)
         throw new IllegalStateException(
           s"Illegal partition strategy $strategyType, available types " +
             s"${PartitionPreferredLocationStrategy.values.mkString(",")}"))
+  }
+
+  /**
+   * Use AAD auth to connect eventhubs instead of connection string. It's internal.
+   *
+   * Default: [[false]]
+   * @return the updated [[EventHubsConf]] instance
+   */
+  private def setUseAadAuth(b: Boolean): EventHubsConf = {
+    set(UseAadAuthKey, b)
+  }
+
+  def useAadAuth: Boolean = {
+    self.get(UseAadAuthKey).getOrElse(DefaultUseAadAuth).toBoolean
+  }
+
+  /**
+   * set a callback class for aad auth. The class should be Serializable and derived from
+   * org.apache.spark.eventhubs.utils.AadAuthenticationCallback.
+   * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+   *
+   * @param callback The callback class which implements org.apache.spark.eventhubs.utils.AadAuthenticationCallback
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthCallback(callback: AadAuthenticationCallback): EventHubsConf = {
+    setUseAadAuth(true)
+    set(AadAuthCallbackKey, callback.getClass.getName)
+  }
+
+  def aadAuthCallback(): Option[AadAuthenticationCallback] = {
+    val params: Map[String, Object] = self.get(AadAuthCallbackParamsKey) map EventHubsConf
+      .read[Map[String, Object]] getOrElse Map.empty
+    if (params.isEmpty) {
+      self.get(AadAuthCallbackKey) map (className => {
+        Class
+          .forName(className)
+          .getConstructor()
+          .newInstance()
+          .asInstanceOf[AadAuthenticationCallback]
+      })
+    } else {
+      self.get(AadAuthCallbackKey) map (className => {
+        Class
+          .forName(className)
+          .getConstructor(classOf[Map[String, Object]])
+          .newInstance(params)
+          .asInstanceOf[AadAuthenticationCallback]
+      })
+    }
+  }
+
+  /**
+   * set the parameter passed to the aad auth callback class in case it accepts parameters. The aad auth class should
+   * either accepts no parameters or accepts a properties bag(Map[String, Object]). This optional parameter can be used
+   * to pass authentication secrets to the aad auth callback class securely.
+   * More info about this: https://docs.microsoft.com/en-us/azure/event-hubs/authorize-access-azure-active-directory
+   *
+   * @param params The parameters passed to the aad authentication callback class. The parameters should be passed as a
+   *               sequence of Strings.
+   * @return the updated [[EventHubsConf]] instance
+   */
+  def setAadAuthCallbackParams(params: Map[String, Object]): EventHubsConf = {
+    set(AadAuthCallbackParamsKey, EventHubsConf.write[Map[String, Object]](params))
   }
 
   // The simulated client (and simulated eventhubs) will be used. These
@@ -536,14 +704,23 @@ object EventHubsConf extends Logging {
   val MaxRatePerPartitionKey = "eventhubs.maxRatePerPartition"
   val MaxRatesPerPartitionKey = "eventhubs.maxRatesPerPartition"
   val ReceiverTimeoutKey = "eventhubs.receiverTimeout"
+  val MaxSilentTimeKey = "eventhubs.maxSilentTime"
   val OperationTimeoutKey = "eventhubs.operationTimeout"
   val PrefetchCountKey = "eventhubs.prefetchCount"
   val ThreadPoolSizeKey = "eventhubs.threadPoolSize"
   val UseExclusiveReceiverKey = "eventhubs.useExclusiveReceiver"
   val MaxEventsPerTriggerKey = "maxEventsPerTrigger"
+  val MaxEventsPerTriggerKeyAlias = "eventhubs.maxEventsPerTrigger"
   val UseSimulatedClientKey = "useSimulatedClient"
   val MetricPluginKey = "eventhubs.metricPlugin"
   val PartitionPreferredLocationStrategyKey = "partitionPreferredLocationStrategy"
+  val SlowPartitionAdjustmentKey = "eventhubs.slowPartitionAdjustment"
+  val ThrottlingStatusPluginKey = "eventhubs.throttlingStatusPlugin"
+  val MaxAcceptableBatchReceiveTimeKey = "eventhubs.maxAcceptableBatchReceiveTime"
+  val UseAadAuthKey = "eventhubs.useAadAuth"
+  val AadAuthCallbackKey = "eventhubs.aadAuthCallback"
+  val AadAuthCallbackParamsKey = "eventhubs.AadAuthCallbackParams"
+  val DynamicPartitionDiscoveryKey = "eventhubs.DynamicPartitionDiscovery"
 
   /** Creates an EventHubsConf */
   def apply(connectionString: String) = new EventHubsConf(connectionString)

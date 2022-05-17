@@ -5,6 +5,12 @@ Hello! This connector supports Structured Streaming and Spark Streaming. For doc
 - [Structured Streaming + Event Hubs Integration Guide](structured-streaming-eventhubs-integration.md)
 - [Spark Streaming + Event Hubs Integration Guide](spark-streaming-eventhubs-integration.md)
 
+Also, you can read more about other features of this connector in below documents:
+
+- [Receive Key-Value Pairs from Events Sent using Event Hubs Kafka Endpoint](receive-events-sent-using-kafka-protocol.md)
+- [Spark Structured Streaming Adjustment for Slow Partitions](slow-partition-adjustment-feature.md)
+- [Use AAD Authentication to Connect Event Hubs](use-aad-authentication-to-connect-eventhubs.md)
+
 Additionally, here are some links to documentation on Event Hubs, Spark, and Databricks:
 
 - [Azure Event Hubs on Databricks](https://docs.azuredatabricks.net/spark/latest/data-sources/azure/eventhubs-connector.html)

@@ -40,12 +40,36 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.api.java.{ JavaInputDStream, JavaStreamingContext }
 import org.apache.spark.streaming.eventhubs.EventHubsDirectDStream
-import org.apache.spark.{ SparkContext, TaskContext }
+import org.apache.spark.{ SparkContext, SparkEnv, TaskContext }
+import org.apache.spark.rpc.RpcEndpointRef
+import org.apache.spark.util.RpcUtils
 
 /**
  * Helper to create Direct DStreams which consume events from Event Hubs.
  */
 object EventHubsUtils extends Logging {
+
+  var partitionPerformanceReceiverRef: RpcEndpointRef = null
+
+  private def createRpcEndpoint() = {
+    if (partitionPerformanceReceiverRef == null) {
+      try {
+        partitionPerformanceReceiverRef = RpcUtils.makeDriverRef(
+          PartitionPerformanceReceiver.ENDPOINT_NAME,
+          SparkEnv.get.conf,
+          SparkEnv.get.rpcEnv)
+        logInfo(
+          s"There is an existing partitionPerformanceReceiverRef on the driver, use that one rather than creating a new one")
+      } catch {
+        case e: Exception =>
+          val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
+          val partitionPerformanceReceiver: PartitionPerformanceReceiver =
+            new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
+          partitionPerformanceReceiverRef = SparkEnv.get.rpcEnv
+            .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
+      }
+    }
+  }
 
   /**
    * Creates a Direct DStream which consumes from  the Event Hubs instance
@@ -56,6 +80,7 @@ object EventHubsUtils extends Logging {
    * @return An [[EventHubsDirectDStream]]
    */
   def createDirectStream(ssc: StreamingContext, ehConf: EventHubsConf): EventHubsDirectDStream = {
+    createRpcEndpoint()
     new EventHubsDirectDStream(ssc, ehConf, EventHubsClient.apply)
   }
 
@@ -69,6 +94,7 @@ object EventHubsUtils extends Logging {
    */
   def createDirectStream(jssc: JavaStreamingContext,
                          ehConf: EventHubsConf): JavaInputDStream[EventData] = {
+    createRpcEndpoint()
     new JavaInputDStream(createDirectStream(jssc.ssc, ehConf))
   }
 
@@ -85,6 +111,7 @@ object EventHubsUtils extends Logging {
   def createRDD(sc: SparkContext,
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): EventHubsRDD = {
+    createRpcEndpoint()
     new EventHubsRDD(sc, ehConf.trimmed, offsetRanges)
   }
 
@@ -101,6 +128,7 @@ object EventHubsUtils extends Logging {
   def createRDD(jsc: JavaSparkContext,
                 ehConf: EventHubsConf,
                 offsetRanges: Array[OffsetRange]): JavaRDD[EventData] = {
+    createRpcEndpoint()
     new JavaRDD(createRDD(jsc.sc, ehConf, offsetRanges))
   }
 
@@ -133,6 +161,18 @@ object EventHubsUtils extends Logging {
     if (taskContext != null) {
       taskContext.taskAttemptId()
     } else -1
+  }
+
+  def getTaskContextSlim: TaskContextSlim = {
+    val taskContext = TaskContext.get()
+    if (taskContext != null) {
+      new TaskContextSlim(taskContext.stageId(),
+                          taskContext.taskAttemptId(),
+                          taskContext.partitionId(),
+                          SparkEnv.get.executorId)
+    } else {
+      new TaskContextSlim(-1, -1, -1, "")
+    }
   }
 
   def encode(inputStr: String): String = {

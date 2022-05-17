@@ -18,7 +18,7 @@
 package org.apache.spark.eventhubs.client
 
 import java.time.Duration
-import java.util.concurrent.TimeUnit
+import java.util.concurrent._
 
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.SparkEnv
@@ -29,14 +29,32 @@ import org.apache.spark.eventhubs.{
   EventHubsConf,
   EventHubsUtils,
   NameAndPartition,
-  SequenceNumber
+  SequenceNumber,
+  PartitionPerformanceReceiver
 }
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.RpcUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ Await, Awaitable, Future }
+import scala.concurrent.{ Await, Awaitable, Future, Promise }
+
+private[client] class CachedReceivedData (startSeqNo: SequenceNumber,
+                                          batchSize: Int,
+                                          cachedData: Seq[EventData]) {
+
+    def matchSeqNoAndBatchSize(reqStartSeqNo: SequenceNumber, reqBatchSize: Int): Boolean = {
+      if ((startSeqNo == reqStartSeqNo) && (batchSize == reqBatchSize)) {
+        return true
+      }
+        false
+    }
+
+    def getCachedDataIterator(): Iterator[EventData] = {
+      cachedData.iterator
+    }
+}
 
 private[spark] trait CachedReceiver {
   private[eventhubs] def receive(ehConf: EventHubsConf,
@@ -70,17 +88,22 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
   import org.apache.spark.eventhubs._
 
+  private lazy val namespaceUri: String = ehConf.namespaceUri
+  private lazy val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+
   private lazy val metricPlugin: Option[MetricPlugin] = ehConf.metricPlugin()
 
   private lazy val client: EventHubClient = ClientConnectionPool.borrowClient(ehConf)
 
   private var receiver: PartitionReceiver = createReceiver(startSeqNo)
 
+  private var cachedData: CachedReceivedData = new CachedReceivedData(-1, -1, null)
+
   private def createReceiver(seqNo: SequenceNumber): PartitionReceiver = {
     val taskId = EventHubsUtils.getTaskId
     logInfo(
-      s"(TID $taskId) creating receiver for Event Hub ${nAndP.ehName} on partition ${nAndP.partitionId}. seqNo: $seqNo")
-    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+      s"(TID $taskId) creating receiver for namespaceUri: $namespaceUri EventHubNameAndPartition: $nAndP " +
+        s"consumer group: $consumerGroup. seqNo: $seqNo")
     val receiverOptions = new ReceiverOptions
     receiverOptions.setReceiverRuntimeMetricEnabled(true)
     receiverOptions.setPrefetchCount(ehConf.prefetchCount.getOrElse(DefaultPrefetchCount))
@@ -112,8 +135,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       if (!receiver.getIsOpen && retryCount < RetryCount) {
         val taskId = EventHubsUtils.getTaskId
         logInfo(
-          s"(TID $taskId) receiver is not opened yet. Will retry {$retryCount} $nAndP, consumer group: ${ehConf.consumerGroup
-            .getOrElse(DefaultConsumerGroup)}")
+          s"(TID $taskId) receiver is not opened yet. Will retry {$retryCount} for namespaceUri: $namespaceUri " +
+            s"EventHubNameAndPartition: $nAndP consumer group: $consumerGroup")
 
         val retry = retryCount + 1
         after(WaitInterval.milliseconds)(receiveOneWithRetry(timeout, msg, retry))
@@ -128,7 +151,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
   }
 
   private def closeReceiver(): Future[Void] = {
-    retryJava(receiver.close(), "closing a receiver")
+    // Closing a PartitionReceiver is not a retryable operation: after the first call, it always
+    // returns the same CompletableFuture. Therefore, if it fails with a transient
+    // error, log and continue.
+    // val dummyResult = Future[Void](null)
+    val dummyResult = Promise[Void]()
+    dummyResult success null
+    retryJava(receiver.close(), "closing a receiver", replaceTransientErrors = dummyResult.future)
   }
 
   private def recreateReceiver(seqNo: SequenceNumber): Unit = {
@@ -143,8 +172,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiver = createReceiver(seqNo)
 
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
-    logInfo(s"(TID $taskId) Finished recreating a receiver for $nAndP, ${ehConf.consumerGroup
-      .getOrElse(DefaultConsumerGroup)}: $elapsedTimeMs ms")
+    logInfo(s"(TID $taskId) Finished recreating a receiver for namespaceUri: $namespaceUri EventHubNameAndPartition: " +
+      s"$nAndP consumer group: $consumerGroup: $elapsedTimeMs ms")
   }
 
   private def checkCursor(requestSeqNo: SequenceNumber): Future[Iterable[EventData]] = {
@@ -155,8 +184,9 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
 
     if ((lastReceivedSeqNo > -1 && lastReceivedSeqNo + 1 != requestSeqNo) ||
         !receiver.getIsOpen) {
-      logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
-        DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
+      logInfo(s"(TID $taskId) checkCursor. Recreating a receiver for namespaceUri: $namespaceUri " +
+        s"EventHubNameAndPartition: $nAndP consumer group: $consumerGroup. requestSeqNo: $requestSeqNo, " +
+        s"lastReceivedSeqNo: $lastReceivedSeqNo, isOpen: ${receiver.getIsOpen}")
 
       recreateReceiver(requestSeqNo)
     }
@@ -174,8 +204,8 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
       // First, we'll check for case (1).
 
       logInfo(
-        s"(TID $taskId) checkCursor. Recreating a receiver for $nAndP, ${ehConf.consumerGroup.getOrElse(
-          DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, receivedSeqNo: $receivedSeqNo")
+        s"(TID $taskId) checkCursor. Recreating a receiver for namespaceUri: $namespaceUri EventHubNameAndPartition:" +
+          s" $nAndP consumer group: $consumerGroup. requestSeqNo: $requestSeqNo, receivedSeqNo: $receivedSeqNo")
       recreateReceiver(requestSeqNo)
       val movedEvent = awaitReceiveMessage(
         receiveOne(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout), "checkCursor move"),
@@ -194,7 +224,6 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
             movedEvent
           }
         } else {
-          val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
           throw new IllegalStateException(
             s"In partition ${info.getPartitionId} of ${info.getEventHubPath}, with consumer group $consumerGroup, " +
               s"request seqNo $requestSeqNo is less than the received seqNo $receivedSeqNo. The earliest seqNo is " +
@@ -218,6 +247,15 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     val startTimeNs = System.nanoTime()
     def elapsedTimeNs = System.nanoTime() - startTimeNs
 
+    // first check if this call re-executes a stream that has already been received.
+    // This situation could happen if multiple actions or writers are using the
+    // same stream. In this case, we return the cached data.
+    if (cachedData.matchSeqNoAndBatchSize(requestSeqNo, batchSize)) {
+      logInfo(s"(TID $taskId) Returned data from cache for namespaceUri: $namespaceUri EventHubNameAndPartition: $nAndP " +
+        s"consumer group: $consumerGroup, requestSeqNo: $requestSeqNo, batchSize: $batchSize")
+      return cachedData.getCachedDataIterator()
+    }
+
     // Retrieve the events. First, we get the first event in the batch.
     // Then, if the succeeds, we collect the rest of the data.
     val first = Await.result(checkCursor(requestSeqNo), ehConf.internalOperationTimeout)
@@ -234,13 +272,26 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
                           requestSeqNo)
     // Combine and sort the data.
     val combined = first ++ theRest.flatten
-    val sorted = combined.toSeq
+    val sortedSeq = combined.toSeq
       .sortWith((e1, e2) =>
         e1.getSystemProperties.getSequenceNumber < e2.getSystemProperties.getSequenceNumber)
-      .iterator
 
+    cachedData = new CachedReceivedData(requestSeqNo, batchSize, sortedSeq)
+
+    val sorted = sortedSeq.iterator
     val (result, validate) = sorted.duplicate
     val elapsedTimeMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeNs)
+
+    // if slowPartitionAdjustment is on, send the partition performance for this batch to the driver
+    if (ehConf.slowPartitionAdjustment) {
+      sendPartitionPerformanceToDriver(
+        PartitionPerformanceMetric(nAndP,
+                                   EventHubsUtils.getTaskContextSlim,
+                                   requestSeqNo,
+                                   batchCount,
+                                   elapsedTimeMs))
+    }
+
     if (metricPlugin.isDefined) {
       val (validateSize, batchSizeInBytes) =
         validate
@@ -249,13 +300,18 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
             (countAndSize1._1 + countAndSize2._1, countAndSize1._2 + countAndSize2._2)
           }
           .getOrElse((0, 0L))
-      metricPlugin.foreach(_.onReceiveMetric(nAndP, batchCount, batchSizeInBytes, elapsedTimeMs))
+      metricPlugin.foreach(
+        _.onReceiveMetric(EventHubsUtils.getTaskContextSlim,
+                          nAndP,
+                          batchCount,
+                          batchSizeInBytes,
+                          elapsedTimeMs))
       assert(validateSize == batchCount)
     } else {
       assert(validate.size == batchCount)
     }
-    logInfo(s"(TID $taskId) Finished receiving for $nAndP, consumer group: ${ehConf.consumerGroup
-      .getOrElse(DefaultConsumerGroup)}, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
+    logInfo(s"(TID $taskId) Finished receiving for namespaceUri: $namespaceUri EventHubNameAndPartition: $nAndP " +
+      s"consumer group: $consumerGroup, batchSize: $batchSize, elapsed time: $elapsedTimeMs ms")
     result
   }
 
@@ -267,11 +323,27 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     } catch {
       case e: AwaitTimeoutException =>
         logError(
-          s"(TID $taskId) awaitReceiveMessage call failed with timeout. Event Hub $nAndP, ConsumerGroup ${ehConf.consumerGroup
-            .getOrElse(DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo")
+          s"(TID $taskId) awaitReceiveMessage call failed with timeout. NamespaceUri: $namespaceUri " +
+            s"EventHubNameAndPartition: $nAndP consumer group: $consumerGroup. requestSeqNo: $requestSeqNo")
 
         recreateReceiver(requestSeqNo)
         throw e
+    }
+  }
+
+  // send the partition perforamcne metric (elapsed time for receiving events in the batch) to the
+  // driver without waiting for any response.
+  private def sendPartitionPerformanceToDriver(partitionPerformance: PartitionPerformanceMetric) = {
+    logDebug(
+      s"(Task: ${EventHubsUtils.getTaskContextSlim}) sends PartitionPerformanceMetric: " +
+        s"${partitionPerformance} to the driver.")
+    try {
+      CachedEventHubsReceiver.partitionPerformanceReceiverRef.send(partitionPerformance)
+    } catch {
+      case e: Exception =>
+        logError(
+          s"(Task: ${EventHubsUtils.getTaskContextSlim}) failed to send the RPC message containing " +
+            s"PartitionPerformanceMetric: ${partitionPerformance} to the driver with error: ${e}.")
     }
   }
 }
@@ -283,9 +355,17 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
  */
 private[spark] object CachedEventHubsReceiver extends CachedReceiver with Logging {
 
+  private val startRecieverTimeNs = System.nanoTime()
+
   type MutableMap[A, B] = scala.collection.mutable.HashMap[A, B]
 
   private[this] val receivers = new MutableMap[String, CachedEventHubsReceiver]()
+
+  // RPC endpoint for partition performance communication in the executor
+  val partitionPerformanceReceiverRef =
+    RpcUtils.makeDriverRef(PartitionPerformanceReceiver.ENDPOINT_NAME,
+                           SparkEnv.get.conf,
+                           SparkEnv.get.rpcEnv)
 
   private def key(ehConf: EventHubsConf, nAndP: NameAndPartition): String = {
     (ehConf.connectionString + ehConf.consumerGroup + nAndP.partitionId).toLowerCase
@@ -297,15 +377,44 @@ private[spark] object CachedEventHubsReceiver extends CachedReceiver with Loggin
                                           batchSize: Int): Iterator[EventData] = {
     val taskId = EventHubsUtils.getTaskId
 
-    logInfo(s"(TID $taskId) EventHubsCachedReceiver look up. For $nAndP, ${ehConf.consumerGroup
-      .getOrElse(DefaultConsumerGroup)}. requestSeqNo: $requestSeqNo, batchSize: $batchSize")
+    logInfo(s"(TID $taskId) EventHubsCachedReceiver look up. For namespaceUri ${ehConf.namespaceUri} " +
+      s"EventHubNameAndPartition $nAndP consumer group ${ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)}. " +
+      s"requestSeqNo: $requestSeqNo, batchSize: $batchSize")
     var receiver: CachedEventHubsReceiver = null
     receivers.synchronized {
       receiver = receivers.getOrElseUpdate(key(ehConf, nAndP), {
         CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo)
       })
     }
-    receiver.receive(requestSeqNo, batchSize)
+    try {
+      receiver.receive(requestSeqNo, batchSize)
+    } catch {
+      case completionExecution: CompletionException =>
+        val exceptionCause = completionExecution.getCause
+        if (exceptionCause != null &&  exceptionCause.isInstanceOf[RejectedExecutionException] && exceptionCause.getMessage.contains("ReactorDispatcher instance is closed")) {
+          // reactor dispatcher closed case
+          logInfo(s"(TID $taskId) EventHubsCachedReceiver receive execution for namespaceUri ${ehConf.namespaceUri} " +
+            s"EventHubNameAndPartition $nAndP consumer group ${ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)} " +
+            s"failed with $completionExecution. Try to recreate the entire CachedEventHubsReceiver instance in order to " +
+            s"use a fresh EventHubClient from the underlying java SDK, then try receiving events again.")
+          receiver.client.close();
+          receiver = CachedEventHubsReceiver(ehConf, nAndP, requestSeqNo)
+          receivers.synchronized {
+            receivers.update(key(ehConf, nAndP), receiver)
+          }
+          receiver.receive(requestSeqNo, batchSize)
+        } else if (exceptionCause != null &&  exceptionCause.isInstanceOf[ReceiverDisconnectedException]) {
+          logInfo(s"(TID $taskId) EventHubsCachedReceiver receive execution for namespaceUri ${ehConf.namespaceUri} " +
+            s"EventHubNameAndPartition $nAndP consumer group ${ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)} " +
+            s"failed because another receiver for the same <NS-EH-CG-Part> combo has been created and caused this one " +
+            s"to get disconnected. The full error is: $completionExecution. Throw the exception so that the driver can " +
+            s"retry the task.")
+          throw completionExecution
+        } else {
+          throw completionExecution
+        }
+
+    }
   }
 
   def apply(ehConf: EventHubsConf,

@@ -45,6 +45,8 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.{ AnalysisException, DataFrame, SQLContext, SaveMode }
 import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.jackson.Serialization
+import org.apache.spark.rpc.RpcEndpointRef
+import org.apache.spark.SparkEnv
 
 import collection.JavaConverters._
 
@@ -140,6 +142,13 @@ private[sql] class EventHubsSourceProvider
 }
 
 private[sql] object EventHubsSourceProvider extends Serializable {
+  // RPC endpoint for partition performance communication in the driver
+  val partitionsStatusTracker = PartitionsStatusTracker.getPartitionStatusTracker
+  val partitionPerformanceReceiver: PartitionPerformanceReceiver =
+    new PartitionPerformanceReceiver(SparkEnv.get.rpcEnv, partitionsStatusTracker)
+  val partitionPerformanceReceiverRef: RpcEndpointRef = SparkEnv.get.rpcEnv
+    .setupEndpoint(PartitionPerformanceReceiver.ENDPOINT_NAME, partitionPerformanceReceiver)
+
   def eventHubsSchema: StructType = {
     StructType(
       Seq(
@@ -168,36 +177,52 @@ private[sql] object EventHubsSourceProvider extends Serializable {
               new java.sql.Timestamp(ed.getSystemProperties.getEnqueuedTime.toEpochMilli)),
             UTF8String.fromString(ed.getSystemProperties.getPublisher),
             UTF8String.fromString(ed.getSystemProperties.getPartitionKey),
+            ArrayBasedMapData(ed.getProperties.asScala
+              .mapValues {
+                case b: Binary =>
+                  val buf = b.asByteBuffer()
+                  val arr = new Array[Byte](buf.remaining)
+                  buf.get(arr)
+                  arr.asInstanceOf[AnyRef]
+                case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
+                case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
+                case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
+                case s: Symbol           => s.toString.asInstanceOf[AnyRef]
+                case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
+                case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
+                case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
+                case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
+                case c: Character        => c.toString.asInstanceOf[AnyRef]
+                case d: DescribedType    => d.getDescribed
+                case default             => default
+              }
+              .map { p =>
+                p._2 match {
+                  case s: String => UTF8String.fromString(p._1) -> UTF8String.fromString(s)
+                  case default =>
+                    UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                }
+              }),
             ArrayBasedMapData(
-              ed.getProperties.asScala
+              // Don't duplicate offset, enqueued time, and seqNo
+              (ed.getSystemProperties.asScala -- Seq(OffsetAnnotation,
+                                                     SequenceNumberAnnotation,
+                                                     EnqueuedTimeAnnotation))
                 .mapValues {
                   case b: Binary =>
                     val buf = b.asByteBuffer()
                     val arr = new Array[Byte](buf.remaining)
                     buf.get(arr)
                     arr.asInstanceOf[AnyRef]
-                  case d128: Decimal128    => d128.asBytes.asInstanceOf[AnyRef]
-                  case d32: Decimal32      => d32.getBits.asInstanceOf[AnyRef]
-                  case d64: Decimal64      => d64.getBits.asInstanceOf[AnyRef]
-                  case s: Symbol           => s.toString.asInstanceOf[AnyRef]
-                  case ub: UnsignedByte    => ub.toString.asInstanceOf[AnyRef]
-                  case ui: UnsignedInteger => ui.toString.asInstanceOf[AnyRef]
-                  case ul: UnsignedLong    => ul.toString.asInstanceOf[AnyRef]
-                  case us: UnsignedShort   => us.toString.asInstanceOf[AnyRef]
-                  case c: Character        => c.toString.asInstanceOf[AnyRef]
-                  case d: DescribedType    => d.getDescribed
-                  case default             => default
+                  case default => default
                 }
                 .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
-                }),
-            ArrayBasedMapData(
-              // Don't duplicate offset, enqueued time, and seqNo
-              (ed.getSystemProperties.asScala -- Seq(OffsetAnnotation,
-                                                     SequenceNumberAnnotation,
-                                                     EnqueuedTimeAnnotation))
-                .map { p =>
-                  UTF8String.fromString(p._1) -> UTF8String.fromString(Serialization.write(p._2))
+                  p._2 match {
+                    case s: String => UTF8String.fromString(p._1) -> UTF8String.fromString(s)
+                    case default =>
+                      UTF8String.fromString(p._1) -> UTF8String.fromString(
+                        Serialization.write(p._2))
+                  }
                 })
           )
         }

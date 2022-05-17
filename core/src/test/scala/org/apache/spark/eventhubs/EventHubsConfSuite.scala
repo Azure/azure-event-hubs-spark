@@ -17,10 +17,14 @@
 
 package org.apache.spark.eventhubs
 
+import org.apache.spark.eventhubs.utils.{
+  AadAuthenticationCallbackMock,
+  AadAuthenticationCallbackMockWithParams,
+  EventHubsTestUtils,
+  MetricPluginMock,
+  ThrottlingStatusPluginMock
+}
 import java.time.Duration
-import java.util.NoSuchElementException
-
-import org.apache.spark.eventhubs.utils.{ EventHubsTestUtils, MetricPluginMock }
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.{ read => sread }
@@ -91,9 +95,12 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(map(MaxRatePerPartitionKey).toRate == DefaultMaxRate)
     intercept[Exception] { map(MaxRatesPerPartitionKey) }
     intercept[Exception] { map(ReceiverTimeoutKey) }
+    intercept[Exception] { map(MaxSilentTimeKey) }
     intercept[Exception] { map(OperationTimeoutKey) }
     intercept[Exception] { map(MaxEventsPerTriggerKey) }
     assert(map(UseSimulatedClientKey).toBoolean)
+    intercept[Exception] { map(UseAadAuthKey) }
+    intercept[Exception] { map(AadAuthCallbackKey) }
   }
 
   test("toConf") {
@@ -113,7 +120,9 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
         StartingPositionsKey -> Serialization.write(expectedPositions.map {
           case (k, v) => k.toString -> v
         }),
-        MaxEventsPerTriggerKey -> 4.toString
+        MaxEventsPerTriggerKey -> 4.toString,
+        UseAadAuthKey -> "true",
+        AadAuthCallbackKey -> classOf[AadAuthenticationCallbackMock].getName
       ))
 
     val expectedConf = EventHubsConf(expectedConnStr)
@@ -121,6 +130,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setStartingPosition(expectedPosition)
       .setStartingPositions(expectedPositions)
       .setMaxEventsPerTrigger(4L)
+      .setAadAuthCallback(new AadAuthenticationCallbackMock())
 
     assert(expectedConf.equals(actualConf))
   }
@@ -218,6 +228,15 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     assert(idField.getInt(actualListener) == expectedListener.id)
   }
 
+  test("throttlingStatusPlugin set/get") {
+    val expectedListener = new ThrottlingStatusPluginMock
+    val conf = testUtils.getEventHubsConf().setThrottlingStatusPlugin(expectedListener)
+    val actualListener = conf.throttlingStatusPlugin.get
+    val idField = actualListener.getClass.getDeclaredField("id")
+    idField.setAccessible(true)
+    assert(idField.getInt(actualListener) == expectedListener.id)
+  }
+
   test("trimmedConfig") {
     val originalConf = testUtils
       .getEventHubsConf()
@@ -229,9 +248,11 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
       .setMaxRatesPerPartition(Map(NameAndPartition("foo", 0) -> 12))
       .setMaxEventsPerTrigger(100)
       .setReceiverTimeout(Duration.ofSeconds(10))
+      .setMaxSilentTime(Duration.ofSeconds(60))
       .setOperationTimeout(Duration.ofSeconds(10))
       .setThreadPoolSize(16)
       .setPrefetchCount(100)
+      .setAadAuthCallback(new AadAuthenticationCallbackMock())
       .setUseExclusiveReceiver(true)
 
     val newConf = originalConf.trimmed
@@ -246,12 +267,15 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     originalConf("eventhubs.maxRatePerPartition")
     originalConf("eventhubs.maxRatesPerPartition")
     originalConf("eventhubs.receiverTimeout")
+    originalConf("eventhubs.maxSilentTime")
     originalConf("eventhubs.operationTimeout")
     originalConf("eventhubs.prefetchCount")
     originalConf("eventhubs.threadPoolSize")
     originalConf("eventhubs.useExclusiveReceiver")
     originalConf("maxEventsPerTrigger")
     originalConf("useSimulatedClient")
+    originalConf("eventhubs.useAadAuth")
+    originalConf("eventhubs.aadAuthCallback")
 
     // newConf should be trimmed
     newConf("eventhubs.connectionString")
@@ -263,6 +287,7 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
     intercept[NoSuchElementException] { newConf("eventhubs.maxRatePerPartition") }
     intercept[NoSuchElementException] { newConf("eventhubs.maxRatesPerPartition") }
     newConf("eventhubs.receiverTimeout")
+    newConf("eventhubs.maxSilentTime")
     newConf("eventhubs.operationTimeout")
     newConf("eventhubs.prefetchCount")
     newConf("eventhubs.threadPoolSize")
@@ -322,5 +347,62 @@ class EventHubsConfSuite extends FunSuite with BeforeAndAfterAll {
 
     eventHubConfig.setOperationTimeout(Duration.ofMinutes(3))
     assert(eventHubConfig.operationTimeout.get.toMinutes == 3)
+  }
+
+  test("validate - max silent time") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+    intercept[IllegalArgumentException] {
+      eventHubConfig.setMaxSilentTime(Duration.ofSeconds(29))
+    }
+
+    eventHubConfig.setMaxSilentTime(Duration.ofMinutes(1))
+    assert(eventHubConfig.maxSilentTime.get.toMinutes == 1)
+  }
+
+  test("validate - slow partition adjustment config") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+
+    // check the default value. It should be DefaultSlowPartitionAdjustment = false
+    assert(
+      eventHubConfig.slowPartitionAdjustment ==
+        DefaultSlowPartitionAdjustment.toBoolean)
+
+    val expectedSlowPartionAdjustment = true
+    eventHubConfig.setSlowPartitionAdjustment(expectedSlowPartionAdjustment)
+    val actualSlowPartionAdjustment = eventHubConfig.slowPartitionAdjustment
+    assert(expectedSlowPartionAdjustment == actualSlowPartionAdjustment)
+  }
+
+  test("validate - max acceptable batch receive time config") {
+    val eventHubConfig = testUtils.getEventHubsConf()
+    val expectedTime = Duration.ofSeconds(20)
+    eventHubConfig.setMaxAcceptableBatchReceiveTime(expectedTime)
+    val actualTime = eventHubConfig.maxAcceptableBatchReceiveTime.get
+    assert(expectedTime == actualTime)
+  }
+
+  test("validate - AadAuthenticationCallback") {
+    val aadAuthCallback = new AadAuthenticationCallbackMock()
+    val eventHubConfig = testUtils
+      .getEventHubsConf()
+      .setAadAuthCallback(aadAuthCallback)
+
+    val actualCallback = eventHubConfig.aadAuthCallback()
+    assert(eventHubConfig.useAadAuth)
+    assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMock])
+  }
+
+  test("validate - AadAuthenticationCallbackWithParams") {
+    val params: Map[String, String] = Map("authority" -> "passed-tenant-id")
+    val aadAuthCallbackWithParams = new AadAuthenticationCallbackMockWithParams(params)
+    val eventHubConfig = testUtils
+      .getEventHubsConf()
+      .setAadAuthCallback(aadAuthCallbackWithParams)
+      .setAadAuthCallbackParams(params)
+
+    val actualCallback = eventHubConfig.aadAuthCallback()
+    assert(eventHubConfig.useAadAuth)
+    assert(actualCallback.get.isInstanceOf[AadAuthenticationCallbackMockWithParams])
+    assert(actualCallback.get.authority == "passed-tenant-id")
   }
 }

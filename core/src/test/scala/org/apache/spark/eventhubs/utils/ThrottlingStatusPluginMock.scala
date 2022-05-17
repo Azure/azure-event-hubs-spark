@@ -17,22 +17,26 @@
 
 package org.apache.spark.eventhubs.utils
 
-import org.apache.spark.eventhubs.{ NameAndPartition, Rate, SequenceNumber, TaskContextSlim }
+import java.net.URI
 
-class MetricPluginMock extends MetricPlugin {
+import org.apache.spark.eventhubs.{ NameAndPartition, PartitionContext }
+import org.apache.spark.eventhubs.rdd.OffsetRange
+import scala.collection.mutable
+
+class ThrottlingStatusPluginMock extends ThrottlingStatusPlugin {
 
   val id = 1
 
-  override def onReceiveMetric(taskContextSlim: TaskContextSlim,
-                               partitionInfo: NameAndPartition,
-                               batchCount: Rate,
-                               batchSizeInBytes: SequenceNumber,
-                               elapsedTimeInMillis: SequenceNumber): Unit = {}
+  override def onBatchCreation(
+      partitionContext: PartitionContext,
+      nextBatchLocalId: Long,
+      nextBatchOffsetRanges: Array[OffsetRange],
+      partitionsThrottleFactor: mutable.Map[NameAndPartition, Double]): Unit = {}
 
-  override def onSendMetric(taskContextSlim: TaskContextSlim,
-                            eventHubName: String,
-                            batchCount: Rate,
-                            batchSizeInBytes: SequenceNumber,
-                            elapsedTimeInMillis: SequenceNumber,
-                            isSuccess: Boolean): Unit = {}
+  override def onPartitionsPerformanceStatusUpdate(
+      partitionContext: PartitionContext,
+      latestUpdatedBatchLocalId: Long,
+      partitionsBatchSizes: Map[NameAndPartition, Int],
+      partitionsBatchReceiveTimeMS: Map[NameAndPartition, Long],
+      partitionsPerformancePercentages: Option[Map[NameAndPartition, Double]]): Unit = {}
 }

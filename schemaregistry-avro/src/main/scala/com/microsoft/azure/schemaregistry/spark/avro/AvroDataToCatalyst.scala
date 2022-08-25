@@ -82,7 +82,7 @@ case class AvroDataToCatalyst(
   } catch {
       case NonFatal(e) => parseMode match {
         case PermissiveMode => //nullResultRow
-          throw new Exception(s"nave Permissive --> error message is $e")
+          nullResultRow
         case FailFastMode =>
           throw new Exception("Malformed records are detected in record parsing. " +
             s"Current parse Mode: ${FailFastMode.name}. To process malformed records as null " +
@@ -101,4 +101,6 @@ case class AvroDataToCatalyst(
       s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
   }
 
+  override protected def withNewChildInternal(newChild: Expression): AvroDataToCatalyst =
+    copy(child = newChild)
 }

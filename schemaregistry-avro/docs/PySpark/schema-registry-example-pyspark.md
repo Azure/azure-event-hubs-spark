@@ -44,9 +44,9 @@ from JVM properly.
 ```python
 from pyspark.sql.column import Column, _to_java_column
 
-def from_avro(col, propMap, configMap):
+def from_avro(col, schemaGuidObj, configs):
     jf = getattr(sc._jvm.com.microsoft.azure.schemaregistry.spark.avro.functions, "from_avro")
-    return Column(jf(_to_java_column(col), propMap, configMap))
+    return Column(jf(_to_java_column(col), schemaGuidObj, configs))
 ```
 
 ### Consumer Example: Using `from_avro`
@@ -75,7 +75,9 @@ df = spark.read.format("eventhubs").options(**ehConf).load()
 ```
 
 #### Create a Schema Registry Object
-In case you want to set `failure.mode` options, you should set their corresponding values in the property map. 
+In case you want to set `failure.mode` options, you should set their corresponding values in the configuration map as below:
+configs.put("failure.mode", PermissiveMode.name) or configs.put("failure.mode", FailFastMode.name) 
+ 
 For more information about these options please refer to the [schema registry README](../../README.md) file.
 
 ```python
@@ -95,6 +97,6 @@ configs.put("schema.registry.client.secret", schemaRegistryClientSecret)
 ```python
 schemaGUID = "<YOUR_SCHEMA_GUID>"
 schemaGuidObj = sc._jvm.com.microsoft.azure.schemaregistry.spark.avro.SchemaGUID(schemaGUID)
-parsed_df = df.withColumn("jsondata", from_avro(df.body, schemaGuidObj, properties)).select("jsondata")
+parsed_df = df.withColumn("jsondata", from_avro(df.body, schemaGuidObj, configs)).select("jsondata")
 ds = parsed_df.select("jsondata.id", "jsondata.amount", "jsondata.description").write.format("console").save()
 ```

@@ -25,14 +25,11 @@ The JAR can then be uploaded without additional required dependencies in your en
 
 ## Environment Support
 
-|Environment|Package Version|
-|-------------|----------------|
-|Databricks Runtime 10.X|azure-schemaregistry-spark-avro-1.0.0|
-|Databricks Runtime 9.X|azure-schemaregistry-spark-avro-1.0.0|
-|Databricks Runtime 7.X|azure-schemaregistry-spark-avro-1.0.0|
-|Synapse Spark pool 3.1|azure-schemaregistry-spark-avro-1.0.0|
-|Synapse Spark pool 3.2|azure-schemaregistry-spark-avro-1.0.0|
-
+| Environment             |Package Version|
+|-------------------------|----------------|
+| Databricks Runtime 11.X |azure-schemaregistry-spark-avro-1.0.0|
+| Databricks Runtime 10.X |azure-schemaregistry-spark-avro-1.0.0|
+| Synapse Spark pool 3.2  |azure-schemaregistry-spark-avro-1.0.0|
 
 ## Available API
 
@@ -46,10 +43,11 @@ Below you can find more info about available APIs:
    */
   def from_avro(
        data: Column,
+       schemaId: SchemaGUID,
        clientOptions: java.util.Map[String, String]): Column
 ```
 
-You can find examples of how to use the above APIs in 
+You can find examples of how to use the above APIs in [schema-registry-example](docs/schema-registry-example.md) or [schema-registry-example for pyspark](docs/PySpark/schema-registry-example-pyspark.md) file.
 
 ## Failure Modes
 
@@ -57,7 +55,7 @@ Two modes will be supported as dictated by Spark SQL -
 - `FailFastMode` - fail on catching any exception
 - `PermissiveMode` - continue processing if parsing exceptions are caught
 
-You can configure the stream with specific failure mode using the `failure.mode` key in the properties map. The default failure mode is `FailFastMode` to prevent perceived data loss with `PermissiveMode`.
+You can configure the stream with specific failure mode using the `failure.mode` key in the configuration map. The default failure mode is `FailFastMode` to prevent perceived data loss with `PermissiveMode`.
 
 See also:
 - aka.ms/schemaregistry

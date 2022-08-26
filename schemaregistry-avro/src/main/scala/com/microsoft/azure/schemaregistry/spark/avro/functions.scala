@@ -36,9 +36,6 @@ object functions {
   val SCHEMA_REGISTRY_CLIENT_ID_KEY: String = "schema.registry.client.id"
   val SCHEMA_REGISTRY_CLIENT_SECRET_KEY: String = "schema.registry.client.secret"
   val SCHEMA_REGISTRY_URL: String = "schema.registry.url"
-  val SCHEMA_GROUP_KEY: String = "schema.group"
-  val SCHEMA_NAME_KEY: String = "schema.name"
-  val SCHEMA_PARSE_MODE: String = "failure.mode"
 
   /***
    * Converts Spark SQL Column containing SR payloads into its corresponding catalyst value.
@@ -47,7 +44,7 @@ object functions {
    *
    * @param data column with SR payloads
    * @param schemaId The GUID of the expected schema.
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast) and schema exact match flag
+   * @param clientOptions map of configuration properties
    */
   def from_avro(
        data: Column,

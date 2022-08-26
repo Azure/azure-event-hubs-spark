@@ -75,10 +75,6 @@ df = spark.read.format("eventhubs").options(**ehConf).load()
 ```
 
 #### Create a Schema Registry Object
-In case you want to set `failure.mode` options, you should set their corresponding values in the configuration map as below:
-configs.put("failure.mode", PermissiveMode.name) or configs.put("failure.mode", FailFastMode.name) 
- 
-For more information about these options please refer to the [schema registry README](../../README.md) file.
 
 ```python
 schemaRegistryURL = "http://<YOUR_NAMESPACE>.servicebus.windows.net"

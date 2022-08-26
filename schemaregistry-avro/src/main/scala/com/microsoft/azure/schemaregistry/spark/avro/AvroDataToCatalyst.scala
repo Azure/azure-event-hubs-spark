@@ -17,23 +17,19 @@
 
 package com.microsoft.azure.schemaregistry.spark.avro
 
-//import com.azure.core.models.MessageContent
 import com.azure.core.util.BinaryData
 import com.azure.core.util.serializer.TypeReference
 import org.apache.avro.generic.GenericRecord
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
-import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, SpecificInternalRow, UnaryExpression}
-import org.apache.spark.sql.catalyst.util.{FailFastMode, ParseMode, PermissiveMode}
+import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
 import org.apache.spark.sql.types._
-
-import scala.util.control.NonFatal
 
 case class AvroDataToCatalyst(
      child: Expression,
      schemaId: String,
      options: Map[java.lang.String, java.lang.String])
-  extends UnaryExpression with ExpectsInputTypes with Logging {
+  extends UnaryExpression with ExpectsInputTypes with Logging{
 
   override def inputTypes: Seq[BinaryType] = Seq(BinaryType)
 
@@ -50,47 +46,23 @@ case class AvroDataToCatalyst(
     new AvroDeserializer(schemaRegistryConstructor.expectedSchema, dataType)
   }
 
-  @transient private lazy val parseMode: ParseMode = {
-    val modeStr = schemaRegistryConstructor.options.getOrElse(functions.SCHEMA_PARSE_MODE, FailFastMode.name)
-    val mode = ParseMode.fromString(modeStr)
-    if (mode != PermissiveMode && mode != FailFastMode) {
-      throw new IllegalArgumentException(mode + " parse mode not supported.")
-    }
-    mode
-  }
-
-  @transient private lazy val nullResultRow: Any = dataType match {
-    case st: StructType =>
-      val resultRow = new SpecificInternalRow(st.map(_.dataType))
-      for(i <- 0 until st.length) {
-        resultRow.setNullAt(i)
-      }
-      resultRow
-
-    case _ =>
-      null
-  }
-
   override def nullSafeEval(input: Any): Any = {
-      val message = new com.azure.core.models.MessageContent()
-        .setBodyAsBinaryData(BinaryData.fromBytes(input.asInstanceOf[Array[Byte]]))
-        .setContentType(("avro/binary+"+schemaRegistryConstructor.schemaId))
-      val genericRecord = schemaRegistryConstructor.serializer.deserialize(message, TypeReference.createInstance(classOf[GenericRecord]))
+    val message = new com.azure.core.models.MessageContent()
+      .setBodyAsBinaryData(BinaryData.fromBytes(input.asInstanceOf[Array[Byte]]))
+      .setContentType(("avro/binary+"+schemaRegistryConstructor.schemaId))
+    val genericRecord = schemaRegistryConstructor.serializer.deserialize(message, TypeReference.createInstance(classOf[GenericRecord]))
+    logInfo("Finished deserializing Message Content")
 
     try {
+      logInfo("Deserializing Avro data to Catalyst data")
       avroConverter.deserialize(genericRecord)
-  } catch {
-      case NonFatal(e) => parseMode match {
-        case PermissiveMode => //nullResultRow
-          nullResultRow
-        case FailFastMode =>
-          throw new Exception("Malformed records are detected in record parsing. " +
-            s"Current parse Mode: ${FailFastMode.name}. To process malformed records as null " +
-            "result, try setting the option 'mode' as 'PERMISSIVE'.", e)
-        case _ =>
-          throw new Exception(s"Unknown parse mode: ${parseMode.name}")
+    } catch {
+      case e:Throwable =>
+      {
+        throw new DeserializationException("Failed to deserialize, error message: \n" + e)
       }
-    }
+      case e => logInfo(s"Error Message: ${e.getMessage}")
+      }
   }
 
   override def prettyName: String = "from_avro"

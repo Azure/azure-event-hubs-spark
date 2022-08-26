@@ -18,3 +18,4 @@
 package com.microsoft.azure.schemaregistry.spark.avro
 
 final case class MissingPropertyException(private val message: String) extends Exception(message) {}
+final case class DeserializationException(private val message: String) extends Exception(message) {}

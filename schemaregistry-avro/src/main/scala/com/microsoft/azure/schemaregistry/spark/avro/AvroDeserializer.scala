@@ -32,7 +32,7 @@ import org.apache.avro.util.Utf8
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{SpecificInternalRow, UnsafeArrayData}
-import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, ArrayData, DateTimeUtils, GenericArrayData, DateTimeConstants}
+import org.apache.spark.sql.catalyst.util.{ArrayBasedMapData, ArrayData, GenericArrayData, DateTimeConstants}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 

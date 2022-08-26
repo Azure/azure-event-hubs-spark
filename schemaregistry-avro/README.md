@@ -33,13 +33,13 @@ The JAR can then be uploaded without additional required dependencies in your en
 
 ## Available API
 
-Both `from_avro` functions can be used by either providing the schema GUID or the schema itself. Note that if you are providing the schema GUID it should be wrapped in a SchemaGUID object. 
-Below you can find more info about available APIs:
+`from_avro` function can be used by providing the schema GUID. Note that if you are providing the schema GUID it should be wrapped in a SchemaGUID object.
+Below you can find more info about the available API:
 
 ```scala
   /**
    * @param data column with SR payloads
-   * @param clientOptions map of configuration properties, including Spark run mode (permissive vs. fail-fast) and schema exact match flag
+   * @param clientOptions map of configuration properties
    */
   def from_avro(
        data: Column,
@@ -48,14 +48,6 @@ Below you can find more info about available APIs:
 ```
 
 You can find examples of how to use the above APIs in [schema-registry-example](docs/schema-registry-example.md) or [schema-registry-example for pyspark](docs/PySpark/schema-registry-example-pyspark.md) file.
-
-## Failure Modes
-
-Two modes will be supported as dictated by Spark SQL - 
-- `FailFastMode` - fail on catching any exception
-- `PermissiveMode` - continue processing if parsing exceptions are caught
-
-You can configure the stream with specific failure mode using the `failure.mode` key in the configuration map. The default failure mode is `FailFastMode` to prevent perceived data loss with `PermissiveMode`.
 
 See also:
 - aka.ms/schemaregistry

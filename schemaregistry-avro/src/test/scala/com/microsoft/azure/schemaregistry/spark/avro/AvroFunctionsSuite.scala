@@ -24,8 +24,6 @@ import scala.collection.JavaConverters._
 
 class AvroFunctionsSuite extends QueryTest with SharedSparkSession {
 
-  import testImplicits._
-
   test("from_avro do not handle null column") {
     try {
       functions.from_avro(null, null, null)

@@ -61,12 +61,6 @@ val df = spark.
 
 #### Create a Schema Registry Object
 
-In case you want to set `failure.mode` options, you should set their corresponding values in the configuration map as below:
-import org.apache.spark.sql.catalyst.util.{FailFastMode, PermissiveMode}
-configs.put(SCHEMA_PARSE_MODE,PermissiveMode.name) or configs.put(SCHEMA_PARSE_MODE,FailFastMode.name)
-
-For more information about these options please refer to the [schema registry README](../README.md) file.
-
 ```scala
 import com.microsoft.azure.schemaregistry.spark.avro.functions._
 import java.util._

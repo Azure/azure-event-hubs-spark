@@ -22,11 +22,11 @@ import com.azure.data.schemaregistry.apacheavro.SchemaRegistryApacheAvroSerializ
 import com.azure.identity.ClientSecretCredentialBuilder
 import com.microsoft.azure.schemaregistry.spark.avro.functions._
 import org.apache.avro.Schema
-import org.apache.spark.sql.types._
+import sun.java2d.marlin.MarlinUtils.logInfo
 
 class SchemaRegistryConstructor(
      var schemaId: String,
-     val options: Map[java.lang.String, java.lang.String]) {
+     val options: Map[java.lang.String, java.lang.String]){
 
   @transient private lazy val schemaRegistryCredential = new ClientSecretCredentialBuilder()
         .tenantId(options.getOrElse(SCHEMA_REGISTRY_TENANT_ID_KEY, null))
@@ -41,12 +41,12 @@ class SchemaRegistryConstructor(
 
   @transient lazy val serializer =  new SchemaRegistryApacheAvroSerializerBuilder()
         .schemaRegistryClient(schemaRegistryAsyncClient)
-        .schemaGroup(options.getOrElse(SCHEMA_GROUP_KEY, null))
         .buildSerializer()
 
   var expectedSchemaString: String = "NOTHING"
 
   def setSchemaString  = {
+    logInfo("Setting up schema description")
     val schemaRegistrySchema = schemaRegistryAsyncClient.getSchema(schemaId).block()
     expectedSchemaString = schemaRegistrySchema.getDefinition
   }
@@ -60,6 +60,7 @@ object SchemaRegistryConstructor {
   def init(
         schemaId: String,
         options: Map[java.lang.String, java.lang.String]) : SchemaRegistryConstructor = {
+
     // check for null schema guid
     if(schemaId == null){
       throw new NullPointerException("Schema Id cannot be null.")
@@ -68,6 +69,7 @@ object SchemaRegistryConstructor {
     validateOptions(options)
     val schemaRegistryConstructor = new SchemaRegistryConstructor(schemaId, options)
     schemaRegistryConstructor.setSchemaString
+    logInfo(s"Created schemaRegistryConstructor using ${options.getOrElse(SCHEMA_REGISTRY_URL, null)}")
     schemaRegistryConstructor
   }
 
@@ -89,17 +91,6 @@ object SchemaRegistryConstructor {
     if(!options.contains(SCHEMA_REGISTRY_URL)) {
       throw new MissingPropertyException(s"schemaRegistryClient requires the endpoint url. Please provide the " +
         s"endpoint url in the properties, using the $SCHEMA_REGISTRY_URL key.")
-    }
-  }
-
-  private def schemaGroupAndNameAreSet(options: Map[java.lang.String, java.lang.String]) = {
-    if(!options.contains(SCHEMA_GROUP_KEY)) {
-      throw new MissingPropertyException(s"schemaRegistryClient requires the schema group to get the schema Guid. " +
-        s"Please provide the schema group in the properties, using the $SCHEMA_GROUP_KEY key.")
-    }
-    if(!options.contains(SCHEMA_NAME_KEY)) {
-      throw new MissingPropertyException(s"schemaRegistryClient requires the schema name to get the schema Guid. " +
-        s"Please provide the schema name in the properties, using the $SCHEMA_NAME_KEY key.")
     }
   }
 }

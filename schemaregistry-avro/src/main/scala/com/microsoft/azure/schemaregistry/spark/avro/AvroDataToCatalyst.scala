@@ -20,6 +20,7 @@ package com.microsoft.azure.schemaregistry.spark.avro
 import com.azure.core.util.BinaryData
 import com.azure.core.util.serializer.TypeReference
 import org.apache.avro.generic.GenericRecord
+import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
@@ -62,7 +63,7 @@ case class AvroDataToCatalyst(
     } catch {
       case e:Exception =>
       {
-        logError(s"TID $taskId Failed to deserialize Avro data to Catalyst data. \nThe schema description is: ${schemaRegistryConstructor.expectedSchema}. \nError Message: ${e.getMessage}. \nCall stack: ${e.getStackTrace}")
+        logError(s"TID $taskId Failed to deserialize Avro data to Catalyst data. \nThe schema description is: ${schemaRegistryConstructor.expectedSchema}. \nError Message: ${e.getMessage}. \nCall stack: ${ExceptionUtils.getStackTrace(e)}")
         throw new DeserializationException("Failed to deserialize, error: \n" + e)
       }
     }

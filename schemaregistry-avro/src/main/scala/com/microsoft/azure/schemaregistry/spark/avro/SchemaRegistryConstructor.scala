@@ -22,6 +22,7 @@ import com.azure.data.schemaregistry.apacheavro.SchemaRegistryApacheAvroSerializ
 import com.azure.identity.ClientSecretCredentialBuilder
 import com.microsoft.azure.schemaregistry.spark.avro.functions._
 import org.apache.avro.Schema
+import org.apache.spark.TaskContext
 import sun.java2d.marlin.MarlinUtils.logInfo
 
 class SchemaRegistryConstructor(
@@ -46,8 +47,9 @@ class SchemaRegistryConstructor(
   var expectedSchemaString: String = "NOTHING"
 
   def setSchemaString  = {
-    logInfo("Setting up schema description")
+    logInfo(s"Setting up schema description using schemaID $schemaId")
     val schemaRegistrySchema = schemaRegistryAsyncClient.getSchema(schemaId).block()
+    logInfo(s"The schema description is ${schemaRegistrySchema.getDefinition}")
     expectedSchemaString = schemaRegistrySchema.getDefinition
   }
 
@@ -69,8 +71,17 @@ object SchemaRegistryConstructor {
     validateOptions(options)
     val schemaRegistryConstructor = new SchemaRegistryConstructor(schemaId, options)
     schemaRegistryConstructor.setSchemaString
-    logInfo(s"Created schemaRegistryConstructor using ${options.getOrElse(SCHEMA_REGISTRY_URL, null)}")
+
+    val taskId = SchemaRegistryConstructor.getTaskId
+    logInfo(s"TID $taskId creates schemaRegistryConstructor using schema registry URL: ${options.getOrElse(SCHEMA_REGISTRY_URL, null)}")
     schemaRegistryConstructor
+  }
+
+  def getTaskId: Long = {
+    val taskContext = TaskContext.get()
+    if (taskContext != null) {
+      taskContext.taskAttemptId()
+    } else -1
   }
 
   private def validateOptions(

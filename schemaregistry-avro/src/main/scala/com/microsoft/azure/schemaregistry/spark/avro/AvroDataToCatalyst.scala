@@ -20,6 +20,7 @@ package com.microsoft.azure.schemaregistry.spark.avro
 import com.azure.core.util.BinaryData
 import com.azure.core.util.serializer.TypeReference
 import org.apache.avro.generic.GenericRecord
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
@@ -47,22 +48,24 @@ case class AvroDataToCatalyst(
   }
 
   override def nullSafeEval(input: Any): Any = {
+    val taskId = AvroDataToCatalyst.getTaskId
     val message = new com.azure.core.models.MessageContent()
       .setBodyAsBinaryData(BinaryData.fromBytes(input.asInstanceOf[Array[Byte]]))
       .setContentType(("avro/binary+"+schemaRegistryConstructor.schemaId))
-    val genericRecord = schemaRegistryConstructor.serializer.deserialize(message, TypeReference.createInstance(classOf[GenericRecord]))
-    logInfo("Finished deserializing Message Content")
 
     try {
-      logInfo("Deserializing Avro data to Catalyst data")
+      logDebug(s"TID $taskId deserializing Message Content with schemaID ${schemaRegistryConstructor.schemaId}")
+      val genericRecord = schemaRegistryConstructor.serializer.deserialize(message, TypeReference.createInstance(classOf[GenericRecord]))
+
+      logDebug(s"TID $taskId deserializing Avro data to Catalyst data")
       avroConverter.deserialize(genericRecord)
     } catch {
-      case e:Throwable =>
+      case e:Exception =>
       {
-        throw new DeserializationException("Failed to deserialize, error message: \n" + e)
+        logError(s"TID $taskId Failed to deserialize Avro data to Catalyst data. \nThe schema description is: ${schemaRegistryConstructor.expectedSchema}. \nError Message: ${e.getMessage}. \nCall stack: ${e.getStackTrace}")
+        throw new DeserializationException("Failed to deserialize, error: \n" + e)
       }
-      case e => logInfo(s"Error Message: ${e.getMessage}")
-      }
+    }
   }
 
   override def prettyName: String = "from_avro"
@@ -75,4 +78,13 @@ case class AvroDataToCatalyst(
 
   override protected def withNewChildInternal(newChild: Expression): AvroDataToCatalyst =
     copy(child = newChild)
+}
+
+object AvroDataToCatalyst {
+  def getTaskId: Long = {
+    val taskContext = TaskContext.get()
+    if (taskContext != null) {
+      taskContext.taskAttemptId()
+    } else -1
+  }
 }

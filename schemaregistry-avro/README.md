@@ -23,13 +23,24 @@ mvn clean compile assembly:assembly
 
 The JAR can then be uploaded without additional required dependencies in your environment.  If using `spark-submit`, use the `--jars` option to submit the path of the custom JAR.
 
-## Environment Support
+## Latest Releases
 
-| Environment             |Package Version|
+#### Spark
+| Environment |Package Name|
+|-------------|------------|
+|Spark 3.2 |azure-schemaregistry-spark-avro-1.0.0|
+
+#### Databricks
+| Environment |Package Name|
 |-------------------------|----------------|
 | Databricks Runtime 11.X |azure-schemaregistry-spark-avro-1.0.0|
 | Databricks Runtime 10.X |azure-schemaregistry-spark-avro-1.0.0|
-| Synapse Spark pool 3.2  |azure-schemaregistry-spark-avro-1.0.0|
+
+
+#### Synapse
+| Environment |Package Name|
+|-------------|------------|
+| Synapse Spark pool 3.2 |azure-schemaregistry-spark-avro-1.0.0|
 
 ## Available API
 

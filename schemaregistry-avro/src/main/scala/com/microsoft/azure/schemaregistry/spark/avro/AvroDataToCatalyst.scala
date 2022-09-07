@@ -63,7 +63,7 @@ case class AvroDataToCatalyst(
     } catch {
       case e:Exception =>
       {
-        logError(s"TID $taskId Failed to deserialize Avro data to Catalyst data. \nThe schema description is: ${schemaRegistryConstructor.expectedSchema}. \nError Message: ${e.getMessage}. \nCall stack: ${ExceptionUtils.getStackTrace(e)}")
+        logError(s"TID $taskId Failed to deserialize Avro data to Catalyst data. \nThe schemaID is: ${schemaRegistryConstructor.schemaId}. \nError Message: ${e.getMessage}. \nCall stack: ${ExceptionUtils.getStackTrace(e)}")
         throw new DeserializationException("Failed to deserialize, error: \n" + e)
       }
     }

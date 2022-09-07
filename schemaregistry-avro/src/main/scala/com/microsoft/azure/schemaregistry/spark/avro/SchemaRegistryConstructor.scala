@@ -23,11 +23,12 @@ import com.azure.identity.ClientSecretCredentialBuilder
 import com.microsoft.azure.schemaregistry.spark.avro.functions._
 import org.apache.avro.Schema
 import org.apache.spark.TaskContext
-import sun.java2d.marlin.MarlinUtils.logInfo
+import org.apache.spark.internal.Logging
+
 
 class SchemaRegistryConstructor(
      var schemaId: String,
-     val options: Map[java.lang.String, java.lang.String]){
+     val options: Map[java.lang.String, java.lang.String]) extends Logging{
 
   @transient private lazy val schemaRegistryCredential = new ClientSecretCredentialBuilder()
         .tenantId(options.getOrElse(SCHEMA_REGISTRY_TENANT_ID_KEY, null))
@@ -49,14 +50,14 @@ class SchemaRegistryConstructor(
   def setSchemaString  = {
     logInfo(s"Setting up schema description using schemaID $schemaId")
     val schemaRegistrySchema = schemaRegistryAsyncClient.getSchema(schemaId).block()
-    logInfo(s"The schema description is ${schemaRegistrySchema.getDefinition}")
+    logDebug(s"The schema description is ${schemaRegistrySchema.getDefinition}")
     expectedSchemaString = schemaRegistrySchema.getDefinition
   }
 
   @transient lazy val expectedSchema = new Schema.Parser().parse(expectedSchemaString)
 }
 
-object SchemaRegistryConstructor {
+object SchemaRegistryConstructor extends Logging{
   val VALUE_NOT_PROVIDED: String = "NOTHING"
 
   def init(

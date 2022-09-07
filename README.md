@@ -27,6 +27,7 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 
 ## Latest Releases
 
+### azure-eventhubs-spark
 #### Spark
 |Spark Version|Package Name|Package Version|
 |-------------|------------|----------------|
@@ -40,6 +41,31 @@ By making Event Hubs and Spark easier to use together, we hope this connector ma
 |Databricks Runtime 8.X|azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.22-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.22%7Cjar)|
 |Databricks Runtime 7.X|azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.22-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.22%7Cjar)|
 |Databricks Runtime 6.X|azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.22-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.22%7Cjar)|
+
+#### Synapse
+| Synapse Runtime Version |Package Name|Package Version|
+|-------------|------------|------------|
+| Synapse Spark pool 3.2 |azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.22-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.22%7Cjar)|
+| Synapse Spark pool 3.1 |azure-eventhubs-spark_2.12|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.22-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.12%7C2.3.22%7Cjar)|
+| Synapse Spark pool 2.4 |azure-eventhubs-spark_2.11|[![Maven Central](https://img.shields.io/badge/maven%20central-2.3.22-brightgreen.svg)](https://search.maven.org/#artifactdetails%7Ccom.microsoft.azure%7Cazure-eventhubs-spark_2.11%7C2.3.22%7Cjar)|
+
+### azure-schemaregistry-spark-avro
+#### Spark
+| Spark Runtime Version |Package Name|
+|-------------|------------|
+|Spark 3.2 |azure-schemaregistry-spark-avro-1.0.0|
+
+#### Databricks
+| Databricks Runtime Version |Package Name|
+|-------------------------|----------------|
+| Databricks Runtime 11.X |azure-schemaregistry-spark-avro-1.0.0|
+| Databricks Runtime 10.X |azure-schemaregistry-spark-avro-1.0.0|
+
+
+#### Synapse
+| Synapse Runtime Version |Package Name|
+|-------------|------------|
+| Synapse Spark pool 3.2 |azure-schemaregistry-spark-avro-1.0.0|
 
 #### Roadmap
 
@@ -69,7 +95,7 @@ or
 
 ### Documentation
 
-Documentation for our connector can be found [here](docs/). The integration guides there contain all the information you need to use this library. 
+Documentation for our connector can be found [here](docs/) and documentation for our SchemaRegistry feature can be found [here](schemaregistry-avro/docs/).  The integration guides there contain all the information you need to use this library.
 
 **If you're new to Apache Spark and/or Event Hubs, then we highly recommend reading their documentation first.** You can read Event Hubs 
 documentation [here](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs), documentation for Spark Streaming 

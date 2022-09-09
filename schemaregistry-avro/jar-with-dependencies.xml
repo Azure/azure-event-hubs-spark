@@ -1,0 +1,13 @@
+<assembly>
+    <id>jar-with-dependencies-and-exclude-classes</id>
+<formats>
+        <format>jar</format>
+    </formats>
+    <dependencySets>
+        <dependencySet>
+            <excludes>
+				<exclude>org.slf4j:slf4j-log4j12</exclude>
+			</excludes>
+        </dependencySet>
+    </dependencySets>
+</assembly>

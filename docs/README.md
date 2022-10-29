@@ -13,7 +13,7 @@ Also, you can read more about other features of this connector in below document
 
 Additionally, here are some links to documentation on Event Hubs, Spark, and Databricks:
 
-- [Azure Event Hubs on Databricks](https://docs.azuredatabricks.net/spark/latest/data-sources/azure/eventhubs-connector.html)
+- [Azure Event Hubs on Databricks](https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/streaming-event-hubs)
 - [Structured Streaming Programming Guide](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
 - [Spark Streaming Programming Guide](https://spark.apache.org/docs/latest/streaming-programming-guide.html)
 - [Event Hubs Documentation](https://docs.microsoft.com/en-us/azure/event-hubs/event-hubs-what-is-event-hubs)

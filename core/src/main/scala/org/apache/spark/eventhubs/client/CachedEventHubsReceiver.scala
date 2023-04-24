@@ -17,9 +17,10 @@
 
 package org.apache.spark.eventhubs.client
 
+import com.microsoft.azure.eventhubs
+
 import java.time.Duration
 import java.util.concurrent._
-
 import com.microsoft.azure.eventhubs._
 import org.apache.spark.SparkEnv
 import org.apache.spark.eventhubs.utils.MetricPlugin
@@ -108,12 +109,13 @@ private[client] class CachedEventHubsReceiver private (ehConf: EventHubsConf,
     receiverOptions.setReceiverRuntimeMetricEnabled(true)
     receiverOptions.setPrefetchCount(ehConf.prefetchCount.getOrElse(DefaultPrefetchCount))
     receiverOptions.setIdentifier(s"spark-${SparkEnv.get.executorId}-$taskId")
+    // Avoid to filter on the last sequence number: https://github.com/Azure/azure-sdk-for-java/issues/29502
     val consumer = retryJava(
       EventHubsUtils.createReceiverInner(client,
                                          ehConf.useExclusiveReceiver,
                                          consumerGroup,
                                          nAndP.partitionId.toString,
-                                         EventPosition.fromSequenceNumber(seqNo).convert,
+                                         eventhubs.EventPosition.fromSequenceNumber(seqNo-1, false),
                                          receiverOptions),
       "CachedReceiver creation."
     )

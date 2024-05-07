@@ -205,6 +205,14 @@ val connectionString = ConnectionStringBuilder("YOUR.EVENTHUB.COMPATIBLE.ENDPOIN
 val connectionString = "Valid EventHubs connection string."
 val ehConf = EventHubsConf(connectionString)
 
+// build a spark Session
+val spark =
+  SparkSession
+          .builder
+          .appName("Event Hub Spark App")
+          .config("spark.master", "local")
+          .getOrCreate()
+
 val df = spark
   .readStream
   .format("eventhubs")
@@ -239,6 +247,14 @@ val df = spark
 ### Creating an Event Hubs Source for Batch Queries 
 
 ```scala
+// build a spark Session
+val spark =
+  SparkSession
+          .builder
+          .appName("Event Hub Spark App")
+          .config("spark.master", "local")
+          .getOrCreate()
+          
 // Simple batch query
 val df = spark
   .read
@@ -315,6 +331,25 @@ Users can also provided properties via a `map[string, string]` if they would lik
 ### Creating an EventHubs Sink for Streaming Queries 
 
 ```scala
+// build a spark Session
+val spark =
+  SparkSession
+          .builder
+          .appName("Event Hub Spark App")
+          .config("spark.master", "local")
+          .getOrCreate()
+
+// Create sample data
+val columns = Seq("body", "num")
+var data = Seq(("hello", "10"), ("azure", "10"), ("data", "10"))
+
+for (a <- 0 to 50000) {
+  data = data :+ ("hello", "2")
+}
+
+val rdd = spark.sparkContext.parallelize(data)
+val df = spark.createDataFrame(rdd).toDF(columns: _*)
+
 // Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
 val ds = df
   .select("body")
@@ -335,6 +370,25 @@ val ds = df
 ### Writing the output of Batch Queries to EventHubs
 
 ```scala
+// build a spark Session
+val spark =
+  SparkSession
+          .builder
+          .appName("Event Hub Spark App")
+          .config("spark.master", "local")
+          .getOrCreate()
+
+// Create sample data
+val columns = Seq("body", "num")
+var data = Seq(("hello", "10"), ("azure", "10"), ("data", "10"))
+
+for (a <- 0 to 50000) {
+  data = data :+ ("hello", "2")
+}
+
+val rdd = spark.sparkContext.parallelize(data)
+val df = spark.createDataFrame(rdd).toDF(columns: _*)
+
 // Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
 df.select("body")
   .write

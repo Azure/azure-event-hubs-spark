@@ -237,6 +237,11 @@ ehConf = {
   'eventhubs.connectionString' : connectionString
 }
 
+# build a spark session
+spark = SparkSession.builder \
+    .appName("EventHubWriter") \
+    .getOrCreate()
+
 df = spark \
   .readStream \
   .format("eventhubs") \
@@ -252,6 +257,11 @@ connectionString = "YOUR.CONNECTION.STRING"
 ehConf = {
   'eventhubs.connectionString' : connectionString
 }
+
+# build a spark session
+spark = SparkSession.builder \
+    .appName("EventHubWriter") \
+    .getOrCreate()
 
 # Simple batch query
 df = spark \
@@ -310,6 +320,21 @@ ehWriteConf = {
   'eventhubs.connectionString' : writeConnectionString
 }
 
+# build a spark session
+spark = SparkSession.builder \
+    .appName("EventHubWriter") \
+    .getOrCreate()
+
+# create sample data
+columns = ["body", "num"]
+data = [("hello", "10"), ("azure", "10"), ("data", "10")]
+
+for a in range(50001):
+    data.append(("hello", "2"))
+
+rdd = spark.sparkContext.parallelize(data)
+df = spark.createDataFrame(rdd, columns)
+
 # Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
 ds = df \
   .select("body") \
@@ -337,6 +362,21 @@ writeConnectionString = "YOUR.EVENTHUB.NAME"
 ehWriteConf = {
   'eventhubs.connectionString' : writeConnectionString
 }
+
+# build a spark session
+spark = SparkSession.builder \
+    .appName("EventHubWriter") \
+    .getOrCreate()
+
+# create sample data
+columns = ["body", "num"]
+data = [("hello", "10"), ("azure", "10"), ("data", "10")]
+
+for a in range(50001):
+    data.append(("hello", "2"))
+
+rdd = spark.sparkContext.parallelize(data)
+df = spark.createDataFrame(rdd, columns)
 
 # Write body data from a DataFrame to EventHubs. Events are distributed across partitions using round-robin model.
 ds = df \

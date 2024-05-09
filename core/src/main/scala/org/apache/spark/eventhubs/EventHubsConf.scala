@@ -30,6 +30,7 @@ import org.apache.spark.eventhubs.utils.{
   ThrottlingStatusPlugin
 }
 import org.apache.spark.internal.Logging
+import org.apache.spark.util.Utils
 import org.json4s.NoTypeHints
 import org.json4s.jackson.Serialization
 
@@ -487,7 +488,7 @@ final class EventHubsConf private (private val connectionStr: String)
 
   def metricPlugin(): Option[MetricPlugin] = {
     self.get(MetricPluginKey) map (className => {
-      Class.forName(className).newInstance().asInstanceOf[MetricPlugin]
+      Utils.classforName(className).newInstance().asInstanceOf[MetricPlugin]
     })
   }
 
@@ -552,7 +553,7 @@ final class EventHubsConf private (private val connectionStr: String)
 
   def throttlingStatusPlugin(): Option[ThrottlingStatusPlugin] = {
     self.get(ThrottlingStatusPluginKey) map (className => {
-      Class.forName(className).newInstance().asInstanceOf[ThrottlingStatusPlugin]
+      Utils.classforName(className).newInstance().asInstanceOf[ThrottlingStatusPlugin]
     })
   }
 
@@ -629,16 +630,16 @@ final class EventHubsConf private (private val connectionStr: String)
       .read[Map[String, Object]] getOrElse Map.empty
     if (params.isEmpty) {
       self.get(AadAuthCallbackKey) map (className => {
-        Class
-          .forName(className)
+        Utils
+          .classforName(className)
           .getConstructor()
           .newInstance()
           .asInstanceOf[AadAuthenticationCallback]
       })
     } else {
       self.get(AadAuthCallbackKey) map (className => {
-        Class
-          .forName(className)
+        Utils
+          .classforName(className)
           .getConstructor(classOf[Map[String, Object]])
           .newInstance(params)
           .asInstanceOf[AadAuthenticationCallback]

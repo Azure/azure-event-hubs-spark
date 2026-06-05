@@ -41,6 +41,53 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   private[this] val pool = new ConcurrentLinkedQueue[EventHubClient]()
   private[this] val count = new AtomicInteger(0)
 
+  private def createNewClient(): EventHubClient = {
+    val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
+    logInfo(
+      s"No clients left to borrow. NamespaceUri: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, " +
+        s"ConsumerGroup name: $consumerGroup. Creating client ${count.incrementAndGet()}")
+    val connStr = ConnectionStringBuilder(ehConf.connectionString)
+    connStr.setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+    EventHubsClient.userAgent =
+      s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
+    var client: EventHubClient = null
+    while (client == null) {
+      if (ehConf.useAadAuth) {
+        val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
+          .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
+          .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
+          .setRetryPolicy(RetryPolicy.getDefault)
+        client = Await.result(
+          retryJava(
+            EventHubClient
+              .createWithAzureActiveDirectory(connStr.getEndpoint,
+                                              ehConf.name,
+                                              ehConf.aadAuthCallback().get,
+                                              ehConf.aadAuthCallback().get.authority,
+                                              ClientThreadPool.get(ehConf),
+                                              ehClientOption),
+            "createWithAzureActiveDirectory"
+          ),
+          ehConf.internalOperationTimeout
+        )
+      } else {
+        client = Await.result(
+          retryJava(
+            EventHubClient.createFromConnectionString(
+              connStr.toString,
+              RetryPolicy.getDefault,
+              ClientThreadPool.get(ehConf),
+              null,
+              ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime)),
+            "createFromConnectionString"
+          ),
+          ehConf.internalOperationTimeout
+        )
+      }
+    }
+    client
+  }
+
   /**
    * First, the connection pool is checked for available clients. If there
    * is a client available, that is given to the borrower. If the connection
@@ -52,47 +99,7 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
     var client = pool.poll()
     val consumerGroup = ehConf.consumerGroup.getOrElse(DefaultConsumerGroup)
     if (client == null) {
-      logInfo(
-        s"No clients left to borrow. NamespaceUri: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, " +
-          s"ConsumerGroup name: $consumerGroup. Creating client ${count.incrementAndGet()}")
-      val connStr = ConnectionStringBuilder(ehConf.connectionString)
-      connStr.setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-      EventHubsClient.userAgent =
-        s"SparkConnector-$SparkConnectorVersion-[${ehConf.name}]-[$consumerGroup]"
-      while (client == null) {
-        if (ehConf.useAadAuth) {
-          val ehClientOption: EventHubClientOptions = new EventHubClientOptions()
-            .setMaximumSilentTime(ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime))
-            .setOperationTimeout(ehConf.receiverTimeout.getOrElse(DefaultReceiverTimeout))
-            .setRetryPolicy(RetryPolicy.getDefault)
-          client = Await.result(
-            retryJava(
-              EventHubClient
-                .createWithAzureActiveDirectory(connStr.getEndpoint,
-                                                ehConf.name,
-                                                ehConf.aadAuthCallback().get,
-                                                ehConf.aadAuthCallback().get.authority,
-                                                ClientThreadPool.get(ehConf),
-                                                ehClientOption),
-              "createWithAzureActiveDirectory"
-            ),
-            ehConf.internalOperationTimeout
-          )
-        } else {
-          client = Await.result(
-            retryJava(
-              EventHubClient.createFromConnectionString(
-                connStr.toString,
-                RetryPolicy.getDefault,
-                ClientThreadPool.get(ehConf),
-                null,
-                ehConf.maxSilentTime.getOrElse(DefaultMaxSilentTime)),
-              "createFromConnectionString"
-            ),
-            ehConf.internalOperationTimeout
-          )
-        }
-      }
+      client = createNewClient()
     } else {
       logInfo(
         s"Borrowing client. Namespace: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}, ConsumerGroup name: " +
@@ -103,15 +110,24 @@ private class ClientConnectionPool(val ehConf: EventHubsConf) extends Logging {
   }
 
   /**
-   * Returns the borrowed client to the connection pool.
+   * Returns the borrowed client to the connection pool. If [[forceRecreation]] is true,
+   * a new client is created and returned instead of the potentially stale one.
    *
    * @param client the [[EventHubClient]] being returned
+   * @param forceRecreation when true, discard the stale client and return a freshly created one
    */
-  private def returnClient(client: EventHubClient): Unit = {
-    pool.offer(client)
-    logInfo(
-      s"Client returned. Namespace: ${ehConf.namespaceUri},EventHub name: ${ehConf.name}. Total clients: ${count.get}. " +
-        s"Available clients: ${pool.size}")
+  private def returnClient(client: EventHubClient, forceRecreation: Boolean = false): Unit = {
+    if (forceRecreation) {
+      pool.offer(createNewClient())
+      logInfo(
+        s"Force-recreated client returned. Namespace: ${ehConf.namespaceUri}, EventHub name: ${ehConf.name}. " +
+          s"Total clients: ${count.get}. Available clients: ${pool.size}")
+    } else {
+      pool.offer(client)
+      logInfo(
+        s"Client returned. Namespace: ${ehConf.namespaceUri},EventHub name: ${ehConf.name}. Total clients: ${count.get}. " +
+          s"Available clients: ${pool.size}")
+    }
   }
 }
 
@@ -182,6 +198,20 @@ object ClientConnectionPool extends Logging {
     ensureInitialized(key(ehConf))
     val pool = get(key(ehConf))
     pool.returnClient(client)
+  }
+
+  /**
+   * Looks up the connection pool instance associated with the connection
+   * string in the provided [[EventHubsConf]], discards the stale [[EventHubClient]],
+   * and returns a freshly created client to the pool instead.
+   *
+   * @param ehConf the [[EventHubsConf]] used to lookup the connection pool
+   * @param client the stale [[EventHubClient]] being discarded
+   */
+  def reinstantiateAndReturnClient(ehConf: EventHubsConf, client: EventHubClient): Unit = {
+    ensureInitialized(key(ehConf))
+    val pool = get(key(ehConf))
+    pool.returnClient(client, forceRecreation = true)
   }
 }
 

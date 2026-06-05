@@ -225,7 +225,15 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
         logError(
           s"failed to complete pending tasks. event hubs: ${ehConf.name}, ${EventHubsUtils.getTaskContextSlim}",
           e)
-        cleanup()
+
+        val forceReinit = isReactorDispatcherError(e)
+        if (forceReinit) {
+          logWarn(
+            s"EventHubsClient send failed with ReactorDispatcher error: ${e.getMessage}. " +
+              s"Force recreating this client to ensure the stale connection is not reused. " +
+              s"event hubs: ${ehConf.name}, ${EventHubsUtils.getTaskContextSlim}")
+        }
+        cleanup(forceReinit)
 
         throw e
     }
@@ -233,7 +241,20 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     Await.result(future, ehConf.internalOperationTimeout)
   }
 
-  private def cleanup(): Unit = {
+  /**
+   * Returns true if the exception indicates that the underlying ReactorDispatcher has been
+   * closed, making the [[EventHubClient]] non-functional. Follows the same detection pattern
+   * as the receiver-side fix in CachedEventHubsReceiver (PR #620).
+   */
+  private[client] def isReactorDispatcherError(e: Throwable): Boolean = {
+    val cause = e.getCause
+    cause != null &&
+    cause.isInstanceOf[java.util.concurrent.RejectedExecutionException] &&
+    cause.getMessage != null &&
+    cause.getMessage.contains("ReactorDispatcher instance is closed")
+  }
+
+  private def cleanup(forceReinitializeClient: Boolean = false): Unit = {
     pendingWorks.clear()
 
     if (partitionSender != null) {
@@ -242,7 +263,11 @@ private[spark] class EventHubsClient(private val ehConf: EventHubsConf)
     }
 
     if (_client != null) {
-      ClientConnectionPool.returnClient(ehConf, _client)
+      if (forceReinitializeClient) {
+        ClientConnectionPool.reinstantiateAndReturnClient(ehConf, _client)
+      } else {
+        ClientConnectionPool.returnClient(ehConf, _client)
+      }
       _client = null
     }
   }

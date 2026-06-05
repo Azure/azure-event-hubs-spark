@@ -21,6 +21,9 @@
 
 package org.apache.spark.eventhubs.client
 
+import java.util.concurrent.{ CompletionException, RejectedExecutionException }
+
+import org.apache.spark.eventhubs.utils.EventHubsTestUtils
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.{ BeforeAndAfter, FunSuite }
 
@@ -36,4 +39,41 @@ class EventHubsClientSuite extends FunSuite with BeforeAndAfter with MockitoSuga
   test("EventHubsClient converts parameters for consumergroup") {}
 
   test("EventHubsClient converts parameters for enqueuetime filter") {}
+
+  // Tests for ReactorDispatcher stale-connection detection (issue #697)
+
+  private def makeClient(): EventHubsClient = {
+    val testUtils = new EventHubsTestUtils
+    val ehName = "isReactorDispatcherErrorTestEh"
+    testUtils.createEventHubs(ehName, partitionCount = 1)
+    val conf = testUtils.getEventHubsConfWithoutStartingPositions(ehName)
+    EventHubsClient(conf)
+  }
+
+  test("isReactorDispatcherError returns true for CompletionException caused by RejectedExecutionException with ReactorDispatcher message") {
+    val client = makeClient()
+    val cause = new RejectedExecutionException("ReactorDispatcher instance is closed.")
+    val e = new CompletionException(cause)
+    assert(client.isReactorDispatcherError(e))
+  }
+
+  test("isReactorDispatcherError returns false for CompletionException caused by RejectedExecutionException with unrelated message") {
+    val client = makeClient()
+    val cause = new RejectedExecutionException("executor is shut down")
+    val e = new CompletionException(cause)
+    assert(!client.isReactorDispatcherError(e))
+  }
+
+  test("isReactorDispatcherError returns false when exception cause is not a RejectedExecutionException") {
+    val client = makeClient()
+    val cause = new IllegalStateException("ReactorDispatcher instance is closed.")
+    val e = new CompletionException(cause)
+    assert(!client.isReactorDispatcherError(e))
+  }
+
+  test("isReactorDispatcherError returns false when exception has no cause") {
+    val client = makeClient()
+    val e = new RuntimeException("ReactorDispatcher instance is closed.")
+    assert(!client.isReactorDispatcherError(e))
+  }
 }
